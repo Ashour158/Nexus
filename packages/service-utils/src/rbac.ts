@@ -45,6 +45,16 @@ export const PERMISSIONS = {
     UPDATE: 'activities:update',
     DELETE: 'activities:delete',
   },
+  NOTES: {
+    READ: 'notes:read',
+    CREATE: 'notes:create',
+    UPDATE: 'notes:update',
+    DELETE: 'notes:delete',
+  },
+  NOTIFICATIONS: {
+    READ: 'notifications:read',
+    UPDATE: 'notifications:update',
+  },
   PRODUCTS: {
     READ: 'products:read',
     CREATE: 'products:create',

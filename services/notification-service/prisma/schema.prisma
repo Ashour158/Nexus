@@ -1,0 +1,32 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../../../node_modules/.prisma/notification-client"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Notification fan-out record written by the in-app channel and consumed by
+/// the web client via `GET /notifications`.
+model Notification {
+  id          String    @id @default(cuid())
+  tenantId    String
+  userId      String
+  type        String
+  title       String
+  body        String
+  entityType  String?
+  entityId    String?
+  actionUrl   String?
+  channel     String    @default("IN_APP")
+  isRead      Boolean   @default(false)
+  readAt      DateTime?
+  metadata    Json      @default("{}")
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId, userId, isRead, createdAt])
+  @@index([tenantId, entityType, entityId])
+}

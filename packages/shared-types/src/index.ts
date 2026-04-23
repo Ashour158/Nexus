@@ -148,6 +148,91 @@ export interface ActivityCompletedEvent extends KafkaEventBase {
   };
 }
 
+export interface ActivityCreatedEvent extends KafkaEventBase {
+  type: 'activity.created';
+  payload: {
+    activityId: string;
+    type: string;
+    ownerId: string;
+    dealId?: string | null;
+    contactId?: string | null;
+    leadId?: string | null;
+    dueDate?: string | null;
+  };
+}
+
+export interface QuoteCreatedEvent extends KafkaEventBase {
+  type: 'quote.created';
+  payload: {
+    quoteId: string;
+    dealId: string;
+    accountId: string;
+    total: number;
+    currency: string;
+  };
+}
+
+export interface QuoteSentEvent extends KafkaEventBase {
+  type: 'quote.sent';
+  payload: {
+    quoteId: string;
+    dealId: string;
+    accountId: string;
+    total: number;
+    recipientEmail?: string;
+  };
+}
+
+export interface QuoteRejectedEvent extends KafkaEventBase {
+  type: 'quote.rejected';
+  payload: {
+    quoteId: string;
+    dealId: string;
+    total: number;
+    reason: string;
+  };
+}
+
+export interface QuoteVoidedEvent extends KafkaEventBase {
+  type: 'quote.voided';
+  payload: {
+    quoteId: string;
+    dealId: string;
+    reason: string;
+  };
+}
+
+export interface CommissionCalculatedEvent extends KafkaEventBase {
+  type: 'commission.calculated';
+  payload: {
+    commissionId: string;
+    userId: string;
+    dealId: string;
+    baseAmount: number;
+    finalAmount: number;
+    currency: string;
+  };
+}
+
+export interface CommissionApprovedEvent extends KafkaEventBase {
+  type: 'commission.approved';
+  payload: {
+    commissionId: string;
+    userId: string;
+    finalAmount: number;
+  };
+}
+
+export interface CommissionClawbackEvent extends KafkaEventBase {
+  type: 'commission.clawback';
+  payload: {
+    commissionId: string;
+    userId: string;
+    originalAmount: number;
+    reason: string;
+  };
+}
+
 export interface QuoteAcceptedEvent extends KafkaEventBase {
   type: 'quote.accepted';
   payload: {
@@ -185,8 +270,16 @@ export type NexusKafkaEvent =
   | DealWonEvent
   | DealLostEvent
   | ContactCreatedEvent
+  | ActivityCreatedEvent
   | ActivityCompletedEvent
+  | QuoteCreatedEvent
+  | QuoteSentEvent
   | QuoteAcceptedEvent
+  | QuoteRejectedEvent
+  | QuoteVoidedEvent
+  | CommissionCalculatedEvent
+  | CommissionApprovedEvent
+  | CommissionClawbackEvent
   | InvoiceCreatedEvent
   | InvoicePaidEvent
   | SubscriptionCreatedEvent
@@ -358,6 +451,89 @@ export interface Deal {
   customFields: Record<string, unknown>;
   tags: string[];
   version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Lead / Activity / Note wire types — Section 31.2 ──────────────────────
+
+export type LeadSourceLiteral =
+  | 'WEBSITE'
+  | 'REFERRAL'
+  | 'OUTBOUND'
+  | 'EVENT'
+  | 'PARTNER'
+  | 'OTHER';
+
+export interface Lead {
+  id: string;
+  tenantId: string;
+  ownerId: string | null;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  company: string | null;
+  jobTitle: string | null;
+  status: LeadStatusLiteral;
+  source: LeadSourceLiteral | string;
+  score: number;
+  aiScore: number | null;
+  convertedAt: string | null;
+  convertedToContactId: string | null;
+  convertedToAccountId: string | null;
+  convertedToDealId: string | null;
+  disqualifiedReason: string | null;
+  customFields: Record<string, unknown>;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ActivityStatusLiteral =
+  | 'PLANNED'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'DEFERRED';
+
+export type ActivityPriorityLiteral = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+
+export interface Activity {
+  id: string;
+  tenantId: string;
+  ownerId: string;
+  type: ActivityTypeLiteral;
+  subject: string;
+  description: string | null;
+  priority: ActivityPriorityLiteral;
+  status: ActivityStatusLiteral;
+  dueDate: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  completedAt: string | null;
+  duration: number | null;
+  outcome: string | null;
+  dealId: string | null;
+  contactId: string | null;
+  leadId: string | null;
+  accountId: string | null;
+  customFields: Record<string, unknown>;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Note {
+  id: string;
+  tenantId: string;
+  authorId: string;
+  content: string;
+  isPinned: boolean;
+  dealId: string | null;
+  contactId: string | null;
+  leadId: string | null;
+  accountId: string | null;
   createdAt: string;
   updatedAt: string;
 }

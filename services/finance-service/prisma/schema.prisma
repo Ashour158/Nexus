@@ -113,6 +113,65 @@ model Account {
   @@index([tenantId])
 }
 
+// ─── Quotes (CPQ persistence — Section 40) ──────────────────────────────────
+
+model Quote {
+  id               String          @id @default(cuid())
+  tenantId         String
+  dealId           String
+  accountId        String
+  ownerId          String
+  quoteNumber      String
+  name             String
+  status           QuoteStatus     @default(DRAFT)
+  currency         String          @default("USD")
+  subtotal         Decimal         @default(0) @db.Decimal(18, 2)
+  discountAmount   Decimal         @default(0) @db.Decimal(18, 2)
+  taxAmount        Decimal         @default(0) @db.Decimal(18, 2)
+  total            Decimal         @default(0) @db.Decimal(18, 2)
+  validUntil       DateTime?
+  expiresAt        DateTime?
+  approvalRequired Boolean         @default(false)
+  approvalStatus   String?
+  approvedById     String?
+  approvedAt       DateTime?
+  sentAt           DateTime?
+  viewedAt         DateTime?
+  acceptedAt       DateTime?
+  rejectedAt       DateTime?
+  rejectionReason  String?
+  voidedAt         DateTime?
+  voidReason       String?
+  paymentTerms     String?
+  terms            String?
+  notes            String?
+  appliedPromos    String[]        @default([])
+  lineItems        Json            @default("[]")
+  pricingBreakdown Json            @default("{}")
+  customFields     Json            @default("{}")
+  version          Int             @default(1)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@unique([tenantId, quoteNumber])
+  @@index([tenantId, dealId])
+  @@index([tenantId, accountId])
+  @@index([tenantId, status])
+}
+
+enum QuoteStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SENT
+  VIEWED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  VOID
+  CONVERTED
+}
+
 // ─── Contracts & Subscriptions ──────────────────────────────────────────────
 
 model Contract {
@@ -329,7 +388,11 @@ model CommissionRecord {
   finalAmount Decimal          @db.Decimal(18, 2)
   period      String
   notes       String?
+  breakdown   Json             @default("[]")
   clawbackOf  String?
+  clawbackReason String?
+  approvedAt  DateTime?
+  approvedById String?
   paidAt      DateTime?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt

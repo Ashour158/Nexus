@@ -584,3 +584,255 @@ export type UpdateContractInput = z.infer<typeof UpdateContractSchema>;
 export type SignContractInput = z.infer<typeof SignContractSchema>;
 export type ContractListQuery = z.infer<typeof ContractListQuerySchema>;
 export type CpqPriceRequestInput = z.infer<typeof CpqPriceRequestSchema>;
+
+// ─── CRM / Activity — Section 33 + 34.2 ─────────────────────────────────────
+
+const ActivityTypeEnum = z.enum([
+  'CALL',
+  'EMAIL',
+  'MEETING',
+  'TASK',
+  'DEMO',
+  'LUNCH',
+  'CONFERENCE',
+  'FOLLOW_UP',
+  'PROPOSAL',
+  'NEGOTIATION',
+  'NOTE',
+]);
+
+const ActivityStatusEnum = z.enum([
+  'PLANNED',
+  'IN_PROGRESS',
+  'COMPLETED',
+  'CANCELLED',
+  'DEFERRED',
+]);
+
+const ActivityPriorityEnum = z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']);
+
+export const CreateActivitySchema = z
+  .object({
+    type: ActivityTypeEnum,
+    subject: z.string().min(1).max(200),
+    description: z.string().max(5000).optional(),
+    priority: ActivityPriorityEnum.default('NORMAL'),
+    dueDate: z.string().datetime().optional(),
+    startDate: z.string().datetime().optional(),
+    endDate: z.string().datetime().optional(),
+    duration: z.number().int().min(0).max(1440).optional(),
+    ownerId: z.string().cuid(),
+    dealId: z.string().cuid().optional(),
+    contactId: z.string().cuid().optional(),
+    leadId: z.string().cuid().optional(),
+    accountId: z.string().cuid().optional(),
+    customFields: z.record(z.unknown()).default({}),
+  })
+  .refine(
+    (v) =>
+      Boolean(v.dealId) ||
+      Boolean(v.contactId) ||
+      Boolean(v.leadId) ||
+      Boolean(v.accountId),
+    { message: 'Activity must be linked to at least one entity' }
+  );
+
+export const UpdateActivitySchema = z.object({
+  type: ActivityTypeEnum.optional(),
+  subject: z.string().min(1).max(200).optional(),
+  description: z.string().max(5000).optional(),
+  status: ActivityStatusEnum.optional(),
+  priority: ActivityPriorityEnum.optional(),
+  dueDate: z.string().datetime().nullable().optional(),
+  startDate: z.string().datetime().nullable().optional(),
+  endDate: z.string().datetime().nullable().optional(),
+  duration: z.number().int().min(0).max(1440).nullable().optional(),
+  outcome: z.string().max(1000).optional(),
+  dealId: z.string().cuid().nullable().optional(),
+  contactId: z.string().cuid().nullable().optional(),
+  leadId: z.string().cuid().nullable().optional(),
+  accountId: z.string().cuid().nullable().optional(),
+  customFields: z.record(z.unknown()).optional(),
+});
+
+export const CompleteActivitySchema = z.object({
+  outcome: z.string().min(1).max(1000),
+});
+
+export const RescheduleActivitySchema = z.object({
+  dueDate: z.string().datetime(),
+});
+
+export const ActivityListQuerySchema = PaginationSchema.extend({
+  dealId: z.string().cuid().optional(),
+  contactId: z.string().cuid().optional(),
+  leadId: z.string().cuid().optional(),
+  accountId: z.string().cuid().optional(),
+  ownerId: z.string().cuid().optional(),
+  type: ActivityTypeEnum.optional(),
+  status: ActivityStatusEnum.optional(),
+  dueBefore: z.string().datetime().optional(),
+  dueAfter: z.string().datetime().optional(),
+  overdue: z.coerce.boolean().optional(),
+});
+
+export const UpcomingActivitiesQuerySchema = z.object({
+  ownerId: z.string().cuid(),
+  daysAhead: z.coerce.number().int().min(1).max(60).default(7),
+});
+
+export type CreateActivityInput = z.infer<typeof CreateActivitySchema>;
+export type UpdateActivityInput = z.infer<typeof UpdateActivitySchema>;
+export type CompleteActivityInput = z.infer<typeof CompleteActivitySchema>;
+export type RescheduleActivityInput = z.infer<typeof RescheduleActivitySchema>;
+export type ActivityListQuery = z.infer<typeof ActivityListQuerySchema>;
+export type UpcomingActivitiesQuery = z.infer<typeof UpcomingActivitiesQuerySchema>;
+
+// ─── CRM / Note — Section 33 + 34.2 ─────────────────────────────────────────
+
+export const CreateNoteSchema = z
+  .object({
+    content: z.string().min(1).max(10_000),
+    dealId: z.string().cuid().optional(),
+    contactId: z.string().cuid().optional(),
+    leadId: z.string().cuid().optional(),
+    accountId: z.string().cuid().optional(),
+    isPinned: z.boolean().default(false),
+  })
+  .refine(
+    (v) =>
+      Boolean(v.dealId) ||
+      Boolean(v.contactId) ||
+      Boolean(v.leadId) ||
+      Boolean(v.accountId),
+    { message: 'Note must reference at least one entity' }
+  );
+
+export const UpdateNoteSchema = z.object({
+  content: z.string().min(1).max(10_000).optional(),
+  isPinned: z.boolean().optional(),
+});
+
+export const NoteListQuerySchema = PaginationSchema.extend({
+  dealId: z.string().cuid().optional(),
+  contactId: z.string().cuid().optional(),
+  leadId: z.string().cuid().optional(),
+  accountId: z.string().cuid().optional(),
+  authorId: z.string().cuid().optional(),
+  isPinned: z.coerce.boolean().optional(),
+});
+
+export type CreateNoteInput = z.infer<typeof CreateNoteSchema>;
+export type UpdateNoteInput = z.infer<typeof UpdateNoteSchema>;
+export type NoteListQuery = z.infer<typeof NoteListQuerySchema>;
+
+// ─── Finance / Quote — Section 33 + 40 ──────────────────────────────────────
+
+const QuoteStatusEnum = z.enum([
+  'DRAFT',
+  'PENDING_APPROVAL',
+  'APPROVED',
+  'SENT',
+  'VIEWED',
+  'ACCEPTED',
+  'REJECTED',
+  'EXPIRED',
+  'VOID',
+  'CONVERTED',
+]);
+
+export const QuoteLineItemSchema = z.object({
+  productId: z.string().cuid(),
+  description: z.string().max(500).optional(),
+  quantity: z.number().int().min(1),
+  unitPrice: z.number().min(0),
+  discountPercent: z.number().min(0).max(100).default(0),
+  taxPercent: z.number().min(0).max(100).default(0),
+  isFree: z.boolean().default(false),
+});
+
+export const CreateQuoteSchema = z.object({
+  dealId: z.string().cuid(),
+  ownerId: z.string().cuid(),
+  accountId: z.string().cuid(),
+  name: z.string().min(1).max(200),
+  currency: z.string().length(3).default('USD'),
+  validUntil: z.string().datetime().optional(),
+  terms: z.string().max(10_000).optional(),
+  notes: z.string().max(5000).optional(),
+  paymentTerms: z.string().max(50).optional(),
+  appliedPromos: z.array(z.string().min(1).max(50)).default([]),
+  items: z
+    .array(
+      z.object({
+        productId: z.string().cuid(),
+        quantity: z.number().int().min(1),
+        competitiveOverridePrice: z.union([z.number(), z.string()]).optional(),
+        manualOverridePrice: z.union([z.number(), z.string()]).optional(),
+      })
+    )
+    .min(1),
+  customFields: z.record(z.unknown()).default({}),
+});
+
+export const UpdateQuoteSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  validUntil: z.string().datetime().nullable().optional(),
+  terms: z.string().max(10_000).optional(),
+  notes: z.string().max(5000).optional(),
+  customFields: z.record(z.unknown()).optional(),
+});
+
+export const RejectQuoteSchema = z.object({
+  reason: z.string().min(1).max(1000),
+});
+
+export const VoidQuoteSchema = z.object({
+  reason: z.string().min(1).max(1000),
+});
+
+export const QuoteListQuerySchema = PaginationSchema.extend({
+  dealId: z.string().cuid().optional(),
+  accountId: z.string().cuid().optional(),
+  ownerId: z.string().cuid().optional(),
+  status: QuoteStatusEnum.optional(),
+});
+
+export type CreateQuoteInput = z.infer<typeof CreateQuoteSchema>;
+export type UpdateQuoteInput = z.infer<typeof UpdateQuoteSchema>;
+export type RejectQuoteInput = z.infer<typeof RejectQuoteSchema>;
+export type VoidQuoteInput = z.infer<typeof VoidQuoteSchema>;
+export type QuoteListQuery = z.infer<typeof QuoteListQuerySchema>;
+export type QuoteLineItem = z.infer<typeof QuoteLineItemSchema>;
+
+// ─── Finance / Commission — Section 33 + 41 ─────────────────────────────────
+
+const CommissionStatusEnum = z.enum([
+  'PENDING',
+  'APPROVED',
+  'PAID',
+  'DISPUTED',
+  'CLAWED_BACK',
+]);
+
+export const ClawbackCommissionSchema = z.object({
+  reason: z.string().min(1).max(1000),
+});
+
+export const CommissionListQuerySchema = PaginationSchema.extend({
+  ownerId: z.string().cuid().optional(),
+  userId: z.string().cuid().optional(),
+  status: CommissionStatusEnum.optional(),
+  dateFrom: z.string().datetime().optional(),
+  dateTo: z.string().datetime().optional(),
+});
+
+export const CommissionSummaryQuerySchema = z.object({
+  ownerId: z.string().cuid(),
+  year: z.coerce.number().int().min(2000).max(2100),
+  quarter: z.coerce.number().int().min(1).max(4).optional(),
+});
+
+export type ClawbackCommissionInput = z.infer<typeof ClawbackCommissionSchema>;
+export type CommissionListQuery = z.infer<typeof CommissionListQuerySchema>;
+export type CommissionSummaryQuery = z.infer<typeof CommissionSummaryQuerySchema>;

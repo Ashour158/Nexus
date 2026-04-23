@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/auth-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("AUTH_DATABASE_URL")
+}
+
+model Tenant {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  plan        String   @default("starter")
+  isActive    Boolean  @default(true)
+  settings    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  users       User[]
+  roles       Role[]
+  apiKeys     ApiKey[]
+}
+
+model User {
+  id              String        @id @default(cuid())
+  tenantId        String
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email           String
+  emailVerified   Boolean       @default(false)
+  keycloakId      String        @unique
+  firstName       String
+  lastName        String
+  avatarUrl       String?
+  phone           String?
+  locale          String        @default("en")
+  timezone        String        @default("UTC")
+  isActive        Boolean       @default(true)
+  lastLoginAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  userRoles       UserRole[]
+  sessions        Session[]
+  auditLogs       AuditLog[]
+  @@unique([tenantId, email])
+  @@index([tenantId])
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  tenantId    String
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  permissions Json         @default("[]")
+  isSystem    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  userRoles   UserRole[]
+  @@unique([tenantId, name])
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId    String
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([userId, roleId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshToken String   @unique
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  @@index([userId])
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  keyHash     String    @unique
+  keyPrefix   String
+  scopes      Json      @default("[]")
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  @@index([tenantId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  resource   String
+  resourceId String?
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  @@index([tenantId])
+  @@index([tenantId, resource, resourceId])
+}

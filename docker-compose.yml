@@ -179,6 +179,81 @@ services:
       kafka:
         condition: service_started
 
+  realtime-service:
+    build:
+      context: .
+      dockerfile: ./services/realtime-service/Dockerfile
+    container_name: nexus-realtime
+    restart: unless-stopped
+    ports:
+      - '3005:3005'
+    env_file:
+      - ./services/realtime-service/.env.example
+    depends_on:
+      kafka:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  search-service:
+    build:
+      context: .
+      dockerfile: ./services/search-service/Dockerfile
+    container_name: nexus-search
+    restart: unless-stopped
+    ports:
+      - '3006:3006'
+    env_file:
+      - ./services/search-service/.env.example
+    depends_on:
+      kafka:
+        condition: service_started
+      meilisearch:
+        condition: service_started
+
+  workflow-service:
+    build:
+      context: .
+      dockerfile: ./services/workflow-service/Dockerfile
+    container_name: nexus-workflow
+    restart: unless-stopped
+    ports:
+      - '3007:3007'
+    env_file:
+      - ./services/workflow-service/.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  analytics-service:
+    build:
+      context: .
+      dockerfile: ./services/analytics-service/Dockerfile
+    container_name: nexus-analytics
+    restart: unless-stopped
+    ports:
+      - '3008:3008'
+    env_file:
+      - ./services/analytics-service/.env.example
+    depends_on:
+      kafka:
+        condition: service_started
+      clickhouse:
+        condition: service_started
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    container_name: nexus-clickhouse
+    restart: unless-stopped
+    ports:
+      - '8123:8123'
+      - '9000:9000'
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./services/analytics-service/src/ddl/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
   web:
     build:
       context: .
@@ -194,6 +269,10 @@ services:
       - crm-service
       - finance-service
       - notification-service
+      - realtime-service
+      - search-service
+      - workflow-service
+      - analytics-service
 
 volumes:
   postgres_data:
@@ -202,3 +281,4 @@ volumes:
   kafka_data:
   zookeeper_data:
   meilisearch_data:
+  clickhouse_data:

@@ -32,6 +32,10 @@ interface UiState {
 
   leadsViewMode: LeadsViewMode;
   setLeadsViewMode: (mode: LeadsViewMode) => void;
+
+  unreadNotifications: number;
+  setUnreadNotifications: (count: number) => void;
+  incrementUnreadNotifications: (delta?: number) => void;
 }
 
 function nextId(): string {
@@ -60,6 +64,13 @@ export const useUiStore = create<UiState>((set) => ({
 
   leadsViewMode: 'table',
   setLeadsViewMode: (leadsViewMode) => set({ leadsViewMode }),
+
+  unreadNotifications: 0,
+  setUnreadNotifications: (unreadNotifications) => set({ unreadNotifications }),
+  incrementUnreadNotifications: (delta = 1) =>
+    set((state) => ({
+      unreadNotifications: Math.max(0, state.unreadNotifications + delta),
+    })),
 }));
 
 /** Alias for consistency with the user spec naming. */

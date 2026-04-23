@@ -1,0 +1,30 @@
+{
+  "name": "@nexus/search-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc --project tsconfig.build.json",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/request-context": "^5.1.0",
+    "@nexus/kafka": "workspace:*",
+    "@nexus/service-utils": "workspace:*",
+    "@nexus/shared-types": "workspace:*",
+    "@nexus/validation": "workspace:*",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "meilisearch": "^0.46.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.9",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.3",
+    "vitest": "^1.6.0"
+  }
+}

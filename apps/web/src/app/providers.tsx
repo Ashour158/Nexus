@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useUiStore } from '@/stores/ui.store';
+import { useAuthStore } from '@/stores/auth.store';
+import { connectSocket, disconnectSocket } from '@/lib/socket';
 
 /**
  * Top-level client providers — React Query + global toast rendering.
@@ -26,10 +28,20 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <RealtimeBridge />
       {children}
       <ToastViewport />
     </QueryClientProvider>
   );
+}
+
+function RealtimeBridge() {
+  const token = useAuthStore((s) => s.accessToken);
+  useEffect(() => {
+    if (token) connectSocket();
+    return () => disconnectSocket();
+  }, [token]);
+  return null;
 }
 
 function ToastViewport() {

@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/workflow-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model WorkflowTemplate {
+  id                String              @id @default(cuid())
+  tenantId          String
+  name              String
+  description       String?
+  trigger           String
+  triggerConditions Json                @default("{}")
+  nodes             Json
+  edges             Json
+  isActive          Boolean             @default(false)
+  version           Int                 @default(1)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  executions        WorkflowExecution[]
+
+  @@index([tenantId])
+  @@index([tenantId, trigger, isActive])
+}
+
+model WorkflowExecution {
+  id             String            @id @default(cuid())
+  tenantId       String
+  workflowId     String
+  workflow       WorkflowTemplate  @relation(fields: [workflowId], references: [id])
+  triggerType    String
+  triggerPayload Json
+  status         ExecutionStatus   @default(RUNNING)
+  currentNodeId  String?
+  resumeAt       DateTime?
+  startedAt      DateTime          @default(now())
+  completedAt    DateTime?
+  error          String?
+  steps          WorkflowStep[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([status, resumeAt])
+}
+
+model WorkflowStep {
+  id          String            @id @default(cuid())
+  executionId String
+  execution   WorkflowExecution @relation(fields: [executionId], references: [id])
+  nodeId      String
+  nodeType    String
+  status      StepStatus        @default(PENDING)
+  input       Json              @default("{}")
+  output      Json              @default("{}")
+  error       String?
+  startedAt   DateTime?
+  completedAt DateTime?
+}
+
+enum ExecutionStatus {
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum StepStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}

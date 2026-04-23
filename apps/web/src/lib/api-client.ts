@@ -16,13 +16,13 @@ const BASE_URLS: Record<string, string> = {
   finance: process.env.NEXT_PUBLIC_FINANCE_URL ?? 'http://localhost:3002/api/v1',
   ai: process.env.NEXT_PUBLIC_AI_URL ?? 'http://localhost:3003/api/v1/ai',
   comms: process.env.NEXT_PUBLIC_COMMS_URL ?? 'http://localhost:3004/api/v1',
-  workflow: process.env.NEXT_PUBLIC_WF_URL ?? 'http://localhost:3005/api/v1',
+  workflow: process.env.NEXT_PUBLIC_WF_URL ?? 'http://localhost:3007/api/v1',
   analytics:
-    process.env.NEXT_PUBLIC_ANALYTICS_URL ?? 'http://localhost:3006/api/v1/analytics',
+    process.env.NEXT_PUBLIC_ANALYTICS_URL ?? 'http://localhost:3008/api/v1/analytics',
   auth: process.env.NEXT_PUBLIC_AUTH_URL ?? 'http://localhost:3010/api/v1',
   notification:
-    process.env.NEXT_PUBLIC_NOTIF_URL ?? 'http://localhost:3011/api/v1',
-  search: process.env.NEXT_PUBLIC_SEARCH_URL ?? 'http://localhost:3008/api/v1/search',
+    process.env.NEXT_PUBLIC_NOTIF_URL ?? 'http://localhost:3003/api/v1',
+  search: process.env.NEXT_PUBLIC_SEARCH_URL ?? 'http://localhost:3006/api/v1/search',
   storage:
     process.env.NEXT_PUBLIC_STORAGE_URL ?? 'http://localhost:3009/api/v1/storage',
 };

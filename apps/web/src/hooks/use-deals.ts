@@ -43,6 +43,19 @@ export interface DealAiInsights {
 type DealListResponse = PaginatedResult<Deal>;
 type TimelineResponse = PaginatedResult<TimelineEvent>;
 
+export interface DealListFilters {
+  page?: number;
+  limit?: number;
+  pipelineId?: string;
+  stageId?: string;
+  ownerId?: string;
+  accountId?: string;
+  status?: Deal['status'];
+  search?: string;
+  sortBy?: 'createdAt' | 'updatedAt' | 'amount' | 'expectedCloseDate';
+  sortDir?: 'asc' | 'desc';
+}
+
 // ─── Queries ────────────────────────────────────────────────────────────────
 
 /** Fetches all deals in a pipeline (up to 500) — used by the Kanban board. */
@@ -58,6 +71,28 @@ export function usePipelineDeals(
       }),
     staleTime: 30_000,
     enabled: Boolean(pipelineId),
+  });
+}
+
+/** Generic paginated deals query with filtering. */
+export function useDeals(filters: DealListFilters = {}) {
+  const normalized: Record<string, unknown> = {
+    page: filters.page ?? 1,
+    limit: filters.limit ?? 25,
+    pipelineId: filters.pipelineId,
+    stageId: filters.stageId,
+    ownerId: filters.ownerId,
+    accountId: filters.accountId,
+    status: filters.status,
+    search: filters.search?.trim() || undefined,
+    sortBy: filters.sortBy,
+    sortDir: filters.sortDir,
+  };
+  return useQuery<DealListResponse>({
+    queryKey: dealKeys.list(normalized),
+    queryFn: () => api.get<DealListResponse>('/deals', { params: normalized }),
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
   });
 }
 

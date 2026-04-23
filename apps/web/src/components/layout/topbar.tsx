@@ -7,6 +7,13 @@ import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/auth.store';
 import { useUiStore } from '@/stores/ui.store';
 import {
+  useMarkAllNotificationsRead,
+  useNotifications,
+  useUnreadNotificationsCount,
+} from '@/hooks/use-notifications';
+import { useRealtimeNotifications } from '@/hooks/use-realtime';
+import { formatDateTime } from '@/lib/format';
+import {
   BellIcon,
   ChevronDownIcon,
   LogOutIcon,
@@ -79,7 +86,16 @@ export function Topbar(): ReactElement {
   const crumbs = toCrumbs(pathname);
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const notifRef = useRef<HTMLDivElement | null>(null);
+  const unreadLocal = useUiStore((s) => s.unreadNotifications);
+  const setUnreadLocal = useUiStore((s) => s.setUnreadNotifications);
+
+  const notificationsQuery = useNotifications(5);
+  const unreadQuery = useUnreadNotificationsCount();
+  const markAllRead = useMarkAllNotificationsRead();
+  useRealtimeNotifications();
 
   useEffect(() => {
     function onClickAway(e: MouseEvent) {
@@ -91,6 +107,23 @@ export function Topbar(): ReactElement {
     if (menuOpen) document.addEventListener('mousedown', onClickAway);
     return () => document.removeEventListener('mousedown', onClickAway);
   }, [menuOpen]);
+
+  useEffect(() => {
+    function onClickAway(e: MouseEvent) {
+      if (!notifRef.current) return;
+      if (!notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    }
+    if (notifOpen) document.addEventListener('mousedown', onClickAway);
+    return () => document.removeEventListener('mousedown', onClickAway);
+  }, [notifOpen]);
+
+  useEffect(() => {
+    if (typeof unreadQuery.data?.count === 'number') {
+      setUnreadLocal(unreadQuery.data.count);
+    }
+  }, [unreadQuery.data?.count, setUnreadLocal]);
 
   const onLogout = () => {
     clearSession();
@@ -155,14 +188,55 @@ export function Topbar(): ReactElement {
       </div>
 
       {/* Notifications */}
-      <button
-        type="button"
-        aria-label="Notifications"
-        className="relative rounded-md p-2 text-slate-500 hover:bg-slate-100 md:ml-2"
-      >
-        <BellIcon size={18} />
-        <span className="absolute right-1.5 top-1.5 inline-flex h-2 w-2 rounded-full bg-red-500" />
-      </button>
+      <div ref={notifRef} className="relative md:ml-2">
+        <button
+          type="button"
+          aria-label="Notifications"
+          onClick={() => setNotifOpen((v) => !v)}
+          className="relative rounded-md p-2 text-slate-500 hover:bg-slate-100"
+        >
+          <BellIcon size={18} />
+          {unreadLocal > 0 ? (
+            <span className="absolute right-0.5 top-0.5 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              {unreadLocal > 99 ? '99+' : unreadLocal}
+            </span>
+          ) : null}
+        </button>
+        {notifOpen ? (
+          <div className="absolute right-0 mt-1 w-80 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+            <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+              <p className="text-sm font-semibold text-slate-900">Notifications</p>
+              <button
+                type="button"
+                className="text-xs font-medium text-brand-700 hover:underline"
+                onClick={async () => {
+                  await markAllRead.mutateAsync();
+                  setUnreadLocal(0);
+                }}
+              >
+                Mark all read
+              </button>
+            </div>
+            <div className="max-h-80 overflow-auto">
+              {(notificationsQuery.data?.data ?? []).map((n) => (
+                <Link
+                  key={n.id}
+                  href={n.actionUrl ?? '/notifications'}
+                  onClick={() => setNotifOpen(false)}
+                  className="block border-b border-slate-50 px-3 py-2 hover:bg-slate-50"
+                >
+                  <p className="text-sm font-medium text-slate-900">{n.title}</p>
+                  <p className="mt-0.5 text-xs text-slate-600">{n.body}</p>
+                  <p className="mt-1 text-[11px] text-slate-500">{formatDateTime(n.createdAt)}</p>
+                </Link>
+              ))}
+              {(notificationsQuery.data?.data ?? []).length === 0 ? (
+                <p className="px-3 py-4 text-sm text-slate-500">No notifications.</p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       {/* User menu */}
       <div ref={menuRef} className="relative">

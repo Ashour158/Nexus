@@ -1,0 +1,412 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/crm-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("CRM_DATABASE_URL")
+}
+
+model Lead {
+  id               String       @id @default(cuid())
+  tenantId         String
+  ownerId          String
+  firstName        String
+  lastName         String
+  email            String?
+  phone            String?
+  company          String?
+  jobTitle         String?
+  source           LeadSource   @default(MANUAL)
+  status           LeadStatus   @default(NEW)
+  score            Int          @default(0)
+  aiScore          Float?
+  aiScoreReason    String?
+  rating           LeadRating   @default(COLD)
+  industry         String?
+  website          String?
+  annualRevenue    Decimal?     @db.Decimal(18, 2)
+  employeeCount    Int?
+  country          String?
+  city             String?
+  address          String?
+  linkedInUrl      String?
+  twitterHandle    String?
+  utmSource        String?
+  utmMedium        String?
+  utmCampaign      String?
+  utmContent       String?
+  utmTerm          String?
+  convertedAt      DateTime?
+  convertedToId    String?
+  customFields     Json         @default("{}")
+  tags             String[]
+  doNotContact     Boolean      @default(false)
+  gdprConsent      Boolean      @default(false)
+  gdprConsentAt    DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  activities       Activity[]
+  notes            Note[]
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, ownerId])
+}
+
+enum LeadSource {
+  MANUAL
+  IMPORT
+  WEB_FORM
+  EMAIL_CAMPAIGN
+  SOCIAL_MEDIA
+  PAID_ADS
+  REFERRAL
+  PARTNER
+  CHAT
+  EVENT
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  ASSIGNED
+  WORKING
+  QUALIFIED
+  UNQUALIFIED
+  CONVERTED
+}
+
+enum LeadRating {
+  HOT
+  WARM
+  COLD
+}
+
+model Contact {
+  id             String       @id @default(cuid())
+  tenantId       String
+  ownerId        String
+  accountId      String?
+  account        Account?     @relation(fields: [accountId], references: [id])
+  firstName      String
+  lastName       String
+  email          String?
+  phone          String?
+  mobile         String?
+  jobTitle       String?
+  department     String?
+  linkedInUrl    String?
+  twitterHandle  String?
+  country        String?
+  city           String?
+  address        String?
+  timezone       String?
+  preferredChannel String?
+  doNotEmail     Boolean      @default(false)
+  doNotCall      Boolean      @default(false)
+  gdprConsent    Boolean      @default(false)
+  gdprConsentAt  DateTime?
+  lastContactedAt DateTime?
+  customFields   Json         @default("{}")
+  tags           String[]
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deals          DealContact[]
+  activities     Activity[]
+  notes          Note[]
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([tenantId, accountId])
+  @@index([tenantId, ownerId])
+}
+
+model Account {
+  id                String        @id @default(cuid())
+  tenantId          String
+  ownerId           String
+  parentAccountId   String?
+  parentAccount     Account?      @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
+  childAccounts     Account[]     @relation("AccountHierarchy")
+  name              String
+  website           String?
+  phone             String?
+  email             String?
+  industry          String?
+  type              AccountType   @default(PROSPECT)
+  tier              AccountTier   @default(SMB)
+  status            AccountStatus @default(ACTIVE)
+  annualRevenue     Decimal?      @db.Decimal(18, 2)
+  employeeCount     Int?
+  country           String?
+  city              String?
+  address           String?
+  zipCode           String?
+  linkedInUrl       String?
+  description       String?
+  sicCode           String?
+  naicsCode         String?
+  healthScore       Int?
+  npsScore          Int?
+  customFields      Json          @default("{}")
+  tags              String[]
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  contacts          Contact[]
+  deals             Deal[]
+  notes             Note[]
+  activities        Activity[]
+  @@index([tenantId])
+  @@index([tenantId, type])
+  @@index([tenantId, ownerId])
+}
+
+enum AccountType {
+  PROSPECT
+  CUSTOMER
+  PARTNER
+  COMPETITOR
+  RESELLER
+  OTHER
+}
+
+enum AccountTier {
+  STRATEGIC
+  ENTERPRISE
+  MID_MARKET
+  SMB
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+  AT_RISK
+  CHURNED
+}
+
+model Deal {
+  id               String       @id @default(cuid())
+  tenantId         String
+  ownerId          String
+  accountId        String
+  account          Account      @relation(fields: [accountId], references: [id])
+  pipelineId       String
+  pipeline         Pipeline     @relation(fields: [pipelineId], references: [id])
+  stageId          String
+  stage            Stage        @relation(fields: [stageId], references: [id])
+  name             String
+  amount           Decimal      @default(0) @db.Decimal(18, 2)
+  currency         String       @default("USD")
+  probability      Int          @default(0)
+  expectedCloseDate DateTime?
+  actualCloseDate  DateTime?
+  status           DealStatus   @default(OPEN)
+  lostReason       String?
+  lostDetail       String?
+  forecastCategory ForecastCategory @default(PIPELINE)
+  meddicicScore    Int          @default(0)
+  meddicicData     Json         @default("{}")
+  aiWinProbability Float?
+  aiInsights       Json         @default("{}")
+  competitors      String[]
+  source           String?
+  campaignId       String?
+  customFields     Json         @default("{}")
+  tags             String[]
+  version          Int          @default(1)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  contacts         DealContact[]
+  activities       Activity[]
+  notes            Note[]
+  quotes           Quote[]
+  @@index([tenantId])
+  @@index([tenantId, pipelineId, stageId])
+  @@index([tenantId, ownerId])
+  @@index([tenantId, status])
+}
+
+enum DealStatus {
+  OPEN
+  WON
+  LOST
+  DORMANT
+}
+
+enum ForecastCategory {
+  PIPELINE
+  BEST_CASE
+  COMMIT
+  CLOSED
+  OMITTED
+}
+
+model DealContact {
+  id        String  @id @default(cuid())
+  dealId    String
+  deal      Deal    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  role      String?
+  isPrimary Boolean @default(false)
+  @@unique([dealId, contactId])
+}
+
+model Pipeline {
+  id         String   @id @default(cuid())
+  tenantId   String
+  name       String
+  currency   String   @default("USD")
+  isDefault  Boolean  @default(false)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  stages     Stage[]
+  deals      Deal[]
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model Stage {
+  id              String   @id @default(cuid())
+  tenantId        String
+  pipelineId      String
+  pipeline        Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  name            String
+  order           Int
+  probability     Int      @default(0)
+  rottenDays      Int      @default(30)
+  requiredFields  Json     @default("[]")
+  entryConditions Json     @default("[]")
+  color           String   @default("#6B7280")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deals           Deal[]
+  @@unique([pipelineId, name])
+  @@index([tenantId, pipelineId])
+}
+
+model Activity {
+  id           String         @id @default(cuid())
+  tenantId     String
+  ownerId      String
+  type         ActivityType
+  subject      String
+  description  String?
+  status       ActivityStatus @default(PLANNED)
+  priority     ActivityPriority @default(NORMAL)
+  dueDate      DateTime?
+  startDate    DateTime?
+  endDate      DateTime?
+  duration     Int?
+  outcome      String?
+  leadId       String?
+  lead         Lead?          @relation(fields: [leadId], references: [id])
+  contactId    String?
+  contact      Contact?       @relation(fields: [contactId], references: [id])
+  accountId    String?
+  account      Account?       @relation(fields: [accountId], references: [id])
+  dealId       String?
+  deal         Deal?          @relation(fields: [dealId], references: [id])
+  customFields Json           @default("{}")
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  @@index([tenantId])
+  @@index([tenantId, ownerId])
+  @@index([tenantId, dealId])
+  @@index([tenantId, dueDate])
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  MEETING
+  TASK
+  DEMO
+  LUNCH
+  CONFERENCE
+  FOLLOW_UP
+  PROPOSAL
+  NEGOTIATION
+  NOTE
+}
+
+enum ActivityStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DEFERRED
+}
+
+enum ActivityPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model Note {
+  id         String   @id @default(cuid())
+  tenantId   String
+  authorId   String
+  content    String
+  isPinned   Boolean  @default(false)
+  leadId     String?
+  lead       Lead?    @relation(fields: [leadId], references: [id])
+  contactId  String?
+  contact    Contact? @relation(fields: [contactId], references: [id])
+  accountId  String?
+  account    Account? @relation(fields: [accountId], references: [id])
+  dealId     String?
+  deal       Deal?    @relation(fields: [dealId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  @@index([tenantId])
+  @@index([tenantId, dealId])
+}
+
+model Quote {
+  id              String      @id @default(cuid())
+  tenantId        String
+  dealId          String
+  deal            Deal        @relation(fields: [dealId], references: [id])
+  ownerId         String
+  quoteNumber     String
+  name            String
+  status          QuoteStatus @default(DRAFT)
+  validUntil      DateTime?
+  currency        String      @default("USD")
+  subtotal        Decimal     @default(0) @db.Decimal(18, 2)
+  discountAmount  Decimal     @default(0) @db.Decimal(18, 2)
+  taxAmount       Decimal     @default(0) @db.Decimal(18, 2)
+  total           Decimal     @default(0) @db.Decimal(18, 2)
+  approvalStatus  String?
+  approvedById    String?
+  approvedAt      DateTime?
+  sentAt          DateTime?
+  viewedAt        DateTime?
+  acceptedAt      DateTime?
+  terms           String?
+  notes           String?
+  lineItems       Json        @default("[]")
+  customFields    Json        @default("{}")
+  version         Int         @default(1)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  @@unique([tenantId, quoteNumber])
+  @@index([tenantId, dealId])
+}
+
+enum QuoteStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SENT
+  VIEWED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}

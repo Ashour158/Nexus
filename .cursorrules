@@ -1,0 +1,84 @@
+# NEXUS CRM — Cursor Coding Rules
+# ════════════════════════════════════════════════════════════════════
+# READ THIS BEFORE WRITING ANY CODE
+# ════════════════════════════════════════════════════════════════════
+
+## CORE RULE: NO INCOMPLETE CODE — EVER
+
+You are building a production system. Every file you write must be:
+- COMPLETE — no placeholders, no stubs, no "// implement later"
+- WORKING — it must compile and run without changes
+- CONNECTED — imports must resolve, types must match
+
+## FORBIDDEN PATTERNS (never write these)
+
+❌ // TODO
+❌ // FIXME
+❌ // implement this
+❌ // add logic here
+❌ throw new Error('Not implemented')
+❌ return {} as any
+❌ /* ... rest of implementation ... */
+❌ // ... (abbreviated for brevity)
+❌ // similar to above
+❌ any type annotation (use unknown + type guard instead)
+❌ Partial implementation with "you can add more later"
+
+If you are about to write any of the above — STOP and write the real implementation instead.
+
+## WHEN A FILE IS TOO LONG
+
+If a file would exceed your output limit:
+1. Write the first half completely
+2. End with the comment: `// ── CONTINUE: next function is [functionName] ──`
+3. Wait for the user to say "continue"
+4. Write the second half completely from where you left off
+5. Never summarize or abbreviate
+
+## FILE WRITING RULES
+
+- Write ONE complete file per response
+- Always start with all imports at the top
+- Always export everything that other files will need
+- Always include error handling in every async function
+- Always validate inputs with Zod before using them
+- Always return the standard ApiResponse format: { success, data } or { success: false, error }
+- Always add JSDoc comment to every exported function
+
+## DATABASE RULES
+
+- Every Prisma query must include `tenantId` in the where clause
+- Always use the tenant isolation middleware — never bypass it
+- Use transactions for any operation that writes to 2+ tables
+- Never use `findUnique` without also checking the result is not null
+
+## TYPESCRIPT RULES
+
+- `strict: true` is enabled — respect it
+- No implicit `any`
+- Every function has explicit parameter types AND return type
+- Use discriminated unions for state management
+- Use `satisfies` operator for config objects
+
+## FASTIFY ROUTE RULES
+
+Every route handler must:
+1. Parse and validate input with the Zod schema
+2. Check permissions with `requirePermission()`
+3. Call the service layer (no business logic in route handlers)
+4. Return standard response format
+5. Have try/catch that throws NexusError subclasses
+
+## REFERENCE DOCUMENT
+
+The full technical specification is in `NEXUS_CRM_Technical_Spec.md`.
+- Prisma schemas: Section 31
+- TypeScript types: Section 32
+- Zod schemas: Section 33
+- REST endpoints: Section 34
+- Fastify bootstrap: Section 35
+- RBAC: Section 35.2
+- Kafka patterns: Section 36
+- Build phases: Section 63
+
+Always reference the spec. Do not invent schemas, types, or patterns.

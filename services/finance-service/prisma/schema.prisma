@@ -1,0 +1,373 @@
+// Finance Service Prisma Schema — Section 31.3 of NEXUS_CRM_Technical_Spec.md
+// ============================================================================
+// Extended beyond Section 31.3 with two models required by the CPQ pricing
+// engine (Section 40):
+//   * `PromoCode` — backs `CpqPricingEngine.getPromoDiscount()` DB lookup.
+//   * `Account`   — read-model shadow of CRM.Account used by the engine to
+//                    resolve the account tier / annual revenue for pricing
+//                    context. Populated by the CRM → Finance event pipeline
+//                    (`account.created`, `account.updated` — Section 36).
+//
+// Every model carries `tenantId` per Section 35.1 (tenant isolation).
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/finance-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("FINANCE_DATABASE_URL")
+}
+
+// ─── Catalog ────────────────────────────────────────────────────────────────
+
+model Product {
+  id            String      @id @default(cuid())
+  tenantId      String
+  sku           String
+  name          String
+  description   String?
+  type          ProductType @default(SERVICE)
+  category      String?
+  currency      String      @default("USD")
+  listPrice     Decimal     @db.Decimal(18, 2)
+  cost          Decimal?    @db.Decimal(18, 2)
+  billingType   BillingType @default(ONE_TIME)
+  billingPeriod String?
+  taxable       Boolean     @default(true)
+  taxCode       String?
+  isActive      Boolean     @default(true)
+  /// Serialized `PricingRule[]` — see `services/finance-service/src/cpq/pricing-engine.ts`.
+  pricingRules  Json        @default("[]")
+  customFields  Json        @default("{}")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  priceTiers    PriceTier[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId])
+}
+
+enum ProductType {
+  PHYSICAL
+  SERVICE
+  DIGITAL
+  BUNDLE
+  SUBSCRIPTION
+}
+
+enum BillingType {
+  ONE_TIME
+  RECURRING
+  USAGE
+  MILESTONE
+}
+
+model PriceTier {
+  id        String   @id @default(cuid())
+  tenantId  String
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String
+  minQty    Int      @default(1)
+  maxQty    Int?
+  unitPrice Decimal  @db.Decimal(18, 2)
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, productId])
+}
+
+// ─── Promotions (CPQ Rule 5) ────────────────────────────────────────────────
+
+model PromoCode {
+  id               String    @id @default(cuid())
+  tenantId         String
+  code             String
+  description      String?
+  discountPercent  Float     @default(0)
+  isActive         Boolean   @default(true)
+  validFrom        DateTime?
+  validUntil       DateTime?
+  /// Redemption cap across the tenant; `null` = unlimited.
+  maxUses          Int?
+  uses             Int       @default(0)
+  /// When non-empty, promo only applies to these product IDs.
+  applicableProductIds String[] @default([])
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+// ─── Account read-model (denormalized from CRM for pricing lookups) ─────────
+
+model Account {
+  id            String   @id
+  tenantId      String
+  tier          String   @default("SMB")
+  annualRevenue Decimal? @db.Decimal(18, 2)
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+// ─── Contracts & Subscriptions ──────────────────────────────────────────────
+
+model Contract {
+  id              String         @id @default(cuid())
+  tenantId        String
+  accountId       String
+  ownerId         String
+  contractNumber  String
+  name            String
+  status          ContractStatus @default(DRAFT)
+  startDate       DateTime?
+  endDate         DateTime?
+  autoRenew       Boolean        @default(false)
+  renewalTermDays Int            @default(30)
+  currency        String         @default("USD")
+  totalValue      Decimal        @db.Decimal(18, 2)
+  signedAt        DateTime?
+  signedById      String?
+  signatureData   Json?
+  terms           String?
+  lineItems       Json           @default("[]")
+  customFields    Json           @default("{}")
+  version         Int            @default(1)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  subscriptions   Subscription[]
+  invoices        Invoice[]
+
+  @@unique([tenantId, contractNumber])
+  @@index([tenantId, accountId])
+}
+
+enum ContractStatus {
+  DRAFT
+  PENDING_SIGNATURE
+  ACTIVE
+  EXPIRED
+  TERMINATED
+  RENEWED
+}
+
+model Subscription {
+  id              String             @id @default(cuid())
+  tenantId        String
+  accountId       String
+  contractId      String?
+  contract        Contract?          @relation(fields: [contractId], references: [id])
+  productId       String
+  planName        String
+  status          SubscriptionStatus @default(ACTIVE)
+  quantity        Int                @default(1)
+  unitPrice       Decimal            @db.Decimal(18, 2)
+  currency        String             @default("USD")
+  billingPeriod   String             @default("MONTHLY")
+  billingDay      Int                @default(1)
+  startDate       DateTime
+  endDate         DateTime?
+  trialEndDate    DateTime?
+  cancelledAt     DateTime?
+  cancelReason    String?
+  mrr             Decimal            @db.Decimal(18, 2)
+  arr             Decimal            @db.Decimal(18, 2)
+  nextBillingDate DateTime?
+  customFields    Json               @default("{}")
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  invoices        Invoice[]
+  usageRecords    UsageRecord[]
+
+  @@index([tenantId, accountId])
+  @@index([tenantId, status])
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  PAUSED
+  CANCELLED
+  EXPIRED
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  tenantId       String
+  accountId      String
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  contractId     String?
+  contract       Contract?     @relation(fields: [contractId], references: [id])
+  invoiceNumber  String
+  status         InvoiceStatus @default(DRAFT)
+  currency       String        @default("USD")
+  subtotal       Decimal       @db.Decimal(18, 2)
+  taxAmount      Decimal       @default(0) @db.Decimal(18, 2)
+  discountAmount Decimal       @default(0) @db.Decimal(18, 2)
+  total          Decimal       @db.Decimal(18, 2)
+  dueDate        DateTime?
+  paidAt         DateTime?
+  paidAmount     Decimal?      @db.Decimal(18, 2)
+  lineItems      Json          @default("[]")
+  notes          String?
+  customFields   Json          @default("{}")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  payments       Payment[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId, accountId])
+  @@index([tenantId, status])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIAL
+  PAID
+  OVERDUE
+  VOID
+  UNCOLLECTIBLE
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  tenantId      String
+  invoiceId     String
+  invoice       Invoice       @relation(fields: [invoiceId], references: [id])
+  amount        Decimal       @db.Decimal(18, 2)
+  currency      String        @default("USD")
+  method        PaymentMethod
+  status        PaymentStatus @default(PENDING)
+  reference     String?
+  gateway       String?
+  gatewayRef    String?
+  notes         String?
+  paidAt        DateTime?
+  failedAt      DateTime?
+  failureReason String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([tenantId, invoiceId])
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  CREDIT_CARD
+  ACH
+  CHECK
+  WIRE
+  CRYPTO
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+// ─── Commissions ────────────────────────────────────────────────────────────
+
+model CommissionPlan {
+  id           String                 @id @default(cuid())
+  tenantId     String
+  name         String
+  description  String?
+  isActive     Boolean                @default(true)
+  currency     String                 @default("USD")
+  period       String                 @default("QUARTERLY")
+  rules        Json                   @default("[]")
+  accelerators Json                   @default("[]")
+  decelerators Json                   @default("[]")
+  spiffs       Json                   @default("[]")
+  clawbackDays Int                    @default(90)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  assignments  CommissionAssignment[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model CommissionAssignment {
+  id        String         @id @default(cuid())
+  tenantId  String
+  planId    String
+  plan      CommissionPlan @relation(fields: [planId], references: [id])
+  userId    String
+  startDate DateTime
+  endDate   DateTime?
+  quota     Decimal?       @db.Decimal(18, 2)
+  createdAt DateTime       @default(now())
+
+  @@index([tenantId, userId])
+}
+
+model CommissionRecord {
+  id          String           @id @default(cuid())
+  tenantId    String
+  userId      String
+  planId      String
+  dealId      String?
+  invoiceId   String?
+  type        CommissionType
+  status      CommissionStatus @default(PENDING)
+  baseAmount  Decimal          @db.Decimal(18, 2)
+  rate        Float
+  amount      Decimal          @db.Decimal(18, 2)
+  multiplier  Float            @default(1)
+  finalAmount Decimal          @db.Decimal(18, 2)
+  period      String
+  notes       String?
+  clawbackOf  String?
+  paidAt      DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([tenantId, userId])
+  @@index([tenantId, period])
+}
+
+enum CommissionType {
+  DEAL_CLOSED
+  RECURRING
+  SPIFF
+  BONUS
+  CLAWBACK
+  ADJUSTMENT
+}
+
+enum CommissionStatus {
+  PENDING
+  APPROVED
+  PAID
+  DISPUTED
+  CLAWED_BACK
+}
+
+// ─── Usage-based billing ────────────────────────────────────────────────────
+
+model UsageRecord {
+  id             String       @id @default(cuid())
+  tenantId       String
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
+  metricName     String
+  quantity       Decimal      @db.Decimal(18, 6)
+  unitPrice      Decimal?     @db.Decimal(18, 6)
+  recordedAt     DateTime
+  billedAt       DateTime?
+
+  @@index([tenantId, subscriptionId])
+  @@index([tenantId, recordedAt])
+}

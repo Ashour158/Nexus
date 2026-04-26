@@ -86,7 +86,7 @@ export class WorkflowExecutor {
             where: { id: execution.id },
             data: {
               status: 'PAUSED',
-              currentNodeId: node.id,
+              currentNodeId: result.nextNodeId ?? node.id,
               resumeAt: result.pauseUntil,
             },
           });
@@ -120,6 +120,14 @@ export class WorkflowExecutor {
         tenantId: execution.tenantId,
         payload: { executionId: execution.id, workflowId: execution.workflowId } as never,
       });
+
+      if (execution.parentExecId) {
+        await this.prisma.workflowExecution.update({
+          where: { id: execution.parentExecId },
+          data: { resumeAt: new Date(0) },
+        });
+        await this.resume(execution.parentExecId);
+      }
     } catch (err) {
       await this.prisma.workflowExecution.update({
         where: { id: execution.id },
@@ -188,13 +196,14 @@ export class WorkflowExecutor {
       case 'NOTIFY':
         return handleNotifyNode(node, context);
       case 'FORK':
-        return handleForkNode(node, context);
+        return handleForkNode(node, context, this.prisma, this.producer);
       case 'JOIN':
-        return handleJoinNode(node, context);
+        return handleJoinNode(node, context, this.prisma);
       case 'END':
         return handleEndNode(node, context);
       default:
-        throw new Error(`Unsupported workflow node type: ${node.type}`);
+        return {};
     }
   }
 }
+  

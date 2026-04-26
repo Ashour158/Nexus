@@ -1,0 +1,35 @@
+{
+  "name": "@nexus/reporting-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy"
+  },
+  "dependencies": {
+    "@fastify/jwt": "^8.0.0",
+    "@fastify/rate-limit": "^9.1.0",
+    "@nexus/kafka": "workspace:*",
+    "@nexus/service-utils": "workspace:*",
+    "@nexus/shared-types": "workspace:*",
+    "@nexus/validation": "workspace:*",
+    "@prisma/client": "5.22.0",
+    "decimal.js": "^10.4.3",
+    "fastify": "^4.28.1",
+    "xlsx": "^0.18.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/supertest": "^7.2.0",
+    "prisma": "5.22.0",
+    "supertest": "^7.2.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.3",
+    "vitest": "^1.6.0"
+  }
+}

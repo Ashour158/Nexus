@@ -1,0 +1,37 @@
+{
+  "name": "@nexus/billing-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc --project tsconfig.build.json",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:push": "prisma db push"
+  },
+  "dependencies": {
+    "@fastify/rate-limit": "^9.1.0",
+    "@fastify/request-context": "^5.1.0",
+    "@nexus/kafka": "workspace:*",
+    "@nexus/service-utils": "workspace:*",
+    "@nexus/shared-types": "workspace:*",
+    "@nexus/validation": "workspace:*",
+    "@prisma/client": "^5.15.0",
+    "decimal.js": "^10.4.3",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "stripe": "^14.25.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.9",
+    "prisma": "^5.15.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.3",
+    "vitest": "^1.6.0"
+  }
+}

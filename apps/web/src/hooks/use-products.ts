@@ -19,12 +19,30 @@ interface PaginatedResult<T> {
   totalPages: number;
 }
 
-export function useProducts(search?: string) {
+export interface ProductListFilters {
+  search?: string;
+  isActive?: boolean;
+  limit?: number;
+}
+
+export function useProducts(filters: ProductListFilters | string = {}) {
+  const normalized =
+    typeof filters === 'string'
+      ? { search: filters.trim() || undefined, isActive: undefined, limit: 100 }
+      : {
+          search: filters.search?.trim() || undefined,
+          isActive: filters.isActive,
+          limit: filters.limit ?? 100,
+        };
   return useQuery<PaginatedResult<Product>>({
-    queryKey: ['products', { search: search?.trim() || '' }],
+    queryKey: ['products', normalized],
     queryFn: () =>
       apiClients.finance.get<PaginatedResult<Product>>('/products', {
-        params: { search: search?.trim() || undefined, limit: 100 },
+        params: {
+          search: normalized.search,
+          isActive: normalized.isActive,
+          limit: normalized.limit,
+        },
       }),
     staleTime: 60_000,
   });

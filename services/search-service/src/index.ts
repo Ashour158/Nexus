@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import rateLimit from '@fastify/rate-limit';
 import { createService, globalErrorHandler, registerHealthRoutes, startService } from '@nexus/service-utils';
 import { createMeilisearchClient } from './meilisearch.js';
 import { setupIndexes } from './indexes/setup.js';
@@ -19,17 +20,33 @@ const app = await createService({
     .split(',')
     .map((s) => s.trim()),
 });
+await app.register(rateLimit, {
+  global: true,
+  max: 300,
+  timeWindow: '1 minute',
+  errorResponseBuilder: (_req, context) => ({
+    success: false,
+    error: 'RATE_LIMIT_EXCEEDED',
+    message: `Too many requests. Retry after ${context.after}.`,
+  }),
+});
 app.setErrorHandler(globalErrorHandler);
 registerHealthRoutes(app, 'search-service', []);
 
 const meili = createMeilisearchClient();
-await setupIndexes(meili);
+
+try {
+  await setupIndexes(meili);
+  app.log.info('Meilisearch indexes ready');
+} catch (err) {
+  app.log.warn({ err }, 'Meilisearch setup failed; search may be degraded');
+}
 
 try {
   await startIndexerConsumer(meili);
   app.log.info('Search indexer consumer started');
 } catch (err) {
-  app.log.warn({ err }, 'Search indexer consumer failed to start');
+  app.log.warn({ err }, 'Indexer consumer failed; real-time indexing disabled');
 }
 
 await startService(app, port, async (a) => {

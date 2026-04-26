@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/territory-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("TERRITORY_DATABASE_URL")
+}
+
+model Territory {
+  id          String           @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  type        TerritoryType    @default(GEOGRAPHIC)
+  ownerIds    String[]
+  teamId      String?
+  priority    Int              @default(0)
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  rules       TerritoryRule[]
+  routingLogs LeadRoutingLog[]
+
+  @@index([tenantId])
+}
+
+model TerritoryRule {
+  id          String    @id @default(cuid())
+  territoryId String
+  territory   Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  field       String
+  operator    String
+  value       String
+  createdAt   DateTime  @default(now())
+}
+
+model LeadRoutingLog {
+  id                 String     @id @default(cuid())
+  tenantId           String
+  leadId             String
+  matchedTerritoryId String?
+  territory          Territory? @relation(fields: [matchedTerritoryId], references: [id])
+  assignedOwnerId    String?
+  routedAt           DateTime   @default(now())
+
+  @@index([tenantId, leadId])
+}
+
+model RoundRobinState {
+  id          String   @id @default(cuid())
+  tenantId    String
+  territoryId String
+  lastIndex   Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, territoryId])
+}
+
+enum TerritoryType {
+  GEOGRAPHIC
+  INDUSTRY
+  ACCOUNT_SIZE
+  CUSTOM
+}

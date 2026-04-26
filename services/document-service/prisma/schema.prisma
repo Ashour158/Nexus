@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/document-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DOCUMENT_DATABASE_URL")
+}
+
+model Document {
+  id          String    @id @default(uuid())
+  tenantId    String
+  ownerId     String
+  name        String
+  description String?
+  mimeType    String
+  sizeBytes   Int
+  storageKey  String    @unique
+  folderId    String?
+  folder      Folder?   @relation(fields: [folderId], references: [id])
+  versions    DocumentVersion[]
+  permissions DocumentPermission[]
+  tags        String[]
+  isDeleted   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([ownerId])
+  @@index([folderId])
+}
+
+model DocumentVersion {
+  id            String   @id @default(uuid())
+  documentId    String
+  document      Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  storageKey    String   @unique
+  sizeBytes     Int
+  createdById   String
+  createdAt     DateTime @default(now())
+
+  @@index([documentId])
+}
+
+model Folder {
+  id        String     @id @default(uuid())
+  tenantId  String
+  name      String
+  parentId  String?
+  parent    Folder?    @relation("FolderTree", fields: [parentId], references: [id])
+  children  Folder[]   @relation("FolderTree")
+  documents Document[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([tenantId])
+  @@index([parentId])
+}
+
+model DocumentPermission {
+  id         String   @id @default(uuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId     String
+  role       String   // VIEWER | EDITOR | OWNER
+  createdAt  DateTime @default(now())
+
+  @@unique([documentId, userId])
+  @@index([documentId])
+  @@index([userId])
+}

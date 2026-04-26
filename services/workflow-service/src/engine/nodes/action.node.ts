@@ -29,6 +29,8 @@ export async function handleActionNode(
     });
     const text = await res.text();
     return { output: { status: res.status, body: text.slice(0, 5000) } };
+  } catch (err) {
+    throw err instanceof Error ? err : new Error(String(err));
   } finally {
     clearTimeout(timer);
   }

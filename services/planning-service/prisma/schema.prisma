@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/planning-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("PLANNING_DATABASE_URL")
+}
+
+model QuotaPlan {
+  id        String        @id @default(cuid())
+  tenantId  String
+  name      String
+  year      Int
+  quarter   Int?
+  type      QuotaType     @default(REVENUE)
+  currency  String        @default("USD")
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  targets   QuotaTarget[]
+
+  @@index([tenantId, year])
+}
+
+model QuotaTarget {
+  id          String    @id @default(cuid())
+  planId      String
+  plan        QuotaPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  tenantId    String
+  ownerId     String
+  targetValue Decimal   @db.Decimal(18, 2)
+  currency    String    @default("USD")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([planId, ownerId])
+  @@index([tenantId, ownerId])
+}
+
+model ForecastSubmission {
+  id             String           @id @default(cuid())
+  tenantId       String
+  ownerId        String
+  period         String
+  commitAmount   Decimal          @db.Decimal(18, 2)
+  bestCaseAmount Decimal          @db.Decimal(18, 2)
+  pipelineAmount Decimal          @db.Decimal(18, 2)
+  commentary     String?
+  submittedAt    DateTime         @default(now())
+  reviews        ForecastReview[]
+
+  @@unique([tenantId, ownerId, period])
+  @@index([tenantId, ownerId, period])
+}
+
+model ForecastReview {
+  id             String             @id @default(cuid())
+  submissionId   String
+  submission     ForecastSubmission @relation(fields: [submissionId], references: [id])
+  reviewerId     String
+  adjustedCommit Decimal?           @db.Decimal(18, 2)
+  adjustedBest   Decimal?           @db.Decimal(18, 2)
+  note           String?
+  reviewedAt     DateTime           @default(now())
+}
+
+enum QuotaType {
+  REVENUE
+  DEAL_COUNT
+  ACTIVITY_COUNT
+  NEW_LOGOS
+}

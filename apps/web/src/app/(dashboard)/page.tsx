@@ -1,307 +1,267 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
-  Bar,
-  BarChart,
+  Area,
+  AreaChart,
   CartesianGrid,
+  Legend,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
-import { Skeleton } from '@/components/ui/skeleton';
-import { formatCurrency, formatDate, parseDecimal } from '@/lib/format';
+import {
+  Briefcase,
+  Calendar,
+  DollarSign,
+  Mail,
+  Phone,
+  Percent,
+  Target,
+  TrendingUp,
+} from 'lucide-react';
+import { StatCard } from '@/components/dashboard/StatCard';
+import { DateRangePicker } from '@/components/dashboard/DateRangePicker';
+import { Sparkline } from '@/components/dashboard/Sparkline';
+import { OnboardingChecklist } from '@/components/onboarding/onboarding-checklist';
 import { useAuthStore } from '@/stores/auth.store';
-import { useActivities, useCompleteActivity } from '@/hooks/use-activities';
-import { useDeals } from '@/hooks/use-deals';
-import { usePipelines, useStages } from '@/hooks/use-pipelines';
 
-const QUOTA_TARGET = 500_000;
+const REVENUE_TREND = [
+  { day: 'Mon', won: 12000, pipeline: 150000 },
+  { day: 'Tue', won: 18000, pipeline: 152000 },
+  { day: 'Wed', won: 22000, pipeline: 149000 },
+  { day: 'Thu', won: 16000, pipeline: 158000 },
+  { day: 'Fri', won: 28000, pipeline: 166000 },
+  { day: 'Sat', won: 9000, pipeline: 164000 },
+  { day: 'Sun', won: 14000, pipeline: 170000 },
+];
 
-export default function DashboardPage(): JSX.Element {
-  const userId = useAuthStore((s) => s.userId);
-  const openDealsQuery = useDeals({ status: 'OPEN', limit: 500 });
-  const wonDealsQuery = useDeals({ status: 'WON', limit: 500 });
-  const recentActivitiesQuery = useActivities({ limit: 10 });
-  const myTasksQuery = useActivities({
-    ownerId: userId ?? undefined,
-    status: 'PLANNED',
-    limit: 5,
-    dueBefore: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-  });
-  const completeActivity = useCompleteActivity();
+const STAGE_DISTRIBUTION = [
+  { name: 'Qualification', count: 14, value: 84000 },
+  { name: 'Proposal', count: 9, value: 102000 },
+  { name: 'Negotiation', count: 6, value: 79000 },
+  { name: 'Commit', count: 4, value: 54000 },
+];
 
-  const pipelinesQuery = usePipelines();
-  const activePipelineId = pipelinesQuery.data?.[0]?.id;
-  const stagesQuery = useStages(activePipelineId);
+const TASKS = [
+  { id: 't1', title: 'Follow up Acme renewal', contact: 'Nina Volkov', time: '09:30', priority: 'high' },
+  { id: 't2', title: 'Prepare Q2 pricing deck', contact: 'Carlos Mendez', time: '11:00', priority: 'medium' },
+  { id: 't3', title: 'Send legal redlines', contact: 'Marcus Chen', time: '14:15', priority: 'low' },
+];
 
-  const openDeals = openDealsQuery.data?.data ?? [];
-  const wonDeals = wonDealsQuery.data?.data ?? [];
-  const recentActivities = recentActivitiesQuery.data?.data ?? [];
-  const myTasks = myTasksQuery.data?.data ?? [];
+const STALE_DEALS = [
+  { id: 'd1', name: 'Globex Expansion', value: 48000, days: 10 },
+  { id: 'd2', name: 'Apex Rollout', value: 72000, days: 13 },
+  { id: 'd3', name: 'Nexa Migration', value: 39000, days: 9 },
+  { id: 'd4', name: 'Northwind Renewal', value: 31000, days: 8 },
+  { id: 'd5', name: 'Octane Pilot', value: 27000, days: 16 },
+];
 
-  const openValue = openDeals.reduce((sum, d) => sum + parseDecimal(d.amount), 0);
-  const wonThisMonth = useMemo(() => {
-    const now = new Date();
-    const m = now.getMonth();
-    const y = now.getFullYear();
-    return wonDeals.filter((d) => {
-      const closed = d.actualCloseDate ? new Date(d.actualCloseDate) : new Date(d.updatedAt);
-      return closed.getMonth() === m && closed.getFullYear() === y;
-    });
-  }, [wonDeals]);
-  const wonMonthValue = wonThisMonth.reduce((sum, d) => sum + parseDecimal(d.amount), 0);
-  const dueTodayCount = useMemo(() => {
-    const now = new Date();
-    return recentActivities.filter((a) => {
-      if (!a.dueDate) return false;
-      const d = new Date(a.dueDate);
-      return (
-        d.getFullYear() === now.getFullYear() &&
-        d.getMonth() === now.getMonth() &&
-        d.getDate() === now.getDate() &&
-        a.status !== 'COMPLETED'
-      );
-    }).length;
-  }, [recentActivities]);
-  const quotaPct = Math.min(200, (wonMonthValue / QUOTA_TARGET) * 100);
+const MEETINGS = [
+  { id: 'm1', title: 'Acme discovery', time: '10:00 - 10:45', attendees: ['NV', 'CM'], link: 'https://meet.google.com/' },
+  { id: 'm2', title: 'Quarterly forecast review', time: '13:00 - 13:45', attendees: ['AR', 'MK'], link: 'https://meet.google.com/' },
+  { id: 'm3', title: 'Procurement negotiation', time: 'Tomorrow 09:00', attendees: ['RS', 'LT'], link: 'https://meet.google.com/' },
+];
 
-  const stageRows = useMemo(() => {
-    const stages = stagesQuery.data ?? [];
-    const byStage = new Map<string, { count: number; value: number }>();
-    openDeals.forEach((d) => {
-      const row = byStage.get(d.stageId) ?? { count: 0, value: 0 };
-      row.count += 1;
-      row.value += parseDecimal(d.amount);
-      byStage.set(d.stageId, row);
-    });
-    return stages.map((s) => ({
-      stageId: s.id,
-      stageName: s.name,
-      count: byStage.get(s.id)?.count ?? 0,
-      value: byStage.get(s.id)?.value ?? 0,
-    }));
-  }, [openDeals, stagesQuery.data]);
+const TEAM_ROWS = [
+  { name: 'Carlos Mendez', won: 12, revenue: 182000, winRate: 44, quota: 91, trend: [8, 12, 9, 13, 14, 16, 18] },
+  { name: 'Sofia Rodriguez', won: 11, revenue: 168000, winRate: 41, quota: 86, trend: [6, 8, 10, 9, 12, 14, 16] },
+  { name: 'Marcus Chen', won: 9, revenue: 151000, winRate: 39, quota: 78, trend: [5, 7, 8, 8, 11, 12, 13] },
+  { name: 'Nina Volkov', won: 8, revenue: 130000, winRate: 36, quota: 71, trend: [4, 6, 7, 7, 9, 10, 11] },
+];
 
-  const closingThisWeek = useMemo(() => {
-    const now = Date.now();
-    const in7 = now + 7 * 24 * 60 * 60 * 1000;
-    return openDeals
-      .filter((d) => {
-        if (!d.expectedCloseDate) return false;
-        const t = new Date(d.expectedCloseDate).getTime();
-        return t >= now && t <= in7;
-      })
-      .slice(0, 8);
-  }, [openDeals]);
+function badgeForRank(index: number) {
+  if (index === 0) return '??';
+  if (index === 1) return '??';
+  if (index === 2) return '??';
+  return `${index + 1}`;
+}
+
+export default function DashboardPage() {
+  const [doneTasks, setDoneTasks] = useState<string[]>([]);
+  const userId = useAuthStore((s) => s.userId) ?? 'Teammate';
+  const roles = useAuthStore((s) => s.roles);
+  const firstName = userId.split(/[._-]/)[0] || 'there';
+
+  const todayDate = useMemo(
+    () => new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }),
+    []
+  );
+
+  const revenue = 119000;
+  const pipelineValue = 319000;
+  const won = 19;
+  const lost = 11;
+  const winRate = (won / (won + lost)) * 100;
+  const avgDealSize = won > 0 ? revenue / won : 0;
+  const activitiesToday = 34;
+  const openDealsCount = 33;
+  const tasksDueToday = TASKS.length - doneTasks.length;
+  const showLeaderboard = roles.includes('manager') || roles.includes('admin');
 
   return (
-    <main className="space-y-6 px-6 py-6">
-      <header>
-        <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-        <p className="text-sm text-slate-600">Real-time snapshot of pipeline and execution.</p>
-      </header>
+    <main className="mx-auto max-w-7xl space-y-6 overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8">
+      <OnboardingChecklist />
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Good morning, {firstName} ??</h1>
+          <p className="mt-0.5 text-sm text-gray-500">
+            {todayDate} ? {openDealsCount} open deals ? {tasksDueToday} tasks due today
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <DateRangePicker />
+          <Link href="/deals/new" className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">+ New Deal</Link>
+        </div>
+      </div>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          title="Open Deals"
-          value={String(openDeals.length)}
-          subtitle={formatCurrency(openValue)}
-          loading={openDealsQuery.isLoading}
-        />
-        <KpiCard
-          title="Won This Month"
-          value={String(wonThisMonth.length)}
-          subtitle={formatCurrency(wonMonthValue)}
-          tone="green"
-          loading={wonDealsQuery.isLoading}
-        />
-        <KpiCard
-          title="Activities Due Today"
-          value={String(dueTodayCount)}
-          subtitle={dueTodayCount > 0 ? 'Action needed' : 'All clear'}
-          tone={dueTodayCount > 0 ? 'amber' : 'default'}
-          loading={recentActivitiesQuery.isLoading}
-        />
-        <KpiCard
-          title="Quota Attainment %"
-          value={`${quotaPct.toFixed(1)}%`}
-          subtitle={`Target ${formatCurrency(QUOTA_TARGET)}`}
-          loading={wonDealsQuery.isLoading}
-        />
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+        <StatCard label="Revenue" value={revenue} format="currency" delta={12.4} icon={<DollarSign className="h-5 w-5" />} iconBg="bg-emerald-100 text-emerald-700" />
+        <StatCard label="Pipeline Value" value={pipelineValue} format="currency" delta={4.8} icon={<Briefcase className="h-5 w-5" />} iconBg="bg-blue-100 text-blue-700" />
+        <StatCard label="Win Rate" value={winRate} format="percent" delta={-1.2} icon={<Percent className="h-5 w-5" />} iconBg="bg-violet-100 text-violet-700" />
+        <StatCard label="Avg Deal Size" value={avgDealSize} format="currency" delta={6.1} icon={<Target className="h-5 w-5" />} iconBg="bg-amber-100 text-amber-700" />
+        <StatCard label="Activities Today" value={activitiesToday} format="number" delta={9.3} icon={<TrendingUp className="h-5 w-5" />} iconBg="bg-slate-100 text-slate-700" />
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Pipeline Health</h2>
-        {openDealsQuery.isLoading || stagesQuery.isLoading ? (
-          <Skeleton className="h-72 rounded-md" />
-        ) : (
-          <div className="h-72 w-full">
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-[60%_40%]">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 xl:col-span-3">
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">Revenue over time</h2>
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stageRows} layout="vertical" margin={{ left: 30, right: 20 }}>
+              <AreaChart data={REVENUE_TREND}>
+                <defs>
+                  <linearGradient id="wonFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.45} />
+                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0.04} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis type="category" dataKey="stageName" width={110} />
-                <Tooltip
-                  formatter={(value: number | string, name: string) =>
-                    name === 'value'
-                      ? [formatCurrency(Number(value)), 'Value']
-                      : [String(value), 'Count']
-                  }
-                />
-                <Bar dataKey="count" fill="#0f172a" name="count" />
-              </BarChart>
+                <XAxis dataKey="day" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Area type="monotone" dataKey="won" name="Closed Won" stroke="#2563eb" fill="url(#wonFill)" strokeWidth={2} />
+                <Area type="monotone" dataKey="pipeline" name="Pipeline Value" stroke="#64748b" fill="transparent" strokeDasharray="6 4" />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
-        )}
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">Recent Activity</h2>
-          {recentActivitiesQuery.isLoading ? (
-            <Skeleton className="h-48 rounded-md" />
-          ) : (
-            <ul className="space-y-2">
-              {recentActivities.map((a) => (
-                <li key={a.id} className="rounded-md border border-slate-100 px-3 py-2 text-sm">
-                  <div className="font-medium text-slate-900">{a.subject}</div>
-                  <div className="mt-0.5 text-xs text-slate-500">
-                    {a.type} • Deal{' '}
-                    {a.dealId ? (
-                      <Link href={`/deals/${a.dealId}`} className="text-brand-700 hover:underline">
-                        {a.dealId.slice(0, 8)}…
-                      </Link>
-                    ) : (
-                      '—'
-                    )}{' '}
-                    • {relativeTime(a.updatedAt)}
-                  </div>
-                </li>
-              ))}
-              {recentActivities.length === 0 ? (
-                <li className="text-sm text-slate-500">No recent activities.</li>
-              ) : null}
-            </ul>
-          )}
         </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">My Tasks</h2>
-            <Link href="/activities" className="text-xs font-medium text-brand-700 hover:underline">
-              View all
-            </Link>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 xl:col-span-2">
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">Pipeline by stage</h2>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={STAGE_DISTRIBUTION} dataKey="value" nameKey="name" innerRadius={52} outerRadius={82} paddingAngle={2} fill="#2563eb" />
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
-          {myTasksQuery.isLoading ? (
-            <Skeleton className="h-48 rounded-md" />
-          ) : (
-            <ul className="space-y-2">
-              {myTasks.map((task) => (
-                <li key={task.id} className="flex items-center gap-2 rounded-md border border-slate-100 px-3 py-2">
-                  <button
-                    type="button"
-                    className="h-4 w-4 rounded border border-slate-400"
-                    onClick={() => completeActivity.mutate({ id: task.id, outcome: 'Completed from dashboard' })}
-                    aria-label="Complete task"
-                  />
-                  <div className="flex-1 text-sm">
-                    <div className="font-medium text-slate-900">{task.subject}</div>
-                    <div className="text-xs text-slate-500">{formatDate(task.dueDate)}</div>
-                  </div>
-                </li>
-              ))}
-              {myTasks.length === 0 ? (
-                <li className="text-sm text-slate-500">No tasks due within 7 days.</li>
-              ) : null}
-            </ul>
-          )}
+          <ul className="space-y-2 text-sm">
+            {STAGE_DISTRIBUTION.map((stage) => (
+              <li key={stage.name} className="flex items-center justify-between">
+                <span>{stage.name} ({stage.count})</span>
+                <span className="font-medium">${stage.value.toLocaleString()}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Deals Closing This Week</h2>
-        {openDealsQuery.isLoading ? (
-          <Skeleton className="h-40 rounded-md" />
-        ) : (
+      <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-900">My Tasks today</h3>
+            <Link href="/tasks" className="text-xs text-blue-700 hover:underline">View all tasks</Link>
+          </div>
+          <ul className="space-y-2">
+            {TASKS.map((task) => (
+              <li key={task.id} className="flex items-center gap-2 rounded-md border border-slate-100 px-2 py-2">
+                <input type="checkbox" checked={doneTasks.includes(task.id)} onChange={() => setDoneTasks((prev) => prev.includes(task.id) ? prev.filter((id) => id !== task.id) : [...prev, task.id])} />
+                <span className={`h-2 w-2 rounded-full ${task.priority === 'high' ? 'bg-red-500' : task.priority === 'medium' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{task.title}</p>
+                  <p className="text-xs text-slate-500"><Link href="/contacts" className="hover:underline">{task.contact}</Link> ? {task.time}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="mb-3 text-sm font-semibold text-slate-900">My deals - activity needed</h3>
+          <ul className="space-y-2">
+            {STALE_DEALS.map((deal) => (
+              <li key={deal.id} className="rounded-md border border-slate-100 p-2">
+                <p className="text-sm font-medium">{deal.name}</p>
+                <p className="text-xs text-slate-500">${deal.value.toLocaleString()} ? {deal.days} days since last touch</p>
+                <div className="mt-2 flex gap-2">
+                  <button className="rounded border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50"><Phone className="h-3.5 w-3.5" /></button>
+                  <button className="rounded border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50"><Mail className="h-3.5 w-3.5" /></button>
+                  <button className="rounded border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50"><Calendar className="h-3.5 w-3.5" /></button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="mb-3 text-sm font-semibold text-slate-900">Upcoming meetings</h3>
+          <ul className="space-y-2">
+            {MEETINGS.map((meeting) => (
+              <li key={meeting.id} className="rounded-md border border-slate-100 p-2">
+                <p className="text-sm font-medium">{meeting.title}</p>
+                <p className="text-xs text-slate-500">{meeting.time}</p>
+                <div className="mt-2 flex items-center justify-between">
+                  <div className="flex -space-x-2">
+                    {meeting.attendees.map((attendee) => (
+                      <span key={attendee} className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-white bg-slate-200 text-[10px] font-semibold">{attendee}</span>
+                    ))}
+                  </div>
+                  <a href={meeting.link} target="_blank" rel="noreferrer" className="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white">Join</a>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {showLeaderboard ? (
+        <section className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="mb-3 text-sm font-semibold text-slate-900">Team Leaderboard</h3>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+              <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-3 py-2 text-left">Name</th>
-                  <th className="px-3 py-2 text-right">Amount</th>
-                  <th className="px-3 py-2 text-left">Stage</th>
-                  <th className="px-3 py-2 text-center">Probability</th>
-                  <th className="px-3 py-2 text-left">Owner</th>
+                  <th className="px-2 py-2">Rank</th>
+                  <th className="px-2 py-2">Rep</th>
+                  <th className="px-2 py-2">Deals won</th>
+                  <th className="px-2 py-2">Revenue</th>
+                  <th className="px-2 py-2">Win rate</th>
+                  <th className="px-2 py-2">Quota %</th>
+                  <th className="px-2 py-2">Trend</th>
                 </tr>
               </thead>
               <tbody>
-                {closingThisWeek.map((d) => (
-                  <tr key={d.id} className="border-t border-slate-100">
-                    <td className="px-3 py-2">
-                      <Link href={`/deals/${d.id}`} className="font-medium text-brand-700 hover:underline">
-                        {d.name}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2 text-right">{formatCurrency(d.amount, d.currency)}</td>
-                    <td className="px-3 py-2">{d.stageId.slice(0, 8)}…</td>
-                    <td className="px-3 py-2 text-center">{d.probability}%</td>
-                    <td className="px-3 py-2">{d.ownerId.slice(0, 8)}…</td>
+                {TEAM_ROWS.map((row, index) => (
+                  <tr key={row.name} className="border-b border-gray-50 even:bg-gray-50/50 transition-colors hover:bg-blue-50/40">
+                    <td className="px-2 py-2">{badgeForRank(index)}</td>
+                    <td className="px-2 py-2 font-medium">{row.name}</td>
+                    <td className="px-2 py-2">{row.won}</td>
+                    <td className="px-2 py-2">${row.revenue.toLocaleString()}</td>
+                    <td className="px-2 py-2">{row.winRate}%</td>
+                    <td className="px-2 py-2">{row.quota}%</td>
+                    <td className="px-2 py-2"><Sparkline data={row.trend} /></td>
                   </tr>
                 ))}
-                {closingThisWeek.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-3 py-8 text-center text-slate-500">
-                      No open deals closing in next 7 days.
-                    </td>
-                  </tr>
-                ) : null}
               </tbody>
             </table>
           </div>
-        )}
-      </section>
+        </section>
+      ) : null}
     </main>
   );
-}
-
-function KpiCard({
-  title,
-  value,
-  subtitle,
-  tone = 'default',
-  loading = false,
-}: {
-  title: string;
-  value: string;
-  subtitle: string;
-  tone?: 'default' | 'green' | 'amber';
-  loading?: boolean;
-}) {
-  const toneClass =
-    tone === 'green'
-      ? 'border-emerald-200 bg-emerald-50'
-      : tone === 'amber'
-        ? 'border-amber-200 bg-amber-50'
-        : 'border-slate-200 bg-white';
-  return (
-    <div className={`rounded-lg border p-4 ${toneClass}`}>
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{title}</p>
-      {loading ? <Skeleton className="mt-2 h-8 w-32" /> : <p className="mt-2 text-3xl font-bold text-slate-900">{value}</p>}
-      <p className="mt-1 text-sm text-slate-600">{subtitle}</p>
-    </div>
-  );
-}
-
-function relativeTime(value: string): string {
-  const t = new Date(value).getTime();
-  const diff = Date.now() - t;
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 60) return `${Math.max(1, mins)}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
 }

@@ -104,6 +104,47 @@ export async function registerUsersRoutes(
       );
 
       r.get(
+        '/users/:slug/availability',
+        async (request, reply) => {
+          const { slug } = request.params as { slug: string };
+          const user = await prisma.user.findFirst({
+            where: {
+              isActive: true,
+              OR: [{ id: slug }, { email: { startsWith: `${slug}@` } }],
+            },
+            select: {
+              id: true,
+              tenantId: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              timezone: true,
+            },
+          });
+          if (!user) return reply.code(404).send({ success: false, error: 'Rep not found' });
+          const slots: string[] = [];
+          const cursor = new Date();
+          cursor.setHours(9, 0, 0, 0);
+          for (let day = 1; day <= 14; day += 1) {
+            const base = new Date(cursor.getTime() + day * 24 * 60 * 60 * 1000);
+            if (base.getDay() === 0 || base.getDay() === 6) continue;
+            for (const hour of [9, 10, 11, 13, 14, 15, 16]) {
+              const slot = new Date(base);
+              slot.setHours(hour, 0, 0, 0);
+              slots.push(slot.toISOString());
+            }
+          }
+          return reply.send({
+            success: true,
+            data: {
+              rep: user,
+              slots,
+            },
+          });
+        }
+      );
+
+      r.get(
         '/users/:id',
         { preHandler: requirePermission(PERMISSIONS.USERS.READ) },
         async (request, reply) => {

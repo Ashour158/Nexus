@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/integration-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model WebhookSubscription {
+  id          String            @id @default(cuid())
+  tenantId    String
+  name        String
+  targetUrl   String
+  secret      String
+  events      String[]          @default([])
+  isActive    Boolean           @default(true)
+  version     Int               @default(1)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  deliveries  WebhookDelivery[]
+
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+}
+
+model WebhookDelivery {
+  id             String              @id @default(cuid())
+  subscriptionId String
+  subscription   WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  tenantId       String
+  eventType      String
+  payload        Json
+  status         DeliveryStatus      @default(PENDING)
+  httpStatus     Int?
+  responseBody   String?             @db.Text
+  attemptCount   Int                 @default(0)
+  nextRetryAt    DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime            @default(now())
+
+  @@index([tenantId, status])
+  @@index([status, nextRetryAt])
+}
+
+model OAuthConnection {
+  id           String    @id @default(cuid())
+  tenantId     String
+  userId       String
+  provider     String
+  scope        String
+  accessToken  String    @db.Text
+  refreshToken String?   @db.Text
+  expiresAt    DateTime?
+  email        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  syncJobs     SyncJob[]
+
+  @@unique([tenantId, userId, provider, scope])
+  @@index([tenantId, userId])
+}
+
+model SyncJob {
+  id               String          @id @default(cuid())
+  tenantId         String
+  connectionId     String
+  connection       OAuthConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  jobType          String
+  status           SyncStatus      @default(PENDING)
+  totalRecords     Int             @default(0)
+  processedRecords Int             @default(0)
+  errorCount       Int             @default(0)
+  errorLog         Json            @default("[]")
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime        @default(now())
+
+  @@index([tenantId, status])
+}
+
+model SyncedCalendarEvent {
+  id         String   @id @default(cuid())
+  tenantId   String
+  activityId String   @unique
+  provider   String
+  externalId String
+  etag       String?
+  syncedAt   DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model GeocodedAccount {
+  id         String   @id @default(cuid())
+  tenantId   String
+  accountId  String   @unique
+  lat        Float
+  lng        Float
+  geocodedAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+enum DeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+  RETRYING
+}
+
+enum SyncStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELED
+}

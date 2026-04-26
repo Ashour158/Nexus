@@ -263,6 +263,75 @@ export interface SubscriptionCancelledEvent extends KafkaEventBase {
   payload: { subscriptionId: string; accountId: string; mrr: number; reason?: string };
 }
 
+export interface WorkflowBranchStartEvent extends KafkaEventBase {
+  type: 'workflow.branch.start';
+  payload: {
+    executionId: string;
+    parentExecutionId: string;
+    branchNodeId: string;
+  };
+}
+
+export interface BillingSubscriptionCreatedEvent extends KafkaEventBase {
+  type: 'billing.subscription.created';
+  payload: { subscriptionId: string; tenantId: string; planId: string; status: string };
+}
+
+export interface BillingSubscriptionUpdatedEvent extends KafkaEventBase {
+  type: 'billing.subscription.updated';
+  payload: { subscriptionId: string; tenantId: string; planId?: string; status?: string };
+}
+
+export interface BillingSubscriptionCanceledEvent extends KafkaEventBase {
+  type: 'billing.subscription.canceled';
+  payload: { subscriptionId: string; tenantId: string };
+}
+
+export interface BillingInvoiceGeneratedEvent extends KafkaEventBase {
+  type: 'billing.invoice.generated';
+  payload: { invoiceId: string; tenantId: string; subscriptionId: string; amount: number };
+}
+
+export interface BillingInvoicePaidEvent extends KafkaEventBase {
+  type: 'billing.invoice.paid';
+  payload: { invoiceId: string; tenantId: string; paidAt: string };
+}
+
+export interface BillingInvoiceVoidedEvent extends KafkaEventBase {
+  type: 'billing.invoice.voided';
+  payload: { invoiceId: string; tenantId: string };
+}
+
+export interface IntegrationSyncStartedEvent extends KafkaEventBase {
+  type: 'integration.sync.started';
+  payload: { jobId: string; tenantId: string; jobType: string };
+}
+
+export interface IntegrationSyncCompletedEvent extends KafkaEventBase {
+  type: 'integration.sync.completed';
+  payload: { jobId: string; tenantId: string };
+}
+
+export interface IntegrationSyncFailedEvent extends KafkaEventBase {
+  type: 'integration.sync.failed';
+  payload: { jobId: string; tenantId: string; error: string };
+}
+
+export interface BlueprintPlaybookCreatedEvent extends KafkaEventBase {
+  type: 'blueprint.playbook.created';
+  payload: { playbookId: string; tenantId: string; name: string };
+}
+
+export interface BlueprintPlaybookUpdatedEvent extends KafkaEventBase {
+  type: 'blueprint.playbook.updated';
+  payload: { playbookId: string; tenantId: string };
+}
+
+export interface BlueprintStageUpsertedEvent extends KafkaEventBase {
+  type: 'blueprint.stage.upserted';
+  payload: { playbookId: string; tenantId: string; stageId: string };
+}
+
 export type NexusKafkaEvent =
   | LeadCreatedEvent
   | DealCreatedEvent
@@ -283,7 +352,20 @@ export type NexusKafkaEvent =
   | InvoiceCreatedEvent
   | InvoicePaidEvent
   | SubscriptionCreatedEvent
-  | SubscriptionCancelledEvent;
+  | SubscriptionCancelledEvent
+  | WorkflowBranchStartEvent
+  | BillingSubscriptionCreatedEvent
+  | BillingSubscriptionUpdatedEvent
+  | BillingSubscriptionCanceledEvent
+  | BillingInvoiceGeneratedEvent
+  | BillingInvoicePaidEvent
+  | BillingInvoiceVoidedEvent
+  | IntegrationSyncStartedEvent
+  | IntegrationSyncCompletedEvent
+  | IntegrationSyncFailedEvent
+  | BlueprintPlaybookCreatedEvent
+  | BlueprintPlaybookUpdatedEvent
+  | BlueprintStageUpsertedEvent;
 
 // ─── CRM Domain Types — Section 32 ───────────────────────────────────────────
 
@@ -374,7 +456,7 @@ export interface Account {
   industry: string | null;
   type: 'PROSPECT' | 'CUSTOMER' | 'PARTNER' | 'COMPETITOR' | 'OTHER';
   tier: 'SMB' | 'MID_MARKET' | 'ENTERPRISE' | 'STRATEGIC';
-  status: 'ACTIVE' | 'INACTIVE' | 'CHURNED';
+  status: 'ACTIVE' | 'INACTIVE' | 'AT_RISK' | 'CHURNED';
   annualRevenue: string | null;
   employeeCount: number | null;
   country: string | null;
@@ -387,6 +469,8 @@ export interface Account {
   naicsCode: string | null;
   healthScore: number | null;
   npsScore: number | null;
+  lat: number | null;
+  lng: number | null;
   customFields: Record<string, unknown>;
   tags: string[];
   createdAt: string;

@@ -1,0 +1,245 @@
+_format_version: '3.0'
+
+services:
+  - name: auth-service
+    url: http://auth-service:3010
+    routes:
+      - name: auth-routes
+        paths:
+          - /api/v1/auth
+          - /api/v1/users
+          - /api/v1/tenants
+          - /api/v1/roles
+          - /api/v1/api-keys
+        strip_path: false
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 60
+          policy: local
+
+  - name: crm-service
+    url: http://crm-service:3001
+    routes:
+      - name: crm-routes
+        paths:
+          - /api/v1/deals
+          - /api/v1/accounts
+          - /api/v1/contacts
+          - /api/v1/leads
+          - /api/v1/pipelines
+          - /api/v1/activities
+          - /api/v1/notes
+        strip_path: false
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: local
+
+  - name: finance-service
+    url: http://finance-service:3002
+    routes:
+      - name: finance-routes
+        paths:
+          - /api/v1/quotes
+          - /api/v1/invoices
+          - /api/v1/contracts
+          - /api/v1/products
+          - /api/v1/commissions
+          - /api/v1/cpq
+        strip_path: false
+
+  - name: notification-service
+    url: http://notification-service:3003
+    routes:
+      - name: notification-routes
+        paths:
+          - /api/v1/notifications
+        strip_path: false
+
+  - name: analytics-service
+    url: http://analytics-service:3008
+    routes:
+      - name: analytics-routes
+        paths:
+          - /api/v1/analytics
+        strip_path: false
+
+  - name: search-service
+    url: http://search-service:3006
+    routes:
+      - name: search-routes
+        paths:
+          - /api/v1/search
+        strip_path: false
+
+  - name: workflow-service
+    url: http://workflow-service:3007
+    routes:
+      - name: workflow-routes
+        paths:
+          - /api/v1/workflows
+          - /api/v1/executions
+        strip_path: false
+
+  - name: ai-service
+    url: http://ai-service:8000
+    routes:
+      - name: ai-routes
+        paths:
+          - /api/v1/score
+          - /api/v1/transcribe
+          - /api/v1/insights
+        strip_path: false
+
+  - name: storage-service
+    url: http://storage-service:3010
+    routes:
+      - name: storage-routes
+        paths:
+          - /api/v1/files
+        strip_path: false
+
+  - name: comm-service
+    url: http://comm-service:3009
+    routes:
+      - name: comm-routes
+        paths:
+          - /api/v1/templates
+          - /api/v1/sequences
+          - /api/v1/outbox
+          - /api/v1/webhooks
+        strip_path: false
+
+  - name: billing-service
+    url: http://billing-service:3011
+    routes:
+      - name: billing-routes
+        paths:
+          - /api/v1/billing
+          - /api/v1/subscriptions
+          - /api/v1/plans
+        strip_path: false
+
+  - name: integration-service
+    url: http://integration-service:3012
+    routes:
+      - name: integration-routes
+        paths:
+          - /api/v1/integrations
+        strip_path: false
+
+  - name: blueprint-service
+    url: http://blueprint-service:3013
+    routes:
+      - name: blueprint-routes
+        paths:
+          - /api/v1/blueprints
+        strip_path: false
+
+  - name: approval-service
+    url: http://approval-service:3014
+    routes:
+      - name: approval-routes
+        paths:
+          - /api/v1/approvals
+          - /api/v1/approval-policies
+        strip_path: false
+
+  - name: data-service
+    url: http://data-service:3015
+    routes:
+      - name: data-routes
+        paths:
+          - /api/v1/audit
+          - /api/v1/export
+          - /api/v1/import
+          - /api/v1/recycle
+          - /api/v1/views
+        strip_path: false
+
+  - name: document-service
+    url: http://document-service:3016
+    routes:
+      - name: document-routes
+        paths:
+          - /api/v1/documents
+        strip_path: false
+
+  - name: chatbot-service
+    url: http://chatbot-service:3017
+    routes:
+      - name: chatbot-routes
+        paths:
+          - /api/v1/chatbot
+          - /api/v1/conversations
+        strip_path: false
+
+  - name: cadence-service
+    url: http://cadence-service:3018
+    routes:
+      - name: cadence-routes
+        paths:
+          - /api/v1/cadences
+          - /api/v1/enrollments
+        strip_path: false
+
+  - name: territory-service
+    url: http://territory-service:3019
+    routes:
+      - name: territory-routes
+        paths:
+          - /api/v1/territories
+        strip_path: false
+
+  - name: planning-service
+    url: http://planning-service:3020
+    routes:
+      - name: planning-routes
+        paths:
+          - /api/v1/quotas
+          - /api/v1/forecasts
+        strip_path: false
+
+  - name: reporting-service
+    url: http://reporting-service:3021
+    routes:
+      - name: reporting-routes
+        paths:
+          - /api/v1/reports
+        strip_path: false
+
+  - name: portal-service
+    url: http://portal-service:3022
+    routes:
+      - name: portal-routes
+        paths:
+          - /api/v1/portal
+        strip_path: false
+
+  - name: knowledge-service
+    url: http://knowledge-service:3023
+    routes:
+      - name: knowledge-routes
+        paths:
+          - /api/v1/knowledge
+        strip_path: false
+
+  - name: incentive-service
+    url: http://incentive-service:3024
+    routes:
+      - name: incentive-routes
+        paths:
+          - /api/v1/badges
+          - /api/v1/contests
+        strip_path: false
+
+  - name: realtime-service
+    url: http://realtime-service:3005
+    routes:
+      - name: realtime-routes
+        paths:
+          - /api/v1/realtime
+          - /socket.io
+        strip_path: false

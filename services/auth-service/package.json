@@ -16,6 +16,7 @@
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@fastify/rate-limit": "^9.1.0",
     "@fastify/request-context": "^5.1.0",
     "@nexus/service-utils": "workspace:*",
     "@nexus/shared-types": "workspace:*",
@@ -24,6 +25,7 @@
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
     "jose": "^5.9.3",
+    "prom-client": "^15.1.0",
     "zod": "^3.23.8"
   },
   "prisma": {
@@ -31,7 +33,9 @@
   },
   "devDependencies": {
     "@types/node": "^20.14.9",
+    "@types/supertest": "^7.2.0",
     "prisma": "^5.15.0",
+    "supertest": "^7.2.2",
     "tsx": "^4.16.0",
     "typescript": "^5.5.3",
     "vitest": "^1.6.0"

@@ -1,0 +1,45 @@
+﻿generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/email-sync-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("EMAIL_SYNC_DATABASE_URL")
+}
+
+model EmailConnection {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  provider     String
+  email        String
+  accessToken  String
+  refreshToken String?
+  tokenExpiry  DateTime?
+  syncEnabled  Boolean  @default(true)
+  lastSyncAt   DateTime?
+  createdAt    DateTime @default(now())
+}
+
+model EmailMessage {
+  id         String   @id @default(uuid())
+  userId     String
+  provider   String
+  messageId  String   @unique
+  threadId   String
+  subject    String
+  from       String
+  to         String
+  snippet    String
+  body       String   @db.Text
+  isRead     Boolean  @default(false)
+  isInbound  Boolean
+  sentAt     DateTime
+  contactId  String?
+  dealId     String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, threadId])
+  @@index([contactId])
+  @@index([dealId])
+}

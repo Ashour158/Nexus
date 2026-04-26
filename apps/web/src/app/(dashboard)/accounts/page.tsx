@@ -1,6 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState, type ReactElement } from 'react';
+import { GoogleMap, InfoWindow, Marker, useJsApiLoader } from '@react-google-maps/api';
 import type { Account } from '@nexus/shared-types';
 import { cn } from '@/lib/cn';
 import { formatCurrency, formatDate } from '@/lib/format';
@@ -11,6 +13,7 @@ import {
 } from '@/hooks/use-accounts';
 import { useUsers } from '@/hooks/use-users';
 import { XIcon } from '@/components/ui/icons';
+import { TableSkeleton } from '@/components/ui/skeleton';
 
 /**
  * Accounts list page. Mirrors the contacts page: filterable table with a
@@ -19,6 +22,12 @@ import { XIcon } from '@/components/ui/icons';
  */
 
 type DetailTab = 'info' | 'contacts' | 'deals' | 'timeline';
+type ViewMode = 'list' | 'map';
+type AccountWithGeo = Omit<Account, 'status'> & {
+  lat?: number | null;
+  lng?: number | null;
+  status: 'ACTIVE' | 'INACTIVE' | 'AT_RISK' | 'CHURNED';
+};
 
 const TIERS: Array<Account['tier']> = ['SMB', 'MID_MARKET', 'ENTERPRISE', 'STRATEGIC'];
 
@@ -35,6 +44,14 @@ function tierColor(tier: Account['tier']): string {
   }
 }
 
+function markerIcon(status: AccountWithGeo['status']): string {
+  const color =
+    status === 'CHURNED' ? '#dc2626' : status === 'AT_RISK' ? '#d97706' : '#16a34a';
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><circle cx="16" cy="16" r="10" fill="${color}" stroke="white" stroke-width="3"/></svg>`
+  )}`;
+}
+
 export default function AccountsPage(): ReactElement {
   const hasPermission = useAuthStore((s) => s.hasPermission);
 
@@ -45,6 +62,8 @@ export default function AccountsPage(): ReactElement {
   const [page, setPage] = useState(1);
   const [active, setActive] = useState<Account | null>(null);
   const [tab, setTab] = useState<DetailTab>('info');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [mapAccount, setMapAccount] = useState<AccountWithGeo | null>(null);
 
   const { data, isLoading, isError, error } = useAccounts({
     search: search || undefined,
@@ -57,6 +76,29 @@ export default function AccountsPage(): ReactElement {
   const users = useUsers();
 
   const accounts = data?.data ?? [];
+  const mappedAccounts = useMemo(
+    () =>
+      (accounts as AccountWithGeo[]).filter(
+        (a) => typeof a.lat === 'number' && typeof a.lng === 'number'
+      ),
+    [accounts]
+  );
+  const mapCenter = useMemo(() => {
+    if (mappedAccounts.length === 0) return { lat: 25.2048, lng: 55.2708 };
+    return {
+      lat:
+        mappedAccounts.reduce((sum, a) => sum + (a.lat ?? 0), 0) /
+        mappedAccounts.length,
+      lng:
+        mappedAccounts.reduce((sum, a) => sum + (a.lng ?? 0), 0) /
+        mappedAccounts.length,
+    };
+  }, [mappedAccounts]);
+  const mapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
+  const maps = useJsApiLoader({
+    googleMapsApiKey: mapsApiKey,
+    id: 'nexus-google-maps',
+  });
 
   const ownerMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -86,6 +128,32 @@ export default function AccountsPage(): ReactElement {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold text-slate-900">Accounts</h1>
+        <div className="inline-flex rounded-md border border-slate-200 bg-white p-0.5">
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            className={cn(
+              'rounded px-3 py-1 text-xs font-medium',
+              viewMode === 'list'
+                ? 'bg-slate-900 text-white'
+                : 'text-slate-600 hover:bg-slate-100'
+            )}
+          >
+            List
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('map')}
+            className={cn(
+              'rounded px-3 py-1 text-xs font-medium',
+              viewMode === 'map'
+                ? 'bg-slate-900 text-white'
+                : 'text-slate-600 hover:bg-slate-100'
+            )}
+          >
+            Map
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -147,8 +215,8 @@ export default function AccountsPage(): ReactElement {
       </div>
 
       {isLoading ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
-          Loading accounts…
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+          <TableSkeleton rows={8} cols={7} />
         </div>
       ) : isError ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700">
@@ -157,6 +225,54 @@ export default function AccountsPage(): ReactElement {
       ) : accounts.length === 0 ? (
         <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
           No accounts match your filters.
+        </div>
+      ) : viewMode === 'map' ? (
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+          {!mapsApiKey ? (
+            <div className="p-10 text-center text-sm text-slate-500">
+              Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to enable the map.
+            </div>
+          ) : !maps.isLoaded ? (
+            <div className="p-10 text-center text-sm text-slate-500">Loading map…</div>
+          ) : mappedAccounts.length === 0 ? (
+            <div className="p-10 text-center text-sm text-slate-500">
+              No visible accounts have coordinates yet.
+            </div>
+          ) : (
+            <GoogleMap
+              mapContainerStyle={{ height: 640, width: '100%' }}
+              center={mapCenter}
+              zoom={mappedAccounts.length === 1 ? 10 : 5}
+            >
+              {mappedAccounts.map((a) => (
+                <Marker
+                  key={a.id}
+                  position={{ lat: a.lat as number, lng: a.lng as number }}
+                  icon={markerIcon(a.status)}
+                  onClick={() => setMapAccount(a)}
+                />
+              ))}
+              {mapAccount?.lat && mapAccount.lng ? (
+                <InfoWindow
+                  position={{ lat: mapAccount.lat, lng: mapAccount.lng }}
+                  onCloseClick={() => setMapAccount(null)}
+                >
+                  <div className="max-w-xs text-sm">
+                    <Link href={`/accounts/${mapAccount.id}`} className="font-semibold text-slate-900 underline">
+                      {mapAccount.name}
+                    </Link>
+                    <p className="mt-1 text-slate-600">{mapAccount.industry ?? 'No industry'}</p>
+                    <p className="text-slate-600">
+                      ARR:{' '}
+                      {mapAccount.annualRevenue
+                        ? formatCurrency(mapAccount.annualRevenue, 'USD')
+                        : '—'}
+                    </p>
+                  </div>
+                </InfoWindow>
+              ) : null}
+            </GoogleMap>
+          )}
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -182,7 +298,15 @@ export default function AccountsPage(): ReactElement {
                   }}
                   className="cursor-pointer hover:bg-slate-50"
                 >
-                  <td className="px-4 py-2 font-medium text-slate-900">{a.name}</td>
+                  <td className="px-4 py-2 font-medium text-slate-900">
+                    <Link
+                      href={`/accounts/${a.id}`}
+                      className="text-brand-700 hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {a.name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-2 text-slate-600">{a.industry ?? '—'}</td>
                   <td className="px-4 py-2 text-slate-600">
                     {a.annualRevenue

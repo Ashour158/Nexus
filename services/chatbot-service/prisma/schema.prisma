@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/chatbot-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("CHATBOT_DATABASE_URL")
+}
+
+model Conversation {
+  id            String              @id @default(cuid())
+  tenantId      String
+  channel       Channel
+  externalId    String
+  state         ConversationState   @default(IDLE)
+  contactId     String?
+  draftQuoteId  String?
+  context       Json                @default("{}")
+  lastMessageAt DateTime            @default(now())
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  messages      ConversationMessage[]
+
+  @@unique([tenantId, channel, externalId])
+  @@index([tenantId, state])
+}
+
+model ConversationMessage {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  direction      Direction
+  body           String
+  metadata       Json         @default("{}")
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+}
+
+enum Channel {
+  WHATSAPP
+  TELEGRAM
+}
+
+enum Direction {
+  INBOUND
+  OUTBOUND
+}
+
+enum ConversationState {
+  IDLE
+  GREETING
+  COLLECTING_INFO
+  PRODUCT_SEARCH
+  QUOTE_BUILDING
+  QUOTE_REVIEW
+  QUOTE_SENT
+  COMPLETE
+}

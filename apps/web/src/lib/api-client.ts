@@ -14,17 +14,33 @@ import { useUiStore } from '@/stores/ui.store';
 const BASE_URLS: Record<string, string> = {
   crm: process.env.NEXT_PUBLIC_CRM_URL ?? 'http://localhost:3001/api/v1',
   finance: process.env.NEXT_PUBLIC_FINANCE_URL ?? 'http://localhost:3002/api/v1',
-  ai: process.env.NEXT_PUBLIC_AI_URL ?? 'http://localhost:3003/api/v1/ai',
+  ai: process.env.NEXT_PUBLIC_AI_SERVICE_URL ?? 'http://localhost:3025',
   comms: process.env.NEXT_PUBLIC_COMMS_URL ?? 'http://localhost:3004/api/v1',
   workflow: process.env.NEXT_PUBLIC_WF_URL ?? 'http://localhost:3007/api/v1',
   analytics:
     process.env.NEXT_PUBLIC_ANALYTICS_URL ?? 'http://localhost:3008/api/v1/analytics',
   auth: process.env.NEXT_PUBLIC_AUTH_URL ?? 'http://localhost:3010/api/v1',
   notification:
-    process.env.NEXT_PUBLIC_NOTIF_URL ?? 'http://localhost:3003/api/v1',
+    process.env.NEXT_PUBLIC_NOTIFICATION_SERVICE_URL ?? 'http://localhost:3003',
   search: process.env.NEXT_PUBLIC_SEARCH_URL ?? 'http://localhost:3006/api/v1/search',
   storage:
     process.env.NEXT_PUBLIC_STORAGE_URL ?? 'http://localhost:3009/api/v1/storage',
+  integration:
+    process.env.NEXT_PUBLIC_INTEGRATION_URL ?? 'http://localhost:3012/api/v1',
+  cadence:
+    process.env.NEXT_PUBLIC_CADENCE_URL ?? 'http://localhost:3018/api/v1',
+  territory:
+    process.env.NEXT_PUBLIC_TERRITORY_URL ?? 'http://localhost:3019/api/v1',
+  planning:
+    process.env.NEXT_PUBLIC_PLANNING_URL ?? 'http://localhost:3020/api/v1',
+  reporting:
+    process.env.NEXT_PUBLIC_REPORTING_URL ?? 'http://localhost:3021/api/v1',
+  portal:
+    process.env.NEXT_PUBLIC_PORTAL_URL ?? 'http://localhost:3022',
+  knowledge:
+    process.env.NEXT_PUBLIC_KNOWLEDGE_URL ?? 'http://localhost:3023/api/v1',
+  incentive:
+    process.env.NEXT_PUBLIC_INCENTIVE_URL ?? 'http://localhost:3024/api/v1',
 };
 
 interface ApiErrorEnvelope {
@@ -131,6 +147,7 @@ function makeTypedClient(instance: AxiosInstance) {
 export const apiClients = {
   crm: makeTypedClient(createApiClient(BASE_URLS.crm)),
   finance: makeTypedClient(createApiClient(BASE_URLS.finance)),
+  billing: makeTypedClient(createApiClient(BASE_URLS.finance)),
   ai: makeTypedClient(createApiClient(BASE_URLS.ai)),
   comms: makeTypedClient(createApiClient(BASE_URLS.comms)),
   workflow: makeTypedClient(createApiClient(BASE_URLS.workflow)),
@@ -139,6 +156,14 @@ export const apiClients = {
   notification: makeTypedClient(createApiClient(BASE_URLS.notification)),
   search: makeTypedClient(createApiClient(BASE_URLS.search)),
   storage: makeTypedClient(createApiClient(BASE_URLS.storage)),
+  integration: makeTypedClient(createApiClient(BASE_URLS.integration)),
+  cadence: makeTypedClient(createApiClient(BASE_URLS.cadence)),
+  territory: makeTypedClient(createApiClient(BASE_URLS.territory)),
+  planning: makeTypedClient(createApiClient(BASE_URLS.planning)),
+  reporting: makeTypedClient(createApiClient(BASE_URLS.reporting)),
+  portal: makeTypedClient(createApiClient(BASE_URLS.portal)),
+  knowledge: makeTypedClient(createApiClient(BASE_URLS.knowledge)),
+  incentive: makeTypedClient(createApiClient(BASE_URLS.incentive)),
 };
 
 /** Default CRM-scoped client — the one consumed by `hooks/use-deals.ts`. */

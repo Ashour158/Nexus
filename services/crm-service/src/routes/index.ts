@@ -8,6 +8,8 @@ import { registerLeadsRoutes } from './leads.routes.js';
 import { registerPipelinesRoutes } from './pipelines.routes.js';
 import { registerActivitiesRoutes } from './activities.routes.js';
 import { registerNotesRoutes } from './notes.routes.js';
+import { registerEmailThreadsRoutes } from './email-threads.routes.js';
+import { registerCrmReportsRoutes } from './reports.routes.js';
 
 /**
  * Registers every CRM HTTP route under `/api/v1` — Section 34.2 + 34.3.
@@ -24,4 +26,6 @@ export async function registerAllRoutes(
   await registerDealsRoutes(app, prisma, producer);
   await registerActivitiesRoutes(app, prisma, producer);
   await registerNotesRoutes(app, prisma);
+  await registerEmailThreadsRoutes(app, prisma);
+  await registerCrmReportsRoutes(app, prisma);
 }

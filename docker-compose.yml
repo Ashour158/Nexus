@@ -120,9 +120,11 @@ services:
     container_name: nexus-auth
     restart: unless-stopped
     ports:
-      - '3010:3010'
+      - '3000:3000'
+    environment:
+      PORT: '3000'
     env_file:
-      - ./services/auth-service/.env
+      - ./services/auth-service/.env.example
     depends_on:
       postgres:
         condition: service_healthy
@@ -140,7 +142,7 @@ services:
     ports:
       - '3001:3001'
     env_file:
-      - ./services/crm-service/.env
+      - ./services/crm-service/.env.example
     depends_on:
       postgres:
         condition: service_healthy
@@ -156,7 +158,7 @@ services:
     ports:
       - '3002:3002'
     env_file:
-      - ./services/finance-service/.env
+      - ./services/finance-service/.env.example
     depends_on:
       postgres:
         condition: service_healthy
@@ -172,7 +174,7 @@ services:
     ports:
       - '3003:3003'
     env_file:
-      - ./services/notification-service/.env
+      - ./services/notification-service/.env.example
     depends_on:
       postgres:
         condition: service_healthy
@@ -227,6 +229,54 @@ services:
       kafka:
         condition: service_started
 
+  billing-service:
+    build:
+      context: .
+      dockerfile: ./services/billing-service/Dockerfile
+    container_name: nexus-billing
+    restart: unless-stopped
+    ports:
+      - '3011:3011'
+    env_file:
+      - ./services/billing-service/.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  integration-service:
+    build:
+      context: .
+      dockerfile: ./services/integration-service/Dockerfile
+    container_name: nexus-integration
+    restart: unless-stopped
+    ports:
+      - '3012:3012'
+    env_file:
+      - ./services/integration-service/.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  blueprint-service:
+    build:
+      context: .
+      dockerfile: ./services/blueprint-service/Dockerfile
+    container_name: nexus-blueprint
+    restart: unless-stopped
+    ports:
+      - '3013:3013'
+    env_file:
+      - ./services/blueprint-service/.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
   analytics-service:
     build:
       context: .
@@ -249,7 +299,6 @@ services:
     restart: unless-stopped
     ports:
       - '8123:8123'
-      - '9000:9000'
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - ./services/analytics-service/src/ddl/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -263,7 +312,7 @@ services:
     ports:
       - '3100:3000'
     env_file:
-      - ./apps/web/.env.local
+      - ./apps/web/.env.example
     depends_on:
       - auth-service
       - crm-service
@@ -273,12 +322,298 @@ services:
       - search-service
       - workflow-service
       - analytics-service
+      - comm-service
+      - storage-service
+      - billing-service
+      - integration-service
+      - blueprint-service
+
+  comm-service:
+    build:
+      context: .
+      dockerfile: ./services/comm-service/Dockerfile
+    container_name: nexus-comm
+    restart: unless-stopped
+    ports:
+      - '3009:3009'
+    env_file:
+      - ./services/comm-service/.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  storage-service:
+    build:
+      context: .
+      dockerfile: ./services/storage-service/Dockerfile
+    container_name: nexus-storage
+    restart: unless-stopped
+    ports:
+      - '3010:3010'
+    env_file:
+      - ./services/storage-service/.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  approval-service:
+    build:
+      context: .
+      dockerfile: ./services/approval-service/Dockerfile
+    container_name: nexus-approval
+    restart: unless-stopped
+    ports:
+      - '3014:3014'
+    environment:
+      PORT: '3014'
+    env_file:
+      - ./services/approval-service/.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  data-service:
+    build:
+      context: .
+      dockerfile: ./services/data-service/Dockerfile
+    container_name: nexus-data
+    restart: unless-stopped
+    ports:
+      - '3015:3015'
+    environment:
+      PORT: '3015'
+    env_file:
+      - ./services/data-service/.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  document-service:
+    build:
+      context: .
+      dockerfile: ./services/document-service/Dockerfile
+    container_name: nexus-document
+    restart: unless-stopped
+    ports:
+      - '3016:3016'
+    environment:
+      PORT: '3016'
+    env_file:
+      - ./services/document-service/.env.example
+    depends_on:
+      - finance-service
+
+  chatbot-service:
+    build:
+      context: .
+      dockerfile: ./services/chatbot-service/Dockerfile
+    container_name: nexus-chatbot
+    restart: unless-stopped
+    ports:
+      - '3017:3017'
+    environment:
+      PORT: '3017'
+    env_file:
+      - ./services/chatbot-service/.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  cadence-service:
+    build:
+      context: .
+      dockerfile: ./services/cadence-service/Dockerfile
+    container_name: nexus-cadence
+    restart: unless-stopped
+    ports:
+      - '3018:3018'
+    environment:
+      PORT: '3018'
+    env_file:
+      - ./services/cadence-service/.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  territory-service:
+    build:
+      context: .
+      dockerfile: ./services/territory-service/Dockerfile
+    container_name: nexus-territory
+    restart: unless-stopped
+    ports:
+      - '3019:3019'
+    environment:
+      PORT: '3019'
+    env_file:
+      - ./services/territory-service/.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  planning-service:
+    build:
+      context: .
+      dockerfile: ./services/planning-service/Dockerfile
+    container_name: nexus-planning
+    restart: unless-stopped
+    ports:
+      - '3020:3020'
+    environment:
+      PORT: '3020'
+    env_file:
+      - ./services/planning-service/.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  reporting-service:
+    build:
+      context: .
+      dockerfile: ./services/reporting-service/Dockerfile
+    container_name: nexus-reporting
+    restart: unless-stopped
+    ports:
+      - '3021:3021'
+    environment:
+      PORT: '3021'
+    env_file:
+      - ./services/reporting-service/.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  portal-service:
+    build:
+      context: .
+      dockerfile: ./services/portal-service/Dockerfile
+    container_name: nexus-portal
+    restart: unless-stopped
+    ports:
+      - '3022:3022'
+    environment:
+      PORT: '3022'
+    env_file:
+      - ./services/portal-service/.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  knowledge-service:
+    build:
+      context: .
+      dockerfile: ./services/knowledge-service/Dockerfile
+    container_name: nexus-knowledge
+    restart: unless-stopped
+    ports:
+      - '3023:3023'
+    environment:
+      PORT: '3023'
+    env_file:
+      - ./services/knowledge-service/.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  incentive-service:
+    build:
+      context: .
+      dockerfile: ./services/incentive-service/Dockerfile
+    container_name: nexus-incentive
+    restart: unless-stopped
+    ports:
+      - '3024:3024'
+    environment:
+      PORT: '3024'
+    env_file:
+      - ./services/incentive-service/.env.example
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: ./services/ai-service/Dockerfile
+    container_name: nexus-ai
+    restart: unless-stopped
+    ports:
+      - '3025:8000'
+    env_file:
+      - ./services/ai-service/.env.example
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: nexus-prometheus
+    restart: unless-stopped
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: nexus-grafana
+    restart: unless-stopped
+    ports:
+      - '3200:3000'
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: nexus-grafana
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: nexus-nginx
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - web
+      - auth-service
+      - crm-service
 
 volumes:
   postgres_data:
   redis_data:
-  minio_data:
-  kafka_data:
   zookeeper_data:
+  kafka_data:
   meilisearch_data:
+  minio_data:
   clickhouse_data:
+  prometheus_data:
+  grafana_data:

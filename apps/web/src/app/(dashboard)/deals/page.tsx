@@ -4,7 +4,7 @@ import { useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import type { Stage } from '@nexus/shared-types';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import { PipelineBoard } from '@/components/deals/pipeline-board';
 import { usePipelines, useStages } from '@/hooks/use-pipelines';
 import { usePipelineStore } from '@/stores/pipeline.store';
@@ -67,10 +67,8 @@ export default function DealsPage() {
       </header>
 
       {pipelinesQuery.isLoading || stagesQuery.isLoading ? (
-        <div className="grid grid-cols-4 gap-3">
-          {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-[60vh] rounded-md" />
-          ))}
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+          <TableSkeleton rows={8} cols={5} />
         </div>
       ) : pipelinesQuery.isError ? (
         <ErrorBanner message="Failed to load pipelines. Try again." />
@@ -81,7 +79,11 @@ export default function DealsPage() {
       ) : stages.length === 0 ? (
         <EmptyState message="This pipeline has no stages yet." />
       ) : (
-        <PipelineBoard pipelineId={resolvedPipelineId} stages={stages} />
+        <div className="-mx-4 overflow-x-auto px-4">
+          <div className="min-w-max pb-4">
+            <PipelineBoard pipelineId={resolvedPipelineId} stages={stages} />
+          </div>
+        </div>
       )}
     </main>
   );

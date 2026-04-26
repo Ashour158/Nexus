@@ -1,3 +1,4 @@
+import { formatCurrency as formatCurrencyValue } from './currency';
 /**
  * Formatting helpers for the CRM UI.
  *
@@ -22,16 +23,7 @@ export function formatCurrency(
   currency: string = 'USD',
   locale: string = 'en-US'
 ): string {
-  const value = parseDecimal(amount);
-  try {
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 0,
-    }).format(value);
-  } catch {
-    return `${currency} ${value.toFixed(0)}`;
-  }
+  return formatCurrencyValue(parseDecimal(amount), currency, locale);
 }
 
 /**
@@ -78,3 +70,5 @@ export function formatDateTime(
     minute: '2-digit',
   }).format(d);
 }
+
+export { getCurrencySymbol, SUPPORTED_CURRENCIES } from './currency';

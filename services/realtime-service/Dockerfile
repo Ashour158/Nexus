@@ -1,34 +1,39 @@
-FROM node:20-alpine AS base
-RUN corepack enable && corepack prepare pnpm@9 --activate
-
-FROM base AS deps
+# -- Stage 1: Install dependencies ------------------------------------------------
+FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY tsconfig.base.json ./
+RUN apk add --no-cache libc6-compat
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/ ./packages/
 COPY services/realtime-service/package.json ./services/realtime-service/
-RUN pnpm install --frozen-lockfile
 
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages ./packages
-COPY tsconfig.base.json ./
-COPY packages ./packages
-COPY services/realtime-service ./services/realtime-service
-WORKDIR /app/services/realtime-service
-RUN pnpm build
+RUN pnpm install --frozen-lockfile --filter realtime-service...
 
+# -- Stage 2: Build ----------------------------------------------------------------
+FROM deps AS builder
+COPY services/realtime-service/ ./services/realtime-service/
+COPY packages/ ./packages/
+
+RUN pnpm --filter realtime-service run build
+
+# -- Stage 3: Production runner ----------------------------------------------------
 FROM node:20-alpine AS runner
 WORKDIR /app
-ENV NODE_ENV=production
-ENV PORT=3005
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nexus
-COPY --from=builder --chown=nexus:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nexus:nodejs /app/packages ./packages
-COPY --from=builder --chown=nexus:nodejs /app/services/realtime-service/dist ./services/realtime-service/dist
-COPY --from=builder --chown=nexus:nodejs /app/services/realtime-service/package.json ./services/realtime-service/package.json
-USER nexus
-WORKDIR /app/services/realtime-service
+
+RUN addgroup --system --gid 1001 nodejs \
+ && adduser --system --uid 1001 service
+
+COPY --from=builder --chown=service:nodejs /app/services/realtime-service/dist ./dist
+COPY --from=builder --chown=service:nodejs /app/services/realtime-service/package.json ./package.json
+COPY --from=builder --chown=service:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=service:nodejs /app/packages ./packages
+
+USER service
 EXPOSE 3005
+ENV NODE_ENV=production PORT=3005
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=45s --retries=3 \
+  CMD wget -qO- http://localhost:3005/health || exit 1
+
 CMD ["node", "dist/index.js"]

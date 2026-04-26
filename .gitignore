@@ -39,3 +39,9 @@ Thumbs.db
 
 # Misc
 *.tsbuildinfo
+
+# Local environment files - NEVER commit
+.env.local
+**/.env.local
+.env*.local
+**/.env*.local

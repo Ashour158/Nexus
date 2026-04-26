@@ -1,10 +1,11 @@
 import {
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
   type QueryKey,
 } from '@tanstack/react-query';
-import type { Contact, PaginatedResult } from '@nexus/shared-types';
+import type { Contact, Deal, PaginatedResult, TimelineEvent } from '@nexus/shared-types';
 import type {
   CreateContactInput,
   UpdateContactInput,
@@ -88,6 +89,34 @@ export function useUpdateContact() {
       qc.invalidateQueries({ queryKey: contactKeys.detail(id) });
       qc.invalidateQueries({ queryKey: contactKeys.lists() });
     },
+  });
+}
+
+export function useContactDeals(
+  contactId: string,
+  opts: { page?: number; limit?: number } = {}
+) {
+  return useQuery({
+    queryKey: [...contactKeys.detail(contactId), 'deals', opts] as QueryKey,
+    queryFn: () =>
+      api.get<{ data: Deal[]; total: number }>(`/contacts/${contactId}/deals`, {
+        params: { page: opts.page ?? 1, limit: opts.limit ?? 25 },
+      }),
+    enabled: Boolean(contactId),
+  });
+}
+
+export function useContactTimeline(contactId: string) {
+  return useInfiniteQuery({
+    queryKey: [...contactKeys.detail(contactId), 'timeline'] as QueryKey,
+    queryFn: ({ pageParam }) =>
+      api.get<{ events: TimelineEvent[]; nextCursor: string | null }>(
+        `/contacts/${contactId}/timeline`,
+        { params: { cursor: pageParam } }
+      ),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    enabled: Boolean(contactId),
   });
 }
 

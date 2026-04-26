@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/cadence-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("CADENCE_DATABASE_URL")
+}
+
+model CadenceTemplate {
+  id            String              @id @default(cuid())
+  tenantId      String
+  name          String
+  description   String?
+  objectType    ObjectType          @default(CONTACT)
+  isActive      Boolean             @default(true)
+  exitOnReply   Boolean             @default(true)
+  exitOnMeeting Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  steps         CadenceStep[]
+  enrollments   CadenceEnrollment[]
+
+  @@index([tenantId])
+}
+
+model CadenceStep {
+  id        String          @id @default(cuid())
+  cadenceId String
+  cadence   CadenceTemplate @relation(fields: [cadenceId], references: [id], onDelete: Cascade)
+  position  Int
+  type      StepType
+  delayDays Int             @default(0)
+  subject   String?
+  body      String?
+  taskTitle String?
+  variantB  Json?
+  createdAt DateTime        @default(now())
+
+  @@index([cadenceId])
+}
+
+model CadenceEnrollment {
+  id          String           @id @default(cuid())
+  tenantId    String
+  cadenceId   String
+  cadence     CadenceTemplate  @relation(fields: [cadenceId], references: [id])
+  objectType  ObjectType
+  objectId    String
+  ownerId     String
+  status      EnrollmentStatus @default(ACTIVE)
+  currentStep Int              @default(0)
+  enrolledAt  DateTime         @default(now())
+  exitReason  String?
+  exitedAt    DateTime?
+  executions  StepExecution[]
+
+  @@unique([tenantId, cadenceId, objectId])
+  @@index([tenantId, status])
+}
+
+model StepExecution {
+  id           String            @id @default(cuid())
+  enrollmentId String
+  enrollment   CadenceEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  stepPosition Int
+  stepType     StepType
+  status       ExecutionStatus   @default(PENDING)
+  scheduledAt  DateTime
+  executedAt   DateTime?
+  result       String?
+  variant      String            @default("A")
+  createdAt    DateTime          @default(now())
+
+  @@index([enrollmentId])
+  @@index([status, scheduledAt])
+}
+
+enum ObjectType {
+  CONTACT
+  LEAD
+}
+
+enum StepType {
+  EMAIL
+  CALL_TASK
+  LINKEDIN_TASK
+  SMS
+  WAIT
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  EXITED
+}
+
+enum ExecutionStatus {
+  PENDING
+  EXECUTED
+  SKIPPED
+  FAILED
+}

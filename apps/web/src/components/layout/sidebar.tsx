@@ -1,251 +1,179 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, type ReactElement } from 'react';
+import {
+  Activity,
+  BarChart2,
+  BookOpen,
+  Briefcase,
+  Building2,
+  CalendarIcon,
+  CheckSquare,
+  DollarSign,
+  FileText,
+  GitBranch,
+  Globe,
+  LayoutDashboard,
+  Mail,
+  Map,
+  Package,
+  ShieldCheck,
+  TrendingUp,
+  Users,
+  Users2,
+  X,
+} from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/auth.store';
 import { useUiStore } from '@/stores/ui.store';
-import {
-  BriefcaseIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  FileTextIcon,
-  LayoutIcon,
-  PhoneIcon,
-  ReceiptIcon,
-  SettingsIcon,
-  UsersIcon,
-  XIcon,
-  type IconProps,
-} from '@/components/ui/icons';
 
-/**
- * Left-hand sidebar (Section 50 layout). Sections:
- *  1. CRM — Deals, Contacts, Accounts, Leads, Activities
- *  2. Finance — Quotes, Invoices
- *  3. Platform — Settings
- *
- * Collapsed/expanded state is stored in `useUiStore` so other parts of the
- * shell (Topbar, content area) can react. Mobile: slides in from the left
- * over a darkened backdrop.
- */
+interface SidebarProps {
+  mobileOpen: boolean;
+  onMobileClose: () => void;
+}
 
-interface NavItem {
-  label: string;
+type NavItem = {
   href: string;
-  Icon: (p: IconProps) => ReactElement;
-  /** Optional numeric badge (e.g. overdue counts). Falsy values hide it. */
-  badge?: number | null;
-}
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+};
 
-interface NavSection {
-  heading: string;
+type NavGroup = {
+  label: string;
   items: NavItem[];
-}
+};
 
-const SECTIONS: NavSection[] = [
+const NAV_GROUPS: NavGroup[] = [
   {
-    heading: 'CRM',
+    label: 'My Work',
     items: [
-      { label: 'Deals', href: '/deals', Icon: BriefcaseIcon },
-      { label: 'Contacts', href: '/contacts', Icon: UsersIcon },
-      { label: 'Accounts', href: '/accounts', Icon: LayoutIcon },
-      { label: 'Leads', href: '/leads', Icon: PhoneIcon },
-      { label: 'Activities', href: '/activities', Icon: FileTextIcon },
+      { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/deals', label: 'Deals', icon: Briefcase },
+      { href: '/contacts', label: 'Contacts', icon: Users },
+      { href: '/accounts', label: 'Companies', icon: Building2 },
+      { href: '/tasks', label: 'Tasks', icon: CheckSquare },
+      { href: '/activities', label: 'Activities', icon: Activity },
+      { href: '/calendar', label: 'Calendar', icon: CalendarIcon },
     ],
   },
   {
-    heading: 'Finance',
+    label: 'Sales',
     items: [
-      { label: 'Quotes', href: '/quotes', Icon: FileTextIcon },
-      { label: 'Invoices', href: '/invoices', Icon: ReceiptIcon },
+      { href: '/cadences', label: 'Sequences', icon: Mail },
+      { href: '/products', label: 'Products', icon: Package },
+      { href: '/documents', label: 'Documents', icon: FileText },
+      { href: '/knowledge', label: 'Knowledge', icon: BookOpen },
+      { href: '/commissions', label: 'Commissions', icon: DollarSign },
     ],
   },
   {
-    heading: 'Platform',
-    items: [{ label: 'Settings', href: '/settings', Icon: SettingsIcon }],
+    label: 'Reports',
+    items: [
+      { href: '/pipeline/analytics', label: 'Pipeline', icon: TrendingUp },
+      { href: '/reports/performance', label: 'Performance', icon: BarChart2 },
+      { href: '/reports/manager', label: 'Manager View', icon: Users2 },
+      { href: '/territories', label: 'Territories', icon: Map },
+    ],
+  },
+  {
+    label: 'Tools',
+    items: [
+      { href: '/approvals', label: 'Approvals', icon: ShieldCheck },
+      { href: '/workflows', label: 'Workflows', icon: GitBranch },
+      { href: '/portal/settings', label: 'Portal', icon: Globe },
+    ],
   },
 ];
 
-function initialsFor(userId: string | null): string {
-  if (!userId) return 'NX';
-  return userId.slice(0, 2).toUpperCase();
-}
-
-export interface SidebarProps {
-  className?: string;
-}
-
-export function Sidebar({ className }: SidebarProps): ReactElement {
+export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps): ReactElement {
   const pathname = usePathname() ?? '/';
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const toggle = useUiStore((s) => s.toggleSidebar);
-  const setCollapsed = useUiStore((s) => s.setSidebarCollapsed);
-  const mobileOpen = useUiStore((s) => s.sidebarOpenOnMobile);
-  const setMobileOpen = useUiStore((s) => s.setSidebarOpenOnMobile);
+  const roles = useAuthStore((s) => s.roles);
 
-  const { tenantId, userId } = useAuthStore((s) => ({
-    tenantId: s.tenantId,
-    userId: s.userId,
-  }));
-
-  // Keyboard shortcut: Cmd/Ctrl + B
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onMobileClose();
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
         e.preventDefault();
         toggle();
       }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [toggle]);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onMobileClose, toggle]);
 
-  // Auto-collapse under the `lg` breakpoint (Tailwind default: 1024px).
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const mq = window.matchMedia('(max-width: 1023px)');
-    const apply = () => setCollapsed(mq.matches);
-    apply();
-    mq.addEventListener('change', apply);
-    return () => mq.removeEventListener('change', apply);
-  }, [setCollapsed]);
-
-  const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(`${href}/`);
+  const isActive = (href: string) => pathname === href || (href !== '/' && pathname.startsWith(href));
 
   return (
     <>
-      {/* Mobile backdrop */}
       {mobileOpen ? (
-        <button
-          type="button"
-          aria-label="Close navigation"
-          onClick={() => setMobileOpen(false)}
-          className="fixed inset-0 z-30 bg-slate-900/50 lg:hidden"
-        />
+        <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={onMobileClose} aria-hidden="true" />
       ) : null}
 
       <aside
-        data-collapsed={collapsed || undefined}
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex flex-col border-r border-slate-200 bg-white transition-[width,transform] duration-200',
-          collapsed ? 'w-16' : 'w-60',
-          mobileOpen
-            ? 'translate-x-0'
-            : 'lg:translate-x-0 max-lg:-translate-x-full',
-          className
+          'fixed inset-y-0 start-0 z-40 flex w-64 flex-col border-e border-gray-200 bg-white transition-transform duration-300 ease-in-out',
+          'lg:static lg:translate-x-0 lg:z-auto',
+          collapsed ? 'lg:w-16' : 'lg:w-60',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
-        {/* Brand */}
-        <div className="flex h-14 items-center justify-between border-b border-slate-200 px-3">
-          <Link
-            href="/"
-            className="flex items-center gap-2 font-semibold text-slate-900"
-          >
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-900 text-white">
-              N
-            </span>
+        <div className="flex h-14 items-center justify-between border-b border-gray-200 px-3">
+          <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-gray-900">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-gray-900 text-white">N</span>
             {!collapsed ? <span>Nexus</span> : null}
           </Link>
-          <button
-            type="button"
-            onClick={() => setMobileOpen(false)}
-            className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 lg:hidden"
-            aria-label="Close menu"
-          >
-            <XIcon size={18} />
+          <button type="button" onClick={onMobileClose} className="rounded p-1.5 text-gray-500 hover:bg-gray-100 lg:hidden" aria-label="Close sidebar">
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Nav */}
-        <nav
-          className="flex-1 overflow-y-auto px-2 py-3"
-          aria-label="Primary navigation"
-        >
-          {SECTIONS.map((section) => (
-            <div key={section.heading} className="mb-4">
+        <nav className="flex-1 space-y-6 overflow-y-auto px-2 py-4" aria-label="Primary navigation">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label}>
               {!collapsed ? (
-                <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  {section.heading}
-                </div>
-              ) : (
-                <div className="mx-2 my-2 border-t border-slate-100" />
-              )}
+                <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">{group.label}</p>
+              ) : null}
               <ul className="space-y-0.5">
-                {section.items.map((item) => {
-                  const active = isActive(item.href);
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        aria-current={active ? 'page' : undefined}
-                        title={collapsed ? item.label : undefined}
-                        className={cn(
-                          'group flex items-center gap-3 rounded-md px-2 py-2 text-sm transition-colors',
-                          active
-                            ? 'bg-slate-900 text-white'
-                            : 'text-slate-700 hover:bg-slate-100'
-                        )}
-                      >
-                        <item.Icon size={18} />
-                        {!collapsed ? (
-                          <span className="flex-1 truncate">{item.label}</span>
-                        ) : null}
-                        {!collapsed && item.badge ? (
-                          <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-semibold text-white">
-                            {item.badge}
-                          </span>
-                        ) : null}
-                      </Link>
-                    </li>
-                  );
-                })}
+                {group.items
+                  .filter((item) => item.href !== '/reports/manager' || roles.includes('manager') || roles.includes('admin'))
+                  .map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.href);
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          onClick={onMobileClose}
+                          className={cn(
+                            'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition',
+                            active ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                            collapsed && 'justify-center px-2'
+                          )}
+                          title={collapsed ? item.label : undefined}
+                        >
+                          <Icon className="h-4 w-4 shrink-0" />
+                          {!collapsed ? item.label : null}
+                        </Link>
+                      </li>
+                    );
+                  })}
               </ul>
             </div>
           ))}
         </nav>
 
-        {/* Footer — user + collapse toggle */}
-        <div className="border-t border-slate-200 p-3">
-          <div
-            className={cn(
-              'flex items-center gap-2 rounded-md p-2',
-              collapsed ? 'justify-center' : 'bg-slate-50'
-            )}
-          >
-            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
-              {initialsFor(userId)}
-            </span>
-            {!collapsed ? (
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium text-slate-900">
-                  {userId ?? 'Not signed in'}
-                </div>
-                <div className="truncate text-xs text-slate-500">
-                  {tenantId ?? 'No tenant'}
-                </div>
-              </div>
-            ) : null}
+        {roles.includes('admin') ? (
+          <div className="border-t border-gray-200 p-2">
+            <Link href="/admin" className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-50">
+              <ShieldCheck className="h-4 w-4" />
+              {!collapsed ? 'Admin Panel' : null}
+            </Link>
           </div>
-          <button
-            type="button"
-            onClick={toggle}
-            className="mt-2 hidden w-full items-center justify-center gap-2 rounded-md border border-slate-200 px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-100 lg:inline-flex"
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            title="Toggle (⌘B / Ctrl+B)"
-          >
-            {collapsed ? (
-              <ChevronRightIcon size={14} />
-            ) : (
-              <>
-                <ChevronLeftIcon size={14} />
-                <span>Collapse</span>
-              </>
-            )}
-          </button>
-        </div>
+        ) : null}
       </aside>
     </>
   );

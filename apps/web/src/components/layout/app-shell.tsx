@@ -20,17 +20,19 @@ export interface AppShellProps {
  */
 export function AppShell({ children, className }: AppShellProps): ReactElement {
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
+  const mobileOpen = useUiStore((s) => s.sidebarOpenOnMobile);
+  const setMobileOpen = useUiStore((s) => s.setSidebarOpenOnMobile);
 
   return (
     <div
       data-sidebar-collapsed={collapsed || undefined}
       className="min-h-screen bg-slate-50 text-slate-900"
     >
-      <Sidebar />
+      <Sidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
       <div
         className={cn(
           'flex min-h-screen flex-col transition-[padding] duration-200',
-          collapsed ? 'lg:pl-16' : 'lg:pl-60'
+          collapsed ? 'lg:ps-16' : 'lg:ps-60'
         )}
       >
         <Topbar />

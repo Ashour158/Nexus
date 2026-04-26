@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { getLocale } from 'next-intl/server';
 import { AppProviders } from './providers';
 import './globals.css';
 
@@ -8,10 +9,13 @@ export const metadata: Metadata = {
   description: 'Enterprise revenue platform — Nexus CRM',
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const locale = await getLocale();
+  const dir = locale === 'ar' ? 'rtl' : 'ltr';
+
   return (
-    <html lang="en">
-      <body className="min-h-screen antialiased">
+    <html lang={locale} dir={dir}>
+      <body>
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

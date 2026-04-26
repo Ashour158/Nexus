@@ -1,0 +1,25 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/storage-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model FileAttachment {
+  id          String   @id @default(cuid())
+  tenantId    String
+  uploadedBy  String
+  entityType  String
+  entityId    String
+  filename    String
+  storedKey   String
+  mimeType    String
+  sizeBytes   Int
+  url         String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, entityType, entityId])
+}

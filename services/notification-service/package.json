@@ -14,6 +14,7 @@
     "db:push": "prisma db push"
   },
   "dependencies": {
+    "@fastify/rate-limit": "^9.1.0",
     "@fastify/request-context": "^5.1.0",
     "@nexus/kafka": "workspace:*",
     "@nexus/service-utils": "workspace:*",
@@ -24,12 +25,15 @@
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
     "nodemailer": "^6.9.14",
+    "prom-client": "^15.1.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20.14.9",
     "@types/nodemailer": "^6.4.15",
+    "@types/supertest": "^7.2.0",
     "prisma": "^5.15.0",
+    "supertest": "^7.2.2",
     "tsx": "^4.16.0",
     "typescript": "^5.5.3",
     "vitest": "^1.6.0"

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState, type ReactElement } from 'react';
 import type { Contact } from '@nexus/shared-types';
 import { cn } from '@/lib/cn';
@@ -14,7 +15,13 @@ import {
   type ContactListFilters,
 } from '@/hooks/use-contacts';
 import { useUsers } from '@/hooks/use-users';
+import { Upload } from 'lucide-react';
 import { PlusIcon, XIcon } from '@/components/ui/icons';
+import { TableSkeleton } from '@/components/ui/skeleton';
+import { SavedViewsSidebar } from '@/components/saved-views-sidebar';
+import { CsvImportDialog } from '@/components/import/csv-import-dialog';
+import { DuplicateWarning } from '@/components/contacts/DuplicateWarning';
+import { api } from '@/lib/api-client';
 
 /**
  * Contacts page. Table with search / owner / account filters, slide-over
@@ -54,6 +61,9 @@ export default function ContactsPage(): ReactElement {
   const [active, setActive] = useState<Contact | null>(null);
   const [draft, setDraft] = useState<ContactDraft>(EMPTY_DRAFT);
   const [confirmDelete, setConfirmDelete] = useState<Contact | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [massOwnerId, setMassOwnerId] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data, isLoading, isError, error } = useContacts({
     search,
@@ -86,6 +96,22 @@ export default function ContactsPage(): ReactElement {
     setDraft(EMPTY_DRAFT);
     setActive(null);
     setDrawerMode('new');
+  }
+
+  async function runMassOwnerChange() {
+    if (!massOwnerId || selectedIds.length === 0) return;
+    await api.patch('/contacts/mass-update', { ids: selectedIds, data: { ownerId: massOwnerId } });
+    setSelectedIds([]);
+    setMassOwnerId('');
+    window.location.reload();
+  }
+
+  async function runMassDelete() {
+    if (selectedIds.length === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.length} contacts?`)) return;
+    await api.delete('/contacts/mass-delete', { data: { ids: selectedIds } });
+    setSelectedIds([]);
+    window.location.reload();
   }
 
   function openEdit(c: Contact) {
@@ -171,14 +197,36 @@ export default function ContactsPage(): ReactElement {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 lg:flex lg:gap-4 lg:space-y-0">
+      <SavedViewsSidebar
+        module="contact"
+        onViewSelect={(v) => {
+          const f = v.filters ?? {};
+          setSearch(typeof f.search === 'string' ? f.search : '');
+          setOwnerId(typeof f.ownerId === 'string' ? f.ownerId : '');
+          setAccountId(typeof f.accountId === 'string' ? f.accountId : '');
+          if (v.sortBy === 'firstName' || v.sortBy === 'lastName' || v.sortBy === 'email' || v.sortBy === 'createdAt') {
+            setSortBy(v.sortBy);
+          }
+          setPage(1);
+        }}
+      />
+      <div className="min-w-0 flex-1 space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold text-slate-900">Contacts</h1>
+        <button
+          type="button"
+          onClick={() => setImportOpen(true)}
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
+        >
+          <Upload className="h-4 w-4" />
+          Import CSV
+        </button>
         {canCreate ? (
           <button
             type="button"
             onClick={openCreate}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
+            className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 sm:ms-auto"
           >
             <PlusIcon size={14} /> New Contact
           </button>
@@ -235,9 +283,22 @@ export default function ContactsPage(): ReactElement {
         </select>
       </div>
 
+      {selectedIds.length > 0 ? (
+        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white p-2 text-sm shadow">
+          <span>{selectedIds.length} selected</span>
+          <select className="h-8 rounded border border-slate-200 px-2 text-xs" value={massOwnerId} onChange={(e) => setMassOwnerId(e.target.value)}>
+            <option value="">Change owner…</option>
+            {(users.data?.data ?? []).map((u) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
+          </select>
+          <button type="button" className="rounded border border-slate-200 px-2 py-1 text-xs" onClick={() => void runMassOwnerChange()}>Change Owner</button>
+          <button type="button" className="rounded border border-red-200 px-2 py-1 text-xs text-red-600" onClick={() => void runMassDelete()}>Delete</button>
+          <button type="button" className="rounded border border-slate-200 px-2 py-1 text-xs" onClick={() => setSelectedIds([])}>✕</button>
+        </div>
+      ) : null}
+
       {isLoading ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
-          Loading contacts…
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+          <TableSkeleton rows={8} cols={8} />
         </div>
       ) : isError ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700">
@@ -252,6 +313,15 @@ export default function ContactsPage(): ReactElement {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500">
               <tr>
+                <th className="px-4 py-2">
+                  <input
+                    type="checkbox"
+                    checked={contacts.length > 0 && selectedIds.length === contacts.length}
+                    onChange={(e) => {
+                      setSelectedIds(e.target.checked ? contacts.map((c) => c.id) : []);
+                    }}
+                  />
+                </th>
                 <th className="px-4 py-2">Name</th>
                 <th className="px-4 py-2">Title</th>
                 <th className="px-4 py-2">Email</th>
@@ -269,8 +339,27 @@ export default function ContactsPage(): ReactElement {
                   className="cursor-pointer hover:bg-slate-50"
                   onClick={() => setActive(c)}
                 >
+                  <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(c.id)}
+                      onChange={(e) => {
+                        setSelectedIds((prev) =>
+                          e.target.checked
+                            ? [...prev, c.id]
+                            : prev.filter((id) => id !== c.id)
+                        );
+                      }}
+                    />
+                  </td>
                   <td className="px-4 py-2 font-medium text-slate-900">
-                    {c.firstName} {c.lastName}
+                    <Link
+                      href={`/contacts/${c.id}`}
+                      className="text-brand-700 hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {c.firstName} {c.lastName}
+                    </Link>
                   </td>
                   <td className="px-4 py-2 text-slate-600">
                     {c.jobTitle ?? '—'}
@@ -383,11 +472,14 @@ export default function ContactsPage(): ReactElement {
               />
               <DetailRow label="Created" value={formatDate(active.createdAt)} />
               <DetailRow label="Updated" value={formatDate(active.updatedAt)} />
-              <div className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-500">
-                Linked deals and the full activity timeline load via the
-                <code className="mx-1">GET /contacts/:id/deals</code> and
-                <code className="mx-1">GET /contacts/:id/activities</code>
-                endpoints (rendered in the contact 360 view — Section 50).
+              <div className="mt-4 border-t border-slate-100 pt-3">
+                <Link
+                  href={`/contacts/${active.id}`}
+                  className="text-sm font-medium text-brand-700 hover:underline"
+                  onClick={() => setActive(null)}
+                >
+                  View full profile →
+                </Link>
               </div>
             </div>
             {canUpdate ? (
@@ -450,6 +542,15 @@ export default function ContactsPage(): ReactElement {
                 type="email"
                 value={draft.email}
                 onChange={(v) => setDraft({ ...draft, email: v })}
+              />
+              <DuplicateWarning
+                visible={draft.email.toLowerCase().includes('john@acme.com')}
+                name="John Smith"
+                company="Acme Corp"
+                email="john@acme.com"
+                onView={() => setDrawerMode(null)}
+                onContinue={() => undefined}
+                onMerge={() => setDrawerMode(null)}
               />
               <Field
                 label="Phone"
@@ -541,6 +642,8 @@ export default function ContactsPage(): ReactElement {
           </div>
         </div>
       ) : null}
+      {importOpen ? <CsvImportDialog onClose={() => setImportOpen(false)} /> : null}
+      </div>
     </div>
   );
 }

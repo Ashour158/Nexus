@@ -40,6 +40,20 @@ export interface HealthCheck {
   message?: string;
 }
 
+export interface HealthResponse {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  service: string;
+  version: string;
+  uptime: number;
+  timestamp: string;
+  checks: {
+    name: string;
+    status: 'pass' | 'warn' | 'fail';
+    responseTime?: number;
+    message?: string;
+  }[];
+}
+
 /** Minimal client shape for `SELECT 1` (any Prisma client). */
 export type SqlPingClient = {
   $queryRaw: (args: TemplateStringsArray, ...values: unknown[]) => Promise<unknown>;
@@ -99,18 +113,43 @@ export function registerHealthRoutes(
   checkFns: Array<() => Promise<HealthCheck>>
 ): void {
   app.get('/health', async (_req, reply) => {
-    reply.send({ status: 'ok', service: serviceName, ts: new Date().toISOString() });
+    const checks = await Promise.all(checkFns.map((fn) => fn()));
+    const hasFail = checks.some((c) => !c.ok);
+    const payload: HealthResponse = {
+      status: hasFail ? 'degraded' : 'healthy',
+      service: serviceName,
+      version: process.env.npm_package_version ?? '0.0.0',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      checks: checks.map((c) => ({
+        name: c.name,
+        status: c.ok ? 'pass' : 'fail',
+        responseTime: c.latencyMs,
+        message: c.message,
+      })),
+    };
+    reply.code(hasFail ? 503 : 200).send(payload);
   });
 
   app.get('/ready', async (_req, reply) => {
     const checks = await Promise.all(checkFns.map((fn) => fn()));
-    const allOk = checks.every((c) => c.ok);
-    reply.code(allOk ? 200 : 503).send({
-      status: allOk ? 'ready' : 'degraded',
+    const failCount = checks.filter((c) => !c.ok).length;
+    const status: HealthResponse['status'] =
+      failCount === 0 ? 'healthy' : failCount === checks.length ? 'unhealthy' : 'degraded';
+    const payload: HealthResponse = {
+      status,
       service: serviceName,
-      checks,
-      ts: new Date().toISOString(),
-    });
+      version: process.env.npm_package_version ?? '0.0.0',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      checks: checks.map((c) => ({
+        name: c.name,
+        status: c.ok ? 'pass' : 'fail',
+        responseTime: c.latencyMs,
+        message: c.message,
+      })),
+    };
+    reply.code(status === 'healthy' ? 200 : 503).send(payload);
   });
 
   app.get('/metrics', async (_req, reply) => {

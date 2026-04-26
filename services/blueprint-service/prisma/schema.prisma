@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/blueprint-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Playbook {
+  id          String          @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  pipelineId  String?
+  isActive    Boolean         @default(true)
+  version     Int             @default(1)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  stages      PlaybookStage[]
+
+  @@index([tenantId])
+}
+
+model PlaybookStage {
+  id             String   @id @default(cuid())
+  tenantId       String
+  playbookId     String
+  playbook       Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  stageId        String
+  stageName      String
+  position       Int
+  entryActions   Json     @default("[]")
+  exitCriteria   Json     @default("[]")
+  requiredFields String[] @default([])
+  talkingPoints  String[] @default([])
+  resources      Json     @default("[]")
+
+  @@unique([playbookId, stageId])
+  @@index([playbookId])
+  @@index([tenantId])
+}
+
+model DealTemplate {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  pipelineId  String?
+  fields      Json     @default("[]")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model StageTransitionRule {
+  id          String   @id @default(cuid())
+  tenantId    String
+  pipelineId  String
+  fromStageId String
+  toStageId   String
+  rules       Json
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, pipelineId, fromStageId, toStageId])
+}

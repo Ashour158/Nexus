@@ -24,6 +24,7 @@
     "@fastify/rate-limit": "^9.1.0",
     "@fastify/request-context": "^5.1.0",
     "@nexus/shared-types": "workspace:*",
+    "@sentry/node": "^10.50.0",
     "fastify": "^4.28.1",
     "kafkajs": "^2.2.4",
     "pino": "^9.3.2",

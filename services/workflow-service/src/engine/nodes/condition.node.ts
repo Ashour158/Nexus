@@ -1,4 +1,7 @@
+import { BusinessRuleError } from '@nexus/service-utils';
 import type { ExecutionContext, NodeResult, WorkflowNode } from '../types.js';
+
+const ALLOWED = new Set(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains']);
 
 function readField(payload: Record<string, unknown>, path: string): unknown {
   return path.split('.').reduce<unknown>((acc, k) => {
@@ -19,6 +22,9 @@ export async function handleConditionNode(
     falseNodeId?: string;
   };
   const fieldValue = cfg.field ? readField(context.triggerPayload, cfg.field) : undefined;
+  if (cfg.operator !== undefined && cfg.operator !== null && !ALLOWED.has(String(cfg.operator))) {
+    throw new BusinessRuleError(`Unknown condition operator: ${String(cfg.operator)}`);
+  }
   let matched = false;
   switch (cfg.operator) {
     case 'eq':
@@ -40,10 +46,11 @@ export async function handleConditionNode(
       matched = Number(fieldValue) <= Number(cfg.value);
       break;
     case 'contains':
-      matched = String(fieldValue ?? '').includes(String(cfg.value ?? ''));
+      matched = String(fieldValue).includes(String(cfg.value));
       break;
     default:
-      matched = Boolean(fieldValue);
+      matched = false;
   }
-  return { nextNodeId: matched ? cfg.trueNodeId : cfg.falseNodeId, output: { matched } };
+  const nextNodeId = matched ? (cfg.trueNodeId ?? null) : (cfg.falseNodeId ?? null);
+  return { nextNodeId, output: { matched, field: cfg.field, operator: cfg.operator, value: cfg.value } };
 }

@@ -1,0 +1,93 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "contacts": "Contacts",
+    "leads": "Leads",
+    "deals": "Deals",
+    "accounts": "Accounts",
+    "activities": "Activities",
+    "reports": "Reports",
+    "analytics": "Analytics",
+    "calendar": "Calendar",
+    "invoices": "Invoices",
+    "quotes": "Quotes",
+    "contracts": "Contracts",
+    "products": "Products",
+    "workflows": "Workflows",
+    "cadences": "Cadences",
+    "territories": "Territories",
+    "planning": "Planning",
+    "approvals": "Approvals",
+    "knowledge": "Knowledge Base",
+    "incentives": "Incentives",
+    "portal": "Portal",
+    "chatbot": "AI Assistant",
+    "integrations": "Integrations",
+    "settings": "Settings"
+  },
+  "common": {
+    "save": "Save Changes",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search...",
+    "loading": "Loading...",
+    "noResults": "No results found.",
+    "actions": "Actions",
+    "status": "Status",
+    "date": "Date",
+    "name": "Name",
+    "email": "Email",
+    "phone": "Phone",
+    "company": "Company",
+    "amount": "Amount",
+    "currency": "Currency"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome back, {name}",
+    "totalRevenue": "Total Revenue",
+    "openDeals": "Open Deals",
+    "newLeads": "New Leads",
+    "activitiesThisWeek": "Activities This Week"
+  },
+  "deals": {
+    "title": "Deals",
+    "newDeal": "New Deal",
+    "pipeline": "Pipeline",
+    "value": "Deal Value",
+    "stage": "Stage",
+    "closeDate": "Close Date",
+    "probability": "Probability",
+    "owner": "Owner"
+  },
+  "contacts": {
+    "title": "Contacts",
+    "newContact": "New Contact",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "jobTitle": "Job Title",
+    "lastActivity": "Last Activity"
+  },
+  "settings": {
+    "title": "Settings",
+    "profile": "Profile",
+    "team": "Team",
+    "billing": "Billing",
+    "integrations": "Integrations",
+    "language": "Language",
+    "currency": "Default Currency",
+    "timezone": "Timezone"
+  },
+  "feedback": {
+    "title": "Send Feedback",
+    "placeholder": "Tell us what you think or report a bug...",
+    "submit": "Submit",
+    "thankYou": "Thank you for your feedback!",
+    "type": "Type",
+    "bug": "Bug Report",
+    "feature": "Feature Request",
+    "general": "General"
+  }
+}

@@ -1,4 +1,5 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
+import * as Sentry from '@sentry/node';
 
 export class NexusError extends Error {
   constructor(
@@ -60,17 +61,23 @@ export function globalErrorHandler(
   request: FastifyRequest,
   reply: FastifyReply
 ): void {
+  if (!error.statusCode || error.statusCode >= 500) {
+    Sentry.captureException(error, {
+      extra: {
+        url: request.url,
+        method: request.method,
+        tenantId: (request.user as { tenantId?: string } | undefined)?.tenantId,
+      },
+    });
+  }
+
   request.log.error({ err: error, requestId: request.id });
 
   if (error instanceof NexusError) {
     reply.code(error.statusCode).send({
       success: false,
-      error: {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        requestId: request.id,
-      },
+      error: error.code,
+      message: error.message,
     });
     return;
   }
@@ -78,7 +85,8 @@ export function globalErrorHandler(
   if ((error as { code?: string }).code === 'P2002') {
     reply.code(409).send({
       success: false,
-      error: { code: 'CONFLICT', message: 'Resource already exists', requestId: request.id },
+      error: 'CONFLICT',
+      message: 'Resource already exists',
     });
     return;
   }
@@ -86,7 +94,8 @@ export function globalErrorHandler(
   if ((error as { code?: string }).code === 'P2025') {
     reply.code(404).send({
       success: false,
-      error: { code: 'NOT_FOUND', message: 'Record not found', requestId: request.id },
+      error: 'NOT_FOUND',
+      message: 'Record not found',
     });
     return;
   }
@@ -94,18 +103,15 @@ export function globalErrorHandler(
   if (error.validation) {
     reply.code(422).send({
       success: false,
-      error: {
-        code: 'VALIDATION_ERROR',
-        message: 'Validation failed',
-        details: error.validation,
-        requestId: request.id,
-      },
+      error: 'VALIDATION_ERROR',
+      message: 'Validation failed',
     });
     return;
   }
 
   reply.code(500).send({
     success: false,
-    error: { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred', requestId: request.id },
+    error: 'INTERNAL_ERROR',
+    message: 'An unexpected error occurred',
   });
 }

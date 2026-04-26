@@ -1,0 +1,46 @@
+﻿# Dependencies - never copy, always reinstall in Docker
+node_modules
+**/node_modules
+.pnpm-store
+
+# Build outputs
+dist
+**/.next
+**/dist
+**/build
+**/out
+
+# Environment files - NEVER bake secrets into images
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+
+# Development tools
+.git
+.gitignore
+**/*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode
+.idea
+**/*.swp
+
+# Test artifacts
+coverage
+**/*.test.js
+**/*.spec.js
+**/jest.config.*
+**/vitest.config.*
+
+# Documentation
+*.md
+!README.md
+LICENSE

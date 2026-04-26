@@ -7,7 +7,7 @@ import {
   logLevel,
 } from 'kafkajs';
 import { randomUUID } from 'node:crypto';
-import type { KafkaEventBase, NexusKafkaEvent } from '@nexus/shared-types';
+import type { NexusKafkaEvent } from '@nexus/shared-types';
 
 // ─── Client Factory ───────────────────────────────────────────────────────────
 
@@ -53,6 +53,9 @@ export const TOPICS = {
   COMMISSIONS: 'nexus.finance.commissions',
   WORKFLOWS: 'nexus.automation.workflows',
   AI_JOBS: 'nexus.ai.jobs',
+  BILLING: 'nexus.billing.events',
+  INTEGRATION: 'nexus.integration.events',
+  BLUEPRINT: 'nexus.blueprint.events',
   NOTIFICATIONS: 'nexus.platform.notifications',
   EMAILS: 'nexus.comms.emails',
   CALLS: 'nexus.comms.calls',
@@ -103,17 +106,28 @@ export class NexusProducer {
    * fields (`type`, `tenantId`, `payload`); this method fills in `eventId`,
    * `timestamp`, `version`, and `source`.
    */
-  async publish<T extends NexusKafkaEvent>(
+  /**
+   * Publishes a domain event. `type` / `payload` are validated at runtime by consumers;
+   * the signature accepts any well-formed JSON event so new event types do not require
+   * updating this package before services can publish them.
+   */
+  async publish(
     topic: TopicName | string,
-    event: Omit<T, keyof KafkaEventBase> & { type: T['type']; tenantId: string; correlationId?: string }
+    event: {
+      type: string;
+      tenantId: string;
+      correlationId?: string;
+      payload?: unknown;
+      [key: string]: unknown;
+    }
   ): Promise<void> {
-    const fullEvent: T = {
+    const fullEvent = {
       ...event,
       eventId: randomUUID(),
       timestamp: new Date().toISOString(),
       version: 1,
       source: this.serviceName,
-    } as unknown as T;
+    } as NexusKafkaEvent;
 
     await this.producer.send({
       topic,
@@ -172,9 +186,9 @@ export class NexusConsumer {
   }
 
   /** Register a handler for a specific event type. Returns `this` for chaining. */
-  on<T extends NexusKafkaEvent>(eventType: T['type'], handler: EventHandler<T>): this {
+  on(eventType: string, handler: EventHandler): this {
     const handlers = this.handlers.get(eventType) ?? [];
-    handlers.push(handler as EventHandler);
+    handlers.push(handler);
     this.handlers.set(eventType, handlers);
     return this;
   }

@@ -1,4 +1,4 @@
-import type { PaginatedResult } from '@nexus/shared-types';
+import type { PaginatedResult, TimelineEvent } from '@nexus/shared-types';
 import { ConflictError, NotFoundError } from '@nexus/service-utils';
 import type {
   ContactListQuery,
@@ -7,7 +7,7 @@ import type {
 } from '@nexus/validation';
 import { NexusProducer, TOPICS } from '@nexus/kafka';
 import { Prisma } from '../../../../node_modules/.prisma/crm-client/index.js';
-import type { Contact } from '../../../../node_modules/.prisma/crm-client/index.js';
+import type { Contact, Deal } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { CrmPrisma } from '../prisma.js';
 import { toPaginatedResult } from '../lib/pagination.js';
 
@@ -210,6 +210,86 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
     async deleteContact(tenantId: string, id: string): Promise<void> {
       await loadOrThrow(tenantId, id);
       await prisma.contact.update({ where: { id }, data: { isActive: false } });
+    },
+
+    async listContactDeals(
+      tenantId: string,
+      contactId: string,
+      opts: { page?: number; limit?: number } = {}
+    ): Promise<{ data: Deal[]; total: number }> {
+      await loadOrThrow(tenantId, contactId);
+      const page = Math.max(1, opts.page ?? 1);
+      const limit = Math.min(100, opts.limit ?? 25);
+      const skip = (page - 1) * limit;
+
+      const [items, total] = await prisma.$transaction([
+        prisma.deal.findMany({
+          where: {
+            tenantId,
+            contacts: { some: { contactId } },
+          },
+          include: {
+            stage: true,
+            account: { select: { id: true, name: true } },
+          },
+          skip,
+          take: limit,
+          orderBy: { updatedAt: 'desc' },
+        }),
+        prisma.deal.count({
+          where: { tenantId, contacts: { some: { contactId } } },
+        }),
+      ]);
+      return { data: items, total };
+    },
+
+    async getContactTimeline(
+      tenantId: string,
+      contactId: string,
+      opts: { cursor?: string; limit?: number } = {}
+    ): Promise<{ events: TimelineEvent[]; nextCursor: string | null }> {
+      await loadOrThrow(tenantId, contactId);
+      const limit = Math.min(50, opts.limit ?? 20);
+
+      const [activities, notes] = await Promise.all([
+        prisma.activity.findMany({
+          where: { tenantId, contactId },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+        }),
+        prisma.note.findMany({
+          where: { tenantId, contactId },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+        }),
+      ]);
+
+      const events: TimelineEvent[] = [
+        ...activities.map((a) => ({
+          id: `activity-${a.id}`,
+          type: 'ACTIVITY' as const,
+          at: a.createdAt.toISOString(),
+          title: `${a.type}: ${a.subject}`,
+          description: a.description ?? undefined,
+          metadata: {
+            status: a.status,
+            dueDate: a.dueDate?.toISOString() ?? undefined,
+            activityType: a.type,
+          },
+        })),
+        ...notes.map((n) => ({
+          id: `note-${n.id}`,
+          type: 'NOTE' as const,
+          at: n.createdAt.toISOString(),
+          title: n.isPinned ? '📌 Pinned note' : 'Note',
+          description: n.content,
+          metadata: { isPinned: n.isPinned },
+        })),
+      ]
+        .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+        .slice(0, limit);
+
+      return { events, nextCursor: null };
     },
   };
 }

@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import rateLimit from '@fastify/rate-limit';
 import { createService, globalErrorHandler, startService } from '@nexus/service-utils';
 import { Server } from 'socket.io';
 import { socketAuthMiddleware } from './socket/auth.middleware.js';
@@ -24,6 +25,16 @@ const app = await createService({
   corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
     .split(',')
     .map((s) => s.trim()),
+});
+await app.register(rateLimit, {
+  global: true,
+  max: 300,
+  timeWindow: '1 minute',
+  errorResponseBuilder: (_req, context) => ({
+    success: false,
+    error: 'RATE_LIMIT_EXCEEDED',
+    message: `Too many requests. Retry after ${context.after}.`,
+  }),
 });
 
 app.setErrorHandler(globalErrorHandler);
@@ -51,7 +62,7 @@ try {
   await startActivityConsumer(io);
   app.log.info('Realtime Kafka consumers started');
 } catch (err) {
-  app.log.warn({ err }, 'Realtime consumers failed to start');
+  app.log.warn({ err }, 'Kafka consumers failed; WebSocket-only mode');
 }
 
-await startService(app, port, async () => Promise.resolve());
+await startService(app, port, async () => { /* routes registered above */ });

@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/portal-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("PORTAL_DATABASE_URL")
+}
+
+model PortalToken {
+  id         String     @id @default(cuid())
+  tenantId   String
+  token      String     @unique @default(cuid())
+  entityType EntityType
+  entityId   String
+  expiresAt  DateTime
+  viewCount  Int        @default(0)
+  createdBy  String
+  createdAt  DateTime   @default(now())
+
+  @@index([token])
+  @@index([tenantId, entityId])
+}
+
+model PortalBranding {
+  id           String   @id @default(cuid())
+  tenantId     String   @unique
+  logoUrl      String?
+  primaryColor String   @default("#3B82F6")
+  companyName  String?
+  updatedAt    DateTime @updatedAt
+}
+
+enum EntityType {
+  QUOTE
+  CONTRACT
+  INVOICE
+  ACCOUNT
+}

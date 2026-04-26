@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/data-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATA_DATABASE_URL")
+}
+
+model RecycleBinItem {
+  id             String   @id @default(cuid())
+  tenantId       String
+  module         String
+  recordId       String
+  recordSnapshot Json
+  deletedBy      String
+  deletedAt      DateTime @default(now())
+  expiresAt      DateTime
+
+  @@index([tenantId, module])
+  @@index([tenantId, expiresAt])
+}
+
+model FieldAuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String
+  module     String
+  recordId   String
+  fieldName  String
+  oldValue   String?
+  newValue   String?
+  changedBy  String
+  changedAt  DateTime @default(now())
+
+  @@index([tenantId, module, recordId])
+  @@index([tenantId, changedAt])
+}
+
+model SavedView {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String
+  module    String
+  name      String
+  filters   Json     @default("{}")
+  columns   Json     @default("[]")
+  sortBy    String?
+  sortDir   String   @default("asc")
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, userId, module, name])
+  @@index([tenantId, userId, module])
+}
+
+model RecentRecord {
+  id       String   @id @default(cuid())
+  tenantId String
+  userId   String
+  module   String
+  recordId String
+  viewedAt DateTime @default(now())
+
+  @@unique([tenantId, userId, module, recordId])
+  @@index([tenantId, userId])
+}
+
+model ImportJob {
+  id          String       @id @default(cuid())
+  tenantId    String
+  module      String
+  status      ImportStatus @default(PENDING)
+  fileName    String
+  totalRows   Int          @default(0)
+  imported    Int          @default(0)
+  failed      Int          @default(0)
+  errors      Json         @default("[]")
+  fieldMap    Json         @default("{}")
+  createdBy   String
+  createdAt   DateTime     @default(now())
+  completedAt DateTime?
+
+  @@index([tenantId, module])
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}

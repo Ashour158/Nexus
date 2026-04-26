@@ -92,6 +92,8 @@ export const PERMISSIONS = {
   },
   SETTINGS: { READ: 'settings:read', UPDATE: 'settings:update' },
   INTEGRATIONS: { READ: 'integrations:read', MANAGE: 'integrations:manage' },
+  BILLING: { READ: 'billing:read', MANAGE: 'billing:manage' },
+  BLUEPRINTS: { READ: 'blueprints:read', MANAGE: 'blueprints:manage' },
 } as const;
 
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -114,6 +116,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'commission:*',
     'workflows:*',
     'analytics:*',
+    'billing:*',
+    'blueprints:*',
   ],
   SALES_MANAGER: [
     'leads:*',
@@ -197,7 +201,8 @@ export function requirePermission(permission: string) {
     if (!user) {
       return reply.code(401).send({
         success: false,
-        error: { code: 'UNAUTHORIZED', message: 'Not authenticated' },
+        error: 'UNAUTHORIZED',
+        message: 'Not authenticated',
       });
     }
 
@@ -205,7 +210,8 @@ export function requirePermission(permission: string) {
     if (!hasPermission) {
       return reply.code(403).send({
         success: false,
-        error: { code: 'FORBIDDEN', message: `Permission required: ${permission}` },
+        error: 'FORBIDDEN',
+        message: `Permission required: ${permission}`,
       });
     }
   };
@@ -238,7 +244,8 @@ export function requireOwnership(resourceField: string = 'ownerId') {
     if (resource[resourceField] !== user.sub) {
       return reply.code(403).send({
         success: false,
-        error: { code: 'FORBIDDEN', message: 'You do not own this resource' },
+        error: 'FORBIDDEN',
+        message: 'You do not own this resource',
       });
     }
   };

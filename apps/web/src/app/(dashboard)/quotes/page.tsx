@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import {
   useDuplicateQuote,
   useQuotes,
@@ -95,11 +95,7 @@ export default function QuotesPage(): JSX.Element {
 
       <section className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         {query.isLoading ? (
-          <div className="space-y-2 p-4">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-10 rounded-md" />
-            ))}
-          </div>
+          <TableSkeleton rows={8} cols={10} />
         ) : query.isError ? (
           <div className="p-4 text-sm text-red-600">Failed to load quotes.</div>
         ) : (
@@ -121,7 +117,11 @@ export default function QuotesPage(): JSX.Element {
             <tbody>
               {rows.map((q) => (
                 <tr key={q.id} className="border-t border-slate-100">
-                  <td className="px-3 py-2 font-medium">{q.quoteNumber || q.id.slice(0, 8)}</td>
+                  <td className="px-3 py-2 font-medium">
+                    <Link href={`/quotes/${q.id}`} className="text-brand-700 hover:underline">
+                      {q.quoteNumber || q.id.slice(0, 8)}
+                    </Link>
+                  </td>
                   <td className="px-3 py-2">
                     <Link href={`/deals/${q.dealId}`} className="text-brand-700 hover:underline">
                       {q.dealId.slice(0, 8)}…

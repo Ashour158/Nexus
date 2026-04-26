@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/approval-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("APPROVAL_DATABASE_URL")
+}
+
+model ApprovalPolicy {
+  id          String            @id @default(cuid())
+  tenantId    String
+  name        String
+  module      String
+  conditions  Json              @default("{}")
+  steps       Json              @default("[]")
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  requests    ApprovalRequest[]
+
+  @@index([tenantId, module])
+}
+
+model ApprovalRequest {
+  id           String          @id @default(cuid())
+  tenantId     String
+  policyId     String
+  policy       ApprovalPolicy  @relation(fields: [policyId], references: [id])
+  module       String
+  recordId     String
+  requestedBy  String
+  status       ApprovalStatus  @default(PENDING)
+  currentStep  Int             @default(0)
+  data         Json            @default("{}")
+  comment      String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  steps        ApprovalStep[]
+
+  @@index([tenantId, module, recordId])
+  @@index([tenantId, status])
+}
+
+model ApprovalStep {
+  id         String          @id @default(cuid())
+  requestId  String
+  request    ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  order      Int
+  approverId String
+  status     StepStatus      @default(PENDING)
+  comment    String?
+  actionedAt DateTime?
+  createdAt  DateTime        @default(now())
+
+  @@index([requestId])
+  @@index([approverId, status])
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ESCALATED
+  CANCELLED
+}
+
+enum StepStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED
+  DELEGATED
+}

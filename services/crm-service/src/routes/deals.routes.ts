@@ -23,6 +23,7 @@ import {
   createDealsService,
   type DealListFilters,
 } from '../services/deals.service.js';
+import { createAttachmentsService } from '../services/attachments.service.js';
 
 // ─── Local param schemas ────────────────────────────────────────────────────
 
@@ -31,6 +32,47 @@ const DealContactParamsSchema = z.object({
   id: z.string().cuid(),
   contactId: z.string().cuid(),
 });
+const MassIdsSchema = z.object({ ids: z.array(z.string().cuid()).min(1).max(200) });
+const DealMassUpdateSchema = z.object({
+  ids: z.array(z.string().cuid()).min(1).max(200),
+  data: z.object({
+    ownerId: z.string().cuid().optional(),
+    stageId: z.string().cuid().optional(),
+    forecastCategory: z.enum(['PIPELINE', 'BEST_CASE', 'COMMIT', 'CLOSED', 'OMITTED']).optional(),
+  }),
+});
+const AttachmentBodySchema = z.object({
+  fileName: z.string().min(1),
+  fileSize: z.number().int().min(0),
+  mimeType: z.string().min(1),
+  contentBase64: z.string().optional(),
+  storageKey: z.string().optional(),
+});
+const AttachmentIdParamSchema = z.object({
+  id: z.string().cuid(),
+  attachmentId: z.string().cuid(),
+});
+
+async function uploadToStorage(payload: {
+  fileName: string;
+  mimeType: string;
+  contentBase64?: string;
+}): Promise<string> {
+  if (!payload.contentBase64) return `manual/${Date.now()}-${payload.fileName}`;
+  const base = process.env.STORAGE_SERVICE_URL ?? 'http://localhost:3008';
+  const token = process.env.INTERNAL_SERVICE_TOKEN ?? '';
+  const res = await fetch(`${base}/api/v1/objects`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error('Storage upload failed');
+  const body = (await res.json()) as { data?: { storageKey?: string } };
+  return body.data?.storageKey ?? `fallback/${Date.now()}-${payload.fileName}`;
+}
 
 // ─── Registration ───────────────────────────────────────────────────────────
 
@@ -49,6 +91,7 @@ export async function registerDealsRoutes(
   producer: NexusProducer
 ): Promise<void> {
   const deals = createDealsService(prisma, producer);
+  const attachments = createAttachmentsService(prisma);
 
   await app.register(
     async (r) => {
@@ -107,6 +150,84 @@ export async function registerDealsRoutes(
       );
 
       // ─── TIMELINE ───────────────────────────────────────────────────────
+      r.get(
+        '/deals/:id/attachments',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.READ) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const data = await attachments.listAttachments(jwt.tenantId, 'deal', id);
+          return reply.send({ success: true, data });
+        }
+      );
+
+      r.post(
+        '/deals/:id/attachments',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.UPDATE) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const body = AttachmentBodySchema.parse(request.body);
+          const jwt = request.user as JwtPayload;
+          const storageKey = body.storageKey ?? (await uploadToStorage({
+            fileName: body.fileName,
+            mimeType: body.mimeType,
+            contentBase64: body.contentBase64,
+          }));
+          const data = await attachments.createAttachment(
+            jwt.tenantId,
+            'deal',
+            id,
+            {
+              fileName: body.fileName,
+              fileSize: body.fileSize,
+              mimeType: body.mimeType,
+              storageKey,
+            },
+            jwt.sub
+          );
+          return reply.code(201).send({ success: true, data });
+        }
+      );
+
+      r.delete(
+        '/deals/:id/attachments/:attachmentId',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.UPDATE) },
+        async (request, reply) => {
+          const p = AttachmentIdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const data = await attachments.deleteAttachment(jwt.tenantId, p.attachmentId);
+          if (!data) return reply.code(404).send({ success: false, error: 'Not found' });
+          return reply.send({ success: true, data });
+        }
+      );
+
+      r.patch(
+        '/deals/mass-update',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.UPDATE) },
+        async (request, reply) => {
+          const body = DealMassUpdateSchema.parse(request.body);
+          const jwt = request.user as JwtPayload;
+          const data = await prisma.deal.updateMany({
+            where: { tenantId: jwt.tenantId, id: { in: body.ids } },
+            data: body.data,
+          });
+          return reply.send({ success: true, data });
+        }
+      );
+
+      r.delete(
+        '/deals/mass-delete',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.DELETE) },
+        async (request, reply) => {
+          const body = MassIdsSchema.parse(request.body);
+          const jwt = request.user as JwtPayload;
+          const data = await prisma.deal.deleteMany({
+            where: { tenantId: jwt.tenantId, id: { in: body.ids } },
+          });
+          return reply.send({ success: true, data });
+        }
+      );
+
       r.get(
         '/deals/:id/timeline',
         { preHandler: requirePermission(PERMISSIONS.DEALS.READ) },

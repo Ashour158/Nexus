@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/knowledge-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("KNOWLEDGE_DATABASE_URL")
+}
+
+model KbCategory {
+  id               String       @id @default(cuid())
+  tenantId         String
+  name             String
+  icon             String?
+  position         Int          @default(0)
+  parentCategoryId String?
+  parent           KbCategory?  @relation("CategoryTree", fields: [parentCategoryId], references: [id])
+  children         KbCategory[] @relation("CategoryTree")
+  articles         KbArticle[]
+
+  @@index([tenantId])
+}
+
+model KbArticle {
+  id         String        @id @default(cuid())
+  tenantId   String
+  categoryId String?
+  category   KbCategory?   @relation(fields: [categoryId], references: [id])
+  title      String
+  slug       String
+  body       String
+  tags       String[]
+  status     ArticleStatus @default(DRAFT)
+  authorId   String
+  version    Int           @default(1)
+  viewCount  Int           @default(0)
+  dealStages String[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  views      KbView[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status])
+}
+
+model KbView {
+  id        String    @id @default(cuid())
+  articleId String
+  article   KbArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  viewedBy  String
+  dealStage String?
+  viewedAt  DateTime  @default(now())
+
+  @@index([articleId])
+}
+
+enum ArticleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}

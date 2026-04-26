@@ -11,10 +11,12 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
+import Link from 'next/link';
 import { useMemo, useState, type ReactElement } from 'react';
 import type { Lead, LeadStatusLiteral } from '@nexus/shared-types';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
+import { api } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth.store';
 import { useUiStore } from '@/stores/ui.store';
 import {
@@ -22,6 +24,9 @@ import {
   useLeads,
   useUpdateLeadStatus,
 } from '@/hooks/use-leads';
+import { useUsers } from '@/hooks/use-users';
+import { TableSkeleton } from '@/components/ui/skeleton';
+import { SavedViewsSidebar } from '@/components/saved-views-sidebar';
 
 /**
  * Leads page — table + kanban with drag-drop status transitions and a
@@ -146,12 +151,15 @@ export default function LeadsPage(): ReactElement {
   const hasPermission = useAuthStore((s) => s.hasPermission);
 
   const { data, isLoading, isError, error } = useLeads({ limit: 200 });
+  const users = useUsers();
   const updateStatus = useUpdateLeadStatus();
   const convertLead = useConvertLead();
 
   const [search, setSearch] = useState('');
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
   const [convertTarget, setConvertTarget] = useState<Lead | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [massOwnerId, setMassOwnerId] = useState('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -230,8 +238,32 @@ export default function LeadsPage(): ReactElement {
     );
   }
 
+  async function runMassOwnerChange() {
+    if (!massOwnerId || selectedIds.length === 0) return;
+    await api.patch('/leads/mass-update', { ids: selectedIds, data: { ownerId: massOwnerId } });
+    setSelectedIds([]);
+    setMassOwnerId('');
+    window.location.reload();
+  }
+
+  async function runMassDelete() {
+    if (selectedIds.length === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.length} leads?`)) return;
+    await api.delete('/leads/mass-delete', { data: { ids: selectedIds } });
+    setSelectedIds([]);
+    window.location.reload();
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 lg:flex lg:gap-4 lg:space-y-0">
+      <SavedViewsSidebar
+        module="lead"
+        onViewSelect={(v) => {
+          const filters = v.filters ?? {};
+          setSearch(typeof filters.search === 'string' ? filters.search : '');
+        }}
+      />
+      <div className="min-w-0 flex-1 space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold text-slate-900">Leads</h1>
         <div className="ml-auto flex items-center gap-2">
@@ -272,8 +304,8 @@ export default function LeadsPage(): ReactElement {
       </div>
 
       {isLoading ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
-          Loading leads…
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+          <TableSkeleton rows={8} cols={8} />
         </div>
       ) : isError ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700">
@@ -305,10 +337,30 @@ export default function LeadsPage(): ReactElement {
           </DragOverlay>
         </DndContext>
       ) : (
+        <>
+        {selectedIds.length > 0 ? (
+          <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white p-2 text-sm shadow">
+            <span>{selectedIds.length} selected</span>
+            <select className="h-8 rounded border border-slate-200 px-2 text-xs" value={massOwnerId} onChange={(e) => setMassOwnerId(e.target.value)}>
+              <option value="">Change owner…</option>
+              {(users.data?.data ?? []).map((u) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
+            </select>
+            <button type="button" className="rounded border border-slate-200 px-2 py-1 text-xs" onClick={() => void runMassOwnerChange()}>Change Owner</button>
+            <button type="button" className="rounded border border-red-200 px-2 py-1 text-xs text-red-700" onClick={() => void runMassDelete()}>Delete</button>
+            <button type="button" className="rounded border border-slate-200 px-2 py-1 text-xs" onClick={() => setSelectedIds([])}>✕</button>
+          </div>
+        ) : null}
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500">
               <tr>
+                <th className="px-4 py-2">
+                  <input
+                    type="checkbox"
+                    checked={leads.length > 0 && selectedIds.length === leads.length}
+                    onChange={(e) => setSelectedIds(e.target.checked ? leads.map((l) => l.id) : [])}
+                  />
+                </th>
                 <th className="px-4 py-2">Name</th>
                 <th className="px-4 py-2">Company</th>
                 <th className="px-4 py-2">Score</th>
@@ -322,8 +374,21 @@ export default function LeadsPage(): ReactElement {
             <tbody className="divide-y divide-slate-100">
               {leads.map((l) => (
                 <tr key={l.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(l.id)}
+                      onChange={(e) => {
+                        setSelectedIds((prev) =>
+                          e.target.checked ? [...prev, l.id] : prev.filter((id) => id !== l.id)
+                        );
+                      }}
+                    />
+                  </td>
                   <td className="px-4 py-2 font-medium text-slate-900">
-                    {l.firstName} {l.lastName}
+                    <Link href={`/leads/${l.id}`} className="hover:underline">
+                      {l.firstName} {l.lastName}
+                    </Link>
                   </td>
                   <td className="px-4 py-2 text-slate-600">{l.company ?? '—'}</td>
                   <td className="px-4 py-2">
@@ -364,6 +429,7 @@ export default function LeadsPage(): ReactElement {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {convertTarget ? (
@@ -401,6 +467,7 @@ export default function LeadsPage(): ReactElement {
           </div>
         </div>
       ) : null}
+      </div>
     </div>
   );
 }

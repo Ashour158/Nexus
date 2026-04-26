@@ -1,37 +1,39 @@
-FROM node:20-alpine AS base
-RUN corepack enable && corepack prepare pnpm@9 --activate
-
-FROM base AS deps
+# -- Stage 1: Install dependencies ------------------------------------------------
+FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY tsconfig.base.json ./
+RUN apk add --no-cache libc6-compat
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/ ./packages/
 COPY services/crm-service/package.json ./services/crm-service/
-RUN pnpm install --frozen-lockfile
 
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages ./packages
-COPY tsconfig.base.json ./
-COPY packages ./packages
-COPY services/crm-service ./services/crm-service
-WORKDIR /app/services/crm-service
-RUN pnpm prisma generate --schema=./prisma/schema.prisma
-RUN pnpm build
+RUN pnpm install --frozen-lockfile --filter crm-service...
 
+# -- Stage 2: Build ----------------------------------------------------------------
+FROM deps AS builder
+COPY services/crm-service/ ./services/crm-service/
+COPY packages/ ./packages/
+
+RUN pnpm --filter crm-service run build
+
+# -- Stage 3: Production runner ----------------------------------------------------
 FROM node:20-alpine AS runner
 WORKDIR /app
-ENV NODE_ENV=production
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nexus
-COPY --from=builder --chown=nexus:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nexus:nodejs /app/packages ./packages
-COPY --from=builder --chown=nexus:nodejs /app/services/crm-service/dist ./services/crm-service/dist
-COPY --from=builder --chown=nexus:nodejs /app/services/crm-service/package.json ./services/crm-service/package.json
-COPY --from=builder --chown=nexus:nodejs /app/services/crm-service/prisma ./services/crm-service/prisma
-COPY --from=builder --chown=nexus:nodejs /app/node_modules/.prisma/crm-client ./node_modules/.prisma/crm-client
-COPY --from=builder --chown=nexus:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-USER nexus
-WORKDIR /app/services/crm-service
+
+RUN addgroup --system --gid 1001 nodejs \
+ && adduser --system --uid 1001 service
+
+COPY --from=builder --chown=service:nodejs /app/services/crm-service/dist ./dist
+COPY --from=builder --chown=service:nodejs /app/services/crm-service/package.json ./package.json
+COPY --from=builder --chown=service:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=service:nodejs /app/packages ./packages
+
+USER service
 EXPOSE 3001
+ENV NODE_ENV=production PORT=3001
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=45s --retries=3 \
+  CMD wget -qO- http://localhost:3001/health || exit 1
+
 CMD ["node", "dist/index.js"]

@@ -26,6 +26,18 @@ import {
 const DealParamsSchema = z.object({ dealId: z.string().cuid() });
 const ContactParamsSchema = z.object({ contactId: z.string().cuid() });
 const LeadParamsSchema = z.object({ leadId: z.string().cuid() });
+const PublicMeetingSchema = z.object({
+  tenantId: z.string().min(1),
+  ownerId: z.string().min(1),
+  subject: z.string().min(1),
+  description: z.string().optional(),
+  dueDate: z.string().datetime(),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
+  duration: z.number().int().positive().default(30),
+  customerName: z.string().min(1),
+  customerEmail: z.string().email(),
+});
 
 /**
  * Registers the `/api/v1/activities/*` route family (Section 34.3).
@@ -77,6 +89,30 @@ export async function registerActivitiesRoutes(
       );
 
       // ─── CREATE ─────────────────────────────────────────────────────────
+      r.post(
+        '/activities/public-meeting',
+        async (request, reply) => {
+          const body = PublicMeetingSchema.parse(request.body);
+          const activity = await activities.createActivity(body.tenantId, {
+            ownerId: body.ownerId,
+            type: 'MEETING',
+            subject: body.subject,
+            description: body.description,
+            priority: 'NORMAL',
+            dueDate: body.dueDate,
+            startDate: body.startDate,
+            endDate: body.endDate,
+            duration: body.duration,
+            customFields: {
+              customerName: body.customerName,
+              customerEmail: body.customerEmail,
+              source: 'public_scheduler',
+            },
+          });
+          return reply.code(201).send({ success: true, data: activity });
+        }
+      );
+
       r.post(
         '/activities',
         { preHandler: requirePermission(PERMISSIONS.ACTIVITIES.CREATE) },

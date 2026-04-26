@@ -14,6 +14,7 @@
     "db:push": "prisma db push"
   },
   "dependencies": {
+    "@fastify/rate-limit": "^9.1.0",
     "@fastify/request-context": "^5.1.0",
     "@nexus/kafka": "workspace:*",
     "@nexus/service-utils": "workspace:*",
@@ -22,6 +23,7 @@
     "@prisma/client": "^5.15.0",
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
+    "prom-client": "^15.1.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

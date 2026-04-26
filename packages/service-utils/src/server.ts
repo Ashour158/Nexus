@@ -2,19 +2,24 @@ import Fastify, { type FastifyInstance, type RawServerDefault } from 'fastify';
 import fastifyJwt from '@fastify/jwt';
 import fastifyCors from '@fastify/cors';
 import fastifyHelmet from '@fastify/helmet';
-import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyMultipart from '@fastify/multipart';
 import { fastifyRequestContext } from '@fastify/request-context';
 import pino from 'pino';
-import type { JwtPayload } from '@nexus/shared-types';
+import * as Sentry from '@sentry/node';
+
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    tracesSampleRate: 0.05,
+    environment: process.env.NODE_ENV ?? 'development',
+  });
+}
 
 export interface ServiceConfig {
   name: string;
   port: number;
   jwtSecret: string;
   corsOrigins: string[];
-  rateLimitMax?: number;
-  rateLimitWindow?: number;
   enableMultipart?: boolean;
 }
 
@@ -27,6 +32,21 @@ function pathOnly(url: string): string {
 function isPublicRoute(url: string, method: string): boolean {
   const path = pathOnly(url);
   if (path.startsWith('/health') || path.startsWith('/metrics') || path.startsWith('/ready')) {
+    return true;
+  }
+  /** Public comm-service email open/click tracking (no JWT on pixel / webhook). */
+  if (path.startsWith('/api/v1/webhooks/')) {
+    return true;
+  }
+  /** Public billing catalog + Stripe webhooks. */
+  if (method === 'GET' && path === '/api/v1/billing/plans') {
+    return true;
+  }
+  if (method === 'POST' && path === '/api/v1/billing/webhooks/stripe') {
+    return true;
+  }
+  /** CRM → blueprint transition check (service token + tenant header; no end-user JWT). */
+  if (method === 'POST' && path === '/api/v1/blueprints/internal/validate-transition') {
     return true;
   }
   if (
@@ -75,16 +95,6 @@ export async function createService(config: ServiceConfig): Promise<FastifyInsta
     sign: { algorithm: 'HS256' },
   });
 
-  await app.register(fastifyRateLimit, {
-    global: true,
-    max: config.rateLimitMax ?? 200,
-    timeWindow: config.rateLimitWindow ?? 60_000,
-    keyGenerator: (req) => {
-      const u = req.user as JwtPayload | undefined;
-      return `${u?.tenantId ?? 'anon'}:${req.ip}`;
-    },
-  });
-
   if (config.enableMultipart) {
     await app.register(fastifyMultipart, {
       limits: { fileSize: 100 * 1024 * 1024 },
@@ -104,14 +114,15 @@ export async function createService(config: ServiceConfig): Promise<FastifyInsta
 
     try {
       await request.jwtVerify();
-      const payload = request.user as JwtPayload;
+      const payload = request.user as { tenantId: string; sub: string };
       const ctx = request.requestContext as { set: (key: string, value: string) => void };
       ctx.set('tenantId', payload.tenantId);
       ctx.set('userId', payload.sub);
     } catch {
       return reply.code(401).send({
         success: false,
-        error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token' },
+        error: 'UNAUTHORIZED',
+        message: 'Invalid or expired token',
       });
     }
   });

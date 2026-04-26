@@ -16,6 +16,7 @@ import {
 } from '@nexus/validation';
 import type { CrmPrisma } from '../prisma.js';
 import { createAccountsService } from '../services/accounts.service.js';
+import { createAttachmentsService } from '../services/attachments.service.js';
 
 const DealsForAccountQuerySchema = PaginationSchema.extend({
   status: z.enum(['OPEN', 'WON', 'LOST', 'DORMANT']).optional(),
@@ -25,6 +26,38 @@ const DealsForAccountQuerySchema = PaginationSchema.extend({
 const ContactsForAccountQuerySchema = PaginationSchema.extend({
   search: z.string().optional(),
 });
+const AttachmentBodySchema = z.object({
+  fileName: z.string().min(1),
+  fileSize: z.number().int().min(0),
+  mimeType: z.string().min(1),
+  contentBase64: z.string().optional(),
+  storageKey: z.string().optional(),
+});
+const AttachmentIdParamSchema = z.object({
+  id: z.string().cuid(),
+  attachmentId: z.string().cuid(),
+});
+
+async function uploadToStorage(payload: {
+  fileName: string;
+  mimeType: string;
+  contentBase64?: string;
+}): Promise<string> {
+  if (!payload.contentBase64) return `manual/${Date.now()}-${payload.fileName}`;
+  const base = process.env.STORAGE_SERVICE_URL ?? 'http://localhost:3008';
+  const token = process.env.INTERNAL_SERVICE_TOKEN ?? '';
+  const res = await fetch(`${base}/api/v1/objects`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error('Storage upload failed');
+  const body = (await res.json()) as { data?: { storageKey?: string } };
+  return body.data?.storageKey ?? `fallback/${Date.now()}-${payload.fileName}`;
+}
 
 /**
  * Registers the `/api/v1/accounts/*` route family — Section 34.2 → "Accounts".
@@ -35,6 +68,7 @@ export async function registerAccountsRoutes(
   producer: NexusProducer
 ): Promise<void> {
   const accounts = createAccountsService(prisma, producer);
+  const attachments = createAttachmentsService(prisma);
 
   await app.register(
     async (r) => {
@@ -75,6 +109,21 @@ export async function registerAccountsRoutes(
           const jwt = request.user as JwtPayload;
           const account = await accounts.createAccount(jwt.tenantId, parsed.data);
           return reply.code(201).send({ success: true, data: account });
+        }
+      );
+
+      r.get(
+        '/accounts/:id/email-threads',
+        { preHandler: requirePermission(PERMISSIONS.ACCOUNTS.READ) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const data = await prisma.emailThread.findMany({
+            where: { tenantId: jwt.tenantId, accountId: id },
+            include: { messages: { orderBy: { sentAt: 'desc' } } },
+            orderBy: { lastMessageAt: 'desc' },
+          });
+          return reply.send({ success: true, data });
         }
       );
 
@@ -134,6 +183,57 @@ export async function registerAccountsRoutes(
             pipelineId: q.pipelineId,
           });
           return reply.send({ success: true, data: result });
+        }
+      );
+
+      r.get(
+        '/accounts/:id/attachments',
+        { preHandler: requirePermission(PERMISSIONS.ACCOUNTS.READ) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const data = await attachments.listAttachments(jwt.tenantId, 'account', id);
+          return reply.send({ success: true, data });
+        }
+      );
+
+      r.post(
+        '/accounts/:id/attachments',
+        { preHandler: requirePermission(PERMISSIONS.ACCOUNTS.UPDATE) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const body = AttachmentBodySchema.parse(request.body);
+          const jwt = request.user as JwtPayload;
+          const storageKey = body.storageKey ?? (await uploadToStorage({
+            fileName: body.fileName,
+            mimeType: body.mimeType,
+            contentBase64: body.contentBase64,
+          }));
+          const data = await attachments.createAttachment(
+            jwt.tenantId,
+            'account',
+            id,
+            {
+              fileName: body.fileName,
+              fileSize: body.fileSize,
+              mimeType: body.mimeType,
+              storageKey,
+            },
+            jwt.sub
+          );
+          return reply.code(201).send({ success: true, data });
+        }
+      );
+
+      r.delete(
+        '/accounts/:id/attachments/:attachmentId',
+        { preHandler: requirePermission(PERMISSIONS.ACCOUNTS.UPDATE) },
+        async (request, reply) => {
+          const p = AttachmentIdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const data = await attachments.deleteAttachment(jwt.tenantId, p.attachmentId);
+          if (!data) return reply.code(404).send({ success: false, error: 'Not found' });
+          return reply.send({ success: true, data });
         }
       );
 

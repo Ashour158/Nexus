@@ -149,10 +149,18 @@ export function useDealQuotes(dealId: string) {
 
 // ─── Mutations ──────────────────────────────────────────────────────────────
 
+interface CreateQuoteResponse {
+  quote: Quote;
+  pricing: unknown;
+}
+
 export function useCreateQuote() {
   const qc = useQueryClient();
   return useMutation<Quote, Error, CreateQuoteInput>({
-    mutationFn: (data) => apiClients.finance.post<Quote>('/quotes', data),
+    mutationFn: async (data) => {
+      const res = await apiClients.finance.post<CreateQuoteResponse>('/quotes', data);
+      return res.quote;
+    },
     onSuccess: (quote) => {
       qc.invalidateQueries({ queryKey: quoteKeys.lists() });
       qc.invalidateQueries({ queryKey: quoteKeys.forDeal(quote.dealId) });

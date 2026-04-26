@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/comm-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model EmailTemplate {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  subject   String
+  htmlBody  String   @db.Text
+  textBody  String   @db.Text
+  variables String[]
+  category  String   @default("GENERAL")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model SmsTemplate {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  body      String   @db.Text
+  variables String[]
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model EmailSequence {
+  id           String                 @id @default(cuid())
+  tenantId     String
+  name         String
+  triggerType  String
+  isActive     Boolean                @default(true)
+  steps        SequenceStep[]
+  enrollments  SequenceEnrollment[]
+  createdAt    DateTime               @default(now())
+
+  @@index([tenantId])
+}
+
+model SequenceStep {
+  id         String        @id @default(cuid())
+  sequenceId String
+  sequence   EmailSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  stepNumber Int
+  delayDays  Int           @default(0)
+  templateId String
+
+  @@unique([sequenceId, stepNumber])
+}
+
+model SequenceEnrollment {
+  id          String        @id @default(cuid())
+  tenantId    String
+  sequenceId  String
+  sequence    EmailSequence @relation(fields: [sequenceId], references: [id])
+  contactId   String
+  currentStep Int           @default(0)
+  status      String        @default("ACTIVE")
+  enrolledAt  DateTime      @default(now())
+  nextSendAt  DateTime?
+
+  @@index([tenantId])
+  @@index([status, nextSendAt])
+  @@index([sequenceId])
+}
+
+model OutboxMessage {
+  id           String    @id @default(cuid())
+  tenantId     String
+  channel      String
+  to           String
+  subject      String?
+  body         String    @db.Text
+  status       String    @default("QUEUED")
+  templateId   String?
+  entityType   String?
+  entityId     String?
+  sentAt       DateTime?
+  openedAt     DateTime?
+  clickedAt    DateTime?
+  errorMessage String?
+  createdAt    DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+}

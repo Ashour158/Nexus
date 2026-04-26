@@ -836,3 +836,9 @@ export const CommissionSummaryQuerySchema = z.object({
 export type ClawbackCommissionInput = z.infer<typeof ClawbackCommissionSchema>;
 export type CommissionListQuery = z.infer<typeof CommissionListQuerySchema>;
 export type CommissionSummaryQuery = z.infer<typeof CommissionSummaryQuerySchema>;
+
+// ─── Billing / Integration / Blueprint — Phase 5 ─────────────────────────────
+
+export * from './billing.schema.js';
+export * from './integration.schema.js';
+export * from './blueprint.schema.js';

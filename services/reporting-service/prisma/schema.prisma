@@ -1,0 +1,44 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/reporting-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("REPORTING_DATABASE_URL")
+}
+
+model ReportDefinition {
+  id          String           @id @default(cuid())
+  tenantId    String?
+  name        String
+  description String?
+  category    String
+  isTemplate  Boolean          @default(false)
+  datasource  String
+  querySpec   Json
+  ownerId     String?
+  isShared    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  schedules   ReportSchedule[]
+
+  @@index([tenantId, category])
+}
+
+model ReportSchedule {
+  id         String           @id @default(cuid())
+  reportId   String
+  report     ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  tenantId   String
+  cron       String
+  format     String           @default("xlsx")
+  recipients String[]
+  lastRunAt  DateTime?
+  nextRunAt  DateTime?
+  isActive   Boolean          @default(true)
+  createdAt  DateTime         @default(now())
+
+  @@index([tenantId])
+  @@index([nextRunAt, isActive])
+}

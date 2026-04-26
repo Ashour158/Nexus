@@ -28,23 +28,42 @@ model WorkflowTemplate {
 }
 
 model WorkflowExecution {
-  id             String            @id @default(cuid())
+  id             String                @id @default(cuid())
   tenantId       String
   workflowId     String
-  workflow       WorkflowTemplate  @relation(fields: [workflowId], references: [id])
+  workflow       WorkflowTemplate      @relation(fields: [workflowId], references: [id])
   triggerType    String
   triggerPayload Json
-  status         ExecutionStatus   @default(RUNNING)
+  status         ExecutionStatus       @default(RUNNING)
   currentNodeId  String?
   resumeAt       DateTime?
-  startedAt      DateTime          @default(now())
+  startedAt      DateTime              @default(now())
   completedAt    DateTime?
   error          String?
   steps          WorkflowStep[]
+  parentForkId   String?
+  parentExecId   String?
+  parent         WorkflowExecution?    @relation("BranchChildren", fields: [parentExecId], references: [id], onDelete: SetNull)
+  branchChildren WorkflowExecution[]   @relation("BranchChildren")
+  forkTrackers   WorkflowForkTracker[]
 
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([status, resumeAt])
+  @@index([parentExecId])
+}
+
+model WorkflowForkTracker {
+  id             String            @id @default(cuid())
+  executionId    String
+  execution      WorkflowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  forkNodeId     String
+  joinNodeId     String
+  branchNodeIds  String[]
+  completedIds   String[]         @default([])
+  createdAt      DateTime         @default(now())
+
+  @@index([executionId, forkNodeId])
 }
 
 model WorkflowStep {
@@ -55,10 +74,12 @@ model WorkflowStep {
   nodeType    String
   status      StepStatus        @default(PENDING)
   input       Json              @default("{}")
-  output      Json              @default("{}")
+  output      Json?
   error       String?
-  startedAt   DateTime?
+  startedAt   DateTime          @default(now())
   completedAt DateTime?
+
+  @@index([executionId])
 }
 
 enum ExecutionStatus {

@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import rateLimit from '@fastify/rate-limit';
 import {
   checkDatabase,
   createService,
@@ -33,6 +34,16 @@ const app = await createService({
   corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
     .split(',')
     .map((s) => s.trim()),
+});
+await app.register(rateLimit, {
+  global: true,
+  max: 300,
+  timeWindow: '1 minute',
+  errorResponseBuilder: (_req, context) => ({
+    success: false,
+    error: 'RATE_LIMIT_EXCEEDED',
+    message: `Too many requests. Retry after ${context.after}.`,
+  }),
 });
 
 registerHealthRoutes(app, 'notification-service', [
@@ -87,12 +98,15 @@ async function lookupOwner(
 try {
   await startDealConsumer({ inApp, email, lookupOwner, log: app.log });
   await startActivityConsumer({ inApp, log: app.log });
-  await startQuoteConsumer({ inApp, email, log: app.log });
-  app.log.info('Kafka consumers started');
+  await startQuoteConsumer({ inApp, email, lookupOwner, log: app.log });
 } catch (err) {
-  app.log.warn({ err }, 'Kafka consumer start failed; HTTP-only mode');
+  app.log.warn({ err }, 'Kafka consumers failed to start; HTTP-only mode');
 }
 
+app.addHook('onClose', async () => {
+  await prismaHealth.$disconnect();
+});
+
 await startService(app, port, async (a) => {
-  await registerNotificationsRoutes(a, prisma);
+  await registerNotificationsRoutes(a, inApp);
 });

@@ -1,0 +1,50 @@
+﻿global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'nexus-auth'
+    static_configs:
+      - targets: ['auth-service:3000']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'nexus-services'
+    static_configs:
+      - targets:
+          - 'crm-service:3001'
+          - 'finance-service:3002'
+          - 'notification-service:3003'
+          - 'realtime-service:3005'
+          - 'search-service:3006'
+          - 'workflow-service:3007'
+          - 'analytics-service:3008'
+          - 'comm-service:3009'
+          - 'storage-service:3010'
+          - 'billing-service:3011'
+          - 'integration-service:3012'
+          - 'blueprint-service:3013'
+          - 'approval-service:3014'
+          - 'data-service:3015'
+          - 'document-service:3016'
+          - 'chatbot-service:3017'
+          - 'cadence-service:3018'
+          - 'territory-service:3019'
+          - 'planning-service:3020'
+          - 'reporting-service:3021'
+          - 'portal-service:3022'
+          - 'knowledge-service:3023'
+          - 'incentive-service:3024'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'nexus-web'
+    static_configs:
+      - targets: ['web:3000']
+    metrics_path: '/api/metrics'
+    scrape_interval: 30s

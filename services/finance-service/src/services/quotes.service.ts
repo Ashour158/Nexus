@@ -194,6 +194,26 @@ export function createQuotesService(
           })
           .catch(() => undefined);
 
+        if (created.approvalRequired) {
+          await fetch(`${process.env.APPROVAL_SERVICE_URL}/api/v1/approval/requests`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${process.env.INTERNAL_SERVICE_TOKEN ?? ''}`,
+            },
+            body: JSON.stringify({
+              module: 'quote',
+              recordId: created.id,
+              requestedBy: data.ownerId,
+              data: {
+                amount: created.total.toString(),
+                currency: created.currency,
+                quoteNumber: created.quoteNumber,
+              },
+            }),
+          }).catch(() => undefined);
+        }
+
         return created;
       } catch (err) {
         if (

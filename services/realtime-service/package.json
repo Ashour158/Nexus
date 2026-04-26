@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fastify/rate-limit": "^9.1.0",
     "@fastify/request-context": "^5.1.0",
     "@nexus/kafka": "workspace:*",
     "@nexus/service-utils": "workspace:*",

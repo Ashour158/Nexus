@@ -116,6 +116,7 @@ model Contact {
   deals          DealContact[]
   activities     Activity[]
   notes          Note[]
+  emailThreads   EmailThread[]
   @@unique([tenantId, email])
   @@index([tenantId])
   @@index([tenantId, accountId])
@@ -150,6 +151,8 @@ model Account {
   healthScore       Int?
   npsScore          Int?
   customFields      Json          @default("{}")
+  lat               Float?
+  lng               Float?
   tags              String[]
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
@@ -157,6 +160,7 @@ model Account {
   deals             Deal[]
   notes             Note[]
   activities        Activity[]
+  emailThreads      EmailThread[]
   @@index([tenantId])
   @@index([tenantId, type])
   @@index([tenantId, ownerId])
@@ -397,6 +401,62 @@ model Quote {
   updatedAt       DateTime    @updatedAt
   @@unique([tenantId, quoteNumber])
   @@index([tenantId, dealId])
+}
+
+model Attachment {
+  id          String   @id @default(cuid())
+  tenantId    String
+  module      String
+  recordId    String
+  fileName    String
+  fileSize    Int
+  mimeType    String
+  storageKey  String
+  uploadedBy  String
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, module, recordId])
+}
+
+model EmailThread {
+  id            String         @id @default(cuid())
+  tenantId      String
+  contactId     String?
+  contact       Contact?       @relation(fields: [contactId], references: [id])
+  accountId     String?
+  account       Account?       @relation(fields: [accountId], references: [id])
+  externalId    String
+  subject       String
+  provider      String
+  lastMessageAt DateTime       @default(now())
+  messageCount  Int            @default(1)
+  isRead        Boolean        @default(false)
+  snippet       String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  messages      EmailMessage[]
+
+  @@unique([tenantId, provider, externalId])
+  @@index([tenantId, contactId])
+  @@index([tenantId, accountId])
+}
+
+model EmailMessage {
+  id         String      @id @default(cuid())
+  threadId   String
+  thread     EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  externalId String
+  fromEmail  String
+  toEmails   String[]
+  ccEmails   String[]
+  subject    String
+  bodyHtml   String?
+  bodyText   String?
+  sentAt     DateTime
+  direction  String
+  createdAt  DateTime    @default(now())
+
+  @@index([threadId])
 }
 
 enum QuoteStatus {

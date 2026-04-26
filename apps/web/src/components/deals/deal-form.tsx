@@ -35,6 +35,8 @@ import {
 import { Select } from '@/components/ui/select';
 import { TagInput } from '@/components/ui/tag-input';
 import { Textarea } from '@/components/ui/textarea';
+import { QuickCreateContact } from '@/components/deals/QuickCreateContact';
+import { UserPlus } from 'lucide-react';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -158,6 +160,7 @@ export function DealForm({
   const [accountSearch, setAccountSearch] = useState('');
   const [contactSearch, setContactSearch] = useState('');
   const [userSearch, setUserSearch] = useState('');
+  const [showQuickCreate, setShowQuickCreate] = useState(false);
 
   const pipelinesQuery = usePipelines();
   const accountsQuery = useAccounts({ search: accountSearch, limit: 50 });
@@ -623,17 +626,38 @@ export function DealForm({
               control={control}
               name="contactIds"
               render={({ field }) => (
-                <MultiSelect
-                  id={id}
-                  describedBy={describedBy}
-                  value={field.value ?? []}
-                  onChange={(v) => field.onChange(v)}
-                  options={contactOptions}
-                  onSearchChange={setContactSearch}
-                  isLoading={contactsQuery.isLoading}
-                  placeholder="Select contacts…"
-                  invalid={Boolean(errors.contactIds)}
-                />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">Select one or more contacts</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowQuickCreate(true)}
+                      className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+                    >
+                      <UserPlus className="h-4 w-4" /> New contact
+                    </button>
+                  </div>
+                  <MultiSelect
+                    id={id}
+                    describedBy={describedBy}
+                    value={field.value ?? []}
+                    onChange={(v) => field.onChange(v)}
+                    options={contactOptions}
+                    onSearchChange={setContactSearch}
+                    isLoading={contactsQuery.isLoading}
+                    placeholder="Select contacts…"
+                    invalid={Boolean(errors.contactIds)}
+                  />
+                  {showQuickCreate ? (
+                    <QuickCreateContact
+                      onCreated={(contact) => {
+                        field.onChange([...(field.value ?? []), contact.id]);
+                        setShowQuickCreate(false);
+                      }}
+                      onCancel={() => setShowQuickCreate(false)}
+                    />
+                  ) : null}
+                </div>
               )}
             />
           )}

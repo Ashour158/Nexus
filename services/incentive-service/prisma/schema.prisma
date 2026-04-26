@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/incentive-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("INCENTIVE_DATABASE_URL")
+}
+
+model Contest {
+  id               String          @id @default(cuid())
+  tenantId         String
+  name             String
+  description      String?
+  metric           ContestMetric
+  targetValue      Decimal?        @db.Decimal(18, 2)
+  startDate        DateTime
+  endDate          DateTime
+  prizeDescription String?
+  isActive         Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+  entries          ContestEntry[]
+
+  @@index([tenantId])
+}
+
+model ContestEntry {
+  id           String   @id @default(cuid())
+  contestId    String
+  contest      Contest  @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  tenantId     String
+  ownerId      String
+  currentValue Decimal  @default(0) @db.Decimal(18, 2)
+  rank         Int?
+  updatedAt    DateTime @updatedAt
+
+  @@unique([contestId, ownerId])
+  @@index([contestId, currentValue])
+}
+
+model Badge {
+  id          String       @id @default(cuid())
+  tenantId    String?
+  key         String       @unique
+  name        String
+  description String
+  icon        String
+  condition   Json
+  awardedTo   BadgeAward[]
+
+  @@index([tenantId])
+}
+
+model BadgeAward {
+  id        String   @id @default(cuid())
+  badgeId   String
+  badge     Badge    @relation(fields: [badgeId], references: [id])
+  tenantId  String
+  ownerId   String
+  awardedAt DateTime @default(now())
+
+  @@unique([badgeId, tenantId, ownerId])
+  @@index([tenantId, ownerId])
+}
+
+enum ContestMetric {
+  DEALS_WON_COUNT
+  DEALS_WON_REVENUE
+  ACTIVITIES_COMPLETED
+  LEADS_CONVERTED
+  NEW_LOGOS
+}

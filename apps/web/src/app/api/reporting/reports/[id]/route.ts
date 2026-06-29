@@ -1,0 +1,11 @@
+import { NextRequest, NextResponse } from 'next/server';
+
+const REPORTING_SERVICE = process.env.REPORTING_SERVICE_URL || 'http://localhost:3021';
+
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const tenantId = req.headers.get('x-tenant-id') || 'default';
+  const res = await fetch(`${REPORTING_SERVICE}/api/v1/reports/${params.id}`, {
+    headers: { 'x-tenant-id': tenantId },
+  });
+  return NextResponse.json(await res.json(), { status: res.status });
+}

@@ -1,14 +1,13 @@
-version: '3.9'
-
 services:
   # ─── Infrastructure ─────────────────────────────────────────────────────────
   postgres:
+    # NOTE: Backend services should connect via PgBouncer (pgbouncer:6432) instead of directly
     image: postgres:16-alpine
     container_name: nexus-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: nexus
-      POSTGRES_PASSWORD: nexus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexus}
       POSTGRES_DB: nexus
     ports:
       - '5432:5432'
@@ -21,17 +20,29 @@ services:
       timeout: 5s
       retries: 10
 
+  # PgBouncer connection pooler — all backend services should connect via port 6432
+  pgbouncer:
+    build: ./infrastructure/postgres/pgbouncer
+    container_name: nexus-pgbouncer
+    restart: unless-stopped
+    ports:
+      - '6432:6432'
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@postgres:5432/nexus
+
   redis:
     image: redis:7-alpine
     container_name: nexus-redis
     restart: unless-stopped
-    command: ['redis-server', '--requirepass', 'nexus']
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:-nexus}']
     ports:
       - '6379:6379'
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ['CMD', 'redis-cli', '-a', 'nexus', 'ping']
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD:-nexus}', 'ping']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -45,6 +56,11 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     volumes:
       - zookeeper_data:/var/lib/zookeeper/data
+    healthcheck:
+      test: ['CMD-SHELL', 'echo ruok | nc localhost 2181 || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   kafka:
     image: confluentinc/cp-kafka:7.6.0
@@ -67,6 +83,12 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
     volumes:
       - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ['CMD-SHELL', 'kafka-topics --bootstrap-server localhost:9092 --list || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   meilisearch:
     image: getmeili/meilisearch:v1.8
@@ -75,13 +97,13 @@ services:
     ports:
       - '7700:7700'
     environment:
-      MEILI_MASTER_KEY: nexus-dev
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-nexus-dev}
       MEILI_ENV: development
     volumes:
       - meilisearch_data:/meili_data
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-06-13T22-53-56Z
     container_name: nexus-minio
     restart: unless-stopped
     command: ['server', '/data', '--console-address', ':9001']
@@ -89,8 +111,8 @@ services:
       - '9000:9000'
       - '9001:9001'
     environment:
-      MINIO_ROOT_USER: nexus
-      MINIO_ROOT_PASSWORD: nexus-minio
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-nexus}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-nexus-minio}
     volumes:
       - minio_data:/data
 
@@ -102,15 +124,40 @@ services:
     ports:
       - '8080:8080'
     environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/nexus
+      KC_DB_URL: jdbc:postgresql://pgbouncer:6432/nexus
       KC_DB_USERNAME: nexus
-      KC_DB_PASSWORD: nexus
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-nexus}
     depends_on:
       postgres:
         condition: service_healthy
+
+  kong:
+    image: kong:3.7
+    container_name: nexus-kong
+    restart: unless-stopped
+    ports:
+      - '8000:8000'  # Proxy port
+      - '8443:8443'  # SSL proxy port
+      - '8001:8001'  # Admin API port
+      - '8444:8444'  # SSL admin API port
+    environment:
+      KONG_DATABASE: 'off'
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001, 0.0.0.0:8444 ssl
+      KONG_PLUGINS: bundled,cors,rate-limiting,request-transformer,key-auth,jwt,oauth2
+    volumes:
+      - ./infrastructure/kong/kong.yml:/kong/declarative/kong.yml:ro
+    depends_on:
+      - auth-service
+      - crm-service
+      - finance-service
 
   # ─── App Services ───────────────────────────────────────────────────────────
   auth-service:
@@ -123,8 +170,9 @@ services:
       - '3000:3000'
     environment:
       PORT: '3000'
-    env_file:
-      - ./services/auth-service/.env.example
+      APP_URL: http://localhost:3000
+      JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_auth
     depends_on:
       postgres:
         condition: service_healthy
@@ -141,8 +189,8 @@ services:
     restart: unless-stopped
     ports:
       - '3001:3001'
-    env_file:
-      - ./services/crm-service/.env.example
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_crm
     depends_on:
       postgres:
         condition: service_healthy
@@ -157,8 +205,9 @@ services:
     restart: unless-stopped
     ports:
       - '3002:3002'
-    env_file:
-      - ./services/finance-service/.env.example
+    environment:
+      CHROMIUM_PATH: /usr/bin/chromium
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_finance
     depends_on:
       postgres:
         condition: service_healthy
@@ -173,8 +222,8 @@ services:
     restart: unless-stopped
     ports:
       - '3003:3003'
-    env_file:
-      - ./services/notification-service/.env.example
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_notification
     depends_on:
       postgres:
         condition: service_healthy
@@ -189,8 +238,6 @@ services:
     restart: unless-stopped
     ports:
       - '3005:3005'
-    env_file:
-      - ./services/realtime-service/.env.example
     depends_on:
       kafka:
         condition: service_started
@@ -205,8 +252,6 @@ services:
     restart: unless-stopped
     ports:
       - '3006:3006'
-    env_file:
-      - ./services/search-service/.env.example
     depends_on:
       kafka:
         condition: service_started
@@ -221,24 +266,8 @@ services:
     restart: unless-stopped
     ports:
       - '3007:3007'
-    env_file:
-      - ./services/workflow-service/.env.example
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_started
-
-  billing-service:
-    build:
-      context: .
-      dockerfile: ./services/billing-service/Dockerfile
-    container_name: nexus-billing
-    restart: unless-stopped
-    ports:
-      - '3011:3011'
-    env_file:
-      - ./services/billing-service/.env.example
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_workflow
     depends_on:
       postgres:
         condition: service_healthy
@@ -253,8 +282,8 @@ services:
     restart: unless-stopped
     ports:
       - '3012:3012'
-    env_file:
-      - ./services/integration-service/.env.example
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_integration
     depends_on:
       postgres:
         condition: service_healthy
@@ -269,8 +298,8 @@ services:
     restart: unless-stopped
     ports:
       - '3013:3013'
-    env_file:
-      - ./services/blueprint-service/.env.example
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_blueprint
     depends_on:
       postgres:
         condition: service_healthy
@@ -285,8 +314,6 @@ services:
     restart: unless-stopped
     ports:
       - '3008:3008'
-    env_file:
-      - ./services/analytics-service/.env.example
     depends_on:
       kafka:
         condition: service_started
@@ -311,23 +338,47 @@ services:
     restart: unless-stopped
     ports:
       - '3100:3000'
-    env_file:
-      - ./apps/web/.env.example
     depends_on:
       - auth-service
       - crm-service
       - finance-service
-      - notification-service
-      - realtime-service
-      - search-service
+
+  graphql-gateway:
+    build:
+      context: .
+      dockerfile: ./services/graphql-gateway/Dockerfile
+    container_name: nexus-graphql
+    restart: unless-stopped
+    ports:
+      - '4000:4000'
+    volumes:
+      - ./services/graphql-gateway/router.yaml:/dist/config/router.yaml:ro
+      - ./services/graphql-gateway/supergraph.graphql:/dist/config/supergraph.graphql:ro
+    depends_on:
+      - auth-service
+      - crm-service
+      - finance-service
+      - comm-service
       - workflow-service
       - analytics-service
-      - comm-service
+      - realtime-service
+      - search-service
       - storage-service
-      - billing-service
+      - approval-service
+      - data-service
+      - document-service
+      - chatbot-service
+      - cadence-service
+      - territory-service
+      - planning-service
+      - reporting-service
+      - portal-service
+      - knowledge-service
+      - incentive-service
       - integration-service
       - blueprint-service
-
+      - email-sync-service
+      - notification-service
   comm-service:
     build:
       context: .
@@ -336,8 +387,8 @@ services:
     restart: unless-stopped
     ports:
       - '3009:3009'
-    env_file:
-      - ./services/comm-service/.env.example
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_comm
     depends_on:
       postgres:
         condition: service_healthy
@@ -352,8 +403,8 @@ services:
     restart: unless-stopped
     ports:
       - '3010:3010'
-    env_file:
-      - ./services/storage-service/.env.example
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -368,8 +419,7 @@ services:
       - '3014:3014'
     environment:
       PORT: '3014'
-    env_file:
-      - ./services/approval-service/.env.example
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_approval
     depends_on:
       postgres:
         condition: service_healthy
@@ -386,8 +436,7 @@ services:
       - '3015:3015'
     environment:
       PORT: '3015'
-    env_file:
-      - ./services/data-service/.env.example
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_data
     depends_on:
       postgres:
         condition: service_healthy
@@ -404,8 +453,6 @@ services:
       - '3016:3016'
     environment:
       PORT: '3016'
-    env_file:
-      - ./services/document-service/.env.example
     depends_on:
       - finance-service
 
@@ -419,8 +466,7 @@ services:
       - '3017:3017'
     environment:
       PORT: '3017'
-    env_file:
-      - ./services/chatbot-service/.env.example
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_chatbot
     depends_on:
       postgres:
         condition: service_healthy
@@ -437,8 +483,7 @@ services:
       - '3018:3018'
     environment:
       PORT: '3018'
-    env_file:
-      - ./services/cadence-service/.env.example
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_cadence
     depends_on:
       postgres:
         condition: service_healthy
@@ -455,8 +500,7 @@ services:
       - '3019:3019'
     environment:
       PORT: '3019'
-    env_file:
-      - ./services/territory-service/.env.example
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_territory
     depends_on:
       postgres:
         condition: service_healthy
@@ -473,8 +517,7 @@ services:
       - '3020:3020'
     environment:
       PORT: '3020'
-    env_file:
-      - ./services/planning-service/.env.example
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_planning
     depends_on:
       postgres:
         condition: service_healthy
@@ -491,8 +534,7 @@ services:
       - '3021:3021'
     environment:
       PORT: '3021'
-    env_file:
-      - ./services/reporting-service/.env.example
+      REPORTING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_reporting
     depends_on:
       postgres:
         condition: service_healthy
@@ -507,8 +549,7 @@ services:
       - '3022:3022'
     environment:
       PORT: '3022'
-    env_file:
-      - ./services/portal-service/.env.example
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_portal
     depends_on:
       postgres:
         condition: service_healthy
@@ -523,8 +564,7 @@ services:
       - '3023:3023'
     environment:
       PORT: '3023'
-    env_file:
-      - ./services/knowledge-service/.env.example
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_knowledge
     depends_on:
       postgres:
         condition: service_healthy
@@ -539,27 +579,106 @@ services:
       - '3024:3024'
     environment:
       PORT: '3024'
-    env_file:
-      - ./services/incentive-service/.env.example
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_incentive
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
         condition: service_started
 
-  ai-service:
+  email-sync-service:
     build:
       context: .
-      dockerfile: ./services/ai-service/Dockerfile
-    container_name: nexus-ai
+      dockerfile: ./services/email-sync-service/Dockerfile
+    container_name: nexus-email-sync
     restart: unless-stopped
     ports:
-      - '3025:8000'
-    env_file:
-      - ./services/ai-service/.env.example
+      - '3026:3026'
+    environment:
+      EMAIL_SYNC_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_email_sync
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  metadata-service:
+    build:
+      context: .
+      dockerfile: ./services/metadata-service/Dockerfile
+    container_name: nexus-metadata
+    restart: unless-stopped
+    ports:
+      - '3004:3004'
+    environment:
+      PORT: '3004'
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_metadata
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  router-coprocessor:
+    build:
+      context: .
+      dockerfile: ./services/router-coprocessor/Dockerfile
+    container_name: nexus-router-coprocessor
+    restart: unless-stopped
+    ports:
+      - '4001:4001'
+    environment:
+      PORT: '4001'
+
+  audit-consumer:
+    build:
+      context: .
+      dockerfile: ./services/audit-consumer/Dockerfile
+    container_name: nexus-audit-consumer
+    restart: unless-stopped
+    ports:
+      - '3028:3028'
+    environment:
+      PORT: '3028'
+      AUDIT_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_audit
+      KAFKA_BROKERS: kafka:29092
+      KAFKA_CLIENT_ID: audit-consumer
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  outbox-relay:
+    build:
+      context: .
+      dockerfile: ./services/outbox-relay/Dockerfile
+    container_name: nexus-outbox-relay
+    restart: unless-stopped
+    ports:
+      - '3027:3027'
+    environment:
+      PORT: '3027'
+      JWT_SECRET: ${JWT_SECRET}
+      KAFKA_BROKERS: kafka:29092
+      KAFKA_CLIENT_ID: outbox-relay
+      AUTH_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_auth
+      CRM_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_crm
+      APPROVAL_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_approval
+      ANALYTICS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_analytics
+      INTEGRATION_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_integration
+      REPORTING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_reporting
+      TERRITORY_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_territory
+      FINANCE_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_finance
+      OUTBOX_RELAY_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_auth
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
 
   prometheus:
-    image: prom/prometheus:v2.51.0
+    image: prom/prometheus:v2.53.0
     container_name: nexus-prometheus
     restart: unless-stopped
     ports:
@@ -575,37 +694,33 @@ services:
       - '--storage.tsdb.retention.time=15d'
       - '--web.enable-lifecycle'
 
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.104.0
+    container_name: nexus-otel-collector
+    restart: unless-stopped
+    ports:
+      - '4317:4317'   # OTLP gRPC
+      - '4318:4318'   # OTLP HTTP
+    volumes:
+      - ./infrastructure/otel/otel-collector-config.yml:/etc/otelcol-contrib/config.yaml:ro
+
   grafana:
-    image: grafana/grafana:10.4.0
+    image: grafana/grafana:10.4.4
     container_name: nexus-grafana
     restart: unless-stopped
     ports:
-      - '3200:3000'
+      - '3030:3000'
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: nexus-grafana
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-nexus_grafana}
       GF_USERS_ALLOW_SIGN_UP: 'false'
-      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infrastructure/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./infrastructure/grafana/datasources:/etc/grafana/provisioning/datasources:ro
     depends_on:
       - prometheus
-
-  nginx:
-    image: nginx:1.25-alpine
-    container_name: nexus-nginx
-    restart: unless-stopped
-    ports:
-      - '80:80'
-      - '443:443'
-    volumes:
-      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./infrastructure/nginx/certs:/etc/nginx/certs:ro
-    depends_on:
-      - web
-      - auth-service
-      - crm-service
 
 volumes:
   postgres_data:

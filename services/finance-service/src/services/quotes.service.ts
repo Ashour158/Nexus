@@ -9,21 +9,23 @@ import type {
   QuoteListQuery,
   UpdateQuoteInput,
 } from '@nexus/validation';
-import { NexusProducer, TOPICS } from '@nexus/kafka';
+import type { NexusProducer } from '@nexus/kafka';
 import { Prisma } from '../../../../node_modules/.prisma/finance-client/index.js';
 import type {
   Quote,
   QuoteStatus,
 } from '../../../../node_modules/.prisma/finance-client/index.js';
 import type { FinancePrisma } from '../prisma.js';
-import { toPaginatedResult } from '../lib/pagination.js';
+import { toPaginatedResult } from '@nexus/shared-types';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 type QuoteListFilters = Omit<
   QuoteListQuery,
   'page' | 'limit' | 'sortBy' | 'sortDir' | 'cursor'
->;
+> & { contactId?: string };
+
+type ContactLinkedCreateQuoteInput = CreateQuoteInput & { contactId?: string };
 
 interface ListPagination {
   page: number;
@@ -65,6 +67,7 @@ function buildWhere(
   const where: Prisma.QuoteWhereInput = { tenantId };
   if (f.dealId) where.dealId = f.dealId;
   if (f.accountId) where.accountId = f.accountId;
+  if (f.contactId) where.contactId = f.contactId;
   if (f.ownerId) where.ownerId = f.ownerId;
   if (f.status) where.status = f.status;
   return where;
@@ -74,11 +77,113 @@ function toPrismaDecimal(value: number): Prisma.Decimal {
   return new Prisma.Decimal(value);
 }
 
+function assertFutureDate(date: Date | null | undefined, label: string) {
+  if (!date) {
+    throw new BusinessRuleError(`${label} is required`);
+  }
+  if (date.getTime() <= Date.now()) {
+    throw new BusinessRuleError(`${label} must be in the future`);
+  }
+}
+
 function assertInStatus(quote: Quote, allowed: QuoteStatus[], action: string) {
   if (!allowed.includes(quote.status)) {
     throw new BusinessRuleError(
       `Cannot ${action} a quote in status ${quote.status}`
     );
+  }
+}
+
+function quoteSnapshot(quote: Quote): Prisma.InputJsonValue {
+  return {
+    id: quote.id,
+    quoteNumber: quote.quoteNumber,
+    version: quote.version,
+    status: quote.status,
+    dealId: quote.dealId,
+    accountId: quote.accountId,
+    contactId: quote.contactId,
+    ownerId: quote.ownerId,
+    currency: quote.currency,
+    subtotal: quote.subtotal.toString(),
+    discountAmount: quote.discountAmount.toString(),
+    taxAmount: quote.taxAmount.toString(),
+    total: quote.total.toString(),
+    validUntil: quote.validUntil?.toISOString() ?? null,
+    expiresAt: quote.expiresAt?.toISOString() ?? null,
+    approvalRequired: quote.approvalRequired,
+    approvalStatus: quote.approvalStatus,
+    lineItems: quote.lineItems,
+    pricingBreakdown: quote.pricingBreakdown,
+    customFields: quote.customFields,
+  } as Prisma.InputJsonValue;
+}
+
+function normalizeQuoteLines(
+  tenantId: string,
+  quoteId: string,
+  pricingResult: CpqPricingResult
+) {
+  return pricingResult.items.map((item, index) => ({
+    tenantId,
+    quoteId,
+    productId: item.productId,
+    productName: item.productName,
+    description: item.notes ?? null,
+    quantity: toPrismaDecimal(item.quantity),
+    listPrice: toPrismaDecimal(item.listPrice),
+    unitPrice: toPrismaDecimal(item.unitPrice),
+    discountPercent: toPrismaDecimal(item.discountPercent),
+    discountAmount: toPrismaDecimal(item.discountAmount * item.quantity),
+    taxPercent: toPrismaDecimal(0),
+    taxAmount: toPrismaDecimal(0),
+    lineTotal: toPrismaDecimal(item.total),
+    sortOrder: index,
+    source: 'CPQ',
+    customFields: {} as Prisma.InputJsonValue,
+  }));
+}
+
+async function persistQuoteArtifacts(
+  prisma: FinancePrisma,
+  tenantId: string,
+  quote: Quote,
+  reason: string,
+  createdById?: string,
+  pricingResult?: CpqPricingResult
+) {
+  const db = prisma as unknown as {
+    quoteLine?: { deleteMany: Function; createMany: Function };
+    quoteRevision?: { create: Function };
+  };
+
+  if (pricingResult && db.quoteLine) {
+    await db.quoteLine.deleteMany({ where: { tenantId, quoteId: quote.id } });
+    await db.quoteLine.createMany({
+      data: normalizeQuoteLines(tenantId, quote.id, pricingResult),
+    });
+  }
+
+  if (db.quoteRevision) {
+    await db.quoteRevision.create({
+      data: {
+        tenantId,
+        quoteId: quote.id,
+        version: quote.version,
+        reason,
+        status: quote.status,
+        snapshot: quoteSnapshot(quote),
+        createdById: createdById ?? null,
+      },
+    }).catch((err: unknown) => {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        return undefined;
+      }
+      throw err;
+    });
   }
 }
 
@@ -93,7 +198,7 @@ function assertInStatus(quote: Quote, allowed: QuoteStatus[], action: string) {
  */
 export function createQuotesService(
   prisma: FinancePrisma,
-  producer: NexusProducer
+  _producer: NexusProducer
 ) {
   async function loadOrThrow(tenantId: string, id: string): Promise<Quote> {
     const row = await prisma.quote.findFirst({ where: { id, tenantId } });
@@ -137,13 +242,17 @@ export function createQuotesService(
      */
     async createQuote(
       tenantId: string,
-      data: CreateQuoteInput,
+      data: ContactLinkedCreateQuoteInput,
       pricingResult: CpqPricingResult
     ): Promise<Quote> {
       if (pricingResult.items.length === 0) {
         throw new BusinessRuleError('Quote must include at least one line item');
       }
       const quoteNumber = await generateQuoteNumber(prisma, tenantId);
+      const expiry = data.validUntil
+        ? new Date(data.validUntil)
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      assertFutureDate(expiry, 'Quote expiry date');
 
       try {
         const created = await prisma.quote.create({
@@ -151,17 +260,19 @@ export function createQuotesService(
               tenantId,
               dealId: data.dealId,
               accountId: data.accountId,
+              contactId: data.contactId ?? null,
               ownerId: data.ownerId,
               quoteNumber,
               name: data.name,
-              status: 'DRAFT',
+              rfqId: data.rfqId ?? null,
+              status: pricingResult.approvalRequired ? 'PENDING_APPROVAL' : 'DRAFT',
               currency: data.currency,
               subtotal: toPrismaDecimal(pricingResult.subtotal),
               discountAmount: toPrismaDecimal(pricingResult.discountTotal),
               taxAmount: toPrismaDecimal(pricingResult.taxTotal),
               total: toPrismaDecimal(pricingResult.total),
-              validUntil: data.validUntil ? new Date(data.validUntil) : null,
-              expiresAt: data.validUntil ? new Date(data.validUntil) : null,
+              validUntil: expiry,
+              expiresAt: expiry,
               approvalRequired: pricingResult.approvalRequired,
               approvalStatus: pricingResult.approvalRequired
                 ? 'PENDING'
@@ -180,19 +291,14 @@ export function createQuotesService(
           },
         });
 
-        await producer
-          .publish(TOPICS.QUOTES, {
-            type: 'quote.created',
-            tenantId,
-            payload: {
-              quoteId: created.id,
-              dealId: created.dealId,
-              accountId: created.accountId,
-              total: Number(created.total.toFixed(2)),
-              currency: created.currency,
-            },
-          })
-          .catch(() => undefined);
+        await persistQuoteArtifacts(
+          prisma,
+          tenantId,
+          created,
+          'quote.created',
+          data.ownerId,
+          pricingResult
+        );
 
         if (created.approvalRequired) {
           await fetch(`${process.env.APPROVAL_SERVICE_URL}/api/v1/approval/requests`, {
@@ -211,7 +317,9 @@ export function createQuotesService(
                 quoteNumber: created.quoteNumber,
               },
             }),
-          }).catch(() => undefined);
+          }).catch((err: unknown) => {
+            console.error('[quotes.service] Failed to create approval request for quote — discount may require manual approval', { quoteId: created.id, err });
+          });
         }
 
         return created;
@@ -240,6 +348,7 @@ export function createQuotesService(
       if (data.name !== undefined) updateData.name = data.name;
       if (data.validUntil !== undefined) {
         const dt = data.validUntil === null ? null : new Date(data.validUntil);
+        assertFutureDate(dt, 'Quote expiry date');
         updateData.validUntil = dt;
         updateData.expiresAt = dt;
       }
@@ -248,12 +357,27 @@ export function createQuotesService(
       if (data.customFields !== undefined)
         updateData.customFields = data.customFields as Prisma.InputJsonValue;
 
-      return prisma.quote.update({ where: { id }, data: updateData });
+      if (data.discountAmount !== undefined) {
+        updateData.discountAmount = toPrismaDecimal(data.discountAmount);
+        const subtotalNum = Number(existing.subtotal);
+        const taxNum = Number(existing.taxAmount);
+        updateData.total = toPrismaDecimal(subtotalNum - data.discountAmount + taxNum);
+      }
+
+      const updated = await prisma.quote.update({ where: { id }, data: updateData });
+      await persistQuoteArtifacts(prisma, tenantId, updated, 'quote.updated');
+      return updated;
     },
 
     async sendQuote(tenantId: string, id: string): Promise<Quote> {
       const existing = await loadOrThrow(tenantId, id);
-      assertInStatus(existing, ['DRAFT'], 'send');
+      assertInStatus(existing, ['DRAFT', 'APPROVED'], 'send');
+      if (existing.expiresAt && existing.expiresAt.getTime() <= Date.now()) {
+        throw new BusinessRuleError('Expired quotes cannot be sent');
+      }
+      if (existing.approvalRequired && existing.approvalStatus !== 'APPROVED') {
+        throw new BusinessRuleError('Quote requires approved discount workflow before it can be sent');
+      }
 
       const now = new Date();
       const updated = await prisma.quote.update({
@@ -264,20 +388,7 @@ export function createQuotesService(
           version: { increment: 1 },
         },
       });
-
-      await producer
-        .publish(TOPICS.QUOTES, {
-          type: 'quote.sent',
-          tenantId,
-          payload: {
-            quoteId: updated.id,
-            dealId: updated.dealId,
-            accountId: updated.accountId,
-            total: Number(updated.total.toFixed(2)),
-            recipientEmail: undefined,
-          },
-        })
-        .catch(() => undefined);
+      await persistQuoteArtifacts(prisma, tenantId, updated, 'quote.sent');
 
       return updated;
     },
@@ -295,19 +406,7 @@ export function createQuotesService(
           version: { increment: 1 },
         },
       });
-
-      await producer
-        .publish(TOPICS.QUOTES, {
-          type: 'quote.accepted',
-          tenantId,
-          payload: {
-            quoteId: updated.id,
-            dealId: updated.dealId,
-            total: Number(updated.total.toFixed(2)),
-            currency: updated.currency,
-          },
-        })
-        .catch(() => undefined);
+      await persistQuoteArtifacts(prisma, tenantId, updated, 'quote.accepted');
 
       return updated;
     },
@@ -330,49 +429,30 @@ export function createQuotesService(
           version: { increment: 1 },
         },
       });
-
-      await producer
-        .publish(TOPICS.QUOTES, {
-          type: 'quote.rejected',
-          tenantId,
-          payload: {
-            quoteId: updated.id,
-            dealId: updated.dealId,
-            total: Number(updated.total.toFixed(2)),
-            reason,
-          },
-        })
-        .catch(() => undefined);
+      await persistQuoteArtifacts(prisma, tenantId, updated, 'quote.rejected');
 
       return updated;
     },
 
     /**
-     * Batch-expires SENT quotes whose `expiresAt` has passed. Returns the
-     * number of rows updated. Intended to be driven by a scheduler; callers
-     * scope to a single tenant.
+     * Deprecated: quote expiry is an authoritative CPQ lifecycle transition.
+     * Call commercialRecords.expireQuotes(...) so each quote receives its own
+     * transition ledger row, audit metadata, and outbox event.
      */
     async expireQuotes(tenantId: string): Promise<number> {
-      const now = new Date();
-      const result = await prisma.quote.updateMany({
-        where: {
-          tenantId,
-          status: 'SENT',
-          expiresAt: { lt: now },
-        },
-        data: { status: 'EXPIRED' },
-      });
-      return result.count;
+      void tenantId;
+      throw new BusinessRuleError('Quote expiry moved to finance CPQ transition authority');
     },
 
     async duplicateQuote(tenantId: string, id: string): Promise<Quote> {
       const existing = await loadOrThrow(tenantId, id);
       const newNumber = await generateQuoteNumber(prisma, tenantId);
-      return prisma.quote.create({
+      const duplicated = await prisma.quote.create({
         data: {
           tenantId,
           dealId: existing.dealId,
           accountId: existing.accountId,
+          contactId: existing.contactId,
           ownerId: existing.ownerId,
           quoteNumber: newNumber,
           name: `${existing.name} (Copy)`,
@@ -396,6 +476,28 @@ export function createQuotesService(
           version: 1,
         },
       });
+      const pricingLike: CpqPricingResult = {
+        items: Array.isArray(existing.lineItems)
+          ? (existing.lineItems as unknown as CpqPricingResult['items'])
+          : [],
+        subtotal: Number(existing.subtotal),
+        discountTotal: Number(existing.discountAmount),
+        taxTotal: Number(existing.taxAmount),
+        total: Number(existing.total),
+        appliedRules: [],
+        floorPriceWarnings: [],
+        approvalRequired: existing.approvalRequired,
+        approvalReasons: [],
+      };
+      await persistQuoteArtifacts(
+        prisma,
+        tenantId,
+        duplicated,
+        'quote.duplicated',
+        existing.ownerId,
+        pricingLike
+      );
+      return duplicated;
     },
 
     async voidQuote(
@@ -415,18 +517,7 @@ export function createQuotesService(
           version: { increment: 1 },
         },
       });
-
-      await producer
-        .publish(TOPICS.QUOTES, {
-          type: 'quote.voided',
-          tenantId,
-          payload: {
-            quoteId: updated.id,
-            dealId: updated.dealId,
-            reason,
-          },
-        })
-        .catch(() => undefined);
+      await persistQuoteArtifacts(prisma, tenantId, updated, 'quote.voided');
 
       return updated;
     },

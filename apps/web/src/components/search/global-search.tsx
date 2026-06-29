@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Command, FileText, Search, TrendingUp, User, X } from 'lucide-react';
+import { useAuthStore } from '@/stores/auth.store';
 
 interface SearchResult {
   id: string;
@@ -29,8 +30,9 @@ const TYPE_BADGES: Record<string, { label: string; color: string }> = {
 
 async function searchAll(q: string): Promise<SearchResult[]> {
   if (!q.trim()) return [];
+  const token = useAuthStore.getState().accessToken ?? '';
   const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&limit=10`, {
-    headers: { Authorization: `Bearer ${localStorage.getItem('access_token') ?? ''}` },
+    headers: { Authorization: `Bearer ${token}` },
   });
   const data = (await res.json().catch(() => ({ hits: [] }))) as { hits?: Array<{ id: string; type?: string; title?: string; subtitle?: string }> };
   return (data.hits ?? []).map((hit) => {
@@ -51,7 +53,7 @@ async function searchAll(q: string): Promise<SearchResult[]> {
   });
 }
 
-export function GlobalSearch() {
+export function GlobalSearch({ compact = false }: { compact?: boolean }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [open, setOpen] = useState(false);
@@ -120,7 +122,10 @@ export function GlobalSearch() {
   }
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-md">
+    <div
+      ref={containerRef}
+      className={compact ? 'relative h-11 w-11 shrink-0' : 'relative w-full min-w-[280px] max-w-[460px]'}
+    >
       <button
         onClick={() => {
           setOpen(true);
@@ -128,17 +133,31 @@ export function GlobalSearch() {
         }}
         aria-label="Search (?K)"
         title="Search (?K)"
-        className="flex w-full items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400 transition-colors hover:bg-gray-100"
+        className={
+          compact
+            ? 'flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-500 transition-colors hover:border-blue-200 hover:bg-white hover:text-slate-700'
+            : 'flex h-11 w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 text-sm text-slate-500 transition-colors hover:border-blue-200 hover:bg-white hover:text-slate-700'
+        }
       >
-        <Search className="h-4 w-4" />
-        <span>Search contacts, deals, notes...</span>
-        <kbd className="ms-auto flex items-center gap-0.5 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-400">
-          <Command className="h-3 w-3" />K
-        </kbd>
+        <Search className="h-4 w-4 shrink-0" />
+        {!compact ? (
+          <>
+            <span className="min-w-0 flex-1 truncate text-start">Search contacts, deals, notes...</span>
+            <kbd className="ms-auto hidden items-center gap-0.5 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 sm:flex">
+              <Command className="h-3 w-3" />K
+            </kbd>
+          </>
+        ) : null}
       </button>
 
       {open ? (
-        <div className="absolute start-0 end-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+        <div
+          className={
+            compact
+              ? 'absolute end-0 top-full z-50 mt-1 w-[min(90vw,28rem)] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl'
+              : 'absolute start-0 end-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl'
+          }
+        >
           <div className="flex items-center gap-2 border-b border-gray-100 px-3">
             <Search className="h-4 w-4 flex-shrink-0 text-gray-400" />
             <input
@@ -158,7 +177,7 @@ export function GlobalSearch() {
 
           {loading ? <div className="px-4 py-6 text-center text-sm text-gray-400">Searching...</div> : null}
           {!loading && results.length === 0 && query.trim() ? (
-            <div className="px-4 py-6 text-center text-sm text-gray-400">No results for "{query}"</div>
+            <div className="px-4 py-6 text-center text-sm text-gray-400">No results for &quot;{query}&quot;</div>
           ) : null}
 
           {!loading && results.length > 0 ? (

@@ -1,5 +1,6 @@
 import type { NotificationPrisma } from '../prisma.js';
 import type { Prisma } from '../../../../node_modules/.prisma/notification-client/index.js';
+import { NexusProducer, TOPICS } from '@nexus/kafka';
 
 /**
  * In-app channel — persists a notification row so the web client can render it
@@ -23,7 +24,7 @@ export interface InAppChannel {
   send(input: InAppNotificationInput): Promise<{ id: string }>;
 }
 
-export function createInAppChannel(prisma: NotificationPrisma): InAppChannel {
+export function createInAppChannel(prisma: NotificationPrisma, producer?: NexusProducer): InAppChannel {
   return {
     async send(input) {
       const row = await prisma.notification.create({
@@ -40,6 +41,27 @@ export function createInAppChannel(prisma: NotificationPrisma): InAppChannel {
           metadata: (input.metadata ?? {}) as Prisma.InputJsonValue,
         },
       });
+
+      // Publish to Kafka so realtime-service can push via WebSocket
+      if (producer) {
+        producer.publish(TOPICS.NOTIFICATIONS, {
+          type: 'notification.created',
+          version: 1,
+          tenantId: input.tenantId,
+          timestamp: new Date().toISOString(),
+          payload: {
+            id: row.id,
+            userId: input.userId,
+            notificationType: input.type,
+            title: input.title,
+            body: input.body,
+            entityType: input.entityType,
+            entityId: input.entityId,
+            actionUrl: input.actionUrl,
+          },
+        }).catch(() => { /* non-critical — DB write already succeeded */ });
+      }
+
       return { id: row.id };
     },
   };

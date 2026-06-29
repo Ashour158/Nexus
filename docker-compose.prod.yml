@@ -1,5 +1,3 @@
-version: '3.9'
-
 # Production overlay — use with:
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
@@ -16,10 +14,30 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U nexus -d nexus']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits: { cpus: '1.0', memory: 1G }
+        reservations: { cpus: '0.5', memory: 512M }
 
   redis:
     restart: always
     command: ['redis-server', '--requirepass', '${REDIS_PASSWORD}']
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 256M }
+        reservations: { cpus: '0.25', memory: 128M }
 
   minio:
     restart: always
@@ -34,125 +52,364 @@ services:
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
     command: ['start'] # production mode (not start-dev)
 
-  # ─── App Services ────────────────────────────────────────────────────────
-  auth-service:
-    image: nexus/auth-service:${IMAGE_TAG:-latest}
+  kong:
+    image: kong:3.7
     restart: always
+    environment:
+      KONG_DATABASE: 'off'
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001, 0.0.0.0:8444 ssl
+      KONG_PLUGINS: bundled,cors,rate-limiting,request-transformer,key-auth,jwt,oauth2
+    volumes:
+      - ./infrastructure/kong/kong.yml:/kong/declarative/kong.yml:ro
+    healthcheck:
+      test: ['CMD', 'kong', 'health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 256M }
+        reservations: { cpus: '0.25', memory: 128M }
+
+  pgbouncer:
+    restart: always
+    healthcheck:
+      test: ['CMD-SHELL', 'psql postgresql://nexus:$${POSTGRES_PASSWORD}@localhost:6432/nexus -c "SELECT 1" || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits: { cpus: '0.25', memory: 128M }
+        reservations: { cpus: '0.125', memory: 64M }
+
+  otel-collector:
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.25', memory: 256M }
+
+  graphql-gateway:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-graphql-gateway:${IMAGE_TAG:-latest}
+    restart: always
+    ports:
+      - '4000:4000'
+    environment:
+      APOLLO_KEY: ${APOLLO_KEY}
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
-  crm-service:
-    image: nexus/crm-service:${IMAGE_TAG:-latest}
+  # ─── App Services ────────────────────────────────────────────────────────
+  auth-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-auth-service:${IMAGE_TAG:-latest}
     restart: always
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+        reservations: { cpus: '0.25', memory: 256M }
+
+  crm-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-crm-service:${IMAGE_TAG:-latest}
+    restart: always
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3001/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     deploy:
       resources:
         limits: { cpus: '1.0', memory: 1G }
+        reservations: { cpus: '0.5', memory: 512M }
 
   finance-service:
-    image: nexus/finance-service:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-finance-service:${IMAGE_TAG:-latest}
     restart: always
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   notification-service:
-    image: nexus/notification-service:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-notification-service:${IMAGE_TAG:-latest}
     restart: always
     deploy:
       resources:
         limits: { cpus: '0.25', memory: 256M }
 
   realtime-service:
-    image: nexus/realtime-service:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-realtime-service:${IMAGE_TAG:-latest}
     restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
 
   search-service:
-    image: nexus/search-service:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-search-service:${IMAGE_TAG:-latest}
     restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
 
   workflow-service:
-    image: nexus/workflow-service:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-workflow-service:${IMAGE_TAG:-latest}
     restart: always
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   analytics-service:
-    image: nexus/analytics-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  comm-service:
-    image: nexus/comm-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  storage-service:
-    image: nexus/storage-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  billing-service:
-    image: nexus/billing-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  integration-service:
-    image: nexus/integration-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  blueprint-service:
-    image: nexus/blueprint-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  approval-service:
-    image: nexus/approval-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  data-service:
-    image: nexus/data-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  document-service:
-    image: nexus/document-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  chatbot-service:
-    image: nexus/chatbot-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  cadence-service:
-    image: nexus/cadence-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  territory-service:
-    image: nexus/territory-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  planning-service:
-    image: nexus/planning-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  reporting-service:
-    image: nexus/reporting-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  portal-service:
-    image: nexus/portal-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  knowledge-service:
-    image: nexus/knowledge-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  incentive-service:
-    image: nexus/incentive-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  ai-service:
-    image: nexus/ai-service:${IMAGE_TAG:-latest}
-    restart: always
-
-  web:
-    image: nexus/web:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-analytics-service:${IMAGE_TAG:-latest}
     restart: always
     deploy:
       resources:
         limits: { cpus: '1.0', memory: 1G }
+
+  comm-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-comm-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  storage-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-storage-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+        reservations: { cpus: '0.25', memory: 256M }
+
+  integration-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-integration-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  blueprint-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-blueprint-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  approval-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-approval-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  data-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-data-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  document-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-document-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  chatbot-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-chatbot-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '1.0', memory: 1G }
+
+  cadence-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-cadence-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  territory-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-territory-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  planning-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-planning-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  reporting-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-reporting-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  portal-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-portal-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  knowledge-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-knowledge-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  incentive-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-incentive-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  email-sync-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-email-sync-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.25', memory: 256M }
+
+  metadata-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-metadata-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  quotes-service:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-quotes-service:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  router-coprocessor:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-router-coprocessor:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  web:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-web:${IMAGE_TAG:-latest}
+    restart: always
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits: { cpus: '1.0', memory: 1G }
+        reservations: { cpus: '0.5', memory: 512M }
+
+  # ─── Observability ────────────────────────────────────────────────────────
+  outbox-relay:
+    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-outbox-relay:${IMAGE_TAG:-latest}
+    restart: always
+    environment:
+      PORT: '3027'
+      JWT_SECRET: ${JWT_SECRET}
+      KAFKA_BROKERS: kafka:29092
+      KAFKA_CLIENT_ID: outbox-relay
+      OUTBOX_RELAY_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_auth
+      AUTH_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_auth
+      CRM_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_crm
+      APPROVAL_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_approval
+      ANALYTICS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_analytics
+      INTEGRATION_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_integration
+      REPORTING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_reporting
+      TERRITORY_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_territory
+      FINANCE_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_finance
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3027/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+        reservations: { cpus: '0.25', memory: 256M }
+
+  fluent-bit:
+    image: cr.fluentbit.io/fluent/fluent-bit:3.0
+    restart: always
+    volumes:
+      - ./infrastructure/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    deploy:
+      resources:
+        limits: { cpus: '0.25', memory: 128M }
+    depends_on:
+      - opensearch
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    restart: always
+    volumes:
+      - ./infrastructure/prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    ports:
+      - '9093:9093'
+    deploy:
+      resources:
+        limits: { cpus: '0.25', memory: 128M }
+
+  opensearch:
+    image: opensearchproject/opensearch:2.14.0
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - DISABLE_SECURITY_PLUGIN=false
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    deploy:
+      resources:
+        limits: { cpus: '1.0', memory: 2G }
+
+# ─── Secrets ──────────────────────────────────────────────────────────────
+# In production, use Docker secrets (swarm mode) or mount from a secrets manager.
+# These placeholders keep compose valid while documenting the required secrets.
+secrets:
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
+
+# ─── Volumes ──────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+  redis_data:
+  alertmanager_data:
+  opensearch_data:

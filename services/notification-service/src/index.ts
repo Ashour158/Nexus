@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { startTracing } from '@nexus/service-utils/tracing';
 import rateLimit from '@fastify/rate-limit';
 import {
   checkDatabase,
@@ -8,15 +9,25 @@ import {
   startService,
 } from '@nexus/service-utils';
 import { PrismaClient } from '../../../node_modules/.prisma/notification-client/index.js';
+import { buildDatabaseUrl } from '@nexus/service-utils/db';
 import { createNotificationPrisma } from './prisma.js';
 import { createEmailChannel } from './channels/email.channel.js';
-import { createInAppChannel } from './channels/in-app.channel.js';
+import { createInAppChannel, type InAppNotificationInput } from './channels/in-app.channel.js';
 import { startDealConsumer } from './consumers/deal.consumer.js';
 import { startActivityConsumer } from './consumers/activity.consumer.js';
 import { startQuoteConsumer } from './consumers/quote.consumer.js';
 import { registerNotificationsRoutes } from './routes/notifications.routes.js';
+import { registerGraphQL } from './graphql/index.js';
+import { NexusProducer, TOPICS } from '@nexus/kafka';
 
-const prismaHealth = new PrismaClient();
+startTracing({ serviceName: 'notification-service' });
+const prismaHealth = new PrismaClient({
+  datasources: {
+    db: {
+      url: buildDatabaseUrl({ connectionLimit: 5, poolTimeout: 10, databaseUrl: process.env.NOTIFICATION_DATABASE_URL }),
+    },
+  },
+});
 const prisma = createNotificationPrisma();
 
 const port = Number(process.env.PORT ?? 3003);
@@ -53,7 +64,18 @@ registerHealthRoutes(app, 'notification-service', [
 app.setErrorHandler(globalErrorHandler);
 
 const email = createEmailChannel(app.log);
-const inApp = createInAppChannel(prisma);
+
+// Kafka producer for real-time push via NOTIFICATIONS topic
+let kafkaProducer: NexusProducer | undefined;
+try {
+  kafkaProducer = new NexusProducer({ clientId: 'notification-service' });
+  await kafkaProducer.connect();
+} catch (err) {
+  app.log.warn({ err }, 'Kafka producer unavailable — real-time push disabled');
+  kafkaProducer = undefined;
+}
+
+const inApp = createInAppChannel(prisma, kafkaProducer);
 
 /**
  * Resolves an owner's contact info from the auth-service. Best-effort; any
@@ -98,7 +120,7 @@ async function lookupOwner(
 try {
   await startDealConsumer({ inApp, email, lookupOwner, log: app.log });
   await startActivityConsumer({ inApp, log: app.log });
-  await startQuoteConsumer({ inApp, email, lookupOwner, log: app.log });
+  await startQuoteConsumer({ inApp, email, log: app.log });
 } catch (err) {
   app.log.warn({ err }, 'Kafka consumers failed to start; HTTP-only mode');
 }
@@ -107,6 +129,8 @@ app.addHook('onClose', async () => {
   await prismaHealth.$disconnect();
 });
 
+await registerGraphQL(app, prisma);
+
 await startService(app, port, async (a) => {
-  await registerNotificationsRoutes(a, inApp);
+  await registerNotificationsRoutes(a, prisma);
 });

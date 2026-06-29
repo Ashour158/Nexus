@@ -1,11 +1,14 @@
 import 'dotenv/config';
+import { startTracing } from '@nexus/service-utils/tracing';
 import rateLimit from '@fastify/rate-limit';
 import { createService, globalErrorHandler, registerHealthRoutes, startService } from '@nexus/service-utils';
 import { createMeilisearchClient } from './meilisearch.js';
 import { setupIndexes } from './indexes/setup.js';
 import { startIndexerConsumer } from './consumers/indexer.consumer.js';
 import { registerSearchRoutes } from './routes/search.routes.js';
+import { registerGraphQL } from './graphql/index.js';
 
+startTracing({ serviceName: 'search-service' });
 const port = Number(process.env.PORT ?? 3006);
 const jwtSecret = process.env.JWT_SECRET;
 if (!jwtSecret || jwtSecret.length < 32) {
@@ -31,9 +34,14 @@ await app.register(rateLimit, {
   }),
 });
 app.setErrorHandler(globalErrorHandler);
-registerHealthRoutes(app, 'search-service', []);
-
 const meili = createMeilisearchClient();
+
+registerHealthRoutes(app, 'search-service', [
+  async () => {
+    const health = await meili.health();
+    if (health.status !== 'available') throw new Error(`Meilisearch status: ${health.status}`);
+  },
+]);
 
 try {
   await setupIndexes(meili);
@@ -48,6 +56,8 @@ try {
 } catch (err) {
   app.log.warn({ err }, 'Indexer consumer failed; real-time indexing disabled');
 }
+
+await registerGraphQL(app);
 
 await startService(app, port, async (a) => {
   await registerSearchRoutes(a, meili);

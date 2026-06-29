@@ -5,6 +5,7 @@ import {
   PERMISSIONS,
   requirePermission,
   ValidationError,
+  createHttpClient,
 } from '@nexus/service-utils';
 import type { NexusProducer } from '@nexus/kafka';
 import {
@@ -14,21 +15,17 @@ import {
   IdParamSchema,
   PaginationSchema,
   RescheduleActivitySchema,
-  UpcomingActivitiesQuerySchema,
   UpdateActivitySchema,
+  UpcomingActivitiesQuerySchema,
 } from '@nexus/validation';
 import type { CrmPrisma } from '../prisma.js';
-import {
-  createActivitiesService,
-  type ActivityListFilters,
-} from '../services/activities.service.js';
+import { createActivitiesService } from '../services/activities.service.js';
 
 const DealParamsSchema = z.object({ dealId: z.string().cuid() });
 const ContactParamsSchema = z.object({ contactId: z.string().cuid() });
 const LeadParamsSchema = z.object({ leadId: z.string().cuid() });
 const PublicMeetingSchema = z.object({
-  tenantId: z.string().min(1),
-  ownerId: z.string().min(1),
+  bookingToken: z.string().min(1),
   subject: z.string().min(1),
   description: z.string().optional(),
   dueDate: z.string().datetime(),
@@ -37,6 +34,10 @@ const PublicMeetingSchema = z.object({
   duration: z.number().int().positive().default(30),
   customerName: z.string().min(1),
   customerEmail: z.string().email(),
+});
+
+const authClient = createHttpClient({
+  baseURL: process.env.AUTH_SERVICE_URL ?? 'http://localhost:3000',
 });
 
 /**
@@ -53,7 +54,7 @@ export async function registerActivitiesRoutes(
 
   await app.register(
     async (r) => {
-      // ─── LIST ───────────────────────────────────────────────────────────
+      // ─── LIST ─────────────────────────────────────────────────────────
       r.get(
         '/activities',
         { preHandler: requirePermission(PERMISSIONS.ACTIVITIES.READ) },
@@ -64,7 +65,7 @@ export async function registerActivitiesRoutes(
           }
           const jwt = request.user as JwtPayload;
           const q = parsed.data;
-          const filters: ActivityListFilters = {
+          const result = await activities.listActivities(jwt.tenantId, {
             dealId: q.dealId,
             contactId: q.contactId,
             leadId: q.leadId,
@@ -75,13 +76,10 @@ export async function registerActivitiesRoutes(
             dueBefore: q.dueBefore,
             dueAfter: q.dueAfter,
             overdue: q.overdue,
-          };
-          const ALLOWED_SORT = ['createdAt', 'updatedAt', 'dueDate'] as const;
-          const narrowedSortBy = ALLOWED_SORT.find((f) => f === q.sortBy);
-          const result = await activities.listActivities(jwt.tenantId, filters, {
+          }, {
             page: q.page,
             limit: q.limit,
-            sortBy: narrowedSortBy,
+            sortBy: q.sortBy as import('../services/activities.service.js').ActivityListPagination['sortBy'],
             sortDir: q.sortDir,
           });
           return reply.send({ success: true, data: result });
@@ -93,8 +91,14 @@ export async function registerActivitiesRoutes(
         '/activities/public-meeting',
         async (request, reply) => {
           const body = PublicMeetingSchema.parse(request.body);
-          const activity = await activities.createActivity(body.tenantId, {
-            ownerId: body.ownerId,
+          const tokenRes = await authClient.get<{ success: boolean; data?: { id: string; tenantId: string } }>(
+            `/api/v1/users/by-booking-token/${encodeURIComponent(body.bookingToken)}`
+          );
+          if (!tokenRes.success || !tokenRes.data) {
+            return reply.code(401).send({ success: false, error: { code: 'INVALID_TOKEN', message: 'Invalid or expired booking token', requestId: request.id } });
+          }
+          const activity = await activities.createActivity(tokenRes.data.tenantId, {
+            ownerId: tokenRes.data.id,
             type: 'MEETING',
             subject: body.subject,
             description: body.description,
@@ -130,7 +134,71 @@ export async function registerActivitiesRoutes(
         }
       );
 
-      // ─── UPCOMING ───────────────────────────────────────────────────────
+      r.post('/activities/call', { preHandler: requirePermission(PERMISSIONS.ACTIVITIES.CREATE) }, async (request, reply) => {
+        const jwt = request.user as JwtPayload;
+        const body = request.body as {
+          contactId?: string;
+          leadId?: string;
+          accountId?: string;
+          dealId?: string;
+          direction: 'INBOUND' | 'OUTBOUND';
+          durationSeconds?: number;
+          outcome?: string;
+          recordingUrl?: string;
+          notes?: string;
+        };
+        const activity = await prisma.activity.create({
+          data: {
+            tenantId: jwt.tenantId,
+            ownerId: jwt.sub,
+            type: 'CALL',
+            contactId: body.contactId,
+            leadId: body.leadId,
+            accountId: body.accountId,
+            dealId: body.dealId,
+            subject: `${body.direction === 'INBOUND' ? 'Incoming' : 'Outgoing'} call`,
+            description: body.notes,
+            customFields: {
+              direction: body.direction,
+              durationSeconds: body.durationSeconds,
+              outcome: body.outcome || 'CONNECTED',
+              recordingUrl: body.recordingUrl,
+            },
+          },
+        });
+        return reply.code(201).send({ success: true, data: activity });
+      });
+
+      r.get('/activities/calls', { preHandler: requirePermission(PERMISSIONS.ACTIVITIES.READ) }, async (request, reply) => {
+        const jwt = request.user as JwtPayload;
+        const {
+          contactId,
+          leadId,
+          accountId,
+          dealId,
+          limit = '50',
+          offset = '0',
+        } = request.query as Record<string, string>;
+        const take = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 50));
+        const skip = Math.max(0, Number.parseInt(offset, 10) || 0);
+        const where: Record<string, unknown> = { tenantId: jwt.tenantId, type: 'CALL' };
+        if (contactId) where.contactId = contactId;
+        if (leadId) where.leadId = leadId;
+        if (accountId) where.accountId = accountId;
+        if (dealId) where.dealId = dealId;
+        const [calls, total] = await Promise.all([
+          prisma.activity.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            take,
+            skip,
+          }),
+          prisma.activity.count({ where }),
+        ]);
+        return reply.send({ success: true, data: { rows: calls, total } });
+      });
+
+      // ─── UPCOMING ─────────────────────────────────────────────────────
       r.get(
         '/activities/upcoming',
         { preHandler: requirePermission(PERMISSIONS.ACTIVITIES.READ) },
@@ -140,16 +208,12 @@ export async function registerActivitiesRoutes(
             throw new ValidationError('Invalid query', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
-          const rows = await activities.getUpcomingActivities(
-            jwt.tenantId,
-            parsed.data.ownerId,
-            parsed.data.daysAhead
-          );
+          const rows = await activities.getUpcomingActivities(jwt.tenantId, parsed.data.ownerId, parsed.data.daysAhead);
           return reply.send({ success: true, data: rows });
         }
       );
 
-      // ─── READ ───────────────────────────────────────────────────────────
+      // ─── READ ─────────────────────────────────────────────────────────
       r.get(
         '/activities/:id',
         { preHandler: requirePermission(PERMISSIONS.ACTIVITIES.READ) },
@@ -186,6 +250,17 @@ export async function registerActivitiesRoutes(
           const jwt = request.user as JwtPayload;
           await activities.deleteActivity(jwt.tenantId, id);
           return reply.send({ success: true, data: { id, deleted: true } });
+        }
+      );
+
+      r.post(
+        '/activities/:id/restore',
+        { preHandler: requirePermission(PERMISSIONS.ACTIVITIES.UPDATE) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const activity = await activities.restoreActivity(jwt.tenantId, id);
+          return reply.send({ success: true, data: activity });
         }
       );
 
@@ -229,7 +304,7 @@ export async function registerActivitiesRoutes(
         }
       );
 
-      // ─── ACTIVITIES FOR DEAL ────────────────────────────────────────────
+      // ─── ACTIVITIES FOR DEAL ──────────────────────────────────────────
       r.get(
         '/deals/:dealId/activities',
         { preHandler: requirePermission(PERMISSIONS.ACTIVITIES.READ) },
@@ -237,16 +312,15 @@ export async function registerActivitiesRoutes(
           const { dealId } = DealParamsSchema.parse(request.params);
           const q = PaginationSchema.parse(request.query);
           const jwt = request.user as JwtPayload;
-          const result = await activities.listActivitiesForDeal(
-            jwt.tenantId,
-            dealId,
-            { page: q.page, limit: q.limit }
-          );
+          const result = await activities.listActivitiesForDeal(jwt.tenantId, dealId, {
+            page: q.page,
+            limit: q.limit,
+          });
           return reply.send({ success: true, data: result });
         }
       );
 
-      // ─── ACTIVITIES FOR CONTACT ─────────────────────────────────────────
+      // ─── ACTIVITIES FOR CONTACT ───────────────────────────────────────
       r.get(
         '/contacts/:contactId/activities',
         { preHandler: requirePermission(PERMISSIONS.ACTIVITIES.READ) },
@@ -254,16 +328,15 @@ export async function registerActivitiesRoutes(
           const { contactId } = ContactParamsSchema.parse(request.params);
           const q = PaginationSchema.parse(request.query);
           const jwt = request.user as JwtPayload;
-          const result = await activities.listActivitiesForContact(
-            jwt.tenantId,
-            contactId,
-            { page: q.page, limit: q.limit }
-          );
+          const result = await activities.listActivitiesForContact(jwt.tenantId, contactId, {
+            page: q.page,
+            limit: q.limit,
+          });
           return reply.send({ success: true, data: result });
         }
       );
 
-      // ─── ACTIVITIES FOR LEAD ────────────────────────────────────────────
+      // ─── ACTIVITIES FOR LEAD (local) ────────────────────────────────────
       r.get(
         '/leads/:leadId/activities',
         { preHandler: requirePermission(PERMISSIONS.ACTIVITIES.READ) },

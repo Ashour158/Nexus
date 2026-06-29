@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useAuthStore } from '@/stores/auth.store';
 
 export interface Product {
   id: string;
@@ -28,7 +29,7 @@ export function ProductLineItems() {
     queryKey: ['products', 'search', productSearch],
     queryFn: () =>
       fetch(`/api/products?q=${encodeURIComponent(productSearch)}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('access_token') ?? ''}` },
+        headers: { Authorization: `Bearer ${useAuthStore.getState().accessToken ?? ''}` },
       }).then((r) => r.json()),
     enabled: productSearch.length > 0,
   });

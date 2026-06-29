@@ -90,8 +90,7 @@ const TIER_DISCOUNTS: Record<string, number> = {
 
 /** Rule 9 — flat early-payment discount. */
 const EARLY_PAYMENT_DISCOUNT_PERCENT = 2;
-/** Simplified uniform tax — production would call the tax engine per jurisdiction. */
-const SIMPLE_TAX_RATE = 0.1;
+const DEFAULT_TAX_RATE = 0.1;
 
 // ─── Type guards ────────────────────────────────────────────────────────────
 
@@ -209,6 +208,7 @@ export class CpqPricingEngine {
     const floorWarnings: string[] = [];
     let approvalRequired = false;
     const approvalReasons: string[] = [];
+    let promoCodesUsed = false;
 
     for (const reqItem of req.items) {
       const product = productMap.get(reqItem.productId);
@@ -263,6 +263,7 @@ export class CpqPricingEngine {
         if (promoDiscount > 0) {
           discountPercent = discountPercent.plus(promoDiscount);
           appliedRules.push(`Promo code: -${promoDiscount}%`);
+          promoCodesUsed = true;
         }
       }
 
@@ -372,12 +373,30 @@ export class CpqPricingEngine {
       (sum, i) => sum.plus(new Decimal(i.discountAmount).times(i.quantity)),
       new Decimal(0)
     );
+    const taxRate = await this.getTaxRate(req.tenantId);
     const taxTotal = lineItems
       .filter((i) => productMap.get(i.productId)?.taxable)
       .reduce(
-        (sum, i) => sum.plus(new Decimal(i.total).times(SIMPLE_TAX_RATE)),
+        (sum, i) => sum.plus(new Decimal(i.total).times(taxRate)),
         new Decimal(0)
       );
+
+    // Increment uses counter for promo codes that were actually applied
+    if (promoCodesUsed && req.appliedPromos && req.appliedPromos.length > 0) {
+      const now = new Date();
+      await this.prisma.promoCode.updateMany({
+        where: {
+          tenantId: req.tenantId,
+          code: { in: req.appliedPromos },
+          isActive: true,
+          AND: [
+            { OR: [{ validFrom: null }, { validFrom: { lte: now } }] },
+            { OR: [{ validUntil: null }, { validUntil: { gte: now } }] },
+          ],
+        },
+        data: { uses: { increment: 1 } },
+      });
+    }
 
     return {
       items: lineItems,
@@ -390,6 +409,22 @@ export class CpqPricingEngine {
       approvalRequired,
       approvalReasons,
     };
+  }
+
+  /**
+   * Looks up the default active tax rate for the tenant.
+   * Falls back to DEFAULT_TAX_RATE if no tax rate is configured.
+   */
+  private async getTaxRate(tenantId: string): Promise<number> {
+    if (!('taxRate' in this.prisma) || !this.prisma.taxRate) {
+      return DEFAULT_TAX_RATE;
+    }
+    const defaultRate = await this.prisma.taxRate.findFirst({
+      where: { tenantId, isDefault: true, isActive: true },
+      select: { rate: true },
+    });
+    if (defaultRate) return Number(defaultRate.rate);
+    return DEFAULT_TAX_RATE;
   }
 
   // ─── Private rule helpers ─────────────────────────────────────────────────

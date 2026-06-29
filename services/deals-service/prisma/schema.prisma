@@ -47,6 +47,7 @@ model Deal {
   dealRoom          DealRoom?
   closeReason       String?
   dataQualityScore  Int?
+  deletedAt         DateTime?
 
   @@index([tenantId])
   @@index([tenantId, pipelineId, stageId])

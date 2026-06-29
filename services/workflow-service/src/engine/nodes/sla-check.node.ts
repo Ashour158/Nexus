@@ -46,7 +46,7 @@ export async function handleSlaCheckNode(
 
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     return {
-      nextNodeId: null,
+      nextNodeId: undefined,
       output: {
         withinSla: data.withinSla ?? true,
         breaches: data.breaches ?? [],
@@ -54,7 +54,7 @@ export async function handleSlaCheckNode(
     };
   } catch (err) {
     return {
-      nextNodeId: null,
+      nextNodeId: undefined,
       output: {
         withinSla: true,
         warning: err instanceof Error ? err.message : 'SLA check failed; assuming within SLA',

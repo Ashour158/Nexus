@@ -19,9 +19,8 @@ interface ListPagination {
 }
 
 function buildWhere(tenantId: string, filters: DealListFilters): Prisma.DealWhereInput {
-  const where: Prisma.DealWhereInput = { tenantId };
+  const where: Prisma.DealWhereInput = { tenantId, deletedAt: null };
   if (filters.status) where.status = filters.status;
-  else where.status = { not: 'DORMANT' };
   if (filters.pipelineId) where.pipelineId = filters.pipelineId;
   if (filters.stageId) where.stageId = filters.stageId;
   if (filters.ownerId) where.ownerId = filters.ownerId;
@@ -54,7 +53,7 @@ function decimalToNumber(value: Prisma.Decimal): number {
 
 export function createDealsService(prisma: DealsPrisma, producer: NexusProducer) {
   async function loadOrThrow(tenantId: string, id: string): Promise<Deal> {
-    const row = await prisma.deal.findFirst({ where: { id, tenantId } });
+    const row = await prisma.deal.findFirst({ where: { id, tenantId, deletedAt: null } });
     if (!row) throw new NotFoundError('Deal', id);
     return row;
   }
@@ -148,11 +147,10 @@ export function createDealsService(prisma: DealsPrisma, producer: NexusProducer)
 
     async deleteDeal(tenantId: string, id: string): Promise<void> {
       const existing = await loadOrThrow(tenantId, id);
-      if (existing.status === 'DORMANT') return;
-      const customFields = (existing.customFields as Record<string, unknown> | null) ?? {};
+      if (existing.deletedAt) return;
       await prisma.deal.update({
         where: { id },
-        data: { status: 'DORMANT', customFields: { ...customFields, _deletedAt: new Date().toISOString() } as Prisma.InputJsonValue, version: { increment: 1 } },
+        data: { deletedAt: new Date(), status: 'DORMANT', version: { increment: 1 } },
       });
     },
 

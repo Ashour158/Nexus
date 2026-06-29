@@ -65,7 +65,7 @@ export async function handleValidationRuleNode(
 
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     return {
-      nextNodeId: null,
+      nextNodeId: undefined,
       output: {
         valid: true,
         data,
@@ -74,7 +74,7 @@ export async function handleValidationRuleNode(
   } catch (err) {
     // Fail-open on network errors
     return {
-      nextNodeId: null,
+      nextNodeId: undefined,
       output: {
         valid: true,
         warning: err instanceof Error ? err.message : 'Blueprint validation failed; allowing transition',

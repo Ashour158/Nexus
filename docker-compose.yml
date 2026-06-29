@@ -214,6 +214,35 @@ services:
       kafka:
         condition: service_started
 
+  billing-service:
+    build:
+      context: .
+      dockerfile: ./services/billing-service/Dockerfile
+    container_name: nexus-billing
+    restart: unless-stopped
+    ports:
+      - '3011:3011'
+    environment:
+      PORT: '3011'
+      BILLING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_billing
+      JWT_SECRET: ${JWT_SECRET}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: billing-service
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3011/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   notification-service:
     build:
       context: .

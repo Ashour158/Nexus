@@ -145,6 +145,14 @@ services:
           - /finance
         strip_path: false
 
+  - name: billing-service
+    url: http://billing-service:3011
+    routes:
+      - name: billing
+        paths:
+          - /billing
+        strip_path: false
+
   - name: incentive-service
     url: http://incentive-service:3024
     routes:

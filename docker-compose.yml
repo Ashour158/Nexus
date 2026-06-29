@@ -243,6 +243,188 @@ services:
       timeout: 10s
       retries: 3
 
+  accounts-service:
+    build:
+      context: .
+      dockerfile: ./services/accounts-service/Dockerfile
+    container_name: nexus-accounts
+    restart: unless-stopped
+    ports:
+      - '3031:3031'
+    environment:
+      PORT: '3031'
+      ACCOUNTS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_accounts
+      JWT_SECRET: ${JWT_SECRET}
+      KAFKA_BROKERS: kafka:9092
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3031/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  leads-service:
+    build:
+      context: .
+      dockerfile: ./services/leads-service/Dockerfile
+    container_name: nexus-leads
+    restart: unless-stopped
+    ports:
+      - '3030:3030'
+    environment:
+      PORT: '3030'
+      LEADS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_leads
+      JWT_SECRET: ${JWT_SECRET}
+      KAFKA_BROKERS: kafka:9092
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3030/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  contacts-service:
+    build:
+      context: .
+      dockerfile: ./services/contacts-service/Dockerfile
+    container_name: nexus-contacts
+    restart: unless-stopped
+    ports:
+      - '3041:3041'
+    environment:
+      PORT: '3041'
+      CONTACTS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_contacts
+      JWT_SECRET: ${JWT_SECRET}
+      KAFKA_BROKERS: kafka:9092
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3041/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  deals-service:
+    build:
+      context: .
+      dockerfile: ./services/deals-service/Dockerfile
+    container_name: nexus-deals
+    restart: unless-stopped
+    ports:
+      - '3042:3042'
+    environment:
+      PORT: '3042'
+      DEALS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_deals
+      JWT_SECRET: ${JWT_SECRET}
+      KAFKA_BROKERS: kafka:9092
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3042/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  activities-service:
+    build:
+      context: .
+      dockerfile: ./services/activities-service/Dockerfile
+    container_name: nexus-activities
+    restart: unless-stopped
+    ports:
+      - '3043:3043'
+    environment:
+      PORT: '3043'
+      ACTIVITIES_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_activities
+      JWT_SECRET: ${JWT_SECRET}
+      KAFKA_BROKERS: kafka:9092
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3043/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  notes-service:
+    build:
+      context: .
+      dockerfile: ./services/notes-service/Dockerfile
+    container_name: nexus-notes
+    restart: unless-stopped
+    ports:
+      - '3032:3032'
+    environment:
+      PORT: '3032'
+      NOTES_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_notes
+      JWT_SECRET: ${JWT_SECRET}
+      KAFKA_BROKERS: kafka:9092
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3032/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  quotes-service:
+    build:
+      context: .
+      dockerfile: ./services/quotes-service/Dockerfile
+    container_name: nexus-quotes
+    restart: unless-stopped
+    ports:
+      - '3033:3033'
+    environment:
+      PORT: '3033'
+      QUOTES_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_quotes
+      JWT_SECRET: ${JWT_SECRET}
+      KAFKA_BROKERS: kafka:9092
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3033/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   notification-service:
     build:
       context: .

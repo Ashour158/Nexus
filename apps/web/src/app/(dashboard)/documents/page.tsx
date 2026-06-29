@@ -2,22 +2,148 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { File, FileText, Sheet, Loader2 } from 'lucide-react';
 import { DocumentUpload } from '@/components/documents/DocumentUpload';
+import { apiClients } from '@/lib/api-client';
+import { formatDate } from '@/lib/format';
 
-const DOCS = [
-  { id: 'd1', name: 'MSA-v2.pdf', type: 'PDF', folder: 'Contracts', deal: 'Acme Expansion', contact: 'John Smith', size: '1.2 MB', modified: '2026-04-25', author: 'Mia' },
-  { id: 'd2', name: 'Proposal-Q2.docx', type: 'DOCX', folder: 'Proposals', deal: 'Globex Renewal', contact: 'Sara Lee', size: '0.9 MB', modified: '2026-04-24', author: 'Ahmed' },
-];
+interface FileRecord {
+  id: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  entityType: string;
+  entityId: string;
+  uploadedBy: string;
+  createdAt: string;
+}
+
+function fileIcon(mime: string) {
+  if (mime === 'application/pdf') return <FileText className="h-8 w-8 text-red-500" />;
+  if (mime.includes('spreadsheet') || mime.includes('excel')) return <Sheet className="h-8 w-8 text-green-600" />;
+  return <File className="h-8 w-8 text-blue-500" />;
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export default function DocumentsPage() {
   const [view, setView] = useState<'grid' | 'list'>('grid');
+  const [entityTypeFilter, setEntityTypeFilter] = useState('');
+
+  const { data, isLoading, refetch } = useQuery<FileRecord[]>({
+    queryKey: ['documents', 'library', entityTypeFilter],
+    queryFn: () =>
+      apiClients.storage.get<FileRecord[]>(
+        `/files${entityTypeFilter ? `?entityType=${entityTypeFilter}` : ''}`
+      ),
+  });
+
+  const docs = data ?? [];
 
   return (
     <main className="space-y-4 p-4">
-      <header className="flex flex-wrap items-center justify-between gap-2"><h1 className="text-2xl font-bold text-slate-900">Document Library</h1><div className="flex gap-2"><button onClick={() => setView('grid')} className={`rounded px-3 py-2 text-sm ${view==='grid'?'bg-slate-900 text-white':'border border-slate-300'}`}>Grid</button><button onClick={() => setView('list')} className={`rounded px-3 py-2 text-sm ${view==='list'?'bg-slate-900 text-white':'border border-slate-300'}`}>List</button></div></header>
-      <div className="rounded-xl border border-slate-200 bg-white p-3 flex flex-wrap gap-2 text-sm"><select className="rounded border border-slate-300 px-2 py-1"><option>All type</option><option>PDF</option><option>DOCX</option><option>XLSX</option></select><select className="rounded border border-slate-300 px-2 py-1"><option>Date modified</option><option>Last 7 days</option><option>Last 30 days</option></select><select className="rounded border border-slate-300 px-2 py-1"><option>Associated entity</option><option>Deal</option><option>Contact</option></select><select className="rounded border border-slate-300 px-2 py-1"><option>Owner</option><option>Mia</option><option>Ahmed</option></select><div className="ml-auto flex gap-2"><button className="rounded border border-slate-300 px-2 py-1">Download zip</button><button className="rounded border border-slate-300 px-2 py-1">Move</button><button className="rounded border border-red-300 px-2 py-1 text-red-700">Delete</button></div></div>
+      <header className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-bold text-slate-900">Document Library</h1>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setView('grid')}
+            className={`rounded px-3 py-2 text-sm ${view === 'grid' ? 'bg-slate-900 text-white' : 'border border-slate-300'}`}
+          >
+            Grid
+          </button>
+          <button
+            onClick={() => setView('list')}
+            className={`rounded px-3 py-2 text-sm ${view === 'list' ? 'bg-slate-900 text-white' : 'border border-slate-300'}`}
+          >
+            List
+          </button>
+        </div>
+      </header>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-3 flex flex-wrap gap-2 text-sm">
+        <select
+          value={entityTypeFilter}
+          onChange={(e) => setEntityTypeFilter(e.target.value)}
+          className="rounded border border-slate-300 px-2 py-1"
+        >
+          <option value="">All types</option>
+          <option value="DEAL">Deal</option>
+          <option value="CONTACT">Contact</option>
+          <option value="ACCOUNT">Account</option>
+          <option value="LEAD">Lead</option>
+          <option value="QUOTE">Quote</option>
+        </select>
+        <button
+          onClick={() => refetch()}
+          className="ms-auto rounded border border-slate-300 px-2 py-1"
+        >
+          Refresh
+        </button>
+      </div>
+
       <DocumentUpload />
-      {view === 'grid' ? <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{DOCS.map((d) => <Link key={d.id} href={`/documents/${d.id}`} className="rounded-xl border border-slate-200 bg-white p-3"><div className="h-20 rounded bg-slate-100 grid place-items-center text-xl">{d.type === 'PDF' ? '??' : d.type === 'DOCX' ? '??' : '??'}</div><p className="mt-2 text-sm font-medium">{d.name}</p><p className="text-xs text-slate-500">{d.deal} · {d.contact}</p><p className="text-xs text-slate-500">{d.size} · {d.modified} · {d.author}</p></Link>)}</section> : <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white"><table className="min-w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">Associated</th><th className="px-3 py-2">Size</th><th className="px-3 py-2">Modified</th><th className="px-3 py-2">Author</th></tr></thead><tbody>{DOCS.map((d) => <tr key={d.id} className="border-t border-slate-100"><td className="px-3 py-2"><Link href={`/documents/${d.id}`} className="font-medium hover:underline">{d.name}</Link></td><td className="px-3 py-2">{d.type}</td><td className="px-3 py-2">{d.deal} / {d.contact}</td><td className="px-3 py-2">{d.size}</td><td className="px-3 py-2">{d.modified}</td><td className="px-3 py-2">{d.author}</td></tr>)}</tbody></table></section>}
+
+      {isLoading ? (
+        <div className="flex h-40 items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+        </div>
+      ) : docs.length === 0 ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
+          <p className="text-sm text-slate-500">No documents uploaded yet.</p>
+          <p className="mt-1 text-xs text-slate-400">Upload a file above to get started.</p>
+        </div>
+      ) : view === 'grid' ? (
+        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {docs.map((d) => (
+            <Link
+              key={d.id}
+              href={`/documents/${d.id}`}
+              className="rounded-xl border border-slate-200 bg-white p-3 hover:shadow-sm transition"
+            >
+              <div className="h-20 rounded bg-slate-100 grid place-items-center">
+                {fileIcon(d.mimeType)}
+              </div>
+              <p className="mt-2 text-sm font-medium truncate">{d.filename}</p>
+              <p className="text-xs text-slate-500">{d.entityType} Â· {d.entityId}</p>
+              <p className="text-xs text-slate-500">{formatBytes(d.sizeBytes)} Â· {formatDate(d.createdAt)}</p>
+            </Link>
+          ))}
+        </section>
+      ) : (
+        <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-start text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-3 py-2 text-start">Name</th>
+                <th className="px-3 py-2 text-start">Type</th>
+                <th className="px-3 py-2 text-start">Entity</th>
+                <th className="px-3 py-2 text-start">Size</th>
+                <th className="px-3 py-2 text-start">Uploaded</th>
+              </tr>
+            </thead>
+            <tbody>
+              {docs.map((d) => (
+                <tr key={d.id} className="border-t border-slate-100">
+                  <td className="px-3 py-2">
+                    <Link href={`/documents/${d.id}`} className="font-medium hover:underline">
+                      {d.filename}
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2 text-slate-500">{d.mimeType}</td>
+                  <td className="px-3 py-2 text-slate-500">{d.entityType} / {d.entityId}</td>
+                  <td className="px-3 py-2">{formatBytes(d.sizeBytes)}</td>
+                  <td className="px-3 py-2">{formatDate(d.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
     </main>
   );
 }

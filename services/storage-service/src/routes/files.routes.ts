@@ -61,6 +61,21 @@ export async function registerFilesRoutes(
       );
 
       r.get(
+        '/files',
+        { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
+        async (request, reply) => {
+          const jwt = request.user as JwtPayload;
+          const q = z.object({
+            limit: z.coerce.number().min(1).max(200).optional(),
+            offset: z.coerce.number().min(0).optional(),
+            entityType: z.string().optional(),
+          }).parse(request.query);
+          const rows = await files.listAllFiles(jwt.tenantId, q);
+          return reply.send({ success: true, data: rows });
+        }
+      );
+
+      r.get(
         '/files/:entityType/:entityId',
         { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
         async (request, reply) => {

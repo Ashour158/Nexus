@@ -51,6 +51,21 @@ export function createFilesService(prisma: StoragePrisma, minio: Minio.Client, b
       });
     },
 
+    async listAllFiles(
+      tenantId: string,
+      opts?: { limit?: number; offset?: number; entityType?: string }
+    ): Promise<FileAttachment[]> {
+      return prisma.fileAttachment.findMany({
+        where: {
+          tenantId,
+          ...(opts?.entityType ? { entityType: opts.entityType } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+        take: opts?.limit ?? 50,
+        skip: opts?.offset ?? 0,
+      });
+    },
+
     async getDownloadUrl(
       tenantId: string,
       fileId: string,

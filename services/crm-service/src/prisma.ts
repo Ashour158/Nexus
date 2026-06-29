@@ -1,72 +1,134 @@
 import { PrismaClient } from '../../../node_modules/.prisma/crm-client/index.js';
+import { createPrismaClientWithReplicas } from '@nexus/service-utils/prisma-client';
+import { createTenantPrismaExtension } from '@nexus/service-utils/prisma-tenant';
+import { withFieldEncryption } from '@nexus/security';
 import { alsStore } from './request-context.js';
+import { OutboxPublisher } from '@nexus/outbox';
+import { TOPICS } from '@nexus/kafka';
 
-/**
- * Tenant isolation — Section 35.1 semantics via Prisma 5 `$extends`.
- *
- * Every CRM model carries `tenantId` directly EXCEPT join-table / child rows
- * that inherit scoping through their parent (`DealContact`). Those models are
- * listed here and are NOT auto-injected; callers must scope them via their
- * parent relation (e.g. `DealContact.deal.tenantId`).
- */
-const skipTenantModels = new Set(['DealContact']);
+const skipTenantModels = new Set<string>();
 
-function mergeWhere(
-  args: Record<string, unknown>,
-  tenantId: string
-): Record<string, unknown> {
-  const where = (args.where as Record<string, unknown> | undefined) ?? {};
-  return { ...args, where: { ...where, tenantId } };
+const softDeleteModels = new Set([
+  'Lead', 'Contact', 'Deal', 'Account', 'Activity', 'Note', 'Quote',
+  'Pipeline', 'Stage', 'EmailThread', 'Competitor', 'Territory', 'SalesRep',
+  'EnrichmentJob', 'LeadScore', 'AccountHealthScore', 'LeadScoringRule',
+  'CustomFieldDefinition', 'Attachment', 'WinLossReason', 'FieldPermission',
+  'ValidationRule', 'DuplicateGroup', 'ConsentRecord', 'DealRoom',
+  'DealCompetitor', 'LeadRoutingEvent', 'DealRoomDocument', 'MutualActionItem',
+]);
+
+const readOperations = new Set([
+  'findMany', 'findFirst', 'findFirstOrThrow', 'findUnique', 'findUniqueOrThrow',
+  'count', 'aggregate', 'groupBy',
+]);
+
+function applySoftDeleteFilter(model: string, args: unknown): unknown {
+  if (!softDeleteModels.has(model)) return args;
+  const a = (args || {}) as Record<string, unknown>;
+  const where = (a.where || {}) as Record<string, unknown>;
+  if (where.deletedAt === undefined) {
+    where.deletedAt = null;
+  }
+  return { ...a, where };
 }
 
-function applyTenantArgs(
-  operation: string,
-  args: Record<string, unknown>,
-  tenantId: string
-): Record<string, unknown> {
+/* ─── Event publishing mapping ────────────────────────────────────────────── */
+
+const MODEL_TOPIC_MAP: Record<string, string> = {
+  Contact: TOPICS.CONTACTS,
+  Deal: TOPICS.DEALS,
+  Account: TOPICS.ACCOUNTS,
+  Activity: TOPICS.ACTIVITIES,
+  Pipeline: TOPICS.DEALS,
+  Stage: TOPICS.DEALS,
+  Note: TOPICS.CONTACTS,
+  CustomFieldDefinition: 'nexus.crm.custom-fields',
+};
+
+function getEventType(model: string, operation: string): string | null {
+  const base = model.toLowerCase().replace(/definition$/, '');
   switch (operation) {
     case 'create':
-      return {
-        ...args,
-        data: { ...(args.data as Record<string, unknown>), tenantId },
-      };
-    case 'createMany':
-      if (Array.isArray(args.data)) {
-        return {
-          ...args,
-          data: (args.data as Record<string, unknown>[]).map((d) => ({ ...d, tenantId })),
-        };
-      }
-      return args;
+      return `${base}.created`;
     case 'update':
-    case 'updateMany':
-    case 'delete':
-    case 'deleteMany':
-    case 'findMany':
-    case 'findFirst':
-    case 'findFirstOrThrow':
-    case 'count':
-    case 'aggregate':
-    case 'groupBy':
-      return mergeWhere(args, tenantId);
+      return `${base}.updated`;
     case 'upsert':
-      return {
-        ...args,
-        where: { ...(args.where as Record<string, unknown>), tenantId },
-        create: { ...(args.create as Record<string, unknown>), tenantId },
-      };
+      return `${base}.updated`;
+    case 'delete':
+      return `${base}.deleted`;
     default:
-      return args;
+      return null;
   }
 }
 
-function delegateName(model: string): keyof PrismaClient {
-  return (model.charAt(0).toLowerCase() + model.slice(1)) as keyof PrismaClient;
+async function publishMutationEvent(
+  prisma: any,
+  outbox: OutboxPublisher,
+  model: string,
+  operation: string,
+  result: unknown
+) {
+  const topic = MODEL_TOPIC_MAP[model];
+  if (!topic) return;
+  const eventType = getEventType(model, operation);
+  if (!eventType) return;
+
+  const record = result as Record<string, unknown> | null;
+  if (!record) return;
+
+  const tenantId = record.tenantId as string | undefined;
+  if (!tenantId) return;
+
+  const isDelete = operation === 'delete';
+  const payload = isDelete
+    ? { id: record.id, action: 'DELETED' as const, source: 'crm-service' }
+    : { ...record, source: 'crm-service' };
+
+  try {
+    // Best-effort outbox write. Full transactional safety requires wrapping
+    // the mutation + outbox.schedule in an explicit $transaction at the service layer.
+    await outbox.publish(
+      prisma,
+      topic,
+      payload,
+      { eventType, tenantId, aggregateId: record.id as string | undefined }
+    );
+  } catch (err) {
+    const requestId = alsStore.get('requestId') as string | undefined;
+    console.error(`Failed to outbox ${eventType} event:`, err, { requestId, payload });
+  }
 }
 
 export function createCrmPrisma() {
-  const base = new PrismaClient();
-  return base.$extends({
+  const outbox = new OutboxPublisher('crm-service');
+
+  const base = createPrismaClientWithReplicas(
+    (url: string) =>
+      new PrismaClient({
+        datasources: {
+          db: { url },
+        },
+      }),
+    { connectionLimit: 3, poolTimeout: 10, writeUrl: process.env.CRM_DATABASE_URL }
+  );
+
+  // Wire field-level encryption for PII fields (GDPR Art. 32 compliance)
+  const encryptionKey = process.env.ENCRYPTION_MASTER_KEY;
+  if (encryptionKey && encryptionKey.length >= 32) {
+    withFieldEncryption(base as any, encryptionKey, [
+      { model: 'Contact', fields: ['email', 'phone', 'mobile', 'address'] },
+      { model: 'Account', fields: ['billingAddressLine1', 'billingAddressLine2', 'shippingAddressLine1', 'shippingAddressLine2'] },
+      { model: 'Note', fields: ['content'] },
+      { model: 'Lead', fields: ['email', 'phone', 'address'] },
+    ]);
+  }
+
+  const tenantExt = createTenantPrismaExtension(base, {
+    getTenantId: () => alsStore.get('tenantId') as string | undefined,
+    skipModels: skipTenantModels,
+  });
+
+  const softDeleteExt = {
     query: {
       $allModels: {
         async $allOperations({
@@ -80,27 +142,34 @@ export function createCrmPrisma() {
           args: unknown;
           query: (a: unknown) => Promise<unknown>;
         }) {
-          if (skipTenantModels.has(model)) {
-            return query(args);
+          if (readOperations.has(operation)) {
+            args = applySoftDeleteFilter(model, args);
           }
-          const tenantId = alsStore.get('tenantId') as string | undefined;
-          if (!tenantId) {
-            return query(args);
-          }
+          return query(args);
+        },
+      },
+    },
+  };
 
-          const d = base[delegateName(model)] as {
-            findFirst?: (a: unknown) => Promise<unknown>;
-            findFirstOrThrow?: (a: unknown) => Promise<unknown>;
-          };
-
-          if (operation === 'findUnique' && d.findFirst) {
-            return d.findFirst(mergeWhere(args as Record<string, unknown>, tenantId));
+  return base.$extends(tenantExt).$extends(softDeleteExt).$extends({
+    query: {
+      $allModels: {
+        async $allOperations({
+          model,
+          operation,
+          args,
+          query,
+        }: {
+          model: string;
+          operation: string;
+          args: unknown;
+          query: (a: unknown) => Promise<unknown>;
+        }) {
+          const result = await query(args);
+          if (['create', 'update', 'delete', 'upsert'].includes(operation)) {
+            await publishMutationEvent(base, outbox, model, operation, result);
           }
-          if (operation === 'findUniqueOrThrow' && d.findFirstOrThrow) {
-            return d.findFirstOrThrow(mergeWhere(args as Record<string, unknown>, tenantId));
-          }
-
-          return query(applyTenantArgs(operation, args as Record<string, unknown>, tenantId));
+          return result;
         },
       },
     },

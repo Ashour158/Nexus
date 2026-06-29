@@ -14,11 +14,15 @@ function tenantId(): string {
 
 export function createPlaybooksService(prisma: BlueprintPrisma, producer: NexusProducer) {
   return {
-    async list() {
+    async list(opts: { page?: number; limit?: number } = {}) {
+      const page = Math.max(1, opts.page ?? 1);
+      const limit = Math.min(100, opts.limit ?? 50);
       return prisma.playbook.findMany({
         where: { isActive: true },
         include: { stages: { orderBy: { position: 'asc' } } },
         orderBy: { updatedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
       });
     },
 

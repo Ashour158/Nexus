@@ -1,0 +1,178 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  quotaPlans(limit: Int, offset: Int): [QuotaPlan!]!
+  quotaPlan(id: ID!): QuotaPlan
+  quotaTargets(planId: ID!): [QuotaTarget!]!
+  quotaTarget(id: ID!): QuotaTarget
+  forecastSubmissions(limit: Int, offset: Int): [ForecastSubmission!]!
+  forecastSubmission(id: ID!): ForecastSubmission
+  forecastReviews(submissionId: ID!): [ForecastReview!]!
+  forecastOverrides(limit: Int, offset: Int): [ForecastOverride!]!
+  forecastOverride(id: ID!): ForecastOverride
+}
+
+type Mutation {
+  createQuotaPlan(input: CreateQuotaPlanInput!): QuotaPlan!
+  updateQuotaPlan(id: ID!, input: UpdateQuotaPlanInput!): QuotaPlan!
+  deleteQuotaPlan(id: ID!): Boolean!
+  createQuotaTarget(input: CreateQuotaTargetInput!): QuotaTarget!
+  updateQuotaTarget(id: ID!, input: UpdateQuotaTargetInput!): QuotaTarget!
+  deleteQuotaTarget(id: ID!): Boolean!
+  createForecastSubmission(input: CreateForecastSubmissionInput!): ForecastSubmission!
+  updateForecastSubmission(id: ID!, input: UpdateForecastSubmissionInput!): ForecastSubmission!
+  deleteForecastSubmission(id: ID!): Boolean!
+  createForecastReview(input: CreateForecastReviewInput!): ForecastReview!
+  createForecastOverride(input: CreateForecastOverrideInput!): ForecastOverride!
+  updateForecastOverride(id: ID!, input: UpdateForecastOverrideInput!): ForecastOverride!
+  deleteForecastOverride(id: ID!): Boolean!
+}
+
+type QuotaPlan @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  year: Int!
+  quarter: Int
+  type: QuotaType!
+  currency: String!
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  targets: [QuotaTarget!]!
+}
+
+type QuotaTarget @key(fields: "id") {
+  id: ID!
+  planId: String!
+  plan: QuotaPlan
+  tenantId: String!
+  ownerId: String!
+  targetValue: String!
+  currency: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type ForecastSubmission @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  ownerId: String!
+  period: String!
+  commitAmount: String!
+  bestCaseAmount: String!
+  pipelineAmount: String!
+  commentary: String
+  submittedAt: DateTime!
+  reviews: [ForecastReview!]!
+}
+
+type ForecastReview @key(fields: "id") {
+  id: ID!
+  submissionId: String!
+  submission: ForecastSubmission
+  reviewerId: String!
+  adjustedCommit: String
+  adjustedBest: String
+  note: String
+  reviewedAt: DateTime!
+}
+
+type ForecastOverride @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  periodKey: String!
+  repId: String!
+  managerId: String!
+  originalValue: String!
+  overrideValue: String!
+  note: String
+  scopePipelineId: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+enum QuotaType {
+  REVENUE
+  DEAL_COUNT
+  ACTIVITY_COUNT
+  NEW_LOGOS
+}
+
+input CreateQuotaPlanInput {
+  tenantId: String!
+  name: String!
+  year: Int!
+  quarter: Int
+  type: QuotaType
+  currency: String
+}
+
+input UpdateQuotaPlanInput {
+  name: String
+  year: Int
+  quarter: Int
+  type: QuotaType
+  currency: String
+  isActive: Boolean
+}
+
+input CreateQuotaTargetInput {
+  planId: String!
+  tenantId: String!
+  ownerId: String!
+  targetValue: String!
+  currency: String
+}
+
+input UpdateQuotaTargetInput {
+  targetValue: String
+  currency: String
+}
+
+input CreateForecastSubmissionInput {
+  tenantId: String!
+  ownerId: String!
+  period: String!
+  commitAmount: String!
+  bestCaseAmount: String!
+  pipelineAmount: String!
+  commentary: String
+}
+
+input UpdateForecastSubmissionInput {
+  commitAmount: String
+  bestCaseAmount: String
+  pipelineAmount: String
+  commentary: String
+}
+
+input CreateForecastReviewInput {
+  submissionId: String!
+  reviewerId: String!
+  adjustedCommit: String
+  adjustedBest: String
+  note: String
+}
+
+input CreateForecastOverrideInput {
+  tenantId: String!
+  periodKey: String!
+  repId: String!
+  managerId: String!
+  originalValue: String!
+  overrideValue: String!
+  note: String
+  scopePipelineId: String
+}
+
+input UpdateForecastOverrideInput {
+  originalValue: String
+  overrideValue: String
+  note: String
+  scopePipelineId: String
+}

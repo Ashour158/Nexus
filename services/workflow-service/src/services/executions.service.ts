@@ -53,12 +53,13 @@ export function createExecutionsService(prisma: WorkflowPrisma, producer: NexusP
       return row;
     },
 
-    async getExecutionLog(tenantId: string, id: string) {
+    async getExecutionLog(tenantId: string, id: string, limit = 100) {
       const row = await prisma.workflowExecution.findFirst({ where: { id, tenantId } });
       if (!row) throw new NotFoundError('WorkflowExecution', id);
       return prisma.workflowStep.findMany({
         where: { executionId: id },
         orderBy: { startedAt: 'asc' },
+        take: Math.min(500, Math.max(1, limit)),
       });
     },
 

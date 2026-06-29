@@ -11,6 +11,7 @@ type RFQ = {
   id: string;
   rfqNumber: string;
   title: string;
+  name?: string;
   status: string;
   currency: string;
   createdAt: string;
@@ -28,7 +29,7 @@ export default function RFQsPage(): JSX.Element {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
-      return (json.data ?? []) as RFQ[];
+      return (json.data?.data ?? json.data ?? []) as RFQ[];
     },
   });
 
@@ -37,7 +38,7 @@ export default function RFQsPage(): JSX.Element {
       const res = await fetch('/api/finance/rfqs', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title }),
+        body: JSON.stringify({ title, name: title }),
       });
       return res.json();
     },
@@ -85,7 +86,7 @@ export default function RFQsPage(): JSX.Element {
             {(list.data ?? []).map((row) => (
               <tr key={row.id} className="border-t">
                 <td className="px-3 py-2">{row.rfqNumber}</td>
-                <td className="px-3 py-2">{row.title}</td>
+                <td className="px-3 py-2">{row.title ?? row.name ?? 'Untitled RFQ'}</td>
                 <td className="px-3 py-2">{row.status}</td>
                 <td className="px-3 py-2">{row.currency}</td>
                 <td className="px-3 py-2 text-end">

@@ -1,8 +1,21 @@
 import type { FastifyInstance } from 'fastify';
 import type { NexusProducer } from '@nexus/kafka';
-import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
+import { PERMISSIONS, requirePermission, checkPermission } from '@nexus/service-utils';
+import { DomainError, type EngineContext } from '@nexus/domain-core';
 import { z } from 'zod';
 import type { CrmPrisma } from '../prisma.js';
+import { createAccountsService } from '../services/accounts.service.js';
+import { createContactsService } from '../services/contacts.service.js';
+import { createDealsService } from '../services/deals.service.js';
+import { createLeadsService } from '../services/leads.service.js';
+import { createBulkRecordsUseCase } from '../use-cases/bulk-records.use-case.js';
+
+const ENTITY_PERMISSIONS: Record<string, { update: string; delete: string }> = {
+  contact: { update: PERMISSIONS.CONTACTS.UPDATE, delete: PERMISSIONS.CONTACTS.DELETE },
+  deal: { update: PERMISSIONS.DEALS.UPDATE, delete: PERMISSIONS.DEALS.DELETE },
+  lead: { update: PERMISSIONS.LEADS.UPDATE, delete: PERMISSIONS.LEADS.DELETE },
+  account: { update: PERMISSIONS.ACCOUNTS.UPDATE, delete: PERMISSIONS.ACCOUNTS.DELETE },
+};
 
 const EntityTypeSchema = z.enum(['contact', 'deal', 'lead', 'account']);
 
@@ -37,175 +50,147 @@ export async function registerBulkRoutes(
   prisma: CrmPrisma,
   producer: NexusProducer
 ): Promise<void> {
+  const accounts = createAccountsService(prisma, producer);
+  const contacts = createContactsService(prisma, producer);
+  const deals = createDealsService(prisma, producer);
+  const leads = createLeadsService(prisma, producer);
+
+  const bulkUseCase = createBulkRecordsUseCase({
+    services: {
+      contact: {
+        update: (tenantId, id, updates, userId) => contacts.updateContact(tenantId, id, updates as any, userId),
+        archive: (tenantId, id) => contacts.deleteContact(tenantId, id),
+      },
+      deal: {
+        update: (tenantId, id, updates, userId) => deals.updateDeal(tenantId, id, updates as any, userId ? { userId } : undefined),
+        archive: (tenantId, id) => deals.deleteDeal(tenantId, id),
+      },
+      lead: {
+        update: (tenantId, id, updates, userId) => leads.updateLead(tenantId, id, updates as any, userId),
+        archive: (tenantId, id) => leads.deleteLead(tenantId, id),
+      },
+      account: {
+        update: (tenantId, id, updates, userId) => accounts.updateAccount(tenantId, id, updates as any, userId),
+        archive: (tenantId, id) => accounts.deleteAccount(tenantId, id),
+      },
+    },
+    prisma,
+    producer,
+  });
+
+  function engineContextFromJwt(req: { id: string }, jwt: { tenantId: string; sub: string; email?: string; roles?: string[]; permissions?: string[] }): EngineContext {
+    return {
+      audit: {
+        actor: {
+          userId: jwt.sub,
+          tenantId: jwt.tenantId,
+          email: jwt.email,
+          roles: jwt.roles ?? [],
+          permissions: jwt.permissions ?? [],
+        },
+        requestId: req.id,
+        correlationId: req.id,
+        source: 'api',
+      },
+      now: new Date(),
+    };
+  }
+
+  function sendDomainError(reply: { code: (statusCode: number) => { send: (payload: unknown) => unknown } }, error: unknown, requestId: string) {
+    if (error instanceof DomainError) {
+      return reply.code(error.statusCode).send({ success: false, error: { code: error.code, message: error.message, requestId } });
+    }
+    throw error;
+  }
+
   await app.register(async (r) => {
     r.addHook('preHandler', async (req, reply) => {
       if (!(req as any).user) return reply.code(401).send({ success: false, error: 'Unauthorized' });
     });
 
     r.post('/bulk/update', { preHandler: requirePermission(PERMISSIONS.DEALS.UPDATE) }, async (req, reply) => {
-      const { tenantId, sub: userId } = (req as any).user as { tenantId: string; sub: string };
+      const jwt = (req as any).user as { tenantId: string; sub: string; permissions: string[] };
       const parse = BulkUpdateSchema.safeParse(req.body);
       if (!parse.success) {
         return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: parse.error.message, requestId: req.id } });
       }
       const { entityType, ids, updates } = parse.data;
 
-      const allowedFields: Record<string, string[]> = {
-        contact: ['ownerId', 'tags', 'isActive', 'doNotEmail', 'doNotCall', 'country', 'city', 'department'],
-        deal: ['ownerId', 'stageId', 'pipelineId', 'status', 'forecastCategory', 'tags'],
-        lead: ['ownerId', 'status', 'rating', 'tags', 'doNotContact'],
-        account: ['ownerId', 'type', 'tier', 'status', 'tags', 'country', 'city'],
-      };
-      const safeUpdates: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(updates)) {
-        if ((allowedFields[entityType] ?? []).includes(k)) safeUpdates[k] = v;
-      }
-      if (!Object.keys(safeUpdates).length) {
-        return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'No valid update fields provided', requestId: req.id } });
+      const requiredPerm = ENTITY_PERMISSIONS[entityType]?.update;
+      if (requiredPerm && !checkPermission(jwt.permissions ?? [], requiredPerm)) {
+        return reply.code(403).send({ success: false, error: { code: 'FORBIDDEN', message: `Permission required: ${requiredPerm}`, requestId: req.id } });
       }
 
-      let count = 0;
-      const data = { ...safeUpdates, updatedAt: new Date() };
-      const p = prisma as any;
-      if (entityType === 'contact') count = (await p.contact.updateMany({ where: { id: { in: ids }, tenantId, deletedAt: null }, data })).count;
-      else if (entityType === 'deal') count = (await p.deal.updateMany({ where: { id: { in: ids }, tenantId, deletedAt: null }, data })).count;
-      else if (entityType === 'lead') count = (await p.lead.updateMany({ where: { id: { in: ids }, tenantId, deletedAt: null }, data })).count;
-      else if (entityType === 'account') count = (await p.account.updateMany({ where: { id: { in: ids }, tenantId, deletedAt: null }, data })).count;
-
-      await producer.publish(`${entityType}.bulk.updated`, {
-        type: `${entityType}.bulk.updated`,
-        tenantId,
-        userId,
-        entityType,
-        ids,
-        updates: safeUpdates,
-        count,
-      });
-      return reply.send({ success: true, data: { updated: count } });
+      try {
+        const result = await bulkUseCase.bulkUpdate(engineContextFromJwt(req, jwt), { entityType, ids, updates });
+        return reply.send({ success: true, data: result });
+      } catch (error) {
+        return sendDomainError(reply, error, req.id);
+      }
     });
 
     r.post('/bulk/delete', { preHandler: requirePermission(PERMISSIONS.DEALS.DELETE) }, async (req, reply) => {
-      const { tenantId, sub: userId, roles } = (req as any).user as { tenantId: string; sub: string; roles: string[] };
-      const role = roles?.[0]?.toLowerCase() ?? '';
+      const jwt = (req as any).user as { tenantId: string; sub: string; roles: string[]; permissions: string[] };
       const parse = BulkDeleteSchema.safeParse(req.body);
       if (!parse.success) {
         return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: parse.error.message, requestId: req.id } });
       }
       const { entityType, ids, hard } = parse.data;
-      if (hard && role !== 'admin') return reply.code(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Only admins can hard-delete records', requestId: req.id } });
-
-      let count = 0;
-      const p = prisma as any;
-      if (hard) {
-        if (entityType === 'contact') count = (await p.contact.deleteMany({ where: { id: { in: ids }, tenantId } })).count;
-        else if (entityType === 'lead') count = (await p.lead.deleteMany({ where: { id: { in: ids }, tenantId } })).count;
-        else if (entityType === 'account') count = (await p.account.deleteMany({ where: { id: { in: ids }, tenantId } })).count;
-        else if (entityType === 'deal') count = (await p.deal.deleteMany({ where: { id: { in: ids }, tenantId } })).count;
-      } else {
-        const now = new Date();
-        if (entityType === 'contact') count = (await p.contact.updateMany({ where: { id: { in: ids }, tenantId }, data: { deletedAt: now } })).count;
-        else if (entityType === 'lead') count = (await p.lead.updateMany({ where: { id: { in: ids }, tenantId }, data: { deletedAt: now } })).count;
-        else if (entityType === 'deal') count = (await p.deal.updateMany({ where: { id: { in: ids }, tenantId }, data: { deletedAt: now } })).count;
-        else if (entityType === 'account') count = (await p.account.updateMany({ where: { id: { in: ids }, tenantId }, data: { deletedAt: now } })).count;
+      const requiredPerm = ENTITY_PERMISSIONS[entityType]?.delete;
+      if (requiredPerm && !checkPermission(jwt.permissions ?? [], requiredPerm)) {
+        return reply.code(403).send({ success: false, error: { code: 'FORBIDDEN', message: `Permission required: ${requiredPerm}`, requestId: req.id } });
       }
-
-      await producer.publish(`${entityType}.bulk.deleted`, {
-        type: `${entityType}.bulk.deleted`,
-        tenantId,
-        userId,
-        entityType,
-        ids,
-        hard,
-        count,
-      });
-      return reply.send({ success: true, data: { deleted: count } });
+      try {
+        const result = await bulkUseCase.bulkDelete(engineContextFromJwt(req, jwt), { entityType, ids, hard });
+        return reply.send({ success: true, data: result });
+      } catch (error) {
+        return sendDomainError(reply, error, req.id);
+      }
     });
 
     r.post('/bulk/tag', { preHandler: requirePermission(PERMISSIONS.DEALS.UPDATE) }, async (req, reply) => {
-      const { tenantId } = (req as any).user as { tenantId: string };
+      const jwt = (req as any).user as { tenantId: string; sub: string; permissions: string[] };
       const parse = BulkTagSchema.safeParse(req.body);
       if (!parse.success) {
         return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: parse.error.message, requestId: req.id } });
       }
       const { entityType, ids, addTags, removeTags } = parse.data;
 
-      const p = prisma as any;
-      // Batch fetch all records in one query to avoid N+1
-      let records: { id: string; tags: string[] }[] = [];
-      if (entityType === 'contact') {
-        records = await p.contact.findMany({ where: { id: { in: ids }, tenantId }, select: { id: true, tags: true } });
-      } else if (entityType === 'lead') {
-        records = await p.lead.findMany({ where: { id: { in: ids }, tenantId }, select: { id: true, tags: true } });
-      } else if (entityType === 'deal') {
-        records = await p.deal.findMany({ where: { id: { in: ids }, tenantId }, select: { id: true, tags: true } });
-      } else if (entityType === 'account') {
-        records = await p.account.findMany({ where: { id: { in: ids }, tenantId }, select: { id: true, tags: true } });
+      const requiredPerm = ENTITY_PERMISSIONS[entityType]?.update;
+      if (requiredPerm && !checkPermission(jwt.permissions ?? [], requiredPerm)) {
+        return reply.code(403).send({ success: false, error: { code: 'FORBIDDEN', message: `Permission required: ${requiredPerm}`, requestId: req.id } });
       }
 
-      const updates = records.map((r) => {
-        const newTags = [...new Set([...r.tags.filter((t: string) => !removeTags.includes(t)), ...addTags])];
-        return { id: r.id, tags: newTags };
-      });
-
-      // Process updates in larger chunks with bounded concurrency to reduce connection churn
-      const chunkSize = 100;
-      for (let i = 0; i < updates.length; i += chunkSize) {
-        const chunk = updates.slice(i, i + chunkSize);
-        await Promise.all(chunk.map((u) => {
-          if (entityType === 'contact') return p.contact.updateMany({ where: { id: u.id, deletedAt: null }, data: { tags: u.tags } });
-          if (entityType === 'lead') return p.lead.updateMany({ where: { id: u.id, deletedAt: null }, data: { tags: u.tags } });
-          if (entityType === 'deal') return p.deal.updateMany({ where: { id: u.id, deletedAt: null }, data: { tags: u.tags } });
-          return p.account.updateMany({ where: { id: u.id, deletedAt: null }, data: { tags: u.tags } });
-        }));
+      try {
+        const result = await bulkUseCase.bulkTag(engineContextFromJwt(req, jwt), { entityType, ids, addTags, removeTags });
+        return reply.send({ success: true, data: result });
+      } catch (error) {
+        return sendDomainError(reply, error, req.id);
       }
-
-      return reply.send({ success: true, data: { processed: updates.length } });
     });
 
     r.post('/bulk/reassign', { preHandler: requirePermission(PERMISSIONS.DEALS.UPDATE) }, async (req, reply) => {
-      const { tenantId, roles, sub: userId } = (req as any).user as { tenantId: string; roles: string[]; sub: string };
-      const roleSet = new Set((roles ?? []).map((r0) => r0.toLowerCase()));
-      if (!roleSet.has('admin') && !roleSet.has('manager')) {
-        return reply.code(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Only admins and managers can bulk reassign', requestId: req.id } });
-      }
-
+      const jwt = (req as any).user as { tenantId: string; roles: string[]; sub: string; permissions: string[] };
       const parse = BulkReassignSchema.safeParse(req.body);
       if (!parse.success) {
         return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: parse.error.message, requestId: req.id } });
       }
       const { entityType, ids, toUserId, fromUserId } = parse.data;
 
-      const whereClause = ids?.length
-        ? { id: { in: ids }, tenantId }
-        : fromUserId
-          ? { ownerId: fromUserId, tenantId }
-          : null;
-
-      if (!whereClause) return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Provide either ids or fromUserId', requestId: req.id } });
-
-      const reassignData = { ownerId: toUserId, updatedAt: new Date() };
-      const results: Record<string, number> = {};
-      const p = prisma as any;
       const entities = entityType === 'all' ? ['contact', 'deal', 'lead', 'account'] : [entityType];
-
-      const reassignWhere = { ...whereClause, deletedAt: null };
       for (const entity of entities) {
-        if (entity === 'contact') results.contacts = (await p.contact.updateMany({ where: reassignWhere, data: reassignData })).count;
-        else if (entity === 'deal') results.deals = (await p.deal.updateMany({ where: reassignWhere, data: reassignData })).count;
-        else if (entity === 'lead') results.leads = (await p.lead.updateMany({ where: reassignWhere, data: reassignData })).count;
-        else if (entity === 'account') results.accounts = (await p.account.updateMany({ where: reassignWhere, data: reassignData })).count;
+        const requiredPerm = ENTITY_PERMISSIONS[entity]?.update;
+        if (requiredPerm && !checkPermission(jwt.permissions ?? [], requiredPerm)) {
+          return reply.code(403).send({ success: false, error: { code: 'FORBIDDEN', message: `Permission required for ${entity}: ${requiredPerm}`, requestId: req.id } });
+        }
       }
 
-      await producer.publish('records.bulk.reassigned', {
-        type: 'records.bulk.reassigned',
-        tenantId,
-        userId,
-        toUserId,
-        fromUserId,
-        entityType,
-        results,
-      });
-      return reply.send({ success: true, data: results });
+      try {
+        const results = await bulkUseCase.bulkReassign(engineContextFromJwt(req, jwt), { entityType, ids, toUserId, fromUserId });
+        return reply.send({ success: true, data: results });
+      } catch (error) {
+        return sendDomainError(reply, error, req.id);
+      }
     });
   }, { prefix: '/api/v1' });
 }

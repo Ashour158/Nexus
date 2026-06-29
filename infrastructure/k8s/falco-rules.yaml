@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: falco-rules
+  namespace: nexus-monitoring
+data:
+  falco_rules.local.yaml: |
+    - rule: Terminal Shell in Container
+      desc: Detect shell spawned in container
+      condition: spawned_process and container and shell_procs
+      output: >
+        Shell spawned in container
+        (user=%user.name command=%proc.cmdline container=%container.name)
+      priority: WARNING
+
+    - rule: Unauthorized K8s API Access
+      desc: Detect unauthorized access to Kubernetes API
+      condition: >
+        k8s_audit and
+        k8s_sa.name != "nexus-crm" and
+        k8s verb in (create, update, delete)
+      output: >
+        Unauthorized K8s API access
+        (user=%ka.user.name verb=%ka.verb resource=%ka.target.resource)
+      priority: CRITICAL

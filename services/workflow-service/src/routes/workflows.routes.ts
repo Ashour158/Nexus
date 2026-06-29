@@ -10,7 +10,7 @@ import type { NexusProducer } from '@nexus/kafka';
 const IdParamSchema = z.object({ id: z.string().cuid() });
 const ListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(25),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 const CreateWorkflowSchema = z.object({
   name: z.string().min(1).max(200),
@@ -54,7 +54,7 @@ export async function registerWorkflowsRoutes(
         const parsed = UpdateWorkflowSchema.safeParse(request.body);
         if (!parsed.success) throw new ValidationError('Invalid body', parsed.error.flatten());
         const jwt = request.user as JwtPayload;
-        const row = await workflows.updateWorkflow(jwt.tenantId, id, parsed.data);
+        const row = await workflows.updateWorkflow(jwt.tenantId, id, parsed.data, jwt.sub);
         return reply.send({ success: true, data: row });
       });
 
@@ -81,6 +81,20 @@ export async function registerWorkflowsRoutes(
         await executions.runExecution(execution.id);
         const latest = await executions.getExecution(jwt.tenantId, execution.id);
         return reply.send({ success: true, data: latest });
+      });
+
+      r.get('/workflows/:id/versions', { preHandler: requirePermission(PERMISSIONS.WORKFLOWS.READ) }, async (request, reply) => {
+        const id = IdParamSchema.parse(request.params).id;
+        const jwt = request.user as JwtPayload;
+        const rows = await workflows.listVersions(jwt.tenantId, id);
+        return reply.send({ success: true, data: rows });
+      });
+
+      r.post('/workflows/:id/rollback/:versionId', { preHandler: requirePermission(PERMISSIONS.WORKFLOWS.UPDATE) }, async (request, reply) => {
+        const params = z.object({ id: z.string().cuid(), versionId: z.string().cuid() }).parse(request.params);
+        const jwt = request.user as JwtPayload;
+        const row = await workflows.rollback(jwt.tenantId, params.id, params.versionId);
+        return reply.send({ success: true, data: row });
       });
     },
     { prefix: '/api/v1' }

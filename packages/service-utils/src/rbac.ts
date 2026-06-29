@@ -67,13 +67,7 @@ export const PERMISSIONS = {
     UPDATE: 'invoices:update',
     VOID: 'invoices:void',
   },
-  CONTRACTS: { READ: 'contracts:read', CREATE: 'contracts:create', SIGN: 'contracts:sign' },
-  SUBSCRIPTIONS: {
-    READ: 'subscriptions:read',
-    CREATE: 'subscriptions:create',
-    UPDATE: 'subscriptions:update',
-    CANCEL: 'subscriptions:cancel',
-  },
+  CONTRACTS: { READ: 'contracts:read', CREATE: 'contracts:create', UPDATE: 'contracts:update', DELETE: 'contracts:delete', SIGN: 'contracts:sign' },
   COMMISSION: { READ: 'commission:read', MANAGE: 'commission:manage', APPROVE: 'commission:approve' },
   WORKFLOWS: {
     READ: 'workflows:read',
@@ -92,8 +86,15 @@ export const PERMISSIONS = {
   },
   SETTINGS: { READ: 'settings:read', UPDATE: 'settings:update' },
   INTEGRATIONS: { READ: 'integrations:read', MANAGE: 'integrations:manage' },
-  BILLING: { READ: 'billing:read', MANAGE: 'billing:manage' },
   BLUEPRINTS: { READ: 'blueprints:read', MANAGE: 'blueprints:manage' },
+  DOCUMENTS: { READ: 'documents:read' },
+  DATA: {
+    READ: 'data:read',
+    IMPORT: 'data:import',
+    EXPORT: 'data:export',
+    UPDATE: 'data:update',
+    ADMIN: 'data:admin',
+  },
 } as const;
 
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -112,12 +113,12 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'products:*',
     'invoices:*',
     'contracts:*',
-    'subscriptions:*',
     'commission:*',
     'workflows:*',
     'analytics:*',
-    'billing:*',
     'blueprints:*',
+    'documents:*',
+    'data:*',
   ],
   SALES_MANAGER: [
     'leads:*',
@@ -131,6 +132,9 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'analytics:*',
     'users:read',
     'products:read',
+    'data:read',
+    'data:export',
+    'data:import',
   ],
   SALES_REP: [
     'leads:read',
@@ -154,11 +158,11 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'activities:*',
     'products:read',
     'analytics:read',
+    'data:read',
   ],
   FINANCE: [
     'invoices:*',
     'contracts:*',
-    'subscriptions:*',
     'commission:read',
     'commission:approve',
     'products:*',
@@ -201,8 +205,11 @@ export function requirePermission(permission: string) {
     if (!user) {
       return reply.code(401).send({
         success: false,
-        error: 'UNAUTHORIZED',
-        message: 'Not authenticated',
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Not authenticated',
+          requestId: request.id,
+        },
       });
     }
 
@@ -210,8 +217,11 @@ export function requirePermission(permission: string) {
     if (!hasPermission) {
       return reply.code(403).send({
         success: false,
-        error: 'FORBIDDEN',
-        message: `Permission required: ${permission}`,
+        error: {
+          code: 'FORBIDDEN',
+          message: `Permission required: ${permission}`,
+          requestId: request.id,
+        },
       });
     }
   };
@@ -239,13 +249,25 @@ export function requireOwnership(resourceField: string = 'ownerId') {
     const resource = (request as unknown as Record<string, unknown>).loadedResource as
       | Record<string, string>
       | undefined;
-    if (!resource) return;
+    if (!resource) {
+      return reply.code(403).send({
+        success: false,
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Resource not loaded for ownership check',
+          requestId: request.id,
+        },
+      });
+    }
 
     if (resource[resourceField] !== user.sub) {
       return reply.code(403).send({
         success: false,
-        error: 'FORBIDDEN',
-        message: 'You do not own this resource',
+        error: {
+          code: 'FORBIDDEN',
+          message: 'You do not own this resource',
+          requestId: request.id,
+        },
       });
     }
   };

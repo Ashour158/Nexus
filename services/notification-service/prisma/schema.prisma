@@ -6,7 +6,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("NOTIFICATION_DATABASE_URL")
 }
 
 /// Notification fan-out record written by the in-app channel and consumed by
@@ -29,4 +29,26 @@ model Notification {
 
   @@index([tenantId, userId, isRead, createdAt])
   @@index([tenantId, entityType, entityId])
+  @@unique([id, tenantId])
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
 }

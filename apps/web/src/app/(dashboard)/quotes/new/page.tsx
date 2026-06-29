@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { CurrencySelect } from '@/components/ui/currency-select';
 import { FormField } from '@/components/ui/form-field';
@@ -13,6 +13,8 @@ import { formatCurrency, parseDecimal } from '@/lib/format';
 import { useProducts } from '@/hooks/use-products';
 import { useCpqPrice, useCreateQuote } from '@/hooks/use-quotes';
 import { cn } from '@/lib/cn';
+import { notify } from '@/lib/toast';
+import type { CreateQuoteInput } from '@nexus/validation';
 
 interface DealRef {
   id: string;
@@ -34,6 +36,7 @@ interface QuoteDraftLine {
   listPrice: number;
   unitPrice: number;
   discountPercent: number;
+  overridePrice?: number;
 }
 
 const STEPS = [
@@ -57,9 +60,23 @@ export default function NewQuotePage(): JSX.Element {
   const [promoCodeInput, setPromoCodeInput] = useState('');
   const [appliedPromos, setAppliedPromos] = useState<string[]>([]);
   const [quoteName, setQuoteName] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
+  const [expiryDate, setExpiryDate] = useState(() => {
+    const dt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    return dt.toISOString().slice(0, 10);
+  });
   const [quoteNotes, setQuoteNotes] = useState('');
+  const [discountReasonCode, setDiscountReasonCode] = useState('COMPETITIVE_MATCH');
+  const [discountReasonNotes, setDiscountReasonNotes] = useState('');
+  const [winningProbability, setWinningProbability] = useState('65');
   const [selectedCurrency, setSelectedCurrency] = useState('USD');
+  const [lineErrors, setLineErrors] = useState<Record<string, string>>({});
+  const [uiArabic, setUiArabic] = useState(false);
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.language.toLowerCase().startsWith('ar')) {
+      setUiArabic(true);
+    }
+  }, []);
 
   const dealsQuery = useQuery<DealListResponse>({
     queryKey: ['quote-builder-deals', dealSearch],
@@ -73,6 +90,53 @@ export default function NewQuotePage(): JSX.Element {
   const productsQuery = useProducts({ search: productSearch, limit: 100 });
   const cpqPrice = useCpqPrice();
   const createQuote = useCreateQuote();
+  const submitQuote = useMutation({
+    mutationFn: async () => {
+      if (!selectedDeal) throw new Error('No deal selected');
+      const payload: CreateQuoteInput = {
+        dealId: selectedDeal.id,
+        ownerId: selectedDeal.ownerId,
+        accountId: selectedDeal.accountId,
+        name: quoteName || `Quote for ${selectedDeal.name}`,
+        customFields: {},
+        currency: selectedCurrency,
+        validUntil: expiryDate ? new Date(expiryDate).toISOString() : undefined,
+        notes: quoteNotes || undefined,
+        paymentTerms: paymentTerms || undefined,
+        appliedPromos,
+        discountRequest: pricingResult?.approvalRequired
+          ? {
+              requestedDiscountPercent:
+                pricingResult.subtotal > 0
+                  ? (pricingResult.discountTotal / pricingResult.subtotal) * 100
+                  : 0,
+              reasonCode: discountReasonCode as never,
+              reasonNotes: discountReasonNotes || 'Discount approval requested by CPQ pricing policy.',
+              winningProbabilityIfApproved: Number(winningProbability),
+              businessImpact: discountReasonNotes || undefined,
+              customFields: {
+                approverHierarchy: [
+                  { level: 1, approver: 'Finance Manager' },
+                  { level: 2, approver: 'Sales Director' },
+                ],
+                workflow: 'DRQ_STANDARD_HIERARCHY',
+              },
+            }
+          : undefined,
+        items: lineItems.map((li) => ({
+          productId: li.productId,
+          quantity: li.quantity,
+          manualOverridePrice: li.overridePrice ?? undefined,
+        })),
+      };
+      return createQuote.mutateAsync(payload);
+    },
+    onSuccess: () => {
+      notify.success('Quote created');
+      router.push('/quotes');
+    },
+    onError: (err) => notify.error('Failed to create quote', err.message),
+  });
 
   const selectedDeal = useMemo(
     () => (dealsQuery.data?.data ?? []).find((d) => d.id === selectedDealId),
@@ -89,7 +153,13 @@ export default function NewQuotePage(): JSX.Element {
   const pricingResult = cpqPrice.data;
   const subtotal = lineItems.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0);
 
-  function addProduct(product: { id: string; name: string; listPrice: string }) {
+  function addProduct(product: {
+    id: string;
+    name: string;
+    nameAr?: string | null;
+    listPrice: string;
+  }) {
+    const displayName = uiArabic ? (product.nameAr?.trim() ? product.nameAr : product.name) : product.name;
     setLineItems((prev) => {
       const existing = prev.find((l) => l.productId === product.id);
       if (existing) {
@@ -102,7 +172,7 @@ export default function NewQuotePage(): JSX.Element {
         ...prev,
         {
           productId: product.id,
-          productName: product.name,
+          productName: displayName,
           quantity: 1,
           listPrice: list,
           unitPrice: list,
@@ -114,6 +184,17 @@ export default function NewQuotePage(): JSX.Element {
 
   async function calculatePrice() {
     if (!selectedDeal) return;
+    const errors: Record<string, string> = {};
+    lineItems.forEach((line) => {
+      if (line.quantity <= 0) errors[`${line.productId}-quantity`] = 'Quantity must be at least 1';
+      if (line.unitPrice < 0) errors[`${line.productId}-unitPrice`] = 'Unit price cannot be negative';
+    });
+    if (Object.keys(errors).length > 0) {
+      setLineErrors(errors);
+      notify.error('Validation error', Object.values(errors)[0]);
+      return;
+    }
+    setLineErrors({});
     await cpqPrice.mutateAsync({
       tenantId: '',
       dealId: selectedDeal.id,
@@ -128,38 +209,6 @@ export default function NewQuotePage(): JSX.Element {
           line.unitPrice !== line.listPrice ? String(line.unitPrice) : undefined,
       })),
     });
-  }
-
-  async function onCreateQuote() {
-    if (!selectedDeal) return;
-    if (lineItems.length === 0) return;
-    const name = quoteName.trim() || `Quote for ${selectedDeal.name}`;
-    let validUntil: string | undefined;
-    if (expiryDate.trim()) {
-      const d = new Date(expiryDate + 'T23:59:59.999Z');
-      validUntil = d.toISOString();
-    }
-    const quote = await createQuote.mutateAsync({
-      dealId: selectedDeal.id,
-      ownerId: selectedDeal.ownerId,
-      accountId: selectedDeal.accountId,
-      name,
-      currency: selectedCurrency,
-      validUntil,
-      notes: quoteNotes || undefined,
-      paymentTerms,
-      appliedPromos,
-      items: lineItems.map((line) => ({
-        productId: line.productId,
-        quantity: line.quantity,
-        manualOverridePrice:
-          line.unitPrice !== line.listPrice ? String(line.unitPrice) : undefined,
-      })),
-      customFields: {
-        pricingPreview: pricingResult ?? null,
-      },
-    });
-    router.push(`/quotes/${quote.id}`);
   }
 
   function next() {
@@ -202,7 +251,7 @@ export default function NewQuotePage(): JSX.Element {
               type="button"
               onClick={() => setStep(i)}
               className={cn(
-                'flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition',
+                'flex items-center gap-2 rounded-lg border px-3 py-2 text-start text-sm transition',
                 step === i
                   ? 'border-slate-900 bg-slate-900 text-white'
                   : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
@@ -302,7 +351,8 @@ export default function NewQuotePage(): JSX.Element {
                 onClick={() => addProduct(p)}
                 className="rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50"
               >
-                {p.name} ({formatCurrency(p.listPrice, p.currency)})
+                {(uiArabic && p.nameAr ? p.nameAr : p.name)} (
+                {formatCurrency(p.listPrice, p.currency)})
               </button>
             ))}
           </div>
@@ -310,20 +360,20 @@ export default function NewQuotePage(): JSX.Element {
             <table className="min-w-full text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
                 <tr>
-                  <th className="px-3 py-2 text-left">Product</th>
-                  <th className="px-3 py-2 text-right">Qty</th>
-                  <th className="px-3 py-2 text-right">List</th>
-                  <th className="px-3 py-2 text-right">Unit</th>
-                  <th className="px-3 py-2 text-right">Disc %</th>
-                  <th className="px-3 py-2 text-right">Line</th>
-                  <th className="px-3 py-2 text-right"> </th>
+                  <th className="px-3 py-2 text-start">Product</th>
+                  <th className="px-3 py-2 text-end">Qty</th>
+                  <th className="px-3 py-2 text-end">List</th>
+                  <th className="px-3 py-2 text-end">Unit</th>
+                  <th className="px-3 py-2 text-end">Disc %</th>
+                  <th className="px-3 py-2 text-end">Line</th>
+                  <th className="px-3 py-2 text-end"> </th>
                 </tr>
               </thead>
               <tbody>
                 {lineItems.map((line) => (
                   <tr key={line.productId} className="border-t border-slate-100">
                     <td className="px-3 py-2">{line.productName}</td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-3 py-2 text-end">
                       <Input
                         type="number"
                         min={1}
@@ -340,13 +390,16 @@ export default function NewQuotePage(): JSX.Element {
                             )
                           )
                         }
-                        className="ml-auto w-20 text-right"
+                        className="ms-auto w-20 text-end"
                       />
+                      {lineErrors[`${line.productId}-quantity`] ? (
+                        <p className="mt-1 text-xs text-red-500">{lineErrors[`${line.productId}-quantity`]}</p>
+                      ) : null}
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-3 py-2 text-end">
                       {formatCurrency(line.listPrice, currency)}
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-3 py-2 text-end">
                       <Input
                         type="number"
                         min={0}
@@ -364,10 +417,13 @@ export default function NewQuotePage(): JSX.Element {
                             )
                           )
                         }
-                        className="ml-auto w-28 text-right"
+                        className="ms-auto w-28 text-end"
                       />
+                      {lineErrors[`${line.productId}-unitPrice`] ? (
+                        <p className="mt-1 text-xs text-red-500">{lineErrors[`${line.productId}-unitPrice`]}</p>
+                      ) : null}
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-3 py-2 text-end">
                       {line.listPrice > 0
                         ? Math.max(
                             0,
@@ -378,10 +434,10 @@ export default function NewQuotePage(): JSX.Element {
                           ).toFixed(1)
                         : '0.0'}
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-3 py-2 text-end">
                       {formatCurrency(line.quantity * line.unitPrice, currency)}
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-3 py-2 text-end">
                       <Button
                         type="button"
                         variant="destructive"
@@ -489,7 +545,7 @@ export default function NewQuotePage(): JSX.Element {
           {pricingResult?.floorPriceWarnings?.length ? (
             <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
               <p className="font-semibold">Floor price warnings</p>
-              <ul className="mt-1 list-disc pl-5">
+              <ul className="mt-1 list-disc ps-5">
                 {pricingResult.floorPriceWarnings.map((w) => (
                   <li key={w}>{w}</li>
                 ))}
@@ -498,7 +554,49 @@ export default function NewQuotePage(): JSX.Element {
           ) : null}
           {pricingResult?.approvalRequired ? (
             <div className="mt-3 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900">
-              Approval required before this quote can be sent to the customer.
+              <p className="font-semibold">Approval required before this quote can be sent to the customer.</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <label className="text-xs font-semibold uppercase tracking-wide">
+                  Discount reason
+                  <select
+                    className="mt-1 h-9 w-full rounded-md border border-red-200 bg-white px-3 text-sm normal-case text-slate-700"
+                    value={discountReasonCode}
+                    onChange={(e) => setDiscountReasonCode(e.target.value)}
+                  >
+                    <option value="COMPETITIVE_MATCH">Competitive match</option>
+                    <option value="STRATEGIC_ACCOUNT">Strategic account</option>
+                    <option value="VOLUME_COMMITMENT">Volume commitment</option>
+                    <option value="MULTI_YEAR_COMMITMENT">Multi-year commitment</option>
+                    <option value="NEW_LOGO_ACQUISITION">New logo acquisition</option>
+                    <option value="RENEWAL_SAVE">Renewal save</option>
+                    <option value="EXECUTIVE_EXCEPTION">Executive exception</option>
+                    <option value="MARKET_ENTRY">Market entry</option>
+                    <option value="BUNDLE_NEGOTIATION">Bundle negotiation</option>
+                    <option value="PAYMENT_TERMS_TRADEOFF">Payment terms trade-off</option>
+                  </select>
+                </label>
+                <label className="text-xs font-semibold uppercase tracking-wide">
+                  Win probability if approved
+                  <Input
+                    className="mt-1 bg-white"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={winningProbability}
+                    onChange={(e) => setWinningProbability(e.target.value)}
+                  />
+                </label>
+                <label className="text-xs font-semibold uppercase tracking-wide md:col-span-3">
+                  Business reason
+                  <Textarea
+                    className="mt-1 bg-white"
+                    rows={2}
+                    value={discountReasonNotes}
+                    onChange={(e) => setDiscountReasonNotes(e.target.value)}
+                    placeholder="Why this discount is justified..."
+                  />
+                </label>
+              </div>
             </div>
           ) : null}
         </section>
@@ -570,13 +668,13 @@ export default function NewQuotePage(): JSX.Element {
               }
               isLoading={step === 2 && cpqPrice.isPending}
             >
-              {step === 2 ? 'Run CPQ & continue' : 'Next'}
+              {step === 2 ? 'Run CPQ & continue' : 'Next step'}
             </Button>
           ) : (
             <Button
               type="button"
-              onClick={() => void onCreateQuote()}
-              isLoading={createQuote.isPending}
+              onClick={() => submitQuote.mutate()}
+              isLoading={submitQuote?.isPending}
               disabled={!selectedDeal || lineItems.length === 0}
             >
               Create quote
@@ -586,4 +684,4 @@ export default function NewQuotePage(): JSX.Element {
       </footer>
     </main>
   );
-}
+} 

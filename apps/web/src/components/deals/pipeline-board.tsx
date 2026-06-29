@@ -63,7 +63,7 @@ export function PipelineBoard({
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
-  const deals = query.data?.data ?? [];
+  const deals = useMemo(() => query.data?.data ?? [], [query.data]);
 
   /** Stages in their canonical order, with deals bucketed per stage. */
   const columns = useMemo(() => {
@@ -189,7 +189,7 @@ export function PipelineBoard({
           </div>
         </header>
 
-        <div className="flex h-full gap-3 overflow-x-auto pb-4">
+        <div className="flex h-full gap-3 overflow-x-auto pb-4 rtl:flex-row-reverse" style={{ direction: 'inherit' }}>
           {columns.map(({ stage, deals: columnDeals }) => (
             <PipelineColumn
               key={stage.id}
@@ -230,7 +230,7 @@ function BoardLoadingSkeleton({
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-4 w-32" />
       </div>
-      <div className="flex h-full gap-3 overflow-x-auto pb-4">
+      <div className="flex h-full gap-3 overflow-x-auto pb-4 rtl:flex-row-reverse" style={{ direction: 'inherit' }}>
         {Array.from({ length: columnCount }).map((_, colIdx) => (
           <div
             key={colIdx}

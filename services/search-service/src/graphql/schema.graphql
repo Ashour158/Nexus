@@ -1,0 +1,44 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  search(query: String!, index: String, limit: Int, offset: Int): SearchResult!
+  searchHealth: Health!
+}
+
+type Mutation {
+  indexDocument(input: IndexDocumentInput!): Boolean!
+  deleteDocument(index: String!, documentId: String!): Boolean!
+}
+
+type SearchResult @key(fields: "id") {
+  id: ID!
+  query: String!
+  index: String
+  hits: [SearchHit!]!
+  totalHits: Int!
+  processingTimeMs: Int!
+}
+
+type SearchHit @key(fields: "id") {
+  id: ID!
+  objectID: String!
+  entityType: String!
+  title: String!
+  snippet: String
+  metadata: JSON!
+}
+
+type Health {
+  status: String!
+  service: String!
+}
+
+input IndexDocumentInput {
+  index: String!
+  documentId: String!
+  data: JSON!
+}

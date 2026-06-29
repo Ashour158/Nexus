@@ -1,5 +1,5 @@
 import type { PaginatedResult } from '@nexus/shared-types';
-import { BusinessRuleError, NotFoundError } from '@nexus/service-utils';
+import { BusinessRuleError, ConflictError, NotFoundError } from '@nexus/service-utils';
 import type {
   ConvertLeadInput,
   CreateLeadInput,
@@ -7,6 +7,7 @@ import type {
   UpdateLeadInput,
 } from '@nexus/validation';
 import { NexusProducer, TOPICS } from '@nexus/kafka';
+import { recordFieldChanges } from '../lib/field-history.js';
 import { Prisma } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type {
   Account,
@@ -15,7 +16,14 @@ import type {
   Lead,
 } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { CrmPrisma } from '../prisma.js';
-import { toPaginatedResult } from '../lib/pagination.js';
+import { toPaginatedResult } from '@nexus/shared-types';
+import { assignLeadToTerritory } from '../lib/territory-router.js';
+import {
+  updateLeadDataQuality,
+  updateAccountDataQuality,
+  updateContactDataQuality,
+  updateDealDataQuality,
+} from '../lib/data-quality.js';
 
 type LeadListFilters = Omit<
   LeadListQuery,
@@ -67,8 +75,8 @@ function resolveSortField(
 }
 
 /**
- * Very simple rule-based scorer (Section 32) — richer AI scoring is delegated
- * to the AI service in Phase 3.
+ * Very simple rule-based scorer (Section 32). Richer deterministic scoring
+ * lives inside CRM and does not depend on an external intelligence service.
  */
 function scoreLead(data: Partial<Lead>): number {
   let score = 0;
@@ -121,7 +129,50 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
       return loadOrThrow(tenantId, id);
     },
 
-    async createLead(tenantId: string, data: CreateLeadInput): Promise<Lead> {
+    async findDuplicateLeads(
+      tenantId: string,
+      data: { email?: string | null; firstName?: string; lastName?: string; company?: string | null }
+    ): Promise<Array<{ id: string; firstName: string; lastName: string; email: string | null; matchReason: string }>> {
+      const duplicates: Array<{ id: string; firstName: string; lastName: string; email: string | null; matchReason: string }> = [];
+      if (data.email) {
+        const byEmail = await prisma.lead.findFirst({
+          where: { tenantId, email: data.email, deletedAt: null },
+        });
+        if (byEmail) {
+          duplicates.push({ id: byEmail.id, firstName: byEmail.firstName, lastName: byEmail.lastName, email: byEmail.email, matchReason: 'email' });
+        }
+      }
+      if (data.firstName && data.lastName && data.company) {
+        const byName = await prisma.lead.findFirst({
+          where: {
+            tenantId,
+            firstName: { equals: data.firstName, mode: 'insensitive' },
+            lastName: { equals: data.lastName, mode: 'insensitive' },
+            company: { equals: data.company, mode: 'insensitive' },
+            deletedAt: null,
+          },
+        });
+        if (byName && !duplicates.some((d) => d.id === byName.id)) {
+          duplicates.push({ id: byName.id, firstName: byName.firstName, lastName: byName.lastName, email: byName.email, matchReason: 'name+company' });
+        }
+      }
+      return duplicates;
+    },
+
+    async createLead(tenantId: string, data: CreateLeadInput, force = false): Promise<Lead> {
+      if (!force) {
+        const duplicates = await this.findDuplicateLeads(tenantId, {
+          email: data.email ?? null,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          company: data.company ?? null,
+        });
+        if (duplicates.length > 0) {
+          const e = new ConflictError('Lead', 'duplicate');
+          (e as any).duplicates = duplicates;
+          throw e;
+        }
+      }
       const score = scoreLead(data as Partial<Lead>);
       const created = await prisma.lead.create({
         data: {
@@ -172,15 +223,34 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
         })
         .catch(() => undefined);
 
+      // Territory assignment (synchronous for immediate UX)
+      const assignment = await assignLeadToTerritory(prisma, tenantId, created);
+      if (assignment) {
+        await prisma.lead.update({
+          where: { id: created.id },
+          data: {
+            ownerId: assignment.userId,
+            territoryId: assignment.territoryId,
+            assignedTo: assignment.salesRepId,
+          },
+        });
+      }
+
+      // Data quality scoring (fire-and-forget)
+      updateLeadDataQuality(prisma, created.id).catch(() => undefined);
+
       return created;
     },
 
     async updateLead(
       tenantId: string,
       id: string,
-      data: UpdateLeadInput
+      data: UpdateLeadInput,
+      changedBy?: string,
+      changedByName?: string
     ): Promise<Lead> {
-      await loadOrThrow(tenantId, id);
+      const existing = await loadOrThrow(tenantId, id);
+      const oldValues: Record<string, unknown> = {};
       const update: Prisma.LeadUpdateInput = {};
       const scalarFields: (keyof UpdateLeadInput)[] = [
         'firstName',
@@ -212,10 +282,12 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
       for (const f of scalarFields) {
         if (data[f] !== undefined) {
           (update as Record<string, unknown>)[f] = data[f];
+          (oldValues as Record<string, unknown>)[f] = (existing as Record<string, unknown>)[f];
         }
       }
       if (data.annualRevenue !== undefined) {
         update.annualRevenue = new Prisma.Decimal(data.annualRevenue);
+        oldValues.annualRevenue = existing.annualRevenue;
       }
       if (data.gdprConsent !== undefined) {
         update.gdprConsent = data.gdprConsent;
@@ -223,15 +295,67 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
       }
       if (data.customFields !== undefined) {
         update.customFields = data.customFields as Prisma.InputJsonValue;
+        oldValues.customFields = existing.customFields;
       }
-      if (data.tags !== undefined) update.tags = data.tags;
+      if (data.tags !== undefined) { update.tags = data.tags; oldValues.tags = existing.tags; }
 
-      return prisma.lead.update({ where: { id }, data: update });
+      const updated = await prisma.lead.update({ where: { id }, data: update });
+      if (changedBy) {
+        await recordFieldChanges(prisma, tenantId, 'lead', id, oldValues, data as Record<string, unknown>, changedBy, changedByName);
+      }
+      await producer
+        .publish(TOPICS.LEADS, {
+          type: 'lead.updated',
+          tenantId,
+          payload: {
+            leadId: updated.id,
+            ownerId: updated.ownerId,
+            status: updated.status,
+            score: updated.score,
+            changedFields: Object.keys(update),
+          },
+        })
+        .catch(() => undefined);
+      // Recalculate data quality when key fields change
+      updateLeadDataQuality(prisma, id).catch(() => undefined);
+      return updated;
     },
 
     async deleteLead(tenantId: string, id: string): Promise<void> {
-      await loadOrThrow(tenantId, id);
-      await prisma.lead.delete({ where: { id } });
+      const existing = await loadOrThrow(tenantId, id);
+      await prisma.lead.update({ where: { id } as any, data: { deletedAt: new Date() } as any });
+      await producer
+        .publish(TOPICS.LEADS, {
+          type: 'lead.archived',
+          tenantId,
+          payload: {
+            leadId: existing.id,
+            ownerId: existing.ownerId,
+            status: existing.status,
+          },
+        })
+        .catch(() => undefined);
+    },
+
+    async restoreLead(tenantId: string, id: string): Promise<Lead> {
+      const result = await prisma.lead.updateMany({
+        where: { id, tenantId, deletedAt: { not: null } } as any,
+        data: { deletedAt: null } as any,
+      });
+      if (result.count === 0) throw new NotFoundError('Lead', id);
+      const restored = await prisma.lead.findFirstOrThrow({ where: { id, tenantId } });
+      await producer
+        .publish(TOPICS.LEADS, {
+          type: 'lead.restored',
+          tenantId,
+          payload: {
+            leadId: restored.id,
+            ownerId: restored.ownerId,
+            status: restored.status,
+          },
+        })
+        .catch(() => undefined);
+      return restored;
     },
 
     /**
@@ -346,6 +470,21 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
         return { lead: refreshed, account, contact, deal };
       });
 
+      // Publish explicit conversion event for downstream listeners
+      await producer
+        .publish(TOPICS.LEADS, {
+          type: 'lead.converted',
+          tenantId,
+          payload: {
+            leadId: result.lead.id,
+            accountId: result.account.id,
+            contactId: result.contact.id,
+            dealId: result.deal?.id,
+            ownerId: result.lead.ownerId,
+          },
+        })
+        .catch(() => undefined);
+
       if (result.deal) {
         await producer
           .publish(TOPICS.DEALS, {
@@ -363,6 +502,11 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
           })
           .catch(() => undefined);
       }
+
+      // Compute data quality for converted records (fire-and-forget)
+      updateAccountDataQuality(prisma, result.account.id).catch(() => undefined);
+      updateContactDataQuality(prisma, result.contact.id).catch(() => undefined);
+      if (result.deal) updateDealDataQuality(prisma, result.deal.id).catch(() => undefined);
 
       return result;
     },

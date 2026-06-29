@@ -1,66 +1,181 @@
 'use client';
+
 import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { useAuthStore } from '@/stores/auth.store';
 
-type Product = { id: string; name: string; sku: string; currency: string; price: number; isActive?: boolean };
-type CreateProductInput = { name: string; sku: string; currency: string; price: number };
+type Product = {
+  id: string;
+  name: string;
+  nameAr?: string | null;
+  sku: string;
+  currency: string;
+  listPrice: string | number;
+  isActive?: boolean;
+};
 
-export default function ProductsPage() {
-  const queryClient = useQueryClient();
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [formData, setFormData] = useState<CreateProductInput>({ name: '', sku: '', currency: 'USD', price: 0 });
+type ProductKit = {
+  id: string;
+  name: string;
+  sku?: string;
+  currency: string;
+  listPrice: string | number;
+  items?: unknown[];
+};
+
+type Vendor = {
+  id: string;
+  name: string;
+  code?: string;
+  currency: string;
+  isActive: boolean;
+  products?: unknown[];
+};
+
+export default function ProductsPage(): JSX.Element {
+  const token = useAuthStore((s) => s.accessToken);
+  const [tab, setTab] = useState<'products' | 'kits' | 'vendors'>('products');
 
   const productsQuery = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
-      const res = await fetch('/api/products');
+      const res = await fetch('/api/products', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const data = await res.json();
-      return data as { products?: Product[]; data?: Product[] };
+      return (data.products ?? data.data ?? []) as Product[];
     },
   });
 
-  const createProduct = useMutation({
-    mutationFn: async (data: CreateProductInput) => {
-      const res = await fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-      if (!res.ok) throw new Error('Failed to create product');
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      setShowCreateModal(false);
-      setFormData({ name: '', sku: '', currency: 'USD', price: 0 });
+  const kitsQuery = useQuery({
+    queryKey: ['product-kits'],
+    queryFn: async () => {
+      const res = await fetch('/api/finance/product-kits', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      return (json.data ?? []) as ProductKit[];
     },
   });
 
-  const products = useMemo(() => productsQuery.data?.products ?? productsQuery.data?.data ?? [], [productsQuery.data]);
+  const vendorsQuery = useQuery({
+    queryKey: ['vendors'],
+    queryFn: async () => {
+      const res = await fetch('/api/finance/vendors', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      return (json.data ?? []) as Vendor[];
+    },
+  });
+
+  const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
+  const kits = useMemo(() => kitsQuery.data ?? [], [kitsQuery.data]);
+  const vendors = useMemo(() => vendorsQuery.data ?? [], [vendorsQuery.data]);
 
   return (
-    <main className="space-y-4 p-4">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">Product Catalog</h1>
-        <button className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white" onClick={() => setShowCreateModal(true)}>Create product</button>
-      </header>
-      <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-start text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2">Name</th><th className="px-3 py-2">SKU</th><th className="px-3 py-2">Price</th><th className="px-3 py-2">Status</th></tr></thead>
-          <tbody>{products.map((p) => <tr key={p.id} className="border-t border-slate-100"><td className="px-3 py-2 font-medium">{p.name}</td><td className="px-3 py-2">{p.sku}</td><td className="px-3 py-2">{p.currency} {Number(p.price ?? 0).toFixed(2)}</td><td className="px-3 py-2">{p.isActive ?? true ? 'Active' : 'Archived'}</td></tr>)}</tbody>
-        </table>
-      </section>
-      {showCreateModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="mb-4 text-lg font-semibold text-slate-900">Create product</h2>
-            <form onSubmit={(e) => { e.preventDefault(); createProduct.mutate(formData); }} className="space-y-3">
-              <input value={formData.name} onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))} placeholder="Product name" className="w-full rounded border border-slate-300 px-3 py-2 text-sm" required />
-              <input value={formData.sku} onChange={(e) => setFormData((prev) => ({ ...prev, sku: e.target.value }))} placeholder="SKU" className="w-full rounded border border-slate-300 px-3 py-2 text-sm" required />
-              <div className="grid grid-cols-2 gap-2">
-                <input value={formData.currency} onChange={(e) => setFormData((prev) => ({ ...prev, currency: e.target.value.toUpperCase() }))} placeholder="USD" className="w-full rounded border border-slate-300 px-3 py-2 text-sm" required />
-                <input type="number" step="0.01" min={0} value={formData.price} onChange={(e) => setFormData((prev) => ({ ...prev, price: Number(e.target.value || 0) }))} placeholder="0.00" className="w-full rounded border border-slate-300 px-3 py-2 text-sm" required />
-              </div>
-              <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setShowCreateModal(false)} className="rounded border border-slate-300 px-3 py-2 text-sm">Cancel</button><button type="submit" disabled={createProduct.isPending} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{createProduct.isPending ? 'Creating...' : 'Create'}</button></div>
-            </form>
-          </div>
-        </div>
+    <main className="space-y-4 p-6">
+      <h1 className="text-2xl font-bold text-slate-900">Catalog</h1>
+      <div className="flex gap-2">
+        {(['products', 'kits', 'vendors'] as const).map((key) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`rounded-lg px-3 py-1.5 text-sm ${
+              tab === key ? 'bg-blue-600 text-white' : 'bg-gray-100'
+            }`}
+          >
+            {key === 'products' ? 'Products' : key === 'kits' ? 'Kits' : 'Vendors'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'products' ? (
+        <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-start text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-3 py-2">Name</th>
+                <th className="px-3 py-2">SKU</th>
+                <th className="px-3 py-2">Price</th>
+                <th className="px-3 py-2">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((p) => (
+                <tr key={p.id} className="border-t border-slate-100">
+                  <td className="px-3 py-2">
+                    <div>
+                      <span className="font-medium text-slate-900">{p.name}</span>
+                      {p.nameAr ? (
+                        <span className="mt-0.5 block text-xs text-slate-500" dir="rtl" lang="ar">
+                          {p.nameAr}
+                        </span>
+                      ) : null}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2">{p.sku}</td>
+                  <td className="px-3 py-2">
+                    {p.currency} {Number(p.listPrice ?? 0).toFixed(2)}
+                  </td>
+                  <td className="px-3 py-2">
+                    {p.isActive ?? true ? 'Active' : 'Archived'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
+
+      {tab === 'kits' ? (
+        <section className="rounded-xl border border-slate-200 bg-white">
+          <ul>
+            {kits.map((k) => (
+              <li key={k.id} className="border-t px-4 py-3 first:border-t-0">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{k.name}</span>
+                  <span className="text-xs text-slate-500">{k.currency} {Number(k.listPrice ?? 0).toFixed(2)} · {(k.items as unknown[])?.length ?? 0} items</span>
+                </div>
+              </li>
+            ))}
+            {kits.length === 0 ? <li className="px-4 py-6 text-center text-sm text-slate-500">No product kits found.</li> : null}
+          </ul>
+        </section>
+      ) : null}
+
+      {tab === 'vendors' ? (
+        <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-start text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-3 py-2">Vendor</th>
+                <th className="px-3 py-2">Code</th>
+                <th className="px-3 py-2">Currency</th>
+                <th className="px-3 py-2">Products</th>
+                <th className="px-3 py-2">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vendors.map((vendor) => (
+                <tr key={vendor.id} className="border-t border-slate-100">
+                  <td className="px-3 py-2 font-medium text-slate-900">{vendor.name}</td>
+                  <td className="px-3 py-2">{vendor.code ?? '-'}</td>
+                  <td className="px-3 py-2">{vendor.currency}</td>
+                  <td className="px-3 py-2">{vendor.products?.length ?? 0}</td>
+                  <td className="px-3 py-2">{vendor.isActive ? 'Active' : 'Inactive'}</td>
+                </tr>
+              ))}
+              {vendors.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-500">
+                    No vendors found.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </section>
       ) : null}
     </main>
   );

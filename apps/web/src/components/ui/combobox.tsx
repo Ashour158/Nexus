@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -52,6 +53,7 @@ export function Combobox({
   emptyLabel = 'No results',
   describedBy,
 }: ComboboxProps): JSX.Element {
+  const listboxId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
@@ -125,6 +127,7 @@ export function Combobox({
         type="text"
         role="combobox"
         aria-expanded={open}
+        aria-controls={listboxId}
         aria-autocomplete="list"
         aria-invalid={invalid || undefined}
         aria-describedby={describedBy}
@@ -150,52 +153,55 @@ export function Combobox({
         )}
       />
 
-      {open && (
-        <ul
-          role="listbox"
-          className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-background shadow-lg"
-        >
-          {isLoading && (
-            <li className="px-3 py-2 text-xs text-muted-foreground">
-              Loading…
-            </li>
-          )}
-          {!isLoading && filtered.length === 0 && (
-            <li className="px-3 py-2 text-xs text-muted-foreground">
-              {emptyLabel}
-            </li>
-          )}
-          {!isLoading &&
-            filtered.map((opt, index) => {
-              const isActive = index === activeIndex;
-              const isSelected = opt.id === value;
-              return (
-                <li
-                  key={opt.id}
-                  role="option"
-                  aria-selected={isSelected}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    handleSelect(opt);
-                  }}
-                  onMouseEnter={() => setActiveIndex(index)}
-                  className={cn(
-                    'cursor-pointer px-3 py-2 text-sm',
-                    isActive && 'bg-muted',
-                    isSelected && 'font-semibold'
-                  )}
-                >
-                  <div className="truncate">{opt.label}</div>
-                  {opt.sublabel && (
-                    <div className="truncate text-xs text-muted-foreground">
-                      {opt.sublabel}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-        </ul>
-      )}
+      <ul
+        id={listboxId}
+        role="listbox"
+        hidden={!open}
+        className={cn(
+          'absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-background shadow-lg',
+          !open && 'hidden'
+        )}
+      >
+        {isLoading && (
+          <li className="px-3 py-2 text-xs text-muted-foreground">
+            Loading…
+          </li>
+        )}
+        {!isLoading && filtered.length === 0 && (
+          <li className="px-3 py-2 text-xs text-muted-foreground">
+            {emptyLabel}
+          </li>
+        )}
+        {!isLoading &&
+          filtered.map((opt, index) => {
+            const isActive = index === activeIndex;
+            const isSelected = opt.id === value;
+            return (
+              <li
+                key={opt.id}
+                role="option"
+                aria-selected={isSelected}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleSelect(opt);
+                }}
+                onMouseEnter={() => setActiveIndex(index)}
+                className={cn(
+                  'cursor-pointer px-3 py-2 text-sm',
+                  isActive && 'bg-muted',
+                  isSelected && 'font-semibold'
+                )}
+              >
+                <div className="truncate">{opt.label}</div>
+                {opt.sublabel && (
+                  <div className="truncate text-xs text-muted-foreground">
+                    {opt.sublabel}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+      </ul>
     </div>
   );
 }

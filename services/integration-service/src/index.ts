@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { startTracing } from '@nexus/service-utils/tracing';
 import rateLimit from '@fastify/rate-limit';
 import {
   checkDatabase,
@@ -9,6 +10,7 @@ import {
 } from '@nexus/service-utils';
 import { NexusProducer } from '@nexus/kafka';
 import { PrismaClient } from '../../../node_modules/.prisma/integration-client/index.js';
+import { buildDatabaseUrl } from '@nexus/service-utils/db';
 import { createIntegrationPrisma } from './prisma.js';
 import { createFieldCrypto } from './lib/crypto.js';
 import { createWebhooksService } from './services/webhooks.service.js';
@@ -24,13 +26,25 @@ import { registerSyncRoutes } from './routes/sync.routes.js';
 import { registerOauthRoutes } from './routes/oauth.routes.js';
 import { registerCalendarRoutes } from './routes/calendar.routes.js';
 import { registerEmailRoutes } from './routes/email.routes.js';
+import { registerGraphQL } from './graphql/index.js';
 import { startIntegrationEventsConsumer } from './consumers/events.consumer.js';
+import { webhookQueue } from './queues/webhook.queue.js';
 
-const rawPrisma = new PrismaClient();
+startTracing({ serviceName: 'integration-service' });
+const rawPrisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: buildDatabaseUrl({ connectionLimit: 5, poolTimeout: 10, databaseUrl: process.env.INTEGRATION_DATABASE_URL }),
+    },
+  },
+});
 const prisma = createIntegrationPrisma();
 const producer = new NexusProducer('integration-service');
 
-const key = process.env.INTEGRATION_ENCRYPTION_KEY ?? process.env.INTEGRATION_SECRET_KEY ?? '';
+const key = process.env.INTEGRATION_ENCRYPTION_KEY ?? process.env.INTEGRATION_SECRET_KEY;
+if (!key || key.length < 32) {
+  throw new Error('INTEGRATION_ENCRYPTION_KEY or INTEGRATION_SECRET_KEY must be set to at least 32 characters.');
+}
 const crypto = createFieldCrypto(key);
 
 const port = Number(process.env.PORT ?? 3012);
@@ -70,9 +84,6 @@ const gmail = createGoogleGmailService(prisma);
 const geocoding = createGeocodingService(prisma);
 
 let eventsConsumer: Awaited<ReturnType<typeof startIntegrationEventsConsumer>> | null = null;
-const deliveryTimer = setInterval(() => {
-  void webhooks.processDeliveryQueue(40).catch((err) => app.log.warn({ err }, 'webhook delivery sweep failed'));
-}, 30_000);
 
 try {
   await producer.connect();
@@ -89,17 +100,19 @@ try {
 }
 
 app.addHook('onClose', async () => {
-  clearInterval(deliveryTimer);
   try { await eventsConsumer?.disconnect(); } catch { /* ignore */ }
   try { await producer.disconnect(); } catch { /* ignore */ }
+  try { await webhookQueue.close(); } catch { /* ignore */ }
   await rawPrisma.$disconnect();
 });
+
+await registerGraphQL(app, prisma);
 
 await startService(app, port, async (a) => {
   await registerWebhooksRoutes(a, webhooks);
   await registerConnectionsRoutes(a, connections);
   await registerSyncRoutes(a, sync);
   await registerOauthRoutes(a, oauth);
-  await registerCalendarRoutes(a, calendar, gmail);
+  await registerCalendarRoutes(a, prisma, calendar);
   await registerEmailRoutes(a, gmail);
 });

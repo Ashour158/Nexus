@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { DEV_PREVIEW_ENABLED, apiSuccess, createId, getDevPreviewState } from '@/lib/server/dev-preview-data';
 
 const FINANCE_URL = process.env.FINANCE_SERVICE_URL ?? 'http://finance-service:3002/api/v1';
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth && !DEV_PREVIEW_ENABLED) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  if (DEV_PREVIEW_ENABLED) {
+    return NextResponse.json(apiSuccess(getDevPreviewState().taxZones));
+  }
+
   const res = await fetch(`${FINANCE_URL}/tax-zones`, {
-    headers: { Authorization: auth },
+    headers: { Authorization: auth ?? '' },
   });
   const data = await res.json().catch(() => ({}));
   return NextResponse.json(data, { status: res.status });
@@ -14,14 +20,25 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const auth = req.headers.get('authorization');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const body = await req.text();
+  if (!auth && !DEV_PREVIEW_ENABLED) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const body = await req.json().catch(() => ({}));
+  if (DEV_PREVIEW_ENABLED) {
+    const state = getDevPreviewState();
+    const zone = {
+      id: createId('tax-zone'),
+      name: String(body.name ?? 'Tax Zone'),
+      country: body.country ? String(body.country).toUpperCase() : null,
+    };
+    state.taxZones.unshift(zone);
+    return NextResponse.json(apiSuccess(zone), { status: 201 });
+  }
+
   const res = await fetch(`${FINANCE_URL}/tax-zones`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: auth },
-    body,
+    headers: { 'Content-Type': 'application/json', Authorization: auth ?? '' },
+    body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
   return NextResponse.json(data, { status: res.status });
 }
-

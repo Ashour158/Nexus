@@ -27,66 +27,78 @@ export async function registerReportsRoutes(
     return reply.send({ success: true, data: reports.listTemplates(query.category) });
   });
 
-  app.get('/api/v1/reports', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
+  app.get('/api/v1/report-definitions', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const query = z.object({ category: z.string().optional() }).parse(request.query);
     return reply.send({ success: true, data: await reports.listCustomReports(tenantId, query.category) });
   });
 
-  app.post('/api/v1/reports', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+  app.post('/api/v1/report-definitions', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
     const user = (request as unknown as { user: { tenantId: string; sub: string } }).user;
     const body = ReportBody.parse(request.body);
     return reply.code(201).send({ success: true, data: await reports.saveReport(user.tenantId, user.sub, body) });
   });
 
-  app.get('/api/v1/reports/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
+  app.get('/api/v1/report-definitions/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const { id } = Id.parse(request.params);
     const data = await reports.getReport(tenantId, id);
-    if (!data) return reply.code(404).send({ success: false, error: 'Report not found' });
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Report not found', requestId: request.id } });
     return reply.send({ success: true, data });
   });
 
-  app.delete('/api/v1/reports/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+  app.delete('/api/v1/report-definitions/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const { id } = Id.parse(request.params);
     return reply.send({ success: true, data: await reports.deleteReport(tenantId, id) });
   });
 
-  app.post('/api/v1/reports/:id/run', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
+  app.post('/api/v1/report-definitions/:id/run', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const { id } = Id.parse(request.params);
     const params = z.record(z.unknown()).default({}).parse(request.body ?? {});
     const data = await reports.runReport(tenantId, id, params);
-    if (!data) return reply.code(404).send({ success: false, error: 'Report not found' });
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Report not found', requestId: request.id } });
     return reply.send({ success: true, data });
   });
 
-  app.post('/api/v1/reports/:id/export', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
+  app.post('/api/v1/report-definitions/:id/export', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const { id } = Id.parse(request.params);
     const params = z.record(z.unknown()).default({}).parse(request.body ?? {});
     const data = await reports.exportXlsx(tenantId, id, params);
-    if (!data) return reply.code(404).send({ success: false, error: 'Report not found' });
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Report not found', requestId: request.id } });
     return reply.header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').send(data);
   });
 
-  app.get('/api/v1/reports/:id/schedules', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
+  app.get('/api/v1/report-definitions/:id/schedules', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const { id } = Id.parse(request.params);
     return reply.send({ success: true, data: await reports.listSchedules(tenantId, id) });
   });
 
-  app.post('/api/v1/reports/:id/schedules', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+  app.post('/api/v1/report-definitions/:id/schedules', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const { id } = Id.parse(request.params);
     const body = ScheduleBody.parse(request.body);
     return reply.code(201).send({ success: true, data: await reports.createSchedule(tenantId, id, body) });
   });
 
-  app.delete('/api/v1/reports/schedules/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+  app.delete('/api/v1/report-definitions/schedules/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const { id } = Id.parse(request.params);
     return reply.send({ success: true, data: await reports.deleteSchedule(tenantId, id) });
+  });
+
+  app.get('/api/v1/reports/performance', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
+    const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+    const data = await reports.getPerformanceReport(tenantId);
+    return reply.send({ success: true, data });
+  });
+
+  app.get('/api/v1/reports/manager', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
+    const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+    const data = await reports.getManagerReport(tenantId);
+    return reply.send({ success: true, data });
   });
 }

@@ -1,38 +1,32 @@
-import Fastify from 'fastify';
-import fastifyJwt from '@fastify/jwt';
-import rateLimit from '@fastify/rate-limit';
-import { globalErrorHandler, startService } from '@nexus/service-utils';
+import { startTracing } from '@nexus/service-utils/tracing';
+import { createService, startService, globalErrorHandler } from '@nexus/service-utils';
 import { getPrisma } from './prisma.js';
 import { createKnowledgeService } from './services/knowledge.service.js';
-import { registerKnowledgeRoutes } from './routes/knowledge.routes.js';
+import { registerRoutes } from './routes/index.js';
+import { registerGraphQL } from './graphql/index.js';
 
-const app = Fastify({ logger: true });
-const prisma = getPrisma();
-await app.register(fastifyJwt, { secret: process.env.JWT_SECRET ?? 'nexus-development-secret-at-least-32' });
-await app.register(rateLimit, {
-  global: true,
-  max: 300,
-  timeWindow: '1 minute',
-  errorResponseBuilder: (_req, context) => ({
-    success: false,
-    error: 'RATE_LIMIT_EXCEEDED',
-    message: `Too many requests. Retry after ${context.after}.`,
-  }),
+startTracing({ serviceName: 'knowledge-service' });
+const port = parseInt(process.env.PORT ?? '3023', 10);
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret || jwtSecret.length < 32) {
+  throw new Error('JWT_SECRET must be set to at least 32 characters.');
+}
+
+const app = await createService({
+  name: 'knowledge-service',
+  port,
+  jwtSecret,
+  corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(',').map((s) => s.trim()),
 });
+
+const prisma = getPrisma();
+
 app.setErrorHandler(globalErrorHandler);
 
-app.addHook('onRequest', async (request, reply) => {
-  try {
-    await request.jwtVerify();
-  } catch {
-    return reply.code(401).send({ success: false, error: 'Unauthorized' });
-  }
-});
-
 const knowledgeSvc = createKnowledgeService(prisma);
-await registerKnowledgeRoutes(app, knowledgeSvc);
 
-const port = parseInt(process.env.PORT ?? '3023', 10);
+await registerGraphQL(app, prisma);
+
 await startService(app, port, async () => {
-  await prisma.$disconnect();
+  await registerRoutes(app, knowledgeSvc);
 });

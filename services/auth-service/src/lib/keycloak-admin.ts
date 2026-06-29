@@ -1,4 +1,10 @@
-import { ConflictError, ServiceUnavailableError } from '@nexus/service-utils';
+import {
+  ConflictError,
+  createHttpClient,
+  NexusError,
+  ServiceUnavailableError,
+  withResilience,
+} from '@nexus/service-utils';
 
 function keycloakBase(): string {
   const base = process.env.KEYCLOAK_URL?.replace(/\/$/, '');
@@ -10,6 +16,18 @@ function keycloakBase(): string {
 
 function targetRealm(): string {
   return process.env.KEYCLOAK_REALM ?? 'nexus';
+}
+
+function createAdminClient(token: string) {
+  const base = keycloakBase();
+  const realm = targetRealm();
+  return createHttpClient({
+    baseURL: `${base}/admin/realms/${realm}`,
+    headers: { Authorization: `Bearer ${token}` },
+    timeoutMs: 10000,
+    maxRetries: 3,
+    circuitBreaker: { failureThreshold: 5, resetTimeoutMs: 30000 },
+  });
 }
 
 /**
@@ -27,25 +45,33 @@ export async function getKeycloakAdminAccessToken(): Promise<string> {
     );
   }
   const tokenRealm = process.env.KEYCLOAK_ADMIN_TOKEN_REALM ?? targetRealm();
-  const tokenUrl = `${base}/realms/${tokenRealm}/protocol/openid-connect/token`;
+  const tokenClient = createHttpClient({
+    baseURL: `${base}/realms/${tokenRealm}`,
+    timeoutMs: 10000,
+    maxRetries: 3,
+    circuitBreaker: { failureThreshold: 5, resetTimeoutMs: 30000 },
+  });
   const body = new URLSearchParams({
     grant_type: 'client_credentials',
     client_id: clientId,
     client_secret: clientSecret,
   });
-  const res = await fetch(tokenUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
-  if (!res.ok) {
-    throw new ServiceUnavailableError(`Keycloak Admin token: HTTP ${res.status}`);
+  try {
+    const json = await tokenClient.post<{ access_token?: string }>(
+      '/protocol/openid-connect/token',
+      body.toString(),
+      { 'Content-Type': 'application/x-www-form-urlencoded' }
+    );
+    if (!json.access_token) {
+      throw new ServiceUnavailableError('Keycloak Admin token: missing access_token');
+    }
+    return json.access_token;
+  } catch (err) {
+    if (err instanceof NexusError) {
+      throw new ServiceUnavailableError(`Keycloak Admin token: HTTP ${err.statusCode}`);
+    }
+    throw err;
   }
-  const json = (await res.json()) as { access_token?: string };
-  if (!json.access_token) {
-    throw new ServiceUnavailableError('Keycloak Admin token: missing access_token');
-  }
-  return json.access_token;
 }
 
 /**
@@ -61,21 +87,29 @@ export async function createKeycloakRealmUser(input: {
   const realm = targetRealm();
   const token = await getKeycloakAdminAccessToken();
   const url = `${base}/admin/realms/${realm}/users`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      username: input.username ?? input.email,
-      email: input.email,
-      firstName: input.firstName,
-      lastName: input.lastName,
-      enabled: true,
-      emailVerified: false,
-    }),
-  });
+  const res = await withResilience(
+    () =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: input.username ?? input.email,
+          email: input.email,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          enabled: true,
+          emailVerified: false,
+        }),
+      }),
+    {
+      timeoutMs: 10000,
+      maxRetries: 3,
+      circuitBreaker: { failureThreshold: 5, resetTimeoutMs: 30000 },
+    }
+  );
   if (res.status === 409) {
     throw new ConflictError('User', 'email');
   }
@@ -99,13 +133,44 @@ export async function createKeycloakRealmUser(input: {
  * Deletes a user from Keycloak (compensating transaction).
  */
 export async function deleteKeycloakRealmUser(keycloakUserId: string): Promise<void> {
-  const base = keycloakBase();
-  const realm = targetRealm();
   const token = await getKeycloakAdminAccessToken();
-  const url = `${base}/admin/realms/${realm}/users/${encodeURIComponent(keycloakUserId)}`;
-  const res = await fetch(url, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok && res.status !== 404) {
-    throw new ServiceUnavailableError(`Keycloak delete user: HTTP ${res.status}`);
+  const client = createAdminClient(token);
+  try {
+    await client.delete(`/users/${encodeURIComponent(keycloakUserId)}`);
+  } catch (err) {
+    if (err instanceof NexusError && err.statusCode === 404) {
+      return;
+    }
+    throw new ServiceUnavailableError(
+      `Keycloak delete user: HTTP ${err instanceof NexusError ? err.statusCode : 'unknown'}`
+    );
+  }
+}
+
+/**
+ * Sets a user's password in Keycloak (best-effort; ignores 404).
+ */
+export async function setKeycloakUserPassword(
+  keycloakUserId: string,
+  password: string,
+  temporary = false
+): Promise<void> {
+  const token = await getKeycloakAdminAccessToken();
+  const client = createAdminClient(token);
+  try {
+    await client.put(`/users/${encodeURIComponent(keycloakUserId)}/reset-password`, {
+      type: 'password',
+      value: password,
+      temporary,
+    });
+  } catch (err) {
+    if (err instanceof NexusError && err.statusCode === 404) {
+      return;
+    }
+    if (err instanceof NexusError) {
+      throw new ServiceUnavailableError(`Keycloak set password: HTTP ${err.statusCode}`);
+    }
+    throw err;
   }
 }
 
@@ -116,27 +181,20 @@ export async function setKeycloakRealmUserEnabled(
   keycloakUserId: string,
   enabled: boolean
 ): Promise<void> {
-  const base = keycloakBase();
-  const realm = targetRealm();
   const token = await getKeycloakAdminAccessToken();
-  const url = `${base}/admin/realms/${realm}/users/${encodeURIComponent(keycloakUserId)}`;
-  const getRes = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (getRes.status === 404) {
-    return;
-  }
-  if (!getRes.ok) {
-    throw new ServiceUnavailableError(`Keycloak get user: HTTP ${getRes.status}`);
-  }
-  const user = (await getRes.json()) as Record<string, unknown>;
-  const putRes = await fetch(url, {
-    method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ ...user, enabled }),
-  });
-  if (!putRes.ok) {
-    throw new ServiceUnavailableError(`Keycloak update user: HTTP ${putRes.status}`);
+  const client = createAdminClient(token);
+  try {
+    const user = await client.get<Record<string, unknown>>(
+      `/users/${encodeURIComponent(keycloakUserId)}`
+    );
+    await client.put(`/users/${encodeURIComponent(keycloakUserId)}`, { ...user, enabled });
+  } catch (err) {
+    if (err instanceof NexusError && err.statusCode === 404) {
+      return;
+    }
+    if (err instanceof NexusError) {
+      throw new ServiceUnavailableError(`Keycloak get user: HTTP ${err.statusCode}`);
+    }
+    throw err;
   }
 }

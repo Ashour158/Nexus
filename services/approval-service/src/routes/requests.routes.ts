@@ -37,7 +37,7 @@ export async function registerRequestsRoutes(
     { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
     async (request, reply) => {
       const q = QuerySchema.parse(request.query);
-      const user = request.user as { tenantId: string };
+      const user = (request as any).user as { tenantId: string };
       const data = await requests.listRequests(
         user.tenantId,
         q.module,
@@ -55,7 +55,7 @@ export async function registerRequestsRoutes(
     { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
     async (request, reply) => {
       const q = QuerySchema.parse(request.query);
-      const user = request.user as { tenantId: string; sub: string };
+      const user = (request as any).user as { tenantId: string; sub: string };
       const data = await requests.listMyPendingRequests(
         user.tenantId,
         user.sub,
@@ -71,12 +71,12 @@ export async function registerRequestsRoutes(
     { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) },
     async (request, reply) => {
       const body = CreateSchema.parse(request.body);
-      const user = request.user as { tenantId: string; sub: string };
+      const user = (request as any).user as { tenantId: string; sub: string };
       const policyId =
         body.policyId ??
         (await policies.findMatchingPolicy(user.tenantId, body.module, body.data))?.id;
       if (!policyId) {
-        return reply.code(404).send({ success: false, error: 'No matching policy' });
+        return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'No matching policy', requestId: request.id } });
       }
       const data = await requests.createRequest(
         user.tenantId,
@@ -86,7 +86,7 @@ export async function registerRequestsRoutes(
         body.requestedBy ?? user.sub,
         body.data
       );
-      if (!data) return reply.code(404).send({ success: false, error: 'Policy not found' });
+      if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Policy not found', requestId: request.id } });
       return reply.code(201).send({ success: true, data });
     }
   );
@@ -96,9 +96,9 @@ export async function registerRequestsRoutes(
     { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
     async (request, reply) => {
       const { id } = IdSchema.parse(request.params);
-      const user = request.user as { tenantId: string };
+      const user = (request as any).user as { tenantId: string };
       const data = await requests.getRequest(user.tenantId, id);
-      if (!data) return reply.code(404).send({ success: false, error: 'Not found' });
+      if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found', requestId: request.id } });
       return reply.send({ success: true, data });
     }
   );
@@ -109,9 +109,9 @@ export async function registerRequestsRoutes(
     async (request, reply) => {
       const { id } = IdSchema.parse(request.params);
       const body = CommentSchema.parse(request.body);
-      const user = request.user as { tenantId: string; sub: string };
+      const user = (request as any).user as { tenantId: string; sub: string };
       const data = await requests.approve(user.tenantId, id, user.sub, body.comment);
-      if (!data) return reply.code(404).send({ success: false, error: 'Not found or not approver' });
+      if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found or not approver', requestId: request.id } });
       return reply.send({ success: true, data });
     }
   );
@@ -122,9 +122,9 @@ export async function registerRequestsRoutes(
     async (request, reply) => {
       const { id } = IdSchema.parse(request.params);
       const body = RejectSchema.parse(request.body);
-      const user = request.user as { tenantId: string; sub: string };
+      const user = (request as any).user as { tenantId: string; sub: string };
       const data = await requests.reject(user.tenantId, id, user.sub, body.comment);
-      if (!data) return reply.code(404).send({ success: false, error: 'Not found or not approver' });
+      if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found or not approver', requestId: request.id } });
       return reply.send({ success: true, data });
     }
   );
@@ -134,14 +134,14 @@ export async function registerRequestsRoutes(
     { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) },
     async (request, reply) => {
       const { id } = IdSchema.parse(request.params);
-      const user = request.user as { tenantId: string; sub: string; roles?: string[] };
+      const user = (request as any).user as { tenantId: string; sub: string; roles?: string[] };
       const data = await requests.cancel(
         user.tenantId,
         id,
         user.sub,
         Array.isArray(user.roles) && user.roles.includes('ADMIN')
       );
-      if (!data) return reply.code(404).send({ success: false, error: 'Not found or forbidden' });
+      if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found or forbidden', requestId: request.id } });
       return reply.send({ success: true, data });
     }
   );

@@ -1,0 +1,204 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  customFieldDefinitions(limit: Int, offset: Int, entityType: String): [CustomFieldDefinition!]!
+  customFieldDefinition(id: ID!): CustomFieldDefinition
+  fieldPermissions(limit: Int, offset: Int): [FieldPermission!]!
+  fieldPermission(id: ID!): FieldPermission
+  validationRules(limit: Int, offset: Int, objectType: String): [ValidationRule!]!
+  validationRule(id: ID!): ValidationRule
+  fieldChangeLogs(limit: Int, offset: Int): [FieldChangeLog!]!
+  fieldChangeLog(id: ID!): FieldChangeLog
+  duplicateGroups(limit: Int, offset: Int): [DuplicateGroup!]!
+  duplicateGroup(id: ID!): DuplicateGroup
+  tags(limit: Int, offset: Int, entityType: String): [Tag!]!
+  tag(id: ID!): Tag
+}
+
+type Mutation {
+  createCustomFieldDefinition(input: CreateCustomFieldDefinitionInput!): CustomFieldDefinition!
+  updateCustomFieldDefinition(id: ID!, input: UpdateCustomFieldDefinitionInput!): CustomFieldDefinition!
+  deleteCustomFieldDefinition(id: ID!): Boolean!
+  createFieldPermission(input: CreateFieldPermissionInput!): FieldPermission!
+  deleteFieldPermission(id: ID!): Boolean!
+  createValidationRule(input: CreateValidationRuleInput!): ValidationRule!
+  updateValidationRule(id: ID!, input: UpdateValidationRuleInput!): ValidationRule!
+  deleteValidationRule(id: ID!): Boolean!
+  createFieldChangeLog(input: CreateFieldChangeLogInput!): FieldChangeLog!
+  createDuplicateGroup(input: CreateDuplicateGroupInput!): DuplicateGroup!
+  updateDuplicateGroup(id: ID!, input: UpdateDuplicateGroupInput!): DuplicateGroup!
+  deleteDuplicateGroup(id: ID!): Boolean!
+  createTag(input: CreateTagInput!): Tag!
+  updateTag(id: ID!, input: UpdateTagInput!): Tag!
+  deleteTag(id: ID!): Boolean!
+}
+
+type CustomFieldDefinition @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  entityType: String!
+  name: String!
+  apiKey: String!
+  fieldType: String!
+  options: JSON!
+  required: Boolean!
+  showOnCard: Boolean!
+  position: Int!
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type FieldPermission @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  objectType: String!
+  fieldName: String!
+  allowedRoles: JSON!
+  createdAt: DateTime!
+}
+
+type ValidationRule @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  objectType: String!
+  name: String!
+  condition: JSON!
+  requirement: JSON!
+  errorMessage: String!
+  isActive: Boolean!
+  createdAt: DateTime!
+}
+
+type FieldChangeLog @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  objectType: String!
+  objectId: String!
+  fieldName: String!
+  oldValue: String
+  newValue: String
+  changedBy: String!
+  changedByName: String
+  changedAt: DateTime!
+}
+
+type DuplicateGroup @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  entityType: String!
+  status: String!
+  masterRecordId: String
+  createdAt: DateTime!
+  resolvedAt: DateTime
+  resolvedBy: String
+  records: [DuplicateRecord!]!
+}
+
+type DuplicateRecord @key(fields: "id") {
+  id: ID!
+  groupId: String!
+  group: DuplicateGroup
+  recordId: String!
+  score: Float!
+  isMaster: Boolean!
+  snapshot: JSON!
+}
+
+type Tag @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  color: String!
+  entityType: String
+  usageCount: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+input CreateCustomFieldDefinitionInput {
+  tenantId: String!
+  entityType: String!
+  name: String!
+  apiKey: String!
+  fieldType: String!
+  options: JSON
+  required: Boolean
+  showOnCard: Boolean
+  position: Int
+}
+
+input UpdateCustomFieldDefinitionInput {
+  name: String
+  fieldType: String
+  options: JSON
+  required: Boolean
+  showOnCard: Boolean
+  position: Int
+  isActive: Boolean
+}
+
+input CreateFieldPermissionInput {
+  tenantId: String!
+  objectType: String!
+  fieldName: String!
+  allowedRoles: JSON!
+}
+
+input CreateValidationRuleInput {
+  tenantId: String!
+  objectType: String!
+  name: String!
+  condition: JSON!
+  requirement: JSON!
+  errorMessage: String!
+}
+
+input UpdateValidationRuleInput {
+  name: String
+  condition: JSON
+  requirement: JSON
+  errorMessage: String
+  isActive: Boolean
+}
+
+input CreateFieldChangeLogInput {
+  tenantId: String!
+  objectType: String!
+  objectId: String!
+  fieldName: String!
+  oldValue: String
+  newValue: String
+  changedBy: String!
+  changedByName: String
+}
+
+input CreateDuplicateGroupInput {
+  tenantId: String!
+  entityType: String!
+  masterRecordId: String
+}
+
+input UpdateDuplicateGroupInput {
+  status: String
+  masterRecordId: String
+  resolvedAt: DateTime
+  resolvedBy: String
+}
+
+input CreateTagInput {
+  tenantId: String!
+  name: String!
+  color: String
+  entityType: String
+}
+
+input UpdateTagInput {
+  name: String
+  color: String
+  entityType: String
+}

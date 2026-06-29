@@ -12,7 +12,7 @@ function buildPrismaMock() {
       count: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
-      delete: vi.fn(),
+      updateMany: vi.fn(),
     },
     deal: { findFirst: vi.fn() },
     contact: { findFirst: vi.fn() },
@@ -98,10 +98,12 @@ describe('createNotesService', () => {
   });
 
   describe('deleteNote', () => {
-    it('hard-deletes the note row', async () => {
+    it('soft-deletes the note row', async () => {
       prisma.note.findFirst.mockResolvedValue(makeNote({ authorId: 'user_1' }));
       await service.deleteNote(TENANT, 'note_1', 'user_1');
-      expect(prisma.note.delete).toHaveBeenCalledWith({ where: { id: 'note_1' } });
+      expect(prisma.note.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'note_1' }, data: expect.objectContaining({ deletedAt: expect.any(Date) }) })
+      );
     });
 
     it('throws ForbiddenError when non-author non-admin attempts delete', async () => {

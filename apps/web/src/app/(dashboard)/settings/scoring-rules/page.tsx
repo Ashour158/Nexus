@@ -22,26 +22,67 @@ const SIGNAL_OPTIONS = [
   'recency_decay',
 ];
 
+const DEV_SCORING_RULES: ScoringRule[] =
+  process.env.NODE_ENV === 'development'
+    ? [
+        {
+          id: 'score-meeting-booked',
+          name: 'Meeting booked',
+          signal: 'meeting_booked',
+          points: 25,
+          isActive: true,
+        },
+        {
+          id: 'score-demo-requested',
+          name: 'Demo requested',
+          signal: 'demo_requested',
+          points: 35,
+          isActive: true,
+        },
+        {
+          id: 'score-recency-decay',
+          name: 'Inactive lead decay',
+          signal: 'recency_decay',
+          points: -10,
+          isActive: true,
+        },
+      ]
+    : [];
+
 export default function ScoringRulesPage() {
-  const [rules, setRules] = useState<ScoringRule[]>([]);
+  const [rules, setRules] = useState<ScoringRule[]>(DEV_SCORING_RULES);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', signal: 'email_opened', points: 5 });
 
   const fetchRules = () =>
     fetch('/api/crm/scoring-rules')
-      .then((r) => r.json())
-      .then((d) => setRules(d.data || []));
+      .then((r) => {
+        if (!r.ok) throw new Error(`Scoring rules request failed (${r.status})`);
+        return r.json();
+      })
+      .then((d) => {
+        setRules(Array.isArray(d.data) ? d.data : []);
+        setError(null);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Unable to load scoring rules');
+      });
 
   useEffect(() => {
     void fetchRules();
   }, []);
 
   const handleCreate = async () => {
-    await fetch('/api/crm/scoring-rules', {
+    const res = await fetch('/api/crm/scoring-rules', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
     });
+    if (!res.ok) {
+      setError(`Unable to create rule (${res.status})`);
+      return;
+    }
     setShowForm(false);
     setForm({ name: '', signal: 'email_opened', points: 5 });
     void fetchRules();
@@ -75,6 +116,12 @@ export default function ScoringRulesPage() {
           + Add Rule
         </Button>
       </div>
+
+      {error ? (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {error}
+        </div>
+      ) : null}
 
       {showForm ? (
         <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-slate-700 dark:bg-slate-900">
@@ -155,6 +202,13 @@ export default function ScoringRulesPage() {
                 </td>
               </tr>
             ))}
+            {rules.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-500 dark:text-slate-400">
+                  No scoring rules configured yet.
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>

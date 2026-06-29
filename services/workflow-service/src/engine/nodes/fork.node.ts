@@ -41,33 +41,39 @@ export async function handleForkNode(
     },
   });
 
-  // Spawn one child execution per branch and publish a start event for each
-  for (const branchNodeId of branches) {
-    const child = await prisma.workflowExecution.create({
-      data: {
-        tenantId: context.tenantId,
-        workflowId: context.workflowId,
-        triggerType: 'BRANCH',
-        triggerPayload: context.triggerPayload as object,
-        status: 'RUNNING',
-        currentNodeId: branchNodeId,
-        parentExecId: context.executionId,
-        parentForkId: node.id,
-      },
-    });
-
-    await producer
-      .publish(TOPICS.WORKFLOWS, {
-        type: 'workflow.branch.start',
-        tenantId: context.tenantId,
-        payload: {
-          executionId: child.id,
-          parentExecutionId: context.executionId,
-          branchNodeId,
+  // Spawn all child executions in parallel to reduce latency under load
+  const children = await Promise.all(
+    branches.map((branchNodeId) =>
+      prisma.workflowExecution.create({
+        data: {
+          tenantId: context.tenantId,
+          workflowId: context.workflowId,
+          triggerType: 'BRANCH',
+          triggerPayload: context.triggerPayload as object,
+          status: 'RUNNING',
+          currentNodeId: branchNodeId,
+          parentExecId: context.executionId,
+          parentForkId: node.id,
         },
       })
-      .catch(() => undefined); // Non-fatal: child row already persisted
-  }
+    )
+  );
+
+  await Promise.all(
+    children.map((child, i) =>
+      producer
+        .publish(TOPICS.WORKFLOWS, {
+          type: 'workflow.branch.start',
+          tenantId: context.tenantId,
+          payload: {
+            executionId: child.id,
+            parentExecutionId: context.executionId,
+            branchNodeId: branches[i],
+          },
+        })
+        .catch(() => undefined)
+    )
+  );
 
   // Pause the parent for up to 24 h; executor will resume it at joinNodeId
   const pauseUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);

@@ -3,7 +3,7 @@ import type { JwtPayload } from '@nexus/shared-types';
 import { PERMISSIONS, requirePermission, ValidationError } from '@nexus/service-utils';
 import { CreateApiKeySchema, IdParamSchema, PaginationSchema } from '@nexus/validation';
 import type { AuthPrisma } from '../prisma.js';
-import { toPaginatedResult } from '../lib/pagination.js';
+import { toPaginatedResult } from '@nexus/shared-types';
 import { randomToken, sha256Hex } from '../lib/crypto-utils.js';
 
 /**
@@ -85,7 +85,7 @@ export async function registerApiKeysRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
-          await prisma.apiKey.delete({ where: { id } });
+          await prisma.apiKey.delete({ where: { id, tenantId: jwt.tenantId } });
           await prisma.auditLog.create({
             data: {
               tenantId: jwt.tenantId,

@@ -20,11 +20,14 @@ const SIZE_CLASSES: Record<NonNullable<ModalProps['size']>, string> = {
 
 export function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
     const el = containerRef.current;
     if (!el) return;
+
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
 
     const focusable = el.querySelectorAll<HTMLElement>(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -53,6 +56,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
     return () => {
       document.removeEventListener('keydown', trap);
       document.removeEventListener('keydown', escape);
+      previousFocusRef.current?.focus();
     };
   }, [open, onClose]);
 

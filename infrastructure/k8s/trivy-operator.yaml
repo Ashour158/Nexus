@@ -1,0 +1,35 @@
+apiVersion: aquasecurity.github.io/v1alpha1
+kind: ClusterScanTemplate
+metadata:
+  name: trivy-image-scan
+  namespace: trivy-system
+spec:
+  ttlSecondsAfterFinished: 3600
+  scanTemplate:
+    spec:
+      containers:
+        - name: trivy
+          image: aquasec/trivy:0.52
+          command:
+            - trivy
+            - image
+            - --severity
+            - HIGH,CRITICAL
+            - --exit-code
+            - "1"
+            - $(IMAGE)
+      restartPolicy: Never
+---
+apiVersion: aquasecurity.github.io/v1alpha1
+kind: ClusterScanPolicy
+metadata:
+  name: scan-on-deploy
+  namespace: trivy-system
+spec:
+  trigger:
+    schedule: "0 2 * * *"
+  scanTemplateRef:
+    name: trivy-image-scan
+  rules:
+    - imagePattern: "*"
+      severity: HIGH

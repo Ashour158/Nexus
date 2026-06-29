@@ -129,7 +129,7 @@ export function CommandPalette({ open, onClose }: Props): JSX.Element | null {
         onClick={onClose}
         className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm"
       />
-      <div className="fixed left-1/2 top-24 z-50 w-full max-w-xl -translate-x-1/2 rounded-xl border border-slate-200 bg-white shadow-2xl">
+      <div className="fixed start-1/2 top-24 z-50 w-full max-w-xl -translate-x-1/2 rounded-xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
           <SearchIcon size={16} className="shrink-0 text-slate-400" />
           <input
@@ -164,7 +164,7 @@ export function CommandPalette({ open, onClose }: Props): JSX.Element | null {
             <div className="px-4 py-6 text-center text-sm text-slate-400">Searching...</div>
           ) : results.length === 0 ? (
             <div className="px-4 py-6 text-center text-sm text-slate-400">
-              No results for "{query}"
+              No results for &quot;{query}&quot;
             </div>
           ) : (
             <>

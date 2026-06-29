@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "@nexus/email-sync-service",
   "version": "1.0.0",
   "private": true,
@@ -9,7 +9,8 @@
     "start": "node dist/index.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@fastify/jwt": "^8.0.0",
@@ -17,12 +18,20 @@
     "@nexus/service-utils": "workspace:*",
     "@prisma/client": "^5.22.0",
     "fastify": "^4.28.1",
-    "googleapis": "^140.0.1"
+    "googleapis": "^140.0.1",
+    "@nexus/validation": "workspace:*",
+    "@nexus/kafka": "workspace:*",
+    "@fastify/swagger": "^9.0.0",
+    "@fastify/swagger-ui": "^5.0.0",
+    "graphql": "^16.13.2",
+    "graphql-yoga": "^5.21.0",
+    "@apollo/subgraph": "^2.13.3",
+    "dataloader": "^2.2.3"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "prisma": "^5.22.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.6.3"
+    "typescript": "^5.5.3"
   }
 }

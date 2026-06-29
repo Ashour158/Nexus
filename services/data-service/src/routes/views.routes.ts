@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
 import type { DataPrisma } from '../prisma.js';
 import { createViewsService } from '../services/views.service.js';
 
@@ -20,37 +21,37 @@ const UpdateViewSchema = CreateViewSchema.partial();
 export async function registerViewsRoutes(app: FastifyInstance, prisma: DataPrisma) {
   const service = createViewsService(prisma);
 
-  app.get('/api/v1/views/:module', async (request, reply) => {
+  app.get('/api/v1/views/:module', { preHandler: requirePermission(PERMISSIONS.DATA.READ) }, async (request, reply) => {
     const { module } = ModuleParams.parse(request.params);
-    const user = request.user as { tenantId: string; sub?: string; userId?: string };
+    const user = (request as any).user as { tenantId: string; sub?: string; userId?: string };
     const userId = user.userId ?? user.sub ?? '';
     const data = await service.listViews(user.tenantId, userId, module);
     return reply.send({ success: true, data });
   });
 
-  app.post('/api/v1/views/:module', async (request, reply) => {
+  app.post('/api/v1/views/:module', { preHandler: requirePermission(PERMISSIONS.DATA.UPDATE) }, async (request, reply) => {
     const { module } = ModuleParams.parse(request.params);
     const body = CreateViewSchema.parse(request.body);
-    const user = request.user as { tenantId: string; sub?: string; userId?: string };
+    const user = (request as any).user as { tenantId: string; sub?: string; userId?: string };
     const userId = user.userId ?? user.sub ?? '';
     const data = await service.createView(user.tenantId, userId, module, body);
     return reply.code(201).send({ success: true, data });
   });
 
-  app.patch('/api/v1/views/:id', async (request, reply) => {
+  app.patch('/api/v1/views/:id', { preHandler: requirePermission(PERMISSIONS.DATA.UPDATE) }, async (request, reply) => {
     const { id } = IdParams.parse(request.params);
     const body = UpdateViewSchema.parse(request.body);
-    const user = request.user as { tenantId: string };
+    const user = (request as any).user as { tenantId: string };
     const data = await service.updateView(user.tenantId, id, body);
-    if (!data) return reply.code(404).send({ success: false, error: 'Not found' });
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found', requestId: request.id } });
     return reply.send({ success: true, data });
   });
 
-  app.delete('/api/v1/views/:id', async (request, reply) => {
+  app.delete('/api/v1/views/:id', { preHandler: requirePermission(PERMISSIONS.DATA.UPDATE) }, async (request, reply) => {
     const { id } = IdParams.parse(request.params);
-    const user = request.user as { tenantId: string };
+    const user = (request as any).user as { tenantId: string };
     const data = await service.deleteView(user.tenantId, id);
-    if (!data) return reply.code(404).send({ success: false, error: 'Not found' });
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found', requestId: request.id } });
     return reply.send({ success: true, data });
   });
 }

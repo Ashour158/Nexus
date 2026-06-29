@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: falco-sidecar-config
+  namespace: nexus-monitoring
+data:
+  falco.yaml: |
+    stdout_output:
+      enabled: true
+    file_output:
+      enabled: true
+      filename: /var/log/falco/events.log
+    http_output:
+      enabled: true
+      url: http://alertmanager:9093
+  falco_rules.local.yaml: |
+    - rule: Write to /etc
+      desc: Detect writes to /etc directory
+      condition: write_etc_common
+      output: >
+        File write to /etc detected
+        (file=%fd.name user=%user.name container=%container.name)
+      priority: WARNING
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: falco
+  namespace: nexus-monitoring
+spec:
+  selector:
+    matchLabels:
+      app: falco
+  template:
+    metadata:
+      labels:
+        app: falco
+    spec:
+      containers:
+        - name: falco
+          image: falcosecurity/falco:0.38
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: config
+              mountPath: /etc/falco
+            - name: proc
+              mountPath: /host/proc
+              readOnly: true
+            - name: etc
+              mountPath: /host/etc
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: falco-sidecar-config
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: etc
+          hostPath:
+            path: /etc

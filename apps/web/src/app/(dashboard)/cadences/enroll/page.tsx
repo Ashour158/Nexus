@@ -19,7 +19,7 @@ export default function CadenceEnrollPage() {
     if (emailList.length === 0) { notify.error('Add at least one email'); return; }
     setSubmitting(true);
     try {
-      await apiClients.cadences.post(`/${cadenceId}/enroll`, { emails: emailList, startStep });
+      await apiClients.cadence.post(`/${cadenceId}/enroll`, { emails: emailList, startStep });
       setDone(true);
       notify.success(`${emailList.length} contact(s) queued for enrollment`);
     } catch {

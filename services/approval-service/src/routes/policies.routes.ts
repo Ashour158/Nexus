@@ -22,7 +22,7 @@ export async function registerPoliciesRoutes(app: FastifyInstance, prisma: Appro
     { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
     async (request, reply) => {
       const q = QuerySchema.parse(request.query);
-      const user = request.user as { tenantId: string };
+      const user = (request as any).user as { tenantId: string };
       const data = await service.listPolicies(user.tenantId, q.module);
       return reply.send({ success: true, data });
     }
@@ -33,7 +33,7 @@ export async function registerPoliciesRoutes(app: FastifyInstance, prisma: Appro
     { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) },
     async (request, reply) => {
       const body = PolicySchema.parse(request.body);
-      const user = request.user as { tenantId: string };
+      const user = (request as any).user as { tenantId: string };
       const data = await service.createPolicy(user.tenantId, body);
       return reply.code(201).send({ success: true, data });
     }
@@ -45,9 +45,9 @@ export async function registerPoliciesRoutes(app: FastifyInstance, prisma: Appro
     async (request, reply) => {
       const { id } = IdSchema.parse(request.params);
       const body = PolicySchema.partial().parse(request.body);
-      const user = request.user as { tenantId: string };
+      const user = (request as any).user as { tenantId: string };
       const data = await service.updatePolicy(user.tenantId, id, body);
-      if (!data) return reply.code(404).send({ success: false, error: 'Not found' });
+      if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found', requestId: request.id } });
       return reply.send({ success: true, data });
     }
   );
@@ -57,9 +57,9 @@ export async function registerPoliciesRoutes(app: FastifyInstance, prisma: Appro
     { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) },
     async (request, reply) => {
       const { id } = IdSchema.parse(request.params);
-      const user = request.user as { tenantId: string };
+      const user = (request as any).user as { tenantId: string };
       const data = await service.deletePolicy(user.tenantId, id);
-      if (!data) return reply.code(404).send({ success: false, error: 'Not found' });
+      if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found', requestId: request.id } });
       return reply.send({ success: true, data });
     }
   );

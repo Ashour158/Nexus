@@ -46,7 +46,7 @@ export async function registerEmailThreadsRoutes(app: FastifyInstance, prisma: C
             where: { tenantId: jwt.tenantId, id },
             include: { messages: { orderBy: { sentAt: 'desc' } } },
           });
-          if (!data) return reply.code(404).send({ success: false, error: 'Not found' });
+          if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found', requestId: request.id } });
           return reply.send({ success: true, data });
         }
       );

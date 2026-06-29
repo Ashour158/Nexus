@@ -1,0 +1,6 @@
+apiVersion: v2
+name: nexus-blueprint
+description: A Helm chart for nexus-blueprint microservice
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

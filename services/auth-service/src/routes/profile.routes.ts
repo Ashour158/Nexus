@@ -70,7 +70,7 @@ export async function registerProfileRoutes(app: FastifyInstance, prisma: AuthPr
       }
       const prismaAny = prisma as any;
       const user = await prismaAny.user.update({
-        where: { id: jwt.sub },
+        where: { id_tenantId: { id: jwt.sub, tenantId: jwt.tenantId } },
         data: {
           ...userUpdates,
           profile: {
@@ -99,7 +99,7 @@ export async function registerProfileRoutes(app: FastifyInstance, prisma: AuthPr
       }
       const prismaAny = prisma as any;
       const user = await prismaAny.user.update({
-        where: { id },
+        where: { id_tenantId: { id, tenantId: jwt.tenantId } },
         data: {
           ...userUpdates,
           profile: {
@@ -118,7 +118,9 @@ export async function registerProfileRoutes(app: FastifyInstance, prisma: AuthPr
       const jwt = (req as any).user as JwtPayload;
       const { avatarUrl } = req.body as { avatarUrl?: string };
       if (!avatarUrl) return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'avatarUrl required', requestId: req.id } });
-      await (prisma as any).user.update({ where: { id: jwt.sub }, data: { avatarUrl } });
+      const urlSchema = z.string().url().max(2048);
+      const validatedUrl = urlSchema.parse(avatarUrl);
+      await (prisma as any).user.update({ where: { id_tenantId: { id: jwt.sub, tenantId: jwt.tenantId } }, data: { avatarUrl: validatedUrl } });
       return reply.send({ success: true });
     });
 

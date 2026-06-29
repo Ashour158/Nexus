@@ -36,7 +36,7 @@
         "otpauth": "^9.3.6",
         "passport": "^0.7.0",
         "qrcode": "^1.5.4",
-        "@node-saml/passport-saml": "^4.0.5",
+        "@node-saml/passport-saml": "^5.1.0",
         "prom-client": "^15.1.0",
         "dataloader": "^2.2.3",
         "zod": "^3.23.8"

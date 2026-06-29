@@ -296,7 +296,7 @@ function SortableStageRow({
           onChange={(e) => onChange({ probability: Number(e.target.value) })}
           className="w-full accent-brand-600"
         />
-        <div className="text-right text-xs text-slate-600">{stage.probability}%</div>
+        <div className="text-end text-xs text-slate-600">{stage.probability}%</div>
       </div>
       <div>
         <label className="mb-1 block text-xs text-slate-500">Rotten days</label>

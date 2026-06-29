@@ -1,0 +1,96 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup-full
+  namespace: nexus
+spec:
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: pgbackrest
+              image: pgbackrest/pgbackrest:2.52
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  pgbackrest --stanza=nexus --type=full backup \
+                    && pgbackrest --stanza=nexus verify \
+                    && echo "Backup completed at $(date)"
+              env:
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backup-s3-credentials
+                      key: access-key
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backup-s3-credentials
+                      key: secret-key
+              volumeMounts:
+                - name: pgbackrest-config
+                  mountPath: /etc/pgbackrest
+                - name: postgres-data
+                  mountPath: /var/lib/postgresql/data
+                  readOnly: true
+          volumes:
+            - name: pgbackrest-config
+              configMap:
+                name: pgbackrest-config
+            - name: postgres-data
+              persistentVolumeClaim:
+                claimName: postgres-data-pvc
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup-incr
+  namespace: nexus
+spec:
+  schedule: "0 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: pgbackrest
+              image: pgbackrest/pgbackrest:2.52
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  pgbackrest --stanza=nexus --type=incr backup \
+                    && echo "Incremental backup completed at $(date)"
+              env:
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backup-s3-credentials
+                      key: access-key
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backup-s3-credentials
+                      key: secret-key
+              volumeMounts:
+                - name: pgbackrest-config
+                  mountPath: /etc/pgbackrest
+                - name: postgres-data
+                  mountPath: /var/lib/postgresql/data
+                  readOnly: true
+          volumes:
+            - name: pgbackrest-config
+              configMap:
+                name: pgbackrest-config
+            - name: postgres-data
+              persistentVolumeClaim:
+                claimName: postgres-data-pvc

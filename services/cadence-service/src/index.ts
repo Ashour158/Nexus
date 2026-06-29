@@ -1,46 +1,38 @@
-import Fastify from 'fastify';
-import fastifyJwt from '@fastify/jwt';
-import rateLimit from '@fastify/rate-limit';
+import { startTracing } from '@nexus/service-utils/tracing';
+import { createService, startService, globalErrorHandler } from '@nexus/service-utils';
 import { NexusConsumer, NexusProducer, TOPICS } from '@nexus/kafka';
-import { globalErrorHandler, startService } from '@nexus/service-utils';
 import { getPrisma } from './prisma.js';
 import { createCadencesService } from './services/cadences.service.js';
 import { createEnrollmentsService } from './services/enrollments.service.js';
 import { createQueueService } from './services/queue.service.js';
 import { registerCadencesRoutes } from './routes/cadences.routes.js';
 import { registerEnrollmentsRoutes } from './routes/enrollments.routes.js';
+import { registerGraphQL } from './graphql/index.js';
 
-const app = Fastify({ logger: true });
+startTracing({ serviceName: 'cadence-service' });
+const port = parseInt(process.env.PORT ?? '3018', 10);
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret || jwtSecret.length < 32) {
+  throw new Error('JWT_SECRET must be set to at least 32 characters.');
+}
+
+const app = await createService({
+  name: 'cadence-service',
+  port,
+  jwtSecret,
+  corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(',').map((s) => s.trim()),
+});
+
 const prisma = getPrisma();
 const producer = new NexusProducer('cadence-service');
 const consumer = new NexusConsumer('cadence-service-events');
 
-await app.register(fastifyJwt, { secret: process.env.JWT_SECRET ?? 'nexus-secret' });
-await app.register(rateLimit, {
-  global: true,
-  max: 300,
-  timeWindow: '1 minute',
-  errorResponseBuilder: (_req, context) => ({
-    success: false,
-    error: 'RATE_LIMIT_EXCEEDED',
-    message: `Too many requests. Retry after ${context.after}.`,
-  }),
-});
-app.setErrorHandler(globalErrorHandler);
-
-app.addHook('onRequest', async (request, reply) => {
-  try {
-    await request.jwtVerify();
-  } catch {
-    return reply.code(401).send({ success: false, error: 'Unauthorized' });
-  }
-});
-
 const cadences = createCadencesService(prisma);
 const enrollments = createEnrollmentsService(prisma, producer);
 const queue = createQueueService(prisma, producer);
-await registerCadencesRoutes(app, cadences);
-await registerEnrollmentsRoutes(app, enrollments);
+const stopQueueWorker = queue.startQueueWorker();
+
+app.setErrorHandler(globalErrorHandler);
 
 await producer.connect().catch(() => undefined);
 await consumer.subscribe([TOPICS.ACTIVITIES]).catch(() => undefined);
@@ -57,11 +49,14 @@ consumer.on('activity.completed', async (event) => {
 await consumer.start().catch(() => undefined);
 
 app.addHook('onClose', async () => {
+  stopQueueWorker();
   try { await producer.disconnect(); } catch { /* ignore */ }
-  try { await consumer.stop(); } catch { /* ignore */ }
+  try { await consumer.disconnect(); } catch { /* ignore */ }
 });
 
-const port = parseInt(process.env.PORT ?? '3018', 10);
+await registerGraphQL(app, prisma);
+
 await startService(app, port, async () => {
-  await prisma.$disconnect();
+  await registerCadencesRoutes(app, cadences);
+  await registerEnrollmentsRoutes(app, enrollments);
 });

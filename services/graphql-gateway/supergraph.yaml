@@ -1,0 +1,129 @@
+federation_version: 2
+
+subgraphs:
+  auth:
+    routing_url: http://auth-service:3000/graphql
+    schema:
+      file: ./schemas/auth.graphql
+
+  crm:
+    routing_url: http://crm-service:3001/graphql
+    schema:
+      file: ./schemas/crm.graphql
+
+  finance:
+    routing_url: http://finance-service:3002/graphql
+    schema:
+      file: ./schemas/finance.graphql
+
+  notification:
+    routing_url: http://notification-service:3003/graphql
+    schema:
+      file: ./schemas/notification.graphql
+
+  metadata:
+    routing_url: http://metadata-service:3004/graphql
+    schema:
+      file: ./schemas/metadata.graphql
+
+  realtime:
+    routing_url: http://realtime-service:3005/graphql
+    schema:
+      file: ./schemas/realtime.graphql
+
+  search:
+    routing_url: http://search-service:3006/graphql
+    schema:
+      file: ./schemas/search.graphql
+
+  workflow:
+    routing_url: http://workflow-service:3007/graphql
+    schema:
+      file: ./schemas/workflow.graphql
+
+  analytics:
+    routing_url: http://analytics-service:3008/graphql
+    schema:
+      file: ./schemas/analytics.graphql
+
+  comm:
+    routing_url: http://comm-service:3009/graphql
+    schema:
+      file: ./schemas/comm.graphql
+
+  storage:
+    routing_url: http://storage-service:3010/graphql
+    schema:
+      file: ./schemas/storage.graphql
+
+  integration:
+    routing_url: http://integration-service:3012/graphql
+    schema:
+      file: ./schemas/integration.graphql
+
+  blueprint:
+    routing_url: http://blueprint-service:3013/graphql
+    schema:
+      file: ./schemas/blueprint.graphql
+
+  approval:
+    routing_url: http://approval-service:3014/graphql
+    schema:
+      file: ./schemas/approval.graphql
+
+  data:
+    routing_url: http://data-service:3015/graphql
+    schema:
+      file: ./schemas/data.graphql
+
+  document:
+    routing_url: http://document-service:3016/graphql
+    schema:
+      file: ./schemas/document.graphql
+
+  chatbot:
+    routing_url: http://chatbot-service:3017/graphql
+    schema:
+      file: ./schemas/chatbot.graphql
+
+  cadence:
+    routing_url: http://cadence-service:3018/graphql
+    schema:
+      file: ./schemas/cadence.graphql
+
+  territory:
+    routing_url: http://territory-service:3019/graphql
+    schema:
+      file: ./schemas/territory.graphql
+
+  planning:
+    routing_url: http://planning-service:3020/graphql
+    schema:
+      file: ./schemas/planning.graphql
+
+  reporting:
+    routing_url: http://reporting-service:3021/graphql
+    schema:
+      file: ./schemas/reporting.graphql
+
+  portal:
+    routing_url: http://portal-service:3022/graphql
+    schema:
+      file: ./schemas/portal.graphql
+
+  knowledge:
+    routing_url: http://knowledge-service:3023/graphql
+    schema:
+      file: ./schemas/knowledge.graphql
+
+  incentive:
+    routing_url: http://incentive-service:3024/graphql
+    schema:
+      file: ./schemas/incentive.graphql
+
+  email-sync:
+    routing_url: http://email-sync-service:3026/graphql
+    schema:
+      file: ./schemas/email-sync.graphql
+
+

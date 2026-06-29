@@ -10,7 +10,7 @@ import {
 } from '@nexus/service-utils';
 import { CreateRoleSchema, IdParamSchema, PaginationSchema, UpdateRoleSchema } from '@nexus/validation';
 import type { AuthPrisma } from '../prisma.js';
-import { toPaginatedResult } from '../lib/pagination.js';
+import { toPaginatedResult } from '@nexus/shared-types';
 
 function allStaticPermissions(): string[] {
   const out = new Set<string>();
@@ -97,7 +97,8 @@ export async function registerRolesRoutes(
 
       r.get('/roles/:id', { preHandler: requirePermission('roles:read') }, async (request, reply) => {
         const { id } = IdParamSchema.parse(request.params);
-        const row = await prisma.role.findUnique({ where: { id } });
+        const jwt = request.user as JwtPayload;
+        const row = await prisma.role.findUnique({ where: { id, tenantId: jwt.tenantId } });
         if (!row) throw new NotFoundError('Role', id);
         return reply.send({ success: true, data: row });
       });
@@ -108,14 +109,14 @@ export async function registerRolesRoutes(
         if (!parsed.success) {
           throw new ValidationError('Invalid body', parsed.error.flatten());
         }
-        const existing = await prisma.role.findUnique({ where: { id } });
+        const jwt = request.user as JwtPayload;
+        const existing = await prisma.role.findUnique({ where: { id, tenantId: jwt.tenantId } });
         if (!existing) throw new NotFoundError('Role', id);
         if (existing.isSystem) {
           throw new BusinessRuleError('Cannot modify system role');
         }
-        const jwt = request.user as JwtPayload;
         const role = await prisma.role.update({
-          where: { id },
+          where: { id, tenantId: jwt.tenantId },
           data: parsed.data,
         });
         await prisma.auditLog.create({
@@ -135,13 +136,13 @@ export async function registerRolesRoutes(
 
       r.delete('/roles/:id', { preHandler: requirePermission('roles:delete') }, async (request, reply) => {
         const { id } = IdParamSchema.parse(request.params);
-        const existing = await prisma.role.findUnique({ where: { id } });
+        const jwt = request.user as JwtPayload;
+        const existing = await prisma.role.findUnique({ where: { id, tenantId: jwt.tenantId } });
         if (!existing) throw new NotFoundError('Role', id);
         if (existing.isSystem) {
           throw new BusinessRuleError('Cannot delete system role');
         }
-        const jwt = request.user as JwtPayload;
-        await prisma.role.delete({ where: { id } });
+        await prisma.role.delete({ where: { id, tenantId: jwt.tenantId } });
         await prisma.auditLog.create({
           data: {
             tenantId: jwt.tenantId,

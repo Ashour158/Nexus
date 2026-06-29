@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
 
 type Status = 'Active' | 'Suspended' | 'Invited';
@@ -27,19 +27,28 @@ export default function AdminUsersPage() {
     return () => clearTimeout(t);
   }, [qInput]);
 
-  function loadUsers() {
-    const params = new URLSearchParams({ q, tenant, role, status, page: String(page), limit: '50' });
+  const loadUsers = useCallback(() => {
+    const params = new URLSearchParams({
+      q,
+      tenant,
+      role,
+      status,
+      page: String(page),
+      limit: '50',
+    });
     return fetch(`/api/admin/users?${params.toString()}`, {
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
     })
       .then((r) => r.json())
       .then((json) => setResult(json))
-      .catch(() => setResult({ data: [], page: 1, limit: 50, total: 0, totalPages: 1 }));
-  }
+      .catch(() =>
+        setResult({ data: [], page: 1, limit: 50, total: 0, totalPages: 1 })
+      );
+  }, [accessToken, page, q, role, status, tenant]);
 
   useEffect(() => {
     void loadUsers();
-  }, [accessToken, page, q, role, status, tenant]);
+  }, [loadUsers]);
 
   const tenants = useMemo(() => Array.from(new Set((result?.data ?? []).map((u) => u.tenant))), [result?.data]);
 
@@ -151,7 +160,7 @@ export default function AdminUsersPage() {
       </div>
 
       <div className="flex items-center justify-between text-sm text-gray-400">
-        <span>Page {result?.page ?? page} of {result?.totalPages ?? 1} · {result?.total ?? 0} users</span>
+        <span>Page {result?.page ?? page} of {result?.totalPages ?? 1} Â {result?.total ?? 0} users</span>
         <div className="space-x-2">
           <button disabled={(result?.page ?? page) <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-gray-700 px-3 py-1 disabled:opacity-50">Prev</button>
           <button disabled={(result?.page ?? page) >= (result?.totalPages ?? 1)} onClick={() => setPage((p) => p + 1)} className="rounded border border-gray-700 px-3 py-1 disabled:opacity-50">Next</button>

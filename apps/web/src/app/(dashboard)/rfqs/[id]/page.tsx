@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { TableSkeleton } from '@/components/ui/skeleton';
@@ -18,6 +19,7 @@ export default function RFQDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = params?.id ?? '';
+  const [isHydrated, setIsHydrated] = useState(false);
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canRead = hasPermission('quotes:read');
   const detail = useRFQ(id);
@@ -25,6 +27,21 @@ export default function RFQDetailPage() {
   const convert = useConvertRFQToQuote();
 
   const rfq = detail.data;
+  const status = String(rfq?.status ?? '');
+  const canSubmitForReview = ['DRAFT', 'RETURNED'].includes(status);
+  const canConvertToQuote = ['READY_FOR_QUOTE', 'RESPONDED', 'REVIEWING'].includes(status);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  if (!isHydrated) {
+    return (
+      <main className="p-6">
+        <TableSkeleton rows={4} cols={4} />
+      </main>
+    );
+  }
 
   if (!canRead) {
     return (
@@ -44,11 +61,11 @@ export default function RFQDetailPage() {
     );
   }
 
-  if (!rfq) {
+  if (detail.isError || !rfq) {
     return (
       <main className="p-6">
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          RFQ not found.
+          {detail.error instanceof Error ? detail.error.message : 'RFQ not found.'}
         </div>
         <Link href="/rfqs" className="mt-2 inline-block text-sm underline">
           Back to RFQs
@@ -74,23 +91,26 @@ export default function RFQDetailPage() {
           <p className="text-sm text-slate-600">
             Status: <strong>{rfq.status}</strong> · {rfq.currency}
           </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Review lifecycle is controlled by finance-service transitions; this page only submits safe BFF actions.
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {rfq.status !== 'SENT' && rfq.status !== 'CONVERTED' && (
+          {canSubmitForReview && (
             <Button
               type="button"
               onClick={() =>
                 send.mutate(rfq.id, {
-                  onSuccess: () => notify.success('RFQ sent'),
-                  onError: (err) => notify.error('Send failed', err.message),
+                  onSuccess: () => notify.success('RFQ submitted for review'),
+                  onError: (err) => notify.error('Submit failed', err.message),
                 })
               }
               disabled={send.isPending}
             >
-              {send.isPending ? 'Sending…' : 'Send RFQ'}
+              {send.isPending ? 'Submitting...' : 'Submit for review'}
             </Button>
           )}
-          {rfq.status !== 'CONVERTED' && (
+          {canConvertToQuote && (
             <Button
               type="button"
               variant="secondary"
@@ -105,7 +125,12 @@ export default function RFQDetailPage() {
               }
               disabled={convert.isPending}
             >
-              {convert.isPending ? 'Converting…' : 'Convert to Quote'}
+              {convert.isPending ? 'Converting...' : 'Convert to quote'}
+            </Button>
+          )}
+          {!canConvertToQuote && rfq.status !== 'CONVERTED' && (
+            <Button type="button" variant="secondary" disabled title="RFQ must be ready for quote before conversion.">
+              Convert after review
             </Button>
           )}
           {rfq.convertedQuoteId && (
@@ -122,7 +147,7 @@ export default function RFQDetailPage() {
         <Metric label="RFQ Number" value={rfq.rfqNumber} />
         <Metric label="Status" value={rfq.status} />
         <Metric label="Currency" value={rfq.currency} />
-        <Metric label="Required By" value={rfq.requiredByDate ? formatDate(rfq.requiredByDate) : '—'} />
+        <Metric label="Required By" value={rfq.requiredByDate ? formatDate(rfq.requiredByDate) : '-'} />
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white">

@@ -1,0 +1,67 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resources
+spec:
+  validationFailureAction: enforce
+  rules:
+    - name: check-resources
+      match:
+        resources:
+          kinds:
+            - Deployment
+      validate:
+        message: "All containers must have resource limits and requests"
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - resources:
+                      limits:
+                        memory: "?*"
+                        cpu: "?*"
+                      requests:
+                        memory: "?*"
+                        cpu: "?*"
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-labels
+spec:
+  validationFailureAction: enforce
+  rules:
+    - name: check-labels
+      match:
+        resources:
+          kinds:
+            - Deployment
+            - Service
+            - ConfigMap
+      validate:
+        message: "All resources must have app.kubernetes.io/name and app.kubernetes.io/instance labels"
+        pattern:
+          metadata:
+            labels:
+              app.kubernetes.io/name: "?*"
+              app.kubernetes.io/instance: "?*"
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-image-registries
+spec:
+  validationFailureAction: enforce
+  rules:
+    - name: validate-registries
+      match:
+        resources:
+          kinds:
+            - Pod
+      validate:
+        message: "Only approved registries are allowed"
+        pattern:
+          spec:
+            containers:
+              - image: "nexus-crm/* | *.amazonaws.com/* | docker.io/library/*"

@@ -102,6 +102,7 @@ export const CreateDealSchema = z.object({
 export const UpdateDealSchema = CreateDealSchema.partial().extend({
   status: z.enum(['OPEN', 'WON', 'LOST', 'DORMANT']).optional(),
   lostReason: z.string().optional(),
+  closeReason: z.string().max(500).optional(),
   forecastCategory: z
     .enum(['PIPELINE', 'BEST_CASE', 'COMMIT', 'CLOSED', 'OMITTED'])
     .optional(),
@@ -157,21 +158,28 @@ const AccountTierEnum = z.enum([
   'ENTERPRISE',
   'STRATEGIC',
 ]);
-const AccountStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'CHURNED']);
+const AccountStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'AT_RISK', 'CHURNED']);
 
 export const CreateAccountSchema = z.object({
   name: z.string().min(1).max(200),
   ownerId: z.string().cuid(),
   parentAccountId: z.string().cuid().optional(),
+  code: z.string().max(100).optional(),
+  legalName: z.string().max(200).optional(),
+  tradeName: z.string().max(200).optional(),
   website: z.string().url().optional(),
   phone: z.string().max(30).optional(),
+  fax: z.string().max(30).optional(),
   email: z.string().email().optional(),
   industry: z.string().max(100).optional(),
+  subIndustry: z.string().max(100).optional(),
   type: AccountTypeEnum.default('PROSPECT'),
   tier: AccountTierEnum.default('SMB'),
   status: AccountStatusEnum.default('ACTIVE'),
+  lifecycleStage: z.string().max(50).optional(),
   annualRevenue: z.number().min(0).optional(),
   employeeCount: z.number().int().min(0).optional(),
+  foundedYear: z.number().int().min(1000).max(2100).optional(),
   country: z.string().max(100).optional(),
   city: z.string().max(100).optional(),
   address: z.string().max(500).optional(),
@@ -180,6 +188,36 @@ export const CreateAccountSchema = z.object({
   description: z.string().max(2000).optional(),
   sicCode: z.string().max(20).optional(),
   naicsCode: z.string().max(20).optional(),
+  taxId: z.string().max(50).optional(),
+  vatNumber: z.string().max(50).optional(),
+  commercialRegistrationNumber: z.string().max(50).optional(),
+  paymentTerms: z.string().max(100).optional(),
+  creditLimit: z.number().min(0).optional(),
+  currency: z.string().length(3).default('USD'),
+  priceBookId: z.string().cuid().optional(),
+  territoryId: z.string().cuid().optional(),
+  healthScore: z.number().int().min(0).max(100).optional(),
+  npsScore: z.number().int().min(-100).max(100).optional(),
+  riskLevel: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+  lastActivityAt: z.string().datetime().optional(),
+  billingAddressLine1: z.string().max(500).optional(),
+  billingAddressLine2: z.string().max(500).optional(),
+  billingCity: z.string().max(100).optional(),
+  billingState: z.string().max(100).optional(),
+  billingPostalCode: z.string().max(20).optional(),
+  billingCountry: z.string().max(100).optional(),
+  billingLatitude: z.number().min(-90).max(90).optional(),
+  billingLongitude: z.number().min(-180).max(180).optional(),
+  shippingAddressLine1: z.string().max(500).optional(),
+  shippingAddressLine2: z.string().max(500).optional(),
+  shippingCity: z.string().max(100).optional(),
+  shippingState: z.string().max(100).optional(),
+  shippingPostalCode: z.string().max(20).optional(),
+  shippingCountry: z.string().max(100).optional(),
+  shippingLatitude: z.number().min(-90).max(90).optional(),
+  shippingLongitude: z.number().min(-180).max(180).optional(),
+  shippingInstructions: z.string().max(1000).optional(),
+  sameAsBilling: z.boolean().optional(),
   customFields: z.record(z.unknown()).default({}),
   tags: z.array(z.string()).default([]),
 });
@@ -226,7 +264,7 @@ export const CreateContactSchema = z.object({
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
   ownerId: z.string().cuid(),
-  accountId: z.string().cuid().optional(),
+  accountId: z.string().cuid(),
   email: z.string().email().optional(),
   phone: z.string().max(30).optional(),
   mobile: z.string().max(30).optional(),
@@ -242,6 +280,7 @@ export const CreateContactSchema = z.object({
   doNotEmail: z.boolean().optional(),
   doNotCall: z.boolean().optional(),
   gdprConsent: z.boolean().optional(),
+  code: z.string().max(100).optional(),
   customFields: z.record(z.unknown()).default({}),
   tags: z.array(z.string()).default([]),
 });
@@ -340,9 +379,11 @@ export const ConvertLeadSchema = z.object({
 
 // ─── CRM / Pipeline + Stage — Section 33 ────────────────────────────────────
 
-export const CreateStageSchema = z.object({
+const StageBodySchema = z.object({
   name: z.string().min(1).max(100),
-  order: z.number().int().min(0),
+  /** Stage order — prefer explicit `position` from Prompt 31 pipelines UI when present. */
+  order: z.number().int().min(0).optional(),
+  position: z.number().int().min(0).optional(),
   probability: z.number().int().min(0).max(100).default(0),
   rottenDays: z.number().int().min(1).default(30),
   requiredFields: z.array(z.string()).default([]),
@@ -350,15 +391,28 @@ export const CreateStageSchema = z.object({
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/)
     .default('#6B7280'),
+  isWon: z.boolean().optional(),
+  isLost: z.boolean().optional(),
 });
 
-export const UpdateStageSchema = CreateStageSchema.partial();
+/** Create — requires `order` or `position`. */
+export const CreateStageSchema = StageBodySchema.superRefine((v, ctx) => {
+  if (v.order === undefined && v.position === undefined) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'order or position is required' });
+  }
+});
+
+/** Update — all fields optional; callers may send `position` as alias for `order`. */
+export const UpdateStageSchema = StageBodySchema.partial();
 
 export const CreatePipelineSchema = z.object({
   name: z.string().min(1).max(100),
+  type: z.string().max(40).optional(),
   currency: z.string().length(3).default('USD'),
   isDefault: z.boolean().default(false),
   isActive: z.boolean().default(true),
+  description: z.string().max(2000).optional(),
+  ownedBy: z.string().max(120).optional(),
   stages: z.array(CreateStageSchema).min(1).default([]),
 });
 
@@ -380,7 +434,10 @@ const BillingTypeEnum = z.enum(['ONE_TIME', 'RECURRING', 'USAGE', 'MILESTONE']);
 export const CreateProductSchema = z.object({
   sku: z.string().min(1).max(100),
   name: z.string().min(1).max(200),
+  nameAr: z.string().max(200).optional(),
   description: z.string().max(2000).optional(),
+  descriptionAr: z.string().max(2000).optional(),
+  unitAr: z.string().max(50).optional(),
   type: ProductTypeEnum.default('SERVICE'),
   category: z.string().max(100).optional(),
   currency: z.string().length(3).default('USD'),
@@ -698,6 +755,7 @@ export const CreateNoteSchema = z
     leadId: z.string().cuid().optional(),
     accountId: z.string().cuid().optional(),
     isPinned: z.boolean().default(false),
+    mentions: z.array(z.string().cuid()).default([]),
   })
   .refine(
     (v) =>
@@ -711,6 +769,7 @@ export const CreateNoteSchema = z
 export const UpdateNoteSchema = z.object({
   content: z.string().min(1).max(10_000).optional(),
   isPinned: z.boolean().optional(),
+  mentions: z.array(z.string().cuid()).optional(),
 });
 
 export const NoteListQuerySchema = PaginationSchema.extend({
@@ -741,6 +800,52 @@ const QuoteStatusEnum = z.enum([
   'CONVERTED',
 ]);
 
+export const DiscountReasonCodeEnum = z.enum([
+  'COMPETITIVE_MATCH',
+  'STRATEGIC_ACCOUNT',
+  'VOLUME_COMMITMENT',
+  'MULTI_YEAR_COMMITMENT',
+  'NEW_LOGO_ACQUISITION',
+  'RENEWAL_SAVE',
+  'EXECUTIVE_EXCEPTION',
+  'MARKET_ENTRY',
+  'BUNDLE_NEGOTIATION',
+  'PAYMENT_TERMS_TRADEOFF',
+]);
+
+export const DiscountRequestStatusEnum = z.enum([
+  'DRAFT',
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'CANCELLED',
+  'EXPIRED',
+]);
+
+export const DiscountRequestPayloadSchema = z.object({
+  quoteRevisionId: z.string().cuid().optional(),
+  requestedDiscountPercent: z.number().min(0.01).max(80),
+  reasonCode: DiscountReasonCodeEnum,
+  reasonNotes: z.string().min(10).max(2000),
+  winningProbabilityIfApproved: z.number().int().min(1).max(100),
+  businessImpact: z.string().max(2000).optional(),
+  competitorName: z.string().max(200).optional(),
+  expiresAt: z.string().datetime().optional(),
+  customFields: z.record(z.unknown()).default({}),
+});
+
+export const CreateDiscountRequestSchema = DiscountRequestPayloadSchema.extend({
+  quoteId: z.string().cuid(),
+  quoteRevisionId: z.string().cuid(),
+  requestedById: z.string().cuid().optional(),
+});
+
+export const DiscountRequestListQuerySchema = PaginationSchema.extend({
+  quoteId: z.string().cuid().optional(),
+  requestedById: z.string().cuid().optional(),
+  status: DiscountRequestStatusEnum.optional(),
+});
+
 export const QuoteLineItemSchema = z.object({
   productId: z.string().cuid(),
   description: z.string().max(500).optional(),
@@ -752,9 +857,11 @@ export const QuoteLineItemSchema = z.object({
 });
 
 export const CreateQuoteSchema = z.object({
+  rfqId: z.string().cuid().optional(),
   dealId: z.string().cuid(),
   ownerId: z.string().cuid(),
   accountId: z.string().cuid(),
+  contactId: z.string().cuid().optional(),
   name: z.string().min(1).max(200),
   currency: z.string().length(3).default('USD'),
   validUntil: z.string().datetime().optional(),
@@ -762,6 +869,7 @@ export const CreateQuoteSchema = z.object({
   notes: z.string().max(5000).optional(),
   paymentTerms: z.string().max(50).optional(),
   appliedPromos: z.array(z.string().min(1).max(50)).default([]),
+  discountRequest: DiscountRequestPayloadSchema.optional(),
   items: z
     .array(
       z.object({
@@ -781,6 +889,9 @@ export const UpdateQuoteSchema = z.object({
   terms: z.string().max(10_000).optional(),
   notes: z.string().max(5000).optional(),
   customFields: z.record(z.unknown()).optional(),
+  /** When set together with threshold breach, PATCH may respond with HTTP 202 and `requiresApproval`. */
+  discountAmount: z.number().min(0).optional(),
+  subtotal: z.number().min(0).optional(),
 });
 
 export const RejectQuoteSchema = z.object({
@@ -794,6 +905,7 @@ export const VoidQuoteSchema = z.object({
 export const QuoteListQuerySchema = PaginationSchema.extend({
   dealId: z.string().cuid().optional(),
   accountId: z.string().cuid().optional(),
+  contactId: z.string().cuid().optional(),
   ownerId: z.string().cuid().optional(),
   status: QuoteStatusEnum.optional(),
 });
@@ -804,6 +916,11 @@ export type RejectQuoteInput = z.infer<typeof RejectQuoteSchema>;
 export type VoidQuoteInput = z.infer<typeof VoidQuoteSchema>;
 export type QuoteListQuery = z.infer<typeof QuoteListQuerySchema>;
 export type QuoteLineItem = z.infer<typeof QuoteLineItemSchema>;
+export type DiscountReasonCodeInput = z.infer<typeof DiscountReasonCodeEnum>;
+export type DiscountRequestStatusInput = z.infer<typeof DiscountRequestStatusEnum>;
+export type CreateDiscountRequestInput = z.infer<typeof CreateDiscountRequestSchema>;
+export type DiscountRequestPayloadInput = z.infer<typeof DiscountRequestPayloadSchema>;
+export type DiscountRequestListQuery = z.infer<typeof DiscountRequestListQuerySchema>;
 
 // ─── Finance / Commission — Section 33 + 41 ─────────────────────────────────
 
@@ -837,8 +954,226 @@ export type ClawbackCommissionInput = z.infer<typeof ClawbackCommissionSchema>;
 export type CommissionListQuery = z.infer<typeof CommissionListQuerySchema>;
 export type CommissionSummaryQuery = z.infer<typeof CommissionSummaryQuerySchema>;
 
+// ─── CRM / Company ─ Section 33 ─────────────────────────────────────────────
+
+export const CreateCompanySchema = z.object({
+  name: z.string().min(1).max(200),
+  ownerId: z.string().cuid(),
+  website: z.string().url().optional(),
+  phone: z.string().max(30).optional(),
+  email: z.string().email().optional(),
+  industry: z.string().max(100).optional(),
+  type: z.string().max(40).optional(),
+  size: z.string().max(40).optional(),
+  annualRevenue: z.number().min(0).optional(),
+  employeeCount: z.number().int().min(0).optional(),
+  country: z.string().max(100).optional(),
+  city: z.string().max(100).optional(),
+  address: z.string().max(500).optional(),
+  zipCode: z.string().max(20).optional(),
+  linkedInUrl: z.string().url().optional(),
+  description: z.string().max(2000).optional(),
+  customFields: z.record(z.unknown()).default({}),
+  tags: z.array(z.string()).default([]),
+});
+
+export const UpdateCompanySchema = CreateCompanySchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
+
+export const CompanyListQuerySchema = PaginationSchema.extend({
+  ownerId: z.string().cuid().optional(),
+  type: z.string().optional(),
+  industry: z.string().optional(),
+  search: z.string().optional(),
+  isActive: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === 'true')),
+});
+
+export type CreateCompanyInput = z.infer<typeof CreateCompanySchema>;
+export type UpdateCompanyInput = z.infer<typeof UpdateCompanySchema>;
+export type CompanyListQuery = z.infer<typeof CompanyListQuerySchema>;
+
+// ─── CRM / Tag ─ Section 33 ─────────────────────────────────────────────────
+
+export const CreateTagSchema = z.object({
+  tenantId: z.string().min(1).optional(),
+  name: z.string().min(1).max(100),
+  color: z
+    .string()
+    .regex(/^#[0-9A-Fa-f]{6}$/)
+    .optional(),
+  entityType: z.string().max(40).optional(),
+});
+
+export const UpdateTagSchema = CreateTagSchema.partial().omit({ tenantId: true });
+
+export type CreateTagInput = z.infer<typeof CreateTagSchema>;
+export type UpdateTagInput = z.infer<typeof UpdateTagSchema>;
+
+// ─── CRM / Custom Field ─ Section 33 ────────────────────────────────────────
+
+export const CreateCustomFieldSchema = z.object({
+  tenantId: z.string().min(1).optional(),
+  entityType: z.string().min(1).max(40),
+  name: z.string().min(1).max(100),
+  apiKey: z.string().min(1).max(100),
+  fieldType: z.string().min(1).max(40),
+  options: z.array(z.record(z.unknown())).default([]),
+  required: z.boolean().default(false),
+  showOnCard: z.boolean().default(false),
+  position: z.number().int().min(0).default(0),
+});
+
+export const UpdateCustomFieldSchema = CreateCustomFieldSchema.partial().omit({ tenantId: true, entityType: true });
+
+export type CreateCustomFieldInput = z.infer<typeof CreateCustomFieldSchema>;
+export type UpdateCustomFieldInput = z.infer<typeof UpdateCustomFieldSchema>;
+
+// ─── Reusable Address — Section 33 ───────────────────────────────────────────
+
+export const AddressSchema = z.object({
+  line1: z.string().max(500).optional(),
+  line2: z.string().max(500).optional(),
+  city: z.string().max(100).optional(),
+  state: z.string().max(100).optional(),
+  postalCode: z.string().max(20).optional(),
+  country: z.string().max(100).optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+});
+
+export const BillingAddressSchema = AddressSchema.extend({
+  isPrimary: z.boolean().optional(),
+});
+
+export const ShippingAddressSchema = AddressSchema.extend({
+  sameAsBilling: z.boolean().optional(),
+  shippingInstructions: z.string().max(1000).optional(),
+});
+
+export type AddressInput = z.infer<typeof AddressSchema>;
+export type BillingAddressInput = z.infer<typeof BillingAddressSchema>;
+export type ShippingAddressInput = z.infer<typeof ShippingAddressSchema>;
+
+// ─── Coding Rules — Section 33 ───────────────────────────────────────────────
+
+export const CodingRuleTokenSchema = z.object({
+  type: z.enum([
+    'PREFIX',
+    'YYYY',
+    'YY',
+    'MM',
+    'DD',
+    'Q',
+    'TERRITORY',
+    'BRANCH',
+    'DEPT',
+    'OWNER_INITIALS',
+    'SEQ',
+    'CATEGORY',
+    'TEXT',
+  ]),
+  value: z.string().optional(),
+  digits: z.number().int().min(1).max(12).optional(),
+});
+
+export const CreateCodingRuleSchema = z.object({
+  tenantId: z.string().min(1).optional(),
+  entityType: z.string().min(1).max(40),
+  name: z.string().min(1).max(100),
+  prefix: z.string().max(20).default(''),
+  pattern: z.string().min(1).max(200),
+  separator: z.string().max(5).default('-'),
+  sequenceScope: z.enum(['TENANT', 'MODULE', 'YEAR', 'MONTH', 'TERRITORY', 'BRANCH', 'TEAM', 'CATEGORY']).default('TENANT'),
+  resetPolicy: z.enum(['NEVER', 'YEARLY', 'MONTHLY', 'DAILY']).default('NEVER'),
+  nextSequence: z.number().int().min(1).default(1),
+  isManualOverrideAllowed: z.boolean().default(false),
+  isRequired: z.boolean().default(true),
+  lockedAfterCreate: z.boolean().default(true),
+  fallbackStrategy: z.enum(['BLOCK', 'USE_DEFAULT', 'USE_TIMESTAMP']).default('USE_DEFAULT'),
+  isActive: z.boolean().default(true),
+  effectiveFrom: z.string().datetime().optional().transform((v) => v ? new Date(v) : null),
+});
+
+export const UpdateCodingRuleSchema = CreateCodingRuleSchema.partial().omit({ tenantId: true, entityType: true });
+
+export const PreviewCodingRuleSchema = z.object({
+  sampleInputs: z.record(z.unknown()).default({}),
+});
+
+export const AllocateCodeSchema = z.object({
+  tenantId: z.string().min(1),
+  ownerId: z.string().cuid().optional(),
+  territoryId: z.string().cuid().optional(),
+  branchId: z.string().cuid().optional(),
+  teamId: z.string().cuid().optional(),
+  category: z.string().optional(),
+  manualCode: z.string().max(100).optional(),
+});
+
+export type CreateCodingRuleInput = z.infer<typeof CreateCodingRuleSchema>;
+export type UpdateCodingRuleInput = z.infer<typeof UpdateCodingRuleSchema>;
+export type PreviewCodingRuleInput = z.infer<typeof PreviewCodingRuleSchema>;
+export type AllocateCodeInput = z.infer<typeof AllocateCodeSchema>;
+
+// ─── Document Templates — Section 33 ─────────────────────────────────────────
+
+export const CreateDocumentTemplateSchema = z.object({
+  tenantId: z.string().min(1).optional(),
+  module: z.string().min(1).max(40),
+  name: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  sourceFormat: z.enum(['DOCX', 'HTML', 'MARKDOWN']).default('HTML'),
+  templateBody: z.string().max(50_000).optional(),
+  mergeFields: z.array(z.string()).default([]),
+  header: z.string().max(2000).optional(),
+  footer: z.string().max(2000).optional(),
+  locale: z.string().max(10).default('en'),
+  currency: z.string().length(3).default('USD'),
+  pageSize: z.enum(['A4', 'LETTER']).default('A4'),
+  orientation: z.enum(['PORTRAIT', 'LANDSCAPE']).default('PORTRAIT'),
+});
+
+export const UpdateDocumentTemplateSchema = CreateDocumentTemplateSchema.partial().omit({ tenantId: true, module: true });
+
+export const RenderTemplateSchema = z.object({
+  data: z.record(z.unknown()).default({}),
+});
+
+export type CreateDocumentTemplateInput = z.infer<typeof CreateDocumentTemplateSchema>;
+export type UpdateDocumentTemplateInput = z.infer<typeof UpdateDocumentTemplateSchema>;
+export type RenderTemplateInput = z.infer<typeof RenderTemplateSchema>;
+
+// ─── Import / Export — Section 33 ────────────────────────────────────────────
+
+export const ImportPreviewSchema = z.object({
+  fileBase64: z.string().min(1),
+  fieldMap: z.record(z.string()).default({}),
+  duplicateStrategy: z.enum(['SKIP', 'UPDATE', 'CREATE', 'MERGE']).default('SKIP'),
+  previewLimit: z.number().int().min(1).max(100).default(10),
+});
+
+export const ImportRunSchema = z.object({
+  fileBase64: z.string().min(1),
+  fieldMap: z.record(z.string()).default({}),
+  duplicateStrategy: z.enum(['SKIP', 'UPDATE', 'CREATE', 'MERGE']).default('SKIP'),
+});
+
+export const ExportRequestSchema = z.object({
+  format: z.enum(['CSV', 'XLSX']).default('CSV'),
+  columns: z.array(z.string()).optional(),
+  selectedIds: z.array(z.string().cuid()).optional(),
+  filters: z.record(z.unknown()).optional(),
+});
+
+export type ImportPreviewInput = z.infer<typeof ImportPreviewSchema>;
+export type ImportRunInput = z.infer<typeof ImportRunSchema>;
+export type ExportRequestInput = z.infer<typeof ExportRequestSchema>;
+
 // ─── Billing / Integration / Blueprint — Phase 5 ─────────────────────────────
 
-export * from './billing.schema.js';
 export * from './integration.schema.js';
 export * from './blueprint.schema.js';

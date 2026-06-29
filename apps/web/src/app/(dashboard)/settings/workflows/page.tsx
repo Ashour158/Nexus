@@ -232,9 +232,9 @@ export default function SettingsWorkflowsPage(): JSX.Element {
             <table className="min-w-full text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
                 <tr>
-                  <th className="px-2 py-1 text-left">Status</th>
-                  <th className="px-2 py-1 text-left">Triggered at</th>
-                  <th className="px-2 py-1 text-left">Completed</th>
+                  <th className="px-2 py-1 text-start">Status</th>
+                  <th className="px-2 py-1 text-start">Triggered at</th>
+                  <th className="px-2 py-1 text-start">Completed</th>
                 </tr>
               </thead>
               <tbody>

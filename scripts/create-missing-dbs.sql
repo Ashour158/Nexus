@@ -7,6 +7,7 @@
 -- Or from the host:
 --   cat scripts/create-missing-dbs.sql | docker compose exec -T postgres psql -U nexus
 
+CREATE DATABASE IF NOT EXISTS nexus_audit;
 CREATE DATABASE IF NOT EXISTS nexus_approval;
 CREATE DATABASE IF NOT EXISTS nexus_cadence;
 CREATE DATABASE IF NOT EXISTS nexus_territory;
@@ -18,6 +19,7 @@ CREATE DATABASE IF NOT EXISTS nexus_incentive;
 CREATE DATABASE IF NOT EXISTS nexus_data;
 CREATE DATABASE IF NOT EXISTS nexus_chatbot;
 
+GRANT ALL PRIVILEGES ON DATABASE nexus_audit TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_approval TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_cadence TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_territory TO nexus;
@@ -28,6 +30,9 @@ GRANT ALL PRIVILEGES ON DATABASE nexus_knowledge TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_incentive TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_data TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_chatbot TO nexus;
+
+\connect nexus_audit
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 \connect nexus_approval
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

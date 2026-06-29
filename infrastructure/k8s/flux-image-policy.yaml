@@ -1,0 +1,47 @@
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImageRepository
+metadata:
+  name: nexus-crm
+  namespace: flux-system
+spec:
+  image: nexus-crm/nexus-crm
+  interval: 1m
+  exclusionList:
+    - "^.*-arm64$"
+---
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImagePolicy
+metadata:
+  name: nexus-crm
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: nexus-crm
+  policy:
+    semver:
+      range: '>=1.0.0'
+---
+apiVersion: image.toolkit.fluxcd.io/v1beta1
+kind: ImageUpdateAutomation
+metadata:
+  name: nexus-crm
+  namespace: flux-system
+spec:
+  interval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: nexus-crm
+  git:
+    checkout:
+      ref:
+        branch: main
+    commit:
+      author:
+        name: Flux Bot
+        email: flux@nexus-crm.io
+      messageTemplate: 'Update image to {{ .AutomationObject }}'
+    push:
+      branch: main
+  policy:
+    semver:
+      range: '>=1.0.0'

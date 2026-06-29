@@ -30,7 +30,10 @@ export default function SettingsUsersPage(): JSX.Element {
   const deactivateUser = useDeactivateUser();
 
   const users = usersQuery.data?.data ?? [];
-  const roles = rolesQuery.data?.data ?? [];
+  const roles = useMemo(
+    () => rolesQuery.data?.data ?? [],
+    [rolesQuery.data]
+  );
   const defaultRoleId = useMemo(() => roles[0]?.id ?? '', [roles]);
 
   return (
@@ -64,13 +67,13 @@ export default function SettingsUsersPage(): JSX.Element {
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>
-                <th className="px-3 py-2 text-left">Avatar</th>
-                <th className="px-3 py-2 text-left">Name</th>
-                <th className="px-3 py-2 text-left">Email</th>
-                <th className="px-3 py-2 text-left">Role</th>
-                <th className="px-3 py-2 text-left">Status</th>
-                <th className="px-3 py-2 text-left">Last login</th>
-                <th className="px-3 py-2 text-right">Actions</th>
+                <th className="px-3 py-2 text-start">Avatar</th>
+                <th className="px-3 py-2 text-start">Name</th>
+                <th className="px-3 py-2 text-start">Email</th>
+                <th className="px-3 py-2 text-start">Role</th>
+                <th className="px-3 py-2 text-start">Status</th>
+                <th className="px-3 py-2 text-start">Last login</th>
+                <th className="px-3 py-2 text-end">Actions</th>
               </tr>
             </thead>
             <tbody>

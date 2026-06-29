@@ -801,7 +801,7 @@ function Section({
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-slate-50"
+        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-start hover:bg-slate-50"
         aria-expanded={open}
       >
         <div className="flex items-center gap-2">
@@ -854,7 +854,7 @@ function ScoreSlider({
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full accent-brand-600"
       />
-      <span className="w-10 text-right text-sm font-semibold tabular-nums text-slate-700">
+      <span className="w-10 text-end text-sm font-semibold tabular-nums text-slate-700">
         {value}
       </span>
     </div>

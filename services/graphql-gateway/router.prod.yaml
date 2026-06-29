@@ -1,0 +1,160 @@
+# Apollo Router Configuration — PRODUCTION
+# Only the auth subgraph is active; all other services are REST APIs.
+# Re-enable a subgraph only after that service exposes a real GraphQL endpoint.
+
+server:
+  listen: 0.0.0.0:4000
+  introspection: false
+
+cors:
+  origins:
+    - https://nexus-crm.com
+  allow_credentials: true
+  methods:
+    - GET
+    - POST
+    - OPTIONS
+
+health_check:
+  listen: 0.0.0.0:8088
+  enabled: true
+
+authentication:
+  jwt:
+    jwks:
+      - url: "http://keycloak:8080/realms/nexus/protocol/openid-connect/certs"
+
+rate_limit:
+  capacity: 1000
+  interval: 60s
+
+subgraphs:
+  auth:
+    routing_url: http://auth-service:3010/graphql
+    schema:
+      subgraph_url: http://auth-service:3010/graphql
+  # The services below are REST-only. They do not expose GraphQL endpoints.
+  # Uncomment and configure routing_url / subgraph_url only after a GraphQL
+  # server is deployed in the respective service.
+  # crm:
+  #   routing_url: http://crm-service:3001/graphql
+  #   schema:
+  #     subgraph_url: http://crm-service:3001/graphql
+  # finance:
+  #   routing_url: http://finance-service:3002/graphql
+  #   schema:
+  #     subgraph_url: http://finance-service:3002/graphql
+  # comm:
+  #   routing_url: http://comm-service:3009/graphql
+  #   schema:
+  #     subgraph_url: http://comm-service:3009/graphql
+  # workflow:
+  #   routing_url: http://workflow-service:3007/graphql
+  #   schema:
+  #     subgraph_url: http://workflow-service:3007/graphql
+  # analytics:
+  #   routing_url: http://analytics-service:3008/graphql
+  #   schema:
+  #     subgraph_url: http://analytics-service:3008/graphql
+  # realtime:
+  #   routing_url: http://realtime-service:3005/graphql
+  #   schema:
+  #     subgraph_url: http://realtime-service:3005/graphql
+  # search:
+  #   routing_url: http://search-service:3006/graphql
+  #   schema:
+  #     subgraph_url: http://search-service:3006/graphql
+  # storage:
+  #   routing_url: http://storage-service:3010/graphql
+  #   schema:
+  #     subgraph_url: http://storage-service:3010/graphql
+  # approval:
+  #   routing_url: http://approval-service:3014/graphql
+  #   schema:
+  #     subgraph_url: http://approval-service:3014/graphql
+  # data:
+  #   routing_url: http://data-service:3015/graphql
+  #   schema:
+  #     subgraph_url: http://data-service:3015/graphql
+  # document:
+  #   routing_url: http://document-service:3016/graphql
+  #   schema:
+  #     subgraph_url: http://document-service:3016/graphql
+  # chatbot:
+  #   routing_url: http://chatbot-service:3017/graphql
+  #   schema:
+  #     subgraph_url: http://chatbot-service:3017/graphql
+  # cadence:
+  #   routing_url: http://cadence-service:3018/graphql
+  #   schema:
+  #     subgraph_url: http://cadence-service:3018/graphql
+  # territory:
+  #   routing_url: http://territory-service:3019/graphql
+  #   schema:
+  #     subgraph_url: http://territory-service:3019/graphql
+  # planning:
+  #   routing_url: http://planning-service:3020/graphql
+  #   schema:
+  #     subgraph_url: http://planning-service:3020/graphql
+  # reporting:
+  #   routing_url: http://reporting-service:3021/graphql
+  #   schema:
+  #     subgraph_url: http://reporting-service:3021/graphql
+  # portal:
+  #   routing_url: http://portal-service:3022/graphql
+  #   schema:
+  #     subgraph_url: http://portal-service:3022/graphql
+  # knowledge:
+  #   routing_url: http://knowledge-service:3023/graphql
+  #   schema:
+  #     subgraph_url: http://knowledge-service:3023/graphql
+  # incentive:
+  #   routing_url: http://incentive-service:3024/graphql
+  #   schema:
+  #     subgraph_url: http://incentive-service:3024/graphql
+  # integration:
+  #   routing_url: http://integration-service:3012/graphql
+  #   schema:
+  #     subgraph_url: http://integration-service:3012/graphql
+  # blueprint:
+  #   routing_url: http://blueprint-service:3013/graphql
+  #   schema:
+  #     subgraph_url: http://blueprint-service:3013/graphql
+  # email-sync:
+  #   routing_url: http://email-sync-service:3026/graphql
+  #   schema:
+  #     subgraph_url: http://email-sync-service:3026/graphql
+
+headers:
+  all:
+    request:
+      - propagate:
+          matching: "authorization"
+      - propagate:
+          matching: "x-tenant-id"
+      - propagate:
+          matching: "x-user-id"
+      - propagate:
+          matching: "x-request-id"
+
+coprocessor:
+  url: http://router-coprocessor:4001/coprocessor
+  timeout: 2s
+  stages:
+    - RouterRequest
+    - RouterResponse
+
+telemetry:
+  apollo:
+    endpoint: https://usage-reporting.api.apollographql.com/api/ingress/traces
+    apollo_key: ${APOLLO_KEY}
+    apollo_graph_ref: nexus-crm@current
+    schema_config_delivery_endpoint: https://uplink.api.apollographql.com/
+  metrics:
+    prometheus:
+      enabled: true
+      listen: 0.0.0.0:9090
+  tracing:
+    jaeger:
+      enabled: true
+      endpoint: "http://jaeger:14268/api/traces"

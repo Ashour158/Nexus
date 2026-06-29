@@ -7,7 +7,7 @@ import {
 import { Prisma } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { Note } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { CrmPrisma } from '../prisma.js';
-import { toPaginatedResult } from '../lib/pagination.js';
+import { toPaginatedResult } from '@nexus/shared-types';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -28,11 +28,13 @@ export interface CreateNoteData {
   accountId?: string;
   isPinned?: boolean;
   authorId: string;
+  mentions?: string[];
 }
 
 export interface UpdateNoteData {
   content?: string;
   isPinned?: boolean;
+  mentions?: string[];
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -155,6 +157,7 @@ export function createNotesService(prisma: CrmPrisma) {
           contactId: data.contactId ?? null,
           leadId: data.leadId ?? null,
           accountId: data.accountId ?? null,
+          mentions: data.mentions ?? [],
         },
       });
     },
@@ -172,11 +175,12 @@ export function createNotesService(prisma: CrmPrisma) {
       const updateData: Prisma.NoteUpdateInput = {};
       if (data.content !== undefined) updateData.content = data.content;
       if (data.isPinned !== undefined) updateData.isPinned = data.isPinned;
+      if (data.mentions !== undefined) updateData.mentions = data.mentions;
       return prisma.note.update({ where: { id }, data: updateData });
     },
 
     /**
-     * Hard-deletes a note. The `requestingUserId` must match the note's
+     * Soft-deletes a note. The `requestingUserId` must match the note's
      * author — callers may pass `null`-equivalent semantics via
      * `skipAuthorCheck` when the caller has been verified to hold the
      * admin role at the route layer.
@@ -193,7 +197,16 @@ export function createNotesService(prisma: CrmPrisma) {
           'Only the author or an admin can delete this note'
         );
       }
-      await prisma.note.delete({ where: { id } });
+      await prisma.note.update({ where: { id } as any, data: { deletedAt: new Date() } as any });
+    },
+
+    async restoreNote(tenantId: string, id: string): Promise<Note> {
+      const result = await prisma.note.updateMany({
+        where: { id, tenantId, deletedAt: { not: null } } as any,
+        data: { deletedAt: null } as any,
+      });
+      if (result.count === 0) throw new NotFoundError('Note', id);
+      return prisma.note.findFirstOrThrow({ where: { id, tenantId } });
     },
 
     async pinNote(tenantId: string, id: string): Promise<Note> {

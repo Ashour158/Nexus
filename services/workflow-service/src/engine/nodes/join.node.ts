@@ -43,9 +43,9 @@ export async function handleJoinNode(
   if (completedCount < totalBranches) {
     // Not all done yet — re-pause for 60 s so the executor polls again
     const pauseUntil = new Date(Date.now() + 60 * 1000);
-    return { pauseUntil, nextNodeId: node.id };
+    return { pauseUntil };
   }
 
-  // All branches completed — pass through to the next node
+  // All branches completed — pass through to the next node via outgoing edge
   return { output: { completedBranches: completedCount } };
 }

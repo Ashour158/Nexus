@@ -10,7 +10,8 @@ import type {
   TimelineEvent,
 } from '@nexus/shared-types';
 import type { CreateDealInput, UpdateDealInput } from '@nexus/validation';
-import { api } from '@/lib/api-client';
+import { api, apiClients } from '@/lib/api-client';
+import { notify } from '@/lib/toast';
 
 /**
  * React Query hooks for the Deals domain — Section 39.2.
@@ -66,7 +67,7 @@ export function usePipelineDeals(
   return useQuery<DealListResponse>({
     queryKey: dealKeys.pipeline(pipelineId),
     queryFn: () =>
-      api.get<DealListResponse>('/deals', {
+      apiClients.deals.get<DealListResponse>('/deals', {
         params: { pipelineId, limit: 500, ...filters },
       }),
     staleTime: 30_000,
@@ -90,7 +91,7 @@ export function useDeals(filters: DealListFilters = {}) {
   };
   return useQuery<DealListResponse>({
     queryKey: dealKeys.list(normalized),
-    queryFn: () => api.get<DealListResponse>('/deals', { params: normalized }),
+    queryFn: () => apiClients.deals.get<DealListResponse>('/deals', { params: normalized }),
     staleTime: 30_000,
     placeholderData: (prev) => prev,
   });
@@ -100,16 +101,16 @@ export function useDeals(filters: DealListFilters = {}) {
 export function useDeal(id: string) {
   return useQuery<Deal>({
     queryKey: dealKeys.detail(id),
-    queryFn: () => api.get<Deal>(`/deals/${id}`),
+    queryFn: () => apiClients.deals.get<Deal>(`/deals/${id}`),
     enabled: Boolean(id),
   });
 }
 
-/** Fetches the AI insights blob + win probability for a deal. */
+/** Fetches the scoring insights blob and win probability for a deal. */
 export function useDealAiInsights(id: string) {
   return useQuery<DealAiInsights>({
     queryKey: dealKeys.insights(id),
-    queryFn: () => api.get<DealAiInsights>(`/deals/${id}/ai-insights`),
+    queryFn: () => api.get<DealAiInsights>(`/deals/${id}/scoring-insights`),
     enabled: Boolean(id),
     staleTime: 5 * 60_000,
   });
@@ -129,10 +130,14 @@ export function useDealTimeline(id: string) {
 export function useCreateDeal() {
   const qc = useQueryClient();
   return useMutation<Deal, Error, CreateDealInput>({
-    mutationFn: (data) => api.post<Deal>('/deals', data),
+    mutationFn: (data) => apiClients.deals.post<Deal>('/deals', data),
     onSuccess: (_deal, vars) => {
       qc.invalidateQueries({ queryKey: dealKeys.pipeline(vars.pipelineId) });
       qc.invalidateQueries({ queryKey: dealKeys.lists() });
+      notify.success('Deal created');
+    },
+    onError: (err) => {
+      notify.error('Failed to create deal', err.message);
     },
   });
 }
@@ -140,10 +145,14 @@ export function useCreateDeal() {
 export function useUpdateDeal() {
   const qc = useQueryClient();
   return useMutation<Deal, Error, { id: string; data: UpdateDealInput }>({
-    mutationFn: ({ id, data }) => api.patch<Deal>(`/deals/${id}`, data),
+    mutationFn: ({ id, data }) => apiClients.deals.patch<Deal>(`/deals/${id}`, data),
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: dealKeys.detail(id) });
       qc.invalidateQueries({ queryKey: dealKeys.lists() });
+      notify.success('Deal updated');
+    },
+    onError: (err) => {
+      notify.error('Failed to update deal', err.message);
     },
   });
 }
@@ -192,10 +201,12 @@ export function useMoveDeal() {
           qc.setQueryData(key, data);
         }
       });
+      notify.error('Failed to move deal');
     },
     onSettled: (_d, _e, { id }) => {
       qc.invalidateQueries({ queryKey: dealKeys.detail(id) });
       qc.invalidateQueries({ queryKey: dealKeys.all });
+      if (!_e) notify.success('Deal stage updated');
     },
   });
 }
@@ -207,6 +218,10 @@ export function useMarkDealWon() {
     onSuccess: (_d, id) => {
       qc.invalidateQueries({ queryKey: dealKeys.detail(id) });
       qc.invalidateQueries({ queryKey: dealKeys.all });
+      notify.success('Deal marked won');
+    },
+    onError: (err) => {
+      notify.error('Failed to mark deal won', err.message);
     },
   });
 }
@@ -223,6 +238,24 @@ export function useMarkDealLost() {
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: dealKeys.detail(id) });
       qc.invalidateQueries({ queryKey: dealKeys.all });
+      notify.success('Deal marked lost');
+    },
+    onError: (err) => {
+      notify.error('Failed to mark deal lost', err.message);
+    },
+  });
+}
+
+export function useCloneDeal() {
+  const qc = useQueryClient();
+  return useMutation<Deal, Error, { id: string; name?: string }>({
+    mutationFn: ({ id, name }) => api.post<Deal>(`/deals/${id}/clone`, name !== undefined ? { name } : {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: dealKeys.all });
+      notify.success('Deal cloned');
+    },
+    onError: (err) => {
+      notify.error('Failed to clone deal', err.message);
     },
   });
 }
@@ -230,10 +263,14 @@ export function useMarkDealLost() {
 export function useDeleteDeal() {
   const qc = useQueryClient();
   return useMutation<void, Error, string>({
-    mutationFn: (id) => api.delete<void>(`/deals/${id}`),
+    mutationFn: (id) => apiClients.deals.delete<void>(`/deals/${id}`),
     onSuccess: (_d, id) => {
       qc.removeQueries({ queryKey: dealKeys.detail(id) });
       qc.invalidateQueries({ queryKey: dealKeys.all });
+      notify.success('Deal deleted');
+    },
+    onError: (err) => {
+      notify.error('Failed to delete deal', err.message);
     },
   });
 }

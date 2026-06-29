@@ -1,4 +1,12 @@
+import { createHttpClient } from '@nexus/service-utils';
 import type { IntegrationPrisma } from '../prisma.js';
+
+const client = createHttpClient({
+  baseURL: 'https://gmail.googleapis.com',
+  timeoutMs: 10000,
+  maxRetries: 3,
+  circuitBreaker: { failureThreshold: 5, resetTimeoutMs: 30000 },
+});
 
 export function createGoogleGmailService(prisma: IntegrationPrisma) {
   return {
@@ -7,12 +15,15 @@ export function createGoogleGmailService(prisma: IntegrationPrisma) {
         where: { tenantId, userId, provider: 'google' },
       });
       if (!conn) return { synced: 0 };
-      const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/threads?maxResults=50', {
-        headers: { Authorization: `Bearer ${conn.accessToken}` },
-      });
-      if (!res.ok) return { synced: 0 };
-      const body = (await res.json()) as { threads?: Array<{ id: string }> };
-      return { synced: body.threads?.length ?? 0 };
+      try {
+        const body = await client.get<{ threads?: Array<{ id: string }> }>(
+          '/gmail/v1/users/me/threads?maxResults=50',
+          { Authorization: `Bearer ${conn.accessToken}` }
+        );
+        return { synced: body.threads?.length ?? 0 };
+      } catch {
+        return { synced: 0 };
+      }
     },
 
     async sendEmail(
@@ -31,16 +42,15 @@ export function createGoogleGmailService(prisma: IntegrationPrisma) {
         .replaceAll('+', '-')
         .replaceAll('/', '_')
         .replaceAll('=', '');
-      const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${conn.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ raw }),
-      });
-      if (!res.ok) throw new Error('Gmail send failed');
-      return res.json();
+      try {
+        return await client.post(
+          '/gmail/v1/users/me/messages/send',
+          { raw },
+          { Authorization: `Bearer ${conn.accessToken}` }
+        );
+      } catch {
+        throw new Error('Gmail send failed');
+      }
     },
   };
 }

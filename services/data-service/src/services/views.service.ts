@@ -12,10 +12,14 @@ export interface SavedViewInput {
 
 export function createViewsService(prisma: DataPrisma) {
   return {
-    async listViews(tenantId: string, userId: string, module: string) {
+    async listViews(tenantId: string, userId: string, module: string, opts: { page?: number; limit?: number } = {}) {
+      const page = Math.max(1, opts.page ?? 1);
+      const limit = Math.min(100, opts.limit ?? 50);
       return prisma.savedView.findMany({
         where: { tenantId, userId, module },
         orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
       });
     },
 

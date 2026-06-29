@@ -118,7 +118,7 @@ export async function registerNotesRoutes(
         }
       );
 
-      // ─── DELETE ─────────────────────────────────────────────────────────
+      // ─── DELETE (soft) ──────────────────────────────────────────────────
       r.delete(
         '/notes/:id',
         { preHandler: requirePermission(PERMISSIONS.NOTES.DELETE) },
@@ -129,6 +129,17 @@ export async function registerNotesRoutes(
             skipAuthorCheck: isAdmin(jwt),
           });
           return reply.send({ success: true, data: { id, deleted: true } });
+        }
+      );
+
+      r.post(
+        '/notes/:id/restore',
+        { preHandler: requirePermission(PERMISSIONS.NOTES.UPDATE) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const note = await notes.restoreNote(jwt.tenantId, id);
+          return reply.send({ success: true, data: note });
         }
       );
 

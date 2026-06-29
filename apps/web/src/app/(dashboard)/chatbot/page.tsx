@@ -1,8 +1,10 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useMemo, useState, type JSX } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+
+const ConversationsBarChart = dynamic(() => import('./charts').then((m) => m.ConversationsBarChart), { ssr: false });
 
 interface Conversation {
   id: string;
@@ -28,12 +30,15 @@ export default function ChatbotPage(): JSX.Element {
     queryFn: async () => {
       const base = process.env.NEXT_PUBLIC_CHATBOT_URL ?? 'http://localhost:3017';
       const res = await fetch(`${base}/api/v1/conversations`);
-      if (!res.ok) return { data: [] } as ConversationList;
+      if (!res.ok) throw new Error(`Failed to load conversations: ${res.status}`);
       return (await res.json()) as ConversationList;
     },
   });
 
-  const convRows = conversations.data?.data ?? [];
+  const convRows = useMemo(
+    () => conversations.data?.data ?? [],
+    [conversations.data]
+  );
   const analytics = useMemo(() => {
     const total = convRows.length;
     const byDayMap = new Map<string, number>();
@@ -59,7 +64,7 @@ export default function ChatbotPage(): JSX.Element {
       {tab === 'conversations' ? (
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">Channel</th><th className="px-3 py-2">Customer ID</th><th className="px-3 py-2">State</th><th className="px-3 py-2">Last Activity</th></tr></thead>
+            <thead className="bg-slate-50 text-start text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">Channel</th><th className="px-3 py-2">Customer ID</th><th className="px-3 py-2">State</th><th className="px-3 py-2">Last Activity</th></tr></thead>
             <tbody className="divide-y divide-slate-100">{convRows.map((c) => <tr key={c.id}><td className="px-3 py-2">{c.channel}</td><td className="px-3 py-2">{c.externalId}</td><td className="px-3 py-2">{c.state}</td><td className="px-3 py-2">{new Date(c.lastMessageAt).toLocaleString()}</td></tr>)}</tbody>
           </table>
         </div>
@@ -93,15 +98,7 @@ export default function ChatbotPage(): JSX.Element {
           <section className="rounded-lg border border-slate-200 bg-white p-4">
             <h2 className="mb-2 text-sm font-semibold">Conversations per day (14d)</h2>
             <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={analytics.byDay.slice(-14)}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="day" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#0f172a" />
-                </BarChart>
-              </ResponsiveContainer>
+              <ConversationsBarChart data={analytics.byDay.slice(-14)} />
             </div>
           </section>
         </div>

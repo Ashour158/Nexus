@@ -1,0 +1,138 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  contests(limit: Int, offset: Int): [Contest!]!
+  contest(id: ID!): Contest
+  contestEntries(contestId: ID!): [ContestEntry!]!
+  badges(limit: Int, offset: Int): [Badge!]!
+  badge(id: ID!): Badge
+  badgeAwards(badgeId: ID!): [BadgeAward!]!
+}
+
+type Mutation {
+  createContest(input: CreateContestInput!): Contest!
+  updateContest(id: ID!, input: UpdateContestInput!): Contest!
+  deleteContest(id: ID!): Boolean!
+  createContestEntry(input: CreateContestEntryInput!): ContestEntry!
+  updateContestEntry(id: ID!, input: UpdateContestEntryInput!): ContestEntry!
+  deleteContestEntry(id: ID!): Boolean!
+  createBadge(input: CreateBadgeInput!): Badge!
+  updateBadge(id: ID!, input: UpdateBadgeInput!): Badge!
+  deleteBadge(id: ID!): Boolean!
+  createBadgeAward(input: CreateBadgeAwardInput!): BadgeAward!
+  deleteBadgeAward(id: ID!): Boolean!
+}
+
+type Contest @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  description: String
+  metric: ContestMetric!
+  targetValue: String
+  startDate: DateTime!
+  endDate: DateTime!
+  prizeDescription: String
+  isActive: Boolean!
+  createdAt: DateTime!
+  entries: [ContestEntry!]!
+}
+
+type ContestEntry @key(fields: "id") {
+  id: ID!
+  contestId: String!
+  contest: Contest
+  tenantId: String!
+  ownerId: String!
+  currentValue: String!
+  rank: Int
+  updatedAt: DateTime!
+}
+
+type Badge @key(fields: "id") {
+  id: ID!
+  tenantId: String
+  key: String!
+  name: String!
+  description: String!
+  icon: String!
+  condition: JSON!
+  awardedTo: [BadgeAward!]!
+}
+
+type BadgeAward @key(fields: "id") {
+  id: ID!
+  badgeId: String!
+  badge: Badge
+  tenantId: String!
+  ownerId: String!
+  awardedAt: DateTime!
+}
+
+enum ContestMetric {
+  DEALS_WON_COUNT
+  DEALS_WON_REVENUE
+  ACTIVITIES_COMPLETED
+  LEADS_CONVERTED
+  NEW_LOGOS
+}
+
+input CreateContestInput {
+  tenantId: String!
+  name: String!
+  description: String
+  metric: ContestMetric!
+  targetValue: String
+  startDate: DateTime!
+  endDate: DateTime!
+  prizeDescription: String
+}
+
+input UpdateContestInput {
+  name: String
+  description: String
+  metric: ContestMetric
+  targetValue: String
+  startDate: DateTime
+  endDate: DateTime
+  prizeDescription: String
+  isActive: Boolean
+}
+
+input CreateContestEntryInput {
+  contestId: String!
+  tenantId: String!
+  ownerId: String!
+  currentValue: String
+}
+
+input UpdateContestEntryInput {
+  currentValue: String
+  rank: Int
+}
+
+input CreateBadgeInput {
+  tenantId: String
+  key: String!
+  name: String!
+  description: String!
+  icon: String!
+  condition: JSON!
+}
+
+input UpdateBadgeInput {
+  name: String
+  description: String
+  icon: String
+  condition: JSON
+}
+
+input CreateBadgeAwardInput {
+  badgeId: String!
+  tenantId: String!
+  ownerId: String!
+}

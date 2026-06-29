@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, type FormEvent } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
@@ -14,11 +14,31 @@ import { useAuthStore } from '@/stores/auth.store';
  */
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const setSession = useAuthStore((s) => s.setSession);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (
+      process.env.NODE_ENV !== 'development' ||
+      process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === 'false'
+    ) {
+      return;
+    }
+
+    setSession({
+      accessToken: 'dev-preview-token',
+      userId: 'dev.admin@nexus.local',
+      tenantId: 'default',
+      roles: ['admin'],
+      permissions: ['*'],
+    });
+    document.cookie = 'nexus_session=dev-preview;path=/;max-age=86400;SameSite=Lax';
+    router.replace(searchParams.get('redirect') ?? '/');
+  }, [router, searchParams, setSession]);
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -48,7 +68,10 @@ export default function LoginPage() {
         roles,
         permissions,
       });
-      router.push('/deals');
+      // Set coarse-grained session cookie for middleware route protection
+      document.cookie = 'nexus_session=1;path=/;max-age=86400;SameSite=Lax';
+      const redirect = searchParams.get('redirect');
+      router.push(redirect ?? '/deals');
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Unable to sign in right now';

@@ -13,6 +13,8 @@ interface WinLossData {
   };
   lostReasons: { reason: string; count: number }[];
   monthlyTrend: { month: string; won: number; lost: number; winRate: number }[];
+  insights?: string[];
+  serviceMap?: string[];
 }
 
 const PERIODS = [
@@ -26,16 +28,24 @@ export default function WinLossPage() {
   const [period, setPeriod] = useState('90');
   const [data, setData] = useState<WinLossData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
     fetch(`/api/crm/analytics/win-loss?period=${period}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`Win/loss request failed (${r.status})`);
+        return r.json();
+      })
       .then((d) => {
         setData(d);
+        setError(null);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Unable to load win/loss analytics');
+        setLoading(false);
+      });
   }, [period]);
 
   const maxLostCount = data ? Math.max(...data.lostReasons.map((r) => r.count), 1) : 1;
@@ -63,6 +73,11 @@ export default function WinLossPage() {
           ))}
         </div>
       </div>
+      {error ? (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {error}
+        </div>
+      ) : null}
       {loading || !data ? (
         <div className="grid grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
@@ -76,8 +91,10 @@ export default function WinLossPage() {
             <Card title="Won" value={String(data.summary.wonDeals)} />
             <Card title="Lost" value={String(data.summary.lostDeals)} />
             <Card title="Win Rate" value={`${data.summary.winRate}%`} />
+            <Card title="Won Revenue" value={currency(data.summary.wonRevenue)} />
+            <Card title="Lost Revenue" value={currency(data.summary.lostRevenue)} />
           </div>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="rounded-xl border border-gray-200 bg-white p-5">
               <h2 className="mb-4 font-semibold text-gray-900">Monthly Trend</h2>
               <div className="space-y-2">
@@ -112,10 +129,40 @@ export default function WinLossPage() {
               </div>
             </div>
           </div>
+          <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.8fr]">
+            <section className="rounded-xl border border-gray-200 bg-white p-5">
+              <h2 className="font-semibold text-gray-900">Decision Intelligence</h2>
+              <div className="mt-4 space-y-3">
+                {(data.insights ?? []).map((insight) => (
+                  <p key={insight} className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                    {insight}
+                  </p>
+                ))}
+              </div>
+            </section>
+            <section className="rounded-xl border border-gray-200 bg-white p-5">
+              <h2 className="font-semibold text-gray-900">Connected Services</h2>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {(data.serviceMap ?? []).map((service) => (
+                  <span key={service} className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+                    {service}
+                  </span>
+                ))}
+              </div>
+            </section>
+          </div>
         </>
       )}
     </div>
   );
+}
+
+function currency(value: number) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 function Card({ title, value }: { title: string; value: string }) {

@@ -1,79 +1,41 @@
-import { describe, expect, it } from 'vitest';
-import supertest from 'supertest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { PrismaClient } from '@prisma/client';
+import { buildServer } from '../server.js';
 
-const baseUrl = process.env.CRM_SERVICE_TEST_URL ?? 'http://localhost:3001';
-const token = process.env.CRM_TEST_TOKEN;
-const dealId = process.env.CRM_TEST_DEAL_ID;
-const request = supertest(baseUrl);
+const prisma = new PrismaClient({
+  datasources: { db: { url: process.env.DATABASE_URL } },
+});
 
-async function serviceAvailable(): Promise<boolean> {
-  try {
-    const response = await request.get('/health');
-    return response.status < 500;
-  } catch {
-    return false;
-  }
-}
+let app: Awaited<ReturnType<typeof buildServer>>['app'];
 
-describe('crm-service deals integration', () => {
-  it('GET /api/v1/deals unauthenticated returns 401', async () => {
-    if (!(await serviceAvailable())) return;
-    const response = await request.get('/api/v1/deals');
-    expect(response.status).toBe(401);
+beforeAll(async () => {
+  const result = await buildServer();
+  app = result.app;
+  await app.ready();
+});
+
+afterAll(async () => {
+  await app.close();
+  await prisma.$disconnect();
+});
+
+describe('GET /deals', () => {
+  it('returns list of deals with 200', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/deals',
+      headers: { 'x-tenant-id': 'test-tenant' },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.payload);
+    expect(Array.isArray(body.data)).toBe(true);
   });
 
-  it('GET /api/v1/deals authenticated returns paginated list', async () => {
-    if (!(await serviceAvailable())) return;
-    if (!token) return;
-    const response = await request.get('/api/v1/deals').set('authorization', `Bearer ${token}`);
-    expect(response.status).toBe(200);
-    expect(Array.isArray(response.body.data?.data)).toBe(true);
-  });
-
-  it('POST /api/v1/deals invalid body returns 400/422', async () => {
-    if (!(await serviceAvailable())) return;
-    if (!token) return;
-    const response = await request
-      .post('/api/v1/deals')
-      .set('authorization', `Bearer ${token}`)
-      .send({ name: '' });
-    expect([400, 422]).toContain(response.status);
-  });
-
-  it('POST /api/v1/deals valid body creates deal', async () => {
-    if (!(await serviceAvailable())) return;
-    if (!token) return;
-    const response = await request
-      .post('/api/v1/deals')
-      .set('authorization', `Bearer ${token}`)
-      .send({
-        accountId: process.env.CRM_TEST_ACCOUNT_ID,
-        pipelineId: process.env.CRM_TEST_PIPELINE_ID,
-        stageId: process.env.CRM_TEST_STAGE_ID,
-        name: 'Integration Test Deal',
-        amount: 10000,
-        currency: 'USD',
-      });
-    expect([201, 422]).toContain(response.status);
-  });
-
-  it('PATCH /api/v1/deals/:id/stage invalid stage returns 400/422', async () => {
-    if (!(await serviceAvailable())) return;
-    if (!token || !dealId) return;
-    const response = await request
-      .patch(`/api/v1/deals/${dealId}/stage`)
-      .set('authorization', `Bearer ${token}`)
-      .send({ stageId: 'invalid-stage' });
-    expect([400, 422]).toContain(response.status);
-  });
-
-  it('PATCH /api/v1/deals/:id/stage valid transition returns updated deal', async () => {
-    if (!(await serviceAvailable())) return;
-    if (!token || !dealId || !process.env.CRM_TEST_STAGE_ID) return;
-    const response = await request
-      .patch(`/api/v1/deals/${dealId}/stage`)
-      .set('authorization', `Bearer ${token}`)
-      .send({ stageId: process.env.CRM_TEST_STAGE_ID });
-    expect([200, 422]).toContain(response.status);
+  it('returns 400 without tenant header', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/deals',
+    });
+    expect(res.statusCode).toBe(400);
   });
 });

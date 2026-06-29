@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu } from 'lucide-react';
+import { HelpCircle, Menu, Moon, Sun } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/auth.store';
@@ -35,6 +35,7 @@ const LABEL_OVERRIDES: Record<string, string> = {
   accounts: 'Accounts',
   leads: 'Leads',
   activities: 'Activities',
+  tasks: 'Tasks',
   quotes: 'Quotes',
   invoices: 'Invoices',
   settings: 'Settings',
@@ -78,16 +79,20 @@ export function Topbar(): ReactElement {
   }));
 
   const crumbs = toCrumbs(pathname);
+  const pageTitle = crumbs.at(-1)?.label ?? 'Dashboard';
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const currentLocale =
-    typeof document !== 'undefined'
-      ? document.cookie
-          .split('; ')
-          .find((c) => c.startsWith('NEXUS_LOCALE='))
-          ?.split('=')[1] ?? 'en'
-      : 'en';
+  const [currentLocale, setCurrentLocale] = useState('en');
   const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const locale =
+      document.cookie
+        .split('; ')
+        .find((c) => c.startsWith('NEXUS_LOCALE='))
+        ?.split('=')[1] ?? 'en';
+    setCurrentLocale(locale);
+  }, []);
 
   useEffect(() => {
     function onClickAway(e: MouseEvent) {
@@ -96,68 +101,102 @@ export function Topbar(): ReactElement {
         setMenuOpen(false);
       }
     }
-    if (menuOpen) document.addEventListener('mousedown', onClickAway);
-    return () => document.removeEventListener('mousedown', onClickAway);
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMenuOpen(false);
+    }
+    if (menuOpen) {
+      document.addEventListener('mousedown', onClickAway);
+      document.addEventListener('keydown', onKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', onClickAway);
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, [menuOpen]);
 
   const onLogout = () => {
     clearSession();
+    document.cookie = 'nexus_session=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT';
     setMenuOpen(false);
     router.push('/login');
   };
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-4">
+    <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/90 sm:px-6 lg:px-8">
       {/* Mobile sidebar toggle */}
       <button
         type="button"
         onClick={() => setMobileOpen(true)}
-        className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 lg:hidden"
+        className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 md:hidden"
         aria-label="Open navigation"
         title="Open navigation"
       >
         <Menu className="h-5 w-5 text-gray-600" />
       </button>
 
-      {/* Breadcrumbs */}
-      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1">
-        <Link
-          href="/"
-          className="truncate text-sm text-slate-500 hover:text-slate-900"
-        >
-          Home
-        </Link>
-        {crumbs.map((c, i) => (
-          <span key={c.href} className="flex items-center gap-1">
-            <span className="text-slate-300">/</span>
+      <div className="flex min-w-0 flex-1 items-center gap-4 xl:gap-6">
+        <div className="min-w-[120px]">
+          <h2 className="truncate text-lg font-semibold tracking-tight text-slate-900">{pageTitle}</h2>
+          <nav aria-label="Breadcrumb" className="mt-0.5 flex min-w-0 items-center gap-1">
             <Link
-              href={c.href}
-              className={cn(
-                'truncate text-sm',
-                i === crumbs.length - 1
-                  ? 'font-semibold text-slate-900'
-                  : 'text-slate-500 hover:text-slate-900'
-              )}
+              href="/"
+              className="truncate text-xs font-medium text-slate-400 hover:text-slate-700"
             >
-              {c.label}
+              Home
             </Link>
-          </span>
-        ))}
-      </nav>
-
-      <div className="ml-auto hidden md:block">
-        <GlobalSearch />
+            {crumbs.map((c, i) => (
+              <span key={c.href} className="flex items-center gap-1">
+                <span className="text-slate-300">/</span>
+                <Link
+                  href={c.href}
+                  aria-current={i === crumbs.length - 1 ? 'page' : undefined}
+                  className={cn(
+                    'truncate text-xs font-medium',
+                    i === crumbs.length - 1
+                      ? 'text-slate-700'
+                      : 'text-slate-400 hover:text-slate-700'
+                  )}
+                >
+                  {c.label}
+                </Link>
+              </span>
+            ))}
+          </nav>
+        </div>
+        <div className="hidden min-w-[280px] max-w-[460px] flex-1 xl:block">
+          <GlobalSearch />
+        </div>
       </div>
 
+      <div className="hidden items-center gap-2 xl:flex">
+        <button className="rounded-lg border border-slate-800 px-4 py-2 text-sm font-bold text-slate-800 transition hover:bg-slate-50">
+          Share
+        </button>
+        <button className="rounded-lg border border-slate-800 px-4 py-2 text-sm font-bold text-slate-800 transition hover:bg-slate-50">
+          Export
+        </button>
+      </div>
+      <div className="mx-1 hidden h-6 w-px bg-slate-200 xl:block" />
+      <div className="hidden md:block xl:hidden">
+        <GlobalSearch compact />
+      </div>
+      <DarkModeToggle />
       <LocaleSwitcher currentLocale={currentLocale} />
       <NotificationBell />
+      <button
+        type="button"
+        className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#005baf]"
+        title="Help"
+      >
+        <HelpCircle className="h-5 w-5" />
+      </button>
 
       {/* User menu */}
       <div ref={menuRef} className="relative">
         <button
           type="button"
           onClick={() => setMenuOpen((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-slate-100"
+          className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100"
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           aria-label="Account menu"
@@ -171,7 +210,7 @@ export function Topbar(): ReactElement {
         {menuOpen ? (
           <div
             role="menu"
-            className="absolute right-0 mt-1 w-56 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg"
+            className="absolute end-0 mt-1 w-56 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900"
           >
             <div className="border-b border-slate-100 px-3 py-2">
               <div className="truncate text-sm font-semibold text-slate-900">
@@ -213,3 +252,34 @@ export function Topbar(): ReactElement {
     </header>
   );
 }
+
+function DarkModeToggle() {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+      setIsDark(true);
+    }
+  }, []);
+
+  const toggle = () => {
+    const next = !isDark;
+    setIsDark(next);
+    document.documentElement.classList.toggle('dark', next);
+    localStorage.setItem('theme', next ? 'dark' : 'light');
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#005baf] dark:hover:bg-slate-800"
+      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+    </button>
+  );
+}
+

@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, Building2, LayoutDashboard, ScrollText, Settings, ShieldCheck, ToggleLeft, Users } from 'lucide-react';
+import { Activity, Building2, GitBranch, LayoutDashboard, ScrollText, Settings, ShieldCheck, ToggleLeft, Users } from 'lucide-react';
 
 const ITEMS = [
   { href: '/admin', label: 'Overview', Icon: LayoutDashboard },
   { href: '/admin/users', label: 'Users', Icon: Users },
   { href: '/admin/tenants', label: 'Tenants', Icon: Building2 },
   { href: '/admin/roles', label: 'Roles & Permissions', Icon: ShieldCheck },
+  { href: '/admin/validation-rules', label: 'Validation Rules', Icon: GitBranch },
   { href: '/admin/audit', label: 'Audit Log', Icon: ScrollText },
   { href: '/admin/flags', label: 'Feature Flags', Icon: ToggleLeft },
   { href: '/admin/health', label: 'System Health', Icon: Activity },

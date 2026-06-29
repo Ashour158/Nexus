@@ -40,3 +40,117 @@ CREATE TABLE IF NOT EXISTS quote_events (
 ) ENGINE = MergeTree()
 ORDER BY (tenant_id, occurred_at)
 PARTITION BY toYYYYMM(occurred_at);
+
+-- CQRS Read Models (M3.2)
+
+CREATE TABLE IF NOT EXISTS deals_summary (
+  tenant_id        String,
+  pipeline_id      String,
+  stage_id         String,
+  owner_id         String,
+  territory        String,
+  total_amount     Decimal64(2),
+  deal_count       UInt32,
+  weighted_amount  Decimal64(2),
+  avg_probability  Float64,
+  updated_at       DateTime64(3)
+) ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (tenant_id, pipeline_id, stage_id, owner_id, territory);
+
+CREATE TABLE IF NOT EXISTS contacts_summary (
+  tenant_id      String,
+  account_id     String,
+  industry       String,
+  region         String,
+  contact_count  UInt32,
+  active_count   UInt32,
+  updated_at     DateTime64(3)
+) ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (tenant_id, account_id, industry, region);
+
+CREATE TABLE IF NOT EXISTS activities_summary (
+  tenant_id       String,
+  owner_id        String,
+  type            String,
+  status          String,
+  activity_count  UInt32,
+  overdue_count   UInt32,
+  updated_at      DateTime64(3)
+) ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (tenant_id, owner_id, type, status);
+
+CREATE TABLE IF NOT EXISTS pipeline_velocity (
+  tenant_id       String,
+  pipeline_id     String,
+  stage_id        String,
+  stage_name      String,
+  avg_days_in_stage  Float64,
+  conversion_rate    Float64,
+  exit_count         UInt32,
+  enter_count        UInt32,
+  updated_at         DateTime64(3)
+) ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (tenant_id, pipeline_id, stage_id);
+
+CREATE TABLE IF NOT EXISTS invoice_events (
+  event_id     UUID DEFAULT generateUUIDv4(),
+  tenant_id    String,
+  invoice_id   String,
+  account_id   String,
+  event_type   String,
+  total        Decimal64(2),
+  currency     String,
+  status       String,
+  occurred_at  DateTime64(3)
+) ENGINE = MergeTree()
+ORDER BY (tenant_id, occurred_at)
+PARTITION BY toYYYYMM(occurred_at);
+
+CREATE TABLE IF NOT EXISTS contract_events (
+  event_id     UUID DEFAULT generateUUIDv4(),
+  tenant_id    String,
+  contract_id  String,
+  account_id   String,
+  event_type   String,
+  value        Decimal64(2),
+  currency     String,
+  status       String,
+  occurred_at  DateTime64(3)
+) ENGINE = MergeTree()
+ORDER BY (tenant_id, occurred_at)
+PARTITION BY toYYYYMM(occurred_at);
+
+-- CQRS Read Models for Finance
+
+CREATE TABLE IF NOT EXISTS invoices_summary (
+  tenant_id      String,
+  account_id     String,
+  status         String,
+  total_amount   Decimal64(2),
+  invoice_count  UInt32,
+  paid_amount    Decimal64(2),
+  overdue_count  UInt32,
+  updated_at     DateTime64(3)
+) ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (tenant_id, account_id, status);
+
+CREATE TABLE IF NOT EXISTS contracts_summary (
+  tenant_id      String,
+  account_id     String,
+  status         String,
+  total_value    Decimal64(2),
+  contract_count UInt32,
+  updated_at     DateTime64(3)
+) ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (tenant_id, account_id, status);
+
+CREATE TABLE IF NOT EXISTS quotes_summary (
+  tenant_id      String,
+  account_id     String,
+  deal_id        String,
+  status         String,
+  total          Decimal64(2),
+  quote_count    UInt32,
+  updated_at     DateTime64(3)
+) ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (tenant_id, account_id, deal_id, status);

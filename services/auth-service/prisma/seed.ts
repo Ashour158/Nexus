@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 async function main(): Promise<void> {
   const tenant = await prisma.tenant.upsert({
     where: { slug: 'default' },
-    create: { slug: 'default', name: 'Default Org', plan: 'starter' },
+    create: { slug: 'default', name: 'Default Org' },
     update: {},
   });
 

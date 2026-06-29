@@ -1,31 +1,35 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { DEV_PREVIEW_ENABLED, apiError, apiSuccess, getDevPreviewState } from '@/lib/server/dev-preview-data';
+import { mergeContacts } from '@/lib/server/contact-hardening';
 
-const CRM_BASE = process.env.NEXT_PUBLIC_CRM_URL ?? 'http://localhost:3001/api/v1';
+const CONTACTS_SERVICE_URL = process.env.CONTACTS_SERVICE_URL || process.env.CRM_SERVICE_URL || 'http://localhost:3041';
 
-type MergeRequest = {
-  masterId: string;
-  mergeIds: string[];
-  keepFields?: Record<string, unknown>;
-};
+export async function POST(req: NextRequest) {
+  const auth = req.headers.get('authorization');
+  if (!auth && !DEV_PREVIEW_ENABLED) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const body = await req.json().catch(() => ({}));
 
-export async function POST(req: Request) {
-  const auth = req.headers.get('authorization') ?? '';
-  const body = (await req.json()) as MergeRequest;
-
-  if (!body.masterId || !Array.isArray(body.mergeIds) || body.mergeIds.length === 0) {
-    return NextResponse.json({ success: false, error: 'masterId and mergeIds are required' }, { status: 400 });
+  if (DEV_PREVIEW_ENABLED) {
+    const actor = String(req.headers.get('x-user-id') ?? 'dev-admin');
+    const result = mergeContacts(
+      getDevPreviewState(),
+      String(body.masterContactId ?? ''),
+      String(body.duplicateContactId ?? ''),
+      actor
+    );
+    if (!result.ok) return NextResponse.json(apiError(result.error, 'MERGE_FAILED'), { status: 422 });
+    return NextResponse.json(apiSuccess(result.contact));
   }
 
-  // Soft merge strategy for now: remove duplicate records, keep selected master.
-  const results = await Promise.all(
-    body.mergeIds.map(async (id) => {
-      const res = await fetch(`${CRM_BASE}/contacts/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: auth },
-      });
-      return { id, ok: res.ok };
-    })
-  );
-
-  return NextResponse.json({ success: true, data: { masterId: body.masterId, merged: results } });
+  const res = await fetch(`${CONTACTS_SERVICE_URL}/api/v1/contacts/merge`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      authorization: auth ?? '',
+      'x-tenant-id': req.headers.get('x-tenant-id') ?? 'default',
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  return NextResponse.json(data, { status: res.status });
 }

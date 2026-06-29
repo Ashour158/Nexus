@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: nexus-crm-services
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - service: auth-service
+            port: 3000
+          - service: crm-service
+            port: 3001
+          - service: contacts-service
+            port: 3003
+          - service: deals-service
+            port: 3002
+          - service: notification-service
+            port: 3004
+          - service: analytics-service
+            port: 3005
+          - service: realtime-service
+            port: 3006
+          - service: workflow-service
+            port: 3007
+          - service: approval-service
+            port: 3009
+          - service: reporting-service
+            port: 3010
+          - service: storage-service
+            port: 3011
+  template:
+    metadata:
+      name: '{{service}}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/nexus-crm/nexus-crm.git
+        targetRevision: main
+        path: infrastructure/helm/nexus-crm
+        helm:
+          parameters:
+            - name: service.name
+              value: '{{service}}'
+            - name: service.port
+              value: '{{port}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: nexus
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true

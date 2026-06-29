@@ -32,13 +32,13 @@ export function createSyncService(prisma: IntegrationPrisma, producer: NexusProd
         payload: { jobId: job.id, tenantId, jobType: input.jobType },
       });
 
-      void simulateJob(prisma, producer, tenantId, job.id);
+      void runSyncJob(prisma, producer, tenantId, job.id);
       return job;
     },
   };
 }
 
-async function simulateJob(
+async function runSyncJob(
   prisma: IntegrationPrisma,
   producer: NexusProducer,
   tenantId: string,
@@ -50,22 +50,33 @@ async function simulateJob(
       data: { status: 'RUNNING', startedAt: new Date() },
     });
 
-    await new Promise((r) => setTimeout(r, 400));
+    // Fetch the job and its OAuth connection to determine the external source
+    const job = await prisma.syncJob.findUnique({
+      where: { id: jobId },
+      include: { connection: true },
+    });
 
+    if (!job || !job.connection) {
+      throw new Error('Sync job or connection not found');
+    }
+
+    // The actual sync implementation (fetch external data, map, write destination)
+    // is pending. We update the job honestly rather than faking success.
     await prisma.syncJob.update({
       where: { id: jobId },
       data: {
-        status: 'COMPLETED',
-        processedRecords: 10,
-        totalRecords: 10,
+        status: 'PENDING_IMPLEMENTATION' as any,
+        processedRecords: 0,
+        totalRecords: 0,
         completedAt: new Date(),
+        errorLog: [{ at: new Date().toISOString(), error: 'Sync logic not yet implemented for provider: ' + job.connection.provider }] as Prisma.InputJsonValue,
       },
     });
 
     await producer.publish(TOPICS.INTEGRATION, {
-      type: 'integration.sync.completed',
+      type: 'integration.sync.pending_implementation',
       tenantId,
-      payload: { jobId, tenantId },
+      payload: { jobId, tenantId, provider: job.connection.provider },
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'sync_failed';

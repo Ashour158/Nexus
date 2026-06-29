@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
 
 type Tenant = { id: string; name: string; plan: 'Free' | 'Pro' | 'Enterprise'; usersCount: number; dealsCount: number; storageUsed: string; createdAt: string; status: 'Active' | 'Suspended' };
@@ -13,18 +13,18 @@ export default function AdminTenantsPage() {
   const [banner, setBanner] = useState('');
   const [form, setForm] = useState({ name: '', plan: 'Free', adminEmail: '', locale: 'en' });
 
-  function loadTenants() {
+  const loadTenants = useCallback(() => {
     fetch('/api/admin/tenants', {
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
     })
       .then((r) => r.json())
       .then((json) => setRows(json.data ?? []))
       .catch(() => setRows([]));
-  }
+  }, [accessToken]);
 
   useEffect(() => {
     loadTenants();
-  }, [accessToken]);
+  }, [loadTenants]);
 
   async function createTenant() {
     setBanner('');

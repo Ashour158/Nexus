@@ -19,7 +19,7 @@ import type {
   Payment,
 } from '../../../../node_modules/.prisma/finance-client/index.js';
 import type { FinancePrisma } from '../prisma.js';
-import { toPaginatedResult } from '../lib/pagination.js';
+import { toPaginatedResult } from '@nexus/shared-types';
 
 type InvoiceListFilters = Omit<
   InvoiceListQuery,
@@ -214,6 +214,57 @@ export function createInvoicesService(
         update.total = toPrismaDecimal(totals.total);
       }
       return prisma.invoice.update({ where: { id }, data: update });
+    },
+
+    async sendInvoice(tenantId: string, id: string): Promise<Invoice> {
+      const existing = await loadOrThrow(tenantId, id);
+      if (existing.status !== 'DRAFT') {
+        throw new BusinessRuleError('Only draft invoices can be sent');
+      }
+      const updated = await prisma.invoice.update({
+        where: { id },
+        data: { status: 'SENT' },
+      });
+      await producer
+        .publish(TOPICS.INVOICES, {
+          type: 'invoice.sent',
+          tenantId,
+          payload: {
+            invoiceId: updated.id,
+            accountId: updated.accountId,
+            total: Number(updated.total.toFixed(2)),
+            sentAt: updated.updatedAt.toISOString(),
+          },
+        })
+        .catch(() => undefined);
+      return updated;
+    },
+
+    async markPaid(tenantId: string, id: string): Promise<Invoice> {
+      const existing = await loadOrThrow(tenantId, id);
+      if (existing.status === 'VOID') {
+        throw new BusinessRuleError('Cannot mark a voided invoice as paid');
+      }
+      if (existing.status === 'PAID') {
+        throw new ConflictError('Invoice', 'already paid');
+      }
+      const updated = await prisma.invoice.update({
+        where: { id },
+        data: { status: 'PAID', paidAt: new Date(), paidAmount: existing.total },
+      });
+      await producer
+        .publish(TOPICS.PAYMENTS, {
+          type: 'invoice.paid',
+          tenantId,
+          payload: {
+            invoiceId: updated.id,
+            accountId: updated.accountId,
+            amount: Number(updated.total.toFixed(2)),
+            markedPaid: true,
+          },
+        })
+        .catch(() => undefined);
+      return updated;
     },
 
     async voidInvoice(tenantId: string, id: string): Promise<Invoice> {

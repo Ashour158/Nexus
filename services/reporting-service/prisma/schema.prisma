@@ -8,25 +8,28 @@ datasource db {
   url      = env("REPORTING_DATABASE_URL")
 }
 
+/// Legacy template-based report definitions (Prompt 16+).
 model ReportDefinition {
-  id          String           @id @default(cuid())
+  id          String                     @id @default(cuid())
   tenantId    String?
   name        String
   description String?
   category    String
-  isTemplate  Boolean          @default(false)
+  isTemplate  Boolean                    @default(false)
   datasource  String
   querySpec   Json
   ownerId     String?
-  isShared    Boolean          @default(false)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  schedules   ReportSchedule[]
+  isShared    Boolean                    @default(false)
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+  schedules   DefinitionReportSchedule[]
 
   @@index([tenantId, category])
+  @@unique([id, tenantId])
 }
 
-model ReportSchedule {
+/// Schedules for `ReportDefinition` reports (legacy).
+model DefinitionReportSchedule {
   id         String           @id @default(cuid())
   reportId   String
   report     ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
@@ -35,10 +38,156 @@ model ReportSchedule {
   format     String           @default("xlsx")
   recipients String[]
   lastRunAt  DateTime?
-  nextRunAt  DateTime?
-  isActive   Boolean          @default(true)
   createdAt  DateTime         @default(now())
 
   @@index([tenantId])
-  @@index([nextRunAt, isActive])
+  @@unique([id, tenantId])
+}
+
+// ─── Prompt 29 — Custom Report Builder ───────────────────────────────────────
+
+model ReportFolder {
+  id        String        @id @default(cuid())
+  tenantId  String
+  name      String
+  ownerId   String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  reports   SavedReport[]
+
+  @@index([tenantId, ownerId])
+  @@unique([id, tenantId])
+}
+
+model SavedReport {
+  id          String          @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  objectType  String
+  columns     Json            @default("[]")
+  filters     Json            @default("[]")
+  groupBy     String?
+  sortBy      String          @default("createdAt")
+  sortDir     String          @default("desc")
+  isShared    Boolean         @default(false)
+  ownerId     String
+  folderId    String?
+  folder      ReportFolder?   @relation(fields: [folderId], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  schedules   ReportSchedule[]
+
+  @@index([tenantId, ownerId])
+  @@index([tenantId, objectType])
+  @@unique([id, tenantId])
+}
+
+model ReportSchedule {
+  id          String      @id @default(cuid())
+  tenantId    String
+  reportId    String
+  report      SavedReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  cron        String
+  format      String      @default("csv")
+  recipients  String[]
+  subject     String?
+  lastRunAt   DateTime?
+  nextRunAt   DateTime?
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, isActive, nextRunAt])
+  @@index([isActive, nextRunAt])
+  @@unique([id, tenantId])
+}
+
+model Dashboard {
+  id        String            @id @default(cuid())
+  tenantId  String
+  name      String
+  ownerId   String
+  isShared  Boolean           @default(false)
+  isPinned  Boolean           @default(false)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  widgets   DashboardWidget[]
+
+  @@index([tenantId, ownerId])
+  @@unique([id, tenantId])
+}
+
+model DashboardWidget {
+  id            String    @id @default(cuid())
+  tenantId      String
+  dashboardId   String
+  dashboard     Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  title         String
+  widgetType    String
+  reportId      String?
+  config        Json      @default("{}")
+  position      Int       @default(0)
+  width         Int       @default(6)
+  height        Int       @default(4)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tenantId, dashboardId])
+  @@unique([id, tenantId])
+}
+
+model PipelineSnapshot {
+  id          String   @id @default(cuid())
+  tenantId    String
+  pipelineId  String
+  snapshotDate DateTime
+  stage       String
+  dealCount   Int      @default(0)
+  totalValue  Decimal  @db.Decimal(18, 2) @default(0)
+  dealIds     Json     @default("[]")
+  createdAt   DateTime @default(now())
+
+  @@unique([tenantId, pipelineId, snapshotDate, stage])
+  @@index([tenantId, pipelineId, snapshotDate])
+  @@unique([id, tenantId])
+}
+
+model ReportAuditLog {
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String
+  action      String   // report_executed, report_exported, report_scheduled, report_deleted
+  reportId    String
+  reportName  String
+  format      String?
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([tenantId, action])
+  @@index([createdAt])
+  @@unique([id, tenantId])
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { DEV_PREVIEW_ENABLED, apiError, apiSuccess, getDevPreviewState } from '@/lib/server/dev-preview-data';
 
 const FINANCE_URL = process.env.FINANCE_SERVICE_URL ?? 'http://finance-service:3002/api/v1';
 
@@ -7,12 +8,26 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   const auth = req.headers.get('authorization');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const body = await req.text();
+  if (!auth && !DEV_PREVIEW_ENABLED) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const body = await req.json().catch(() => ({}));
+  if (DEV_PREVIEW_ENABLED) {
+    const state = getDevPreviewState();
+    const index = state.currencies.findIndex((currency) => currency.id === params.id);
+    if (index === -1) {
+      return NextResponse.json(apiError('Currency not found', 'NOT_FOUND'), { status: 404 });
+    }
+    if (body.isBase) {
+      state.currencies = state.currencies.map((currency) => ({ ...currency, isBase: false }));
+    }
+    state.currencies[index] = { ...state.currencies[index], ...body };
+    return NextResponse.json(apiSuccess(state.currencies[index]));
+  }
+
   const res = await fetch(`${FINANCE_URL}/currencies/${params.id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: auth },
-    body,
+    headers: { 'Content-Type': 'application/json', Authorization: auth ?? '' },
+    body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
   return NextResponse.json(data, { status: res.status });
@@ -23,12 +38,18 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const auth = req.headers.get('authorization');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth && !DEV_PREVIEW_ENABLED) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  if (DEV_PREVIEW_ENABLED) {
+    const state = getDevPreviewState();
+    state.currencies = state.currencies.filter((currency) => currency.id !== params.id);
+    return NextResponse.json(apiSuccess({ id: params.id, deleted: true }));
+  }
+
   const res = await fetch(`${FINANCE_URL}/currencies/${params.id}`, {
     method: 'DELETE',
-    headers: { Authorization: auth },
+    headers: { Authorization: auth ?? '' },
   });
   const data = await res.json().catch(() => ({}));
   return NextResponse.json(data, { status: res.status });
 }
-

@@ -43,7 +43,7 @@ export async function registerQuotasRoutes(
     const { id } = IdParam.parse(request.params);
     const body = PlanBody.partial().parse(request.body);
     const data = await quotas.updatePlan(tenantId, id, body);
-    if (!data) return reply.code(404).send({ success: false, error: 'Plan not found' });
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Plan not found', requestId: request.id } });
     return reply.send({ success: true, data });
   });
 
@@ -51,7 +51,7 @@ export async function registerQuotasRoutes(
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const { id } = IdParam.parse(request.params);
     const data = await quotas.getPlanAttainment(tenantId, id);
-    if (!data) return reply.code(404).send({ success: false, error: 'Plan not found' });
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Plan not found', requestId: request.id } });
     return reply.send({ success: true, data });
   });
 

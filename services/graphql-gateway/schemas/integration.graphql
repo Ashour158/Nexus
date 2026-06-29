@@ -1,0 +1,201 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  webhookSubscriptions(limit: Int, offset: Int): [WebhookSubscription!]!
+  webhookSubscription(id: ID!): WebhookSubscription
+  webhookDeliveries(subscriptionId: ID!): [WebhookDelivery!]!
+  oAuthConnections(limit: Int, offset: Int): [OAuthConnection!]!
+  oAuthConnection(id: ID!): OAuthConnection
+  syncJobs(limit: Int, offset: Int): [SyncJob!]!
+  syncJob(id: ID!): SyncJob
+  syncedCalendarEvents(limit: Int, offset: Int): [SyncedCalendarEvent!]!
+  syncedCalendarEvent(id: ID!): SyncedCalendarEvent
+  geocodedAccounts(limit: Int, offset: Int): [GeocodedAccount!]!
+  geocodedAccount(id: ID!): GeocodedAccount
+}
+
+type Mutation {
+  createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSubscription!
+  updateWebhookSubscription(id: ID!, input: UpdateWebhookSubscriptionInput!): WebhookSubscription!
+  deleteWebhookSubscription(id: ID!): Boolean!
+  createOAuthConnection(input: CreateOAuthConnectionInput!): OAuthConnection!
+  updateOAuthConnection(id: ID!, input: UpdateOAuthConnectionInput!): OAuthConnection!
+  deleteOAuthConnection(id: ID!): Boolean!
+  createSyncJob(input: CreateSyncJobInput!): SyncJob!
+  updateSyncJob(id: ID!, input: UpdateSyncJobInput!): SyncJob!
+  deleteSyncJob(id: ID!): Boolean!
+  createSyncedCalendarEvent(input: CreateSyncedCalendarEventInput!): SyncedCalendarEvent!
+  deleteSyncedCalendarEvent(id: ID!): Boolean!
+  createGeocodedAccount(input: CreateGeocodedAccountInput!): GeocodedAccount!
+  updateGeocodedAccount(id: ID!, input: UpdateGeocodedAccountInput!): GeocodedAccount!
+  deleteGeocodedAccount(id: ID!): Boolean!
+}
+
+type WebhookSubscription @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  targetUrl: String!
+  secret: String!
+  events: [String!]!
+  isActive: Boolean!
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  deliveries: [WebhookDelivery!]!
+}
+
+type WebhookDelivery @key(fields: "id") {
+  id: ID!
+  subscriptionId: String!
+  subscription: WebhookSubscription
+  tenantId: String!
+  eventType: String!
+  payload: JSON!
+  status: DeliveryStatus!
+  httpStatus: Int
+  responseBody: String
+  attemptCount: Int!
+  nextRetryAt: DateTime
+  deliveredAt: DateTime
+  createdAt: DateTime!
+}
+
+type OAuthConnection @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  userId: String!
+  provider: String!
+  scope: String!
+  accessToken: String!
+  refreshToken: String
+  expiresAt: DateTime
+  email: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  syncJobs: [SyncJob!]!
+}
+
+type SyncJob @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  connectionId: String!
+  connection: OAuthConnection
+  jobType: String!
+  status: SyncStatus!
+  totalRecords: Int!
+  processedRecords: Int!
+  errorCount: Int!
+  errorLog: JSON!
+  startedAt: DateTime
+  completedAt: DateTime
+  createdAt: DateTime!
+}
+
+type SyncedCalendarEvent @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  activityId: String!
+  provider: String!
+  externalId: String!
+  etag: String
+  syncedAt: DateTime!
+}
+
+type GeocodedAccount @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  accountId: String!
+  lat: Float!
+  lng: Float!
+  geocodedAt: DateTime!
+}
+
+enum DeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+  RETRYING
+}
+
+enum SyncStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELED
+}
+
+input CreateWebhookSubscriptionInput {
+  tenantId: String!
+  name: String!
+  targetUrl: String!
+  secret: String!
+  events: [String!]
+}
+
+input UpdateWebhookSubscriptionInput {
+  name: String
+  targetUrl: String
+  secret: String
+  events: [String!]
+  isActive: Boolean
+}
+
+input CreateOAuthConnectionInput {
+  tenantId: String!
+  userId: String!
+  provider: String!
+  scope: String!
+  accessToken: String!
+  refreshToken: String
+  expiresAt: DateTime
+  email: String
+}
+
+input UpdateOAuthConnectionInput {
+  accessToken: String
+  refreshToken: String
+  expiresAt: DateTime
+  email: String
+}
+
+input CreateSyncJobInput {
+  tenantId: String!
+  connectionId: String!
+  jobType: String!
+}
+
+input UpdateSyncJobInput {
+  status: SyncStatus
+  totalRecords: Int
+  processedRecords: Int
+  errorCount: Int
+  errorLog: JSON
+  startedAt: DateTime
+  completedAt: DateTime
+}
+
+input CreateSyncedCalendarEventInput {
+  tenantId: String!
+  activityId: String!
+  provider: String!
+  externalId: String!
+  etag: String
+}
+
+input CreateGeocodedAccountInput {
+  tenantId: String!
+  accountId: String!
+  lat: Float!
+  lng: Float!
+}
+
+input UpdateGeocodedAccountInput {
+  lat: Float
+  lng: Float
+}

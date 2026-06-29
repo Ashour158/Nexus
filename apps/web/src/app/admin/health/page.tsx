@@ -1,13 +1,15 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+
+const ResponseTimeChart = dynamic(() => import('./charts').then((m) => m.ResponseTimeChart), { ssr: false });
 
 type Status = 'Healthy' | 'Degraded' | 'Down';
 type ServiceHealth = { name: string; port: number; status: Status; responseMs: number; uptime: number; checkedAt: string };
 
 const SERVICES = [
-  ['auth',3000],['crm',3001],['finance',3002],['notification',3003],['realtime',3005],['search',3006],['workflow',3007],['analytics',3008],['comm',3009],['storage',3010],['billing',3011],['integration',3012],['blueprint',3013],['approval',3014],['data',3015],['document',3016],['chatbot',3017],['cadence',3018],['territory',3019],['planning',3020],['reporting',3021],['portal',3022],['knowledge',3023],['incentive',3024],
+  ['auth',3000],['crm',3001],['finance',3002],['notification',3003],['realtime',3005],['search',3006],['workflow',3007],['analytics',3008],['comm',3009],['storage',3010],['integration',3012],['blueprint',3013],['approval',3014],['data',3015],['document',3016],['chatbot',3017],['cadence',3018],['territory',3019],['planning',3020],['reporting',3021],['portal',3022],['knowledge',3023],['incentive',3024],
 ] as const;
 
 export default function AdminHealthPage() {
@@ -39,7 +41,7 @@ export default function AdminHealthPage() {
     <div className="space-y-5">
       <h2 className="text-2xl font-bold">System Health</h2>
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {services.map((s) => <div key={s.name} className="rounded-xl border border-gray-800 bg-gray-900 p-3 text-sm"><div className="flex items-center justify-between"><span className="font-semibold">{s.name}:{s.port}</span><span className={`rounded px-2 py-0.5 text-xs ${s.status === 'Healthy' ? 'bg-green-700' : s.status === 'Degraded' ? 'bg-yellow-700' : 'bg-red-700'}`}>{s.status}</span></div><p className="mt-2 text-gray-300">{s.responseMs} ms · Uptime {s.uptime.toFixed(1)}%</p><p className="mt-1 text-xs text-gray-500">Last checked {new Date(s.checkedAt).toLocaleTimeString()}</p></div>)}
+        {services.map((s) => <div key={s.name} className="rounded-xl border border-gray-800 bg-gray-900 p-3 text-sm"><div className="flex items-center justify-between"><span className="font-semibold">{s.name}:{s.port}</span><span className={`rounded px-2 py-0.5 text-xs ${s.status === 'Healthy' ? 'bg-green-700' : s.status === 'Degraded' ? 'bg-yellow-700' : 'bg-red-700'}`}>{s.status}</span></div><p className="mt-2 text-gray-300">{s.responseMs} ms Â· Uptime {s.uptime.toFixed(1)}%</p><p className="mt-1 text-xs text-gray-500">Last checked {new Date(s.checkedAt).toLocaleTimeString()}</p></div>)}
       </section>
 
       <section className="rounded-xl border border-gray-800 bg-gray-900 p-4">
@@ -49,7 +51,7 @@ export default function AdminHealthPage() {
 
       <section className="rounded-xl border border-gray-800 bg-gray-900 p-4">
         <h3 className="mb-3 text-sm font-semibold">Response times (last hour)</h3>
-        <div className="h-64 w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={series}><XAxis dataKey="t" hide /><YAxis /><Tooltip /><Line type="monotone" dataKey="p50" stroke="#3b82f6" dot={false} /><Line type="monotone" dataKey="p95" stroke="#f59e0b" dot={false} /></LineChart></ResponsiveContainer></div>
+        <div className="h-64 w-full"><ResponseTimeChart data={series} /></div>
       </section>
     </div>
   );

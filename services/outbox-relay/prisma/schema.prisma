@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/outbox-relay-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("OUTBOX_RELAY_DATABASE_URL")
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  key            String?
+  payload        Json
+  headers        Json     @default("{}")
+  tenantId       String
+  aggregateType  String
+  aggregateId    String
+  eventType      String
+  createdAt      DateTime @default(now())
+  processedAt    DateTime?
+  error          String?
+  retryCount     Int      @default(0)
+
+  @@index([processedAt, retryCount, createdAt])
+  @@index([aggregateType, aggregateId])
+}

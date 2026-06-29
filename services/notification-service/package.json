@@ -10,8 +10,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate deploy",
-    "db:push": "prisma db push"
+    "db:migrate": "prisma migrate deploy"
   },
   "dependencies": {
     "@fastify/rate-limit": "^9.1.0",
@@ -26,13 +25,19 @@
     "fastify": "^4.28.1",
     "nodemailer": "^6.9.14",
     "prom-client": "^15.1.0",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "@fastify/swagger": "^9.0.0",
+    "@fastify/swagger-ui": "^5.0.0",
+    "graphql": "^16.13.2",
+    "graphql-yoga": "^5.21.0",
+    "@apollo/subgraph": "^2.13.3",
+    "dataloader": "^2.2.3"
   },
   "devDependencies": {
     "@types/node": "^20.14.9",
     "@types/nodemailer": "^6.4.15",
     "@types/supertest": "^7.2.0",
-    "prisma": "^5.15.0",
+    "prisma": "^5.22.0",
     "supertest": "^7.2.2",
     "tsx": "^4.16.0",
     "typescript": "^5.5.3",

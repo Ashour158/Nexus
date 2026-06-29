@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("COMM_DATABASE_URL")
 }
 
 model EmailTemplate {
@@ -22,6 +22,7 @@ model EmailTemplate {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 model SmsTemplate {
@@ -35,6 +36,7 @@ model SmsTemplate {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 model EmailSequence {
@@ -48,6 +50,7 @@ model EmailSequence {
   createdAt    DateTime               @default(now())
 
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 model SequenceStep {
@@ -75,9 +78,10 @@ model SequenceEnrollment {
   @@index([tenantId])
   @@index([status, nextSendAt])
   @@index([sequenceId])
+  @@unique([id, tenantId])
 }
 
-model OutboxMessage {
+model CommOutbox {
   id           String    @id @default(cuid())
   tenantId     String
   channel      String
@@ -96,4 +100,47 @@ model OutboxMessage {
 
   @@index([tenantId])
   @@index([tenantId, status])
+  @@unique([id, tenantId])
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
+}
+
+/// WhatsApp Business API outbound/inbound thread (Prompt 32).
+model WhatsAppMessage {
+  id          String   @id @default(cuid())
+  tenantId    String
+  contactId   String?
+  dealId      String?
+  direction   String
+  /// WhatsApp Phone Number ID or sender id (outbound metadata).
+  from        String
+  to          String
+  body        String   @db.Text
+  status      String
+  externalId  String?
+  sentBy      String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, contactId])
+  @@index([externalId])
+  @@unique([id, tenantId])
 }

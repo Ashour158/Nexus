@@ -152,7 +152,7 @@ export default function IntegrationsPage(): JSX.Element {
           <p className="p-6 text-center text-sm text-slate-500">No sync jobs yet.</p>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+            <thead className="bg-slate-50 text-start text-xs uppercase text-slate-500">
               <tr><th className="px-3 py-2">Provider</th><th>Type</th><th>Status</th><th>Started</th><th>Completed</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100">

@@ -1,0 +1,230 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  emailTemplates(limit: Int, offset: Int): [EmailTemplate!]!
+  emailTemplate(id: ID!): EmailTemplate
+  smsTemplates(limit: Int, offset: Int): [SmsTemplate!]!
+  smsTemplate(id: ID!): SmsTemplate
+  emailSequences(limit: Int, offset: Int): [EmailSequence!]!
+  emailSequence(id: ID!): EmailSequence
+  sequenceSteps(sequenceId: ID!): [SequenceStep!]!
+  sequenceEnrollments(limit: Int, offset: Int): [SequenceEnrollment!]!
+  sequenceEnrollment(id: ID!): SequenceEnrollment
+  commOutbox(limit: Int, offset: Int): [CommOutbox!]!
+  commOutboxItem(id: ID!): CommOutbox
+  whatsAppMessages(limit: Int, offset: Int): [WhatsAppMessage!]!
+  whatsAppMessage(id: ID!): WhatsAppMessage
+}
+
+type Mutation {
+  createEmailTemplate(input: CreateEmailTemplateInput!): EmailTemplate!
+  updateEmailTemplate(id: ID!, input: UpdateEmailTemplateInput!): EmailTemplate!
+  deleteEmailTemplate(id: ID!): Boolean!
+  createSmsTemplate(input: CreateSmsTemplateInput!): SmsTemplate!
+  updateSmsTemplate(id: ID!, input: UpdateSmsTemplateInput!): SmsTemplate!
+  deleteSmsTemplate(id: ID!): Boolean!
+  createEmailSequence(input: CreateEmailSequenceInput!): EmailSequence!
+  updateEmailSequence(id: ID!, input: UpdateEmailSequenceInput!): EmailSequence!
+  deleteEmailSequence(id: ID!): Boolean!
+  createSequenceStep(input: CreateSequenceStepInput!): SequenceStep!
+  deleteSequenceStep(id: ID!): Boolean!
+  createSequenceEnrollment(input: CreateSequenceEnrollmentInput!): SequenceEnrollment!
+  updateSequenceEnrollment(id: ID!, input: UpdateSequenceEnrollmentInput!): SequenceEnrollment!
+  deleteSequenceEnrollment(id: ID!): Boolean!
+  createCommOutbox(input: CreateCommOutboxInput!): CommOutbox!
+  updateCommOutbox(id: ID!, input: UpdateCommOutboxInput!): CommOutbox!
+  deleteCommOutbox(id: ID!): Boolean!
+  createWhatsAppMessage(input: CreateWhatsAppMessageInput!): WhatsAppMessage!
+}
+
+type EmailTemplate @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  subject: String!
+  htmlBody: String!
+  textBody: String!
+  variables: [String!]!
+  category: String!
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type SmsTemplate @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  body: String!
+  variables: [String!]!
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type EmailSequence @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  triggerType: String!
+  isActive: Boolean!
+  steps: [SequenceStep!]!
+  enrollments: [SequenceEnrollment!]!
+  createdAt: DateTime!
+}
+
+type SequenceStep @key(fields: "id") {
+  id: ID!
+  sequenceId: String!
+  sequence: EmailSequence
+  stepNumber: Int!
+  delayDays: Int!
+  templateId: String!
+}
+
+type SequenceEnrollment @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  sequenceId: String!
+  sequence: EmailSequence
+  contactId: String!
+  currentStep: Int!
+  status: String!
+  enrolledAt: DateTime!
+  nextSendAt: DateTime
+}
+
+type CommOutbox @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  channel: String!
+  to: String!
+  subject: String
+  body: String!
+  status: String!
+  templateId: String
+  entityType: String
+  entityId: String
+  sentAt: DateTime
+  openedAt: DateTime
+  clickedAt: DateTime
+  errorMessage: String
+  createdAt: DateTime!
+}
+
+type WhatsAppMessage @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  contactId: String
+  dealId: String
+  direction: String!
+  from: String!
+  to: String!
+  body: String!
+  status: String!
+  externalId: String
+  sentBy: String
+  createdAt: DateTime!
+}
+
+input CreateEmailTemplateInput {
+  tenantId: String!
+  name: String!
+  subject: String!
+  htmlBody: String!
+  textBody: String!
+  variables: [String!]
+  category: String
+}
+
+input UpdateEmailTemplateInput {
+  name: String
+  subject: String
+  htmlBody: String
+  textBody: String
+  variables: [String!]
+  category: String
+  isActive: Boolean
+}
+
+input CreateSmsTemplateInput {
+  tenantId: String!
+  name: String!
+  body: String!
+  variables: [String!]
+}
+
+input UpdateSmsTemplateInput {
+  name: String
+  body: String
+  variables: [String!]
+  isActive: Boolean
+}
+
+input CreateEmailSequenceInput {
+  tenantId: String!
+  name: String!
+  triggerType: String!
+}
+
+input UpdateEmailSequenceInput {
+  name: String
+  triggerType: String
+  isActive: Boolean
+}
+
+input CreateSequenceStepInput {
+  sequenceId: String!
+  stepNumber: Int!
+  delayDays: Int
+  templateId: String!
+}
+
+input CreateSequenceEnrollmentInput {
+  tenantId: String!
+  sequenceId: String!
+  contactId: String!
+  nextSendAt: DateTime
+}
+
+input UpdateSequenceEnrollmentInput {
+  currentStep: Int
+  status: String
+  nextSendAt: DateTime
+}
+
+input CreateCommOutboxInput {
+  tenantId: String!
+  channel: String!
+  to: String!
+  subject: String
+  body: String!
+  templateId: String
+  entityType: String
+  entityId: String
+}
+
+input UpdateCommOutboxInput {
+  status: String
+  sentAt: DateTime
+  openedAt: DateTime
+  clickedAt: DateTime
+  errorMessage: String
+}
+
+input CreateWhatsAppMessageInput {
+  tenantId: String!
+  contactId: String
+  dealId: String
+  direction: String!
+  from: String!
+  to: String!
+  body: String!
+  status: String!
+  externalId: String
+  sentBy: String
+}

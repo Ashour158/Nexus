@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, type ReactElement } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCreateLead } from '@/hooks/use-leads';
 import { useCreateContact } from '@/hooks/use-contacts';
 import { useCreateAccount } from '@/hooks/use-accounts';
 import { useCreateDeal } from '@/hooks/use-deals';
 import { useAuthStore } from '@/stores/auth.store';
+import { contactSchema, dealSchema, leadSchema } from '@/lib/schemas';
+import { notify } from '@/lib/toast';
 
 type ModalType = 'lead' | 'contact' | 'account' | 'deal' | null;
 
@@ -20,9 +22,18 @@ export function QuickCreateFab(): ReactElement {
   const createAccount = useCreateAccount();
   const createDeal = useCreateDeal();
 
+  useEffect(() => {
+    if (!modal) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setModal(null);
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [modal]);
+
   return (
     <>
-      <div className="fixed bottom-6 right-6 z-40">
+      <div className="fixed bottom-6 end-6 z-40">
         {open ? (
           <div className="mb-2 flex flex-col items-end gap-2">
             <FabItem label="Lead" onClick={() => setModal('lead')} />
@@ -42,8 +53,19 @@ export function QuickCreateFab(): ReactElement {
 
       {modal === 'lead' ? (
         <SimpleModal title="Create Lead" onClose={() => setModal(null)} onSubmit={async (v) => {
-          await createLead.mutateAsync({
+          const parsed = leadSchema.safeParse({
             firstName: v.name,
+            lastName: 'Lead',
+            email: '',
+            company: '',
+            source: 'MANUAL',
+          });
+          if (!parsed.success) {
+            notify.error('Validation error', parsed.error.errors[0]?.message);
+            return;
+          }
+          await createLead.mutateAsync({
+            firstName: parsed.data.firstName,
             lastName: 'Lead',
             ownerId: userId,
             source: 'MANUAL',
@@ -58,16 +80,28 @@ export function QuickCreateFab(): ReactElement {
 
       {modal === 'contact' ? (
         <SimpleModal title="Create Contact" onClose={() => setModal(null)} onSubmit={async (v) => {
-          await createContact.mutateAsync({
+          const parsed = contactSchema.safeParse({
             firstName: v.name,
             lastName: 'Contact',
+            email: '',
+            phone: '',
+            jobTitle: '',
+          });
+          if (!parsed.success) {
+            notify.error('Validation error', parsed.error.errors[0]?.message);
+            return;
+          }
+          await createContact.mutateAsync({
+            firstName: parsed.data.firstName,
+            lastName: 'Contact',
+            accountId: v.idOrRef || 'acct-preview',
             ownerId: userId,
             customFields: {},
             tags: [],
           });
           await qc.invalidateQueries({ queryKey: ['contacts'] });
           setModal(null);
-        }} />
+        }} includeRefs />
       ) : null}
 
       {modal === 'account' ? (
@@ -78,6 +112,7 @@ export function QuickCreateFab(): ReactElement {
             type: 'PROSPECT',
             tier: 'SMB',
             status: 'ACTIVE',
+            currency: 'USD',
             customFields: {},
             tags: [],
           });
@@ -88,14 +123,26 @@ export function QuickCreateFab(): ReactElement {
 
       {modal === 'deal' ? (
         <SimpleModal title="Create Deal" onClose={() => setModal(null)} onSubmit={async (v) => {
-          await createDeal.mutateAsync({
+          const parsed = dealSchema.safeParse({
             name: v.name,
+            amount: 0,
+            expectedCloseDate: new Date().toISOString().slice(0, 10),
+            stageId: v.thirdRef,
+            pipelineId: v.secondRef,
+          });
+          if (!parsed.success) {
+            notify.error('Validation error', parsed.error.errors[0]?.message);
+            return;
+          }
+          await createDeal.mutateAsync({
+            name: parsed.data.name,
             ownerId: userId,
             accountId: v.idOrRef,
-            pipelineId: v.secondRef,
-            stageId: v.thirdRef,
+            pipelineId: parsed.data.pipelineId,
+            stageId: parsed.data.stageId,
             currency: 'USD',
-            amount: 0,
+            amount: parsed.data.amount,
+            expectedCloseDate: `${parsed.data.expectedCloseDate}T00:00:00.000Z`,
             contactIds: [],
             customFields: {},
             tags: [],
@@ -136,14 +183,17 @@ function SimpleModal({
   const [secondRef, setSecondRef] = useState('');
   const [thirdRef, setThirdRef] = useState('');
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 md:items-center md:p-4">
       <form
-        className="w-full max-w-md space-y-3 rounded-lg bg-white p-4"
+        className="max-h-[90vh] w-full space-y-3 overflow-y-auto rounded-t-2xl bg-white p-4 md:max-w-md md:rounded-2xl dark:bg-slate-900"
         onSubmit={(e) => {
           e.preventDefault();
           void onSubmit({ name, idOrRef, secondRef, thirdRef });
         }}
       >
+        <div className="flex justify-center pb-1 pt-1 md:hidden">
+          <div className="h-1 w-10 rounded-full bg-slate-300 dark:bg-slate-600" />
+        </div>
         <h3 className="text-lg font-semibold">{title}</h3>
         <input className="h-9 w-full rounded border border-slate-200 px-3 text-sm" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
         {includeRefs ? (

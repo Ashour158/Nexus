@@ -1,0 +1,25 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  realtimeHealth: Health!
+  connectedUsers: Int!
+}
+
+type Mutation {
+  broadcast(input: BroadcastInput!): Boolean!
+}
+
+type Health {
+  status: String!
+  service: String!
+}
+
+input BroadcastInput {
+  room: String!
+  event: String!
+  payload: JSON!
+}

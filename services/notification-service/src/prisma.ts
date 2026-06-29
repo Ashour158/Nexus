@@ -1,4 +1,5 @@
 import { PrismaClient } from '../../../node_modules/.prisma/notification-client/index.js';
+import { buildDatabaseUrl } from '@nexus/service-utils/db';
 
 /**
  * Notification service Prisma client.
@@ -11,7 +12,13 @@ import { PrismaClient } from '../../../node_modules/.prisma/notification-client/
  */
 
 export function createNotificationPrisma(): PrismaClient {
-  return new PrismaClient();
+  return new PrismaClient({
+    datasources: {
+      db: {
+        url: buildDatabaseUrl({ connectionLimit: 5, poolTimeout: 10, databaseUrl: process.env.NOTIFICATION_DATABASE_URL }),
+      },
+    },
+  });
 }
 
 export type NotificationPrisma = PrismaClient;

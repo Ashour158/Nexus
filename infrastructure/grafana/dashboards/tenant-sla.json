@@ -1,0 +1,117 @@
+﻿{
+  "dashboard": {
+    "title": "Tenant SLA Dashboard",
+    "tags": ["sla", "tenant", "nexus"],
+    "timezone": "UTC",
+    "templating": {
+      "list": [
+        {
+          "name": "tenant_id",
+          "type": "query",
+          "query": "label_values(http_requests_total, tenant_id)",
+          "refresh": 1
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Availability — $tenant_id",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "1 - (sum(rate(http_requests_total{tenant_id=~\"$tenant_id\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{tenant_id=~\"$tenant_id\"}[5m])))",
+            "legendFormat": "availability"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "thresholds": {
+              "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "yellow", "value": 0.99 },
+                { "color": "green", "value": 0.999 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 }
+      },
+      {
+        "id": 2,
+        "title": "Latency P95 — $tenant_id",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{tenant_id=~\"$tenant_id\"}[5m])) by (le))",
+            "legendFormat": "p95"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "steps": [
+                { "color": "green", "value": 0 },
+                { "color": "yellow", "value": 0.3 },
+                { "color": "red", "value": 0.5 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 }
+      },
+      {
+        "id": 3,
+        "title": "Error Rate — $tenant_id",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{tenant_id=~\"$tenant_id\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{tenant_id=~\"$tenant_id\"}[5m]))",
+            "legendFormat": "error %"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 }
+      },
+      {
+        "id": 4,
+        "title": "Error Budget Consumption",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "(1 - (sum(increase(http_requests_total{tenant_id=~\"$tenant_id\",status!~\"5..\"}[30d])) / sum(increase(http_requests_total{tenant_id=~\"$tenant_id\"}[30d])))) / (1 - 0.999)",
+            "legendFormat": "budget consumed"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 }
+      },
+      {
+        "id": 5,
+        "title": "Tenant Resource Usage",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum by (pod) (container_cpu_usage_seconds_total{namespace=\"nexus\",pod=~\"nexus-crm-.*\"})",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }
+      },
+      {
+        "id": 6,
+        "title": "Active Users — $tenant_id",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum by (user_id) (rate(http_requests_total{tenant_id=~\"$tenant_id\"}[5m])) > 0",
+            "legendFormat": "active"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 }
+      }
+    ],
+    "time": { "from": "now-24h", "to": "now" },
+    "refresh": "30s"
+  }
+}

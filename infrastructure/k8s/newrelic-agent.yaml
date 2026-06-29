@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: newrelic-agent
+  namespace: nexus-monitoring
+spec:
+  selector:
+    matchLabels:
+      app: newrelic-agent
+  template:
+    metadata:
+      labels:
+        app: newrelic-agent
+    spec:
+      serviceAccountName: newrelic-agent
+      containers:
+        - name: agent
+          image: newrelic/infrastructure-k8s:2.13.0
+          env:
+            - name: NRIA_LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: newrelic-license
+                  key: license-key
+            - name: CLUSTER_NAME
+              value: nexus-crm
+          volumeMounts:
+            - name: varrun
+              mountPath: /var/run/docker.sock
+            - name: hostroot
+              mountPath: /host
+              readOnly: true
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+      volumes:
+        - name: varrun
+          hostPath:
+            path: /var/run/docker.sock
+        - name: hostroot
+          hostPath:
+            path: /

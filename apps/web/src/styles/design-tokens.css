@@ -1,0 +1,26 @@
+/* Vars without @layer: postcss hoists @import before @tailwind directives. */
+:root {
+  --color-primary: #4F6CF7;
+  --color-primary-dark: #3D56C5;
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-surface: #FFFFFF;
+  --color-background: #F8FAFC;
+  --color-text-primary: #1E293B;
+  --color-text-secondary: #64748B;
+  --spacing-base: 4px;
+  --font-family: 'Inter', system-ui, sans-serif;
+}
+
+.dark {
+  --color-primary: #4F6CF7;
+  --color-primary-dark: #3D56C5;
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-surface: #0F172A;
+  --color-background: #1E293B;
+  --color-text-primary: #F1F5F9;
+  --color-text-secondary: #94A3B8;
+}

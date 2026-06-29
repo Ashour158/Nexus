@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("WORKFLOW_DATABASE_URL")
 }
 
 model WorkflowTemplate {
@@ -22,9 +22,29 @@ model WorkflowTemplate {
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   executions        WorkflowExecution[]
+  versions          WorkflowVersion[]
 
   @@index([tenantId])
   @@index([tenantId, trigger, isActive])
+  @@unique([id, tenantId])
+}
+
+model WorkflowVersion {
+  id           String           @id @default(cuid())
+  tenantId     String
+  workflowId   String
+  workflow     WorkflowTemplate @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  version      Int
+  nodes        Json
+  edges        Json
+  name         String
+  description  String?
+  createdBy    String
+  createdAt    DateTime         @default(now())
+
+  @@index([tenantId, workflowId])
+  @@unique([workflowId, version])
+  @@unique([id, tenantId])
 }
 
 model WorkflowExecution {
@@ -49,8 +69,10 @@ model WorkflowExecution {
 
   @@index([tenantId])
   @@index([tenantId, status])
+  @@index([tenantId, status, resumeAt])
   @@index([status, resumeAt])
   @@index([parentExecId])
+  @@unique([id, tenantId])
 }
 
 model WorkflowForkTracker {
@@ -96,4 +118,120 @@ enum StepStatus {
   COMPLETED
   FAILED
   SKIPPED
+}
+
+model Journey {
+  id            String            @id @default(cuid())
+  tenantId      String
+  name          String
+  description   String?
+  status        JourneyStatus     @default(DRAFT)
+  entryTrigger  String            // FORM_SUBMIT, TAG_ADDED, MANUAL, API
+  entryConfig   Json              @default("{}") // segment rules, form id, tag name
+  nodes         Json              // React Flow compatible node array
+  edges         Json              // React Flow compatible edge array
+  settings      Json              @default("{}") // exit conditions, re-entry rules
+  version       Int               @default(1)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  enrollments   JourneyEnrollment[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@unique([id, tenantId])
+}
+
+model JourneyEnrollment {
+  id          String        @id @default(cuid())
+  tenantId    String
+  journeyId   String
+  journey     Journey       @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  contactId   String
+  currentNodeId String?
+  status      EnrollmentStatus @default(ACTIVE)
+  enteredAt   DateTime      @default(now())
+  exitedAt    DateTime?
+  exitReason  String?       // COMPLETED, GOAL_REACHED, UNSUBSCRIBED, ERROR
+  metadata    Json          @default("{}")
+
+  @@index([tenantId])
+  @@index([journeyId, status])
+  @@index([contactId])
+  @@unique([journeyId, contactId], name: "journeyId_contactId")
+}
+
+enum JourneyStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  EXITED
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
+}
+
+// ─── SLA Engine ─────────────────────────────────────────────────────────────
+
+model SlaDefinition {
+  id            String       @id @default(cuid())
+  tenantId      String
+  name          String
+  description   String?
+  entityType    String       // deal, lead, ticket, etc.
+  stageId       String?      // optional: specific pipeline stage
+  condition     Json         @default("{}") // JSON filter conditions
+  timeLimitHours Int         @default(24)
+  businessHoursOnly Boolean  @default(true)
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  breaches      SlaBreach[]
+
+  @@index([tenantId])
+  @@index([tenantId, entityType, isActive])
+  @@unique([id, tenantId])
+}
+
+model SlaBreach {
+  id             String        @id @default(cuid())
+  tenantId       String
+  slaId          String
+  sla            SlaDefinition @relation(fields: [slaId], references: [id], onDelete: Cascade)
+  entityId       String        // the deal/lead/ticket ID that breached
+  entityType     String
+  status         String        @default("BREACHED") // BREACHED, ESCALATED, RESOLVED
+  breachedAt     DateTime      @default(now())
+  resolvedAt     DateTime?
+  escalationLevel Int          @default(1)
+  metadata       Json          @default("{}")
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([slaId, entityId])
+  @@unique([id, tenantId])
 }

@@ -1,3 +1,5 @@
+import { createHttpClient } from '@nexus/service-utils';
+
 export interface SmsEnvelope {
   to: string;
   body: string;
@@ -32,6 +34,17 @@ export function createSmsChannel(log: {
 
   const sid = process.env.TWILIO_ACCOUNT_SID!.trim();
 
+  const client = createHttpClient({
+    baseURL: `https://api.twilio.com/2010-04-01/Accounts/${sid}`,
+    headers: {
+      Authorization: `Basic ${auth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    timeoutMs: 10_000,
+    maxRetries: 3,
+    circuitBreaker: { failureThreshold: 5, resetTimeoutMs: 30_000 },
+  });
+
   return {
     async send(envelope) {
       const body = new URLSearchParams({
@@ -39,21 +52,7 @@ export function createSmsChannel(log: {
         From: from,
         Body: envelope.body,
       });
-      const res = await fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Basic ${auth}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: body.toString(),
-        }
-      );
-      if (!res.ok) {
-        const t = await res.text();
-        throw new Error(`Twilio send failed: ${res.status} ${t}`);
-      }
+      await client.post('/Messages.json', body.toString());
     },
   };
 }

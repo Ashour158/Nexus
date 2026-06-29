@@ -1,0 +1,56 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: error-budget-alerts
+  namespace: nexus-monitoring
+  labels:
+    release: prometheus
+spec:
+  groups:
+    - name: error-budgets
+      rules:
+        - alert: ErrorBudgetBurnRateFast
+          expr: |
+            (
+              sum(rate(http_requests_total{status=~"5.."}[1h]))
+              /
+              sum(rate(http_requests_total[1h]))
+            ) > (1 - 0.999) * 14.4
+          for: 2m
+          labels:
+            severity: critical
+            burn_rate: fast
+          annotations:
+            summary: "Fast error budget burn detected"
+            description: "Error rate is {{ $value | humanizePercentage }} over 1h, burning budget rapidly"
+
+        - alert: ErrorBudgetBurnRateSlow
+          expr: |
+            (
+              sum(rate(http_requests_total{status=~"5.."}[6h]))
+              /
+              sum(rate(http_requests_total[6h]))
+            ) > (1 - 0.999) * 2
+          for: 15m
+          labels:
+            severity: warning
+            burn_rate: slow
+          annotations:
+            summary: "Slow error budget burn detected"
+            description: "Error rate is {{ $value | humanizePercentage }} over 6h"
+
+        - alert: ErrorBudgetExhausted
+          expr: |
+            (
+              1 - (
+                sum(increase(http_requests_total{status!~"5.."}[30d]))
+                /
+                sum(increase(http_requests_total[30d]))
+              )
+            ) > (1 - 0.999)
+          for: 1h
+          labels:
+            severity: critical
+          annotations:
+            summary: "Error budget exhausted"
+            description: "30-day error budget for API availability has been exhausted"

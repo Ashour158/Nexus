@@ -1050,8 +1050,11 @@ model LeadRoutingEvent {
 model OutboxMessage {
   id            String    @id @default(cuid())
   topic         String
+  tenantId      String?
+  key           String?
   payload       Json
   aggregateId   String?
+  eventType     String?
   correlationId String?
   headers       Json      @default("{}")
   status        String    @default("PENDING")
@@ -1062,6 +1065,7 @@ model OutboxMessage {
 
   @@index([status, createdAt])
   @@index([aggregateId])
+  @@index([tenantId])
 }
 
 model User {

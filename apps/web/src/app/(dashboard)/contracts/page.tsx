@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useUiStore } from '@/stores/ui.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { formatCurrency, formatDate } from '@/lib/format';
+import SendForSignature from '@/components/esign/SendForSignature';
 
 interface Contract {
   id: string;
@@ -154,8 +155,8 @@ export default function ContractsPage(): JSX.Element {
           <p className="p-8 text-center text-sm text-slate-500">No contracts found.</p>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-              <tr><th className="px-3 py-2">Title</th><th>Account</th><th>Status</th><th>Value</th><th>Start Date</th><th>End Date</th><th className="pr-3 text-right">Actions</th></tr>
+            <thead className="bg-slate-50 text-start text-xs uppercase text-slate-500">
+              <tr><th className="px-3 py-2">Title</th><th>Account</th><th>Status</th><th>Value</th><th>Start Date</th><th>End Date</th><th className="pe-3 text-end">Actions</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {contracts.map((contract) => (
@@ -166,7 +167,10 @@ export default function ContractsPage(): JSX.Element {
                   <td>{contract.currency} {formatCurrency(Number(contract.totalValue))}</td>
                   <td>{contract.startDate ? formatDate(contract.startDate) : '—'}</td>
                   <td>{contract.endDate ? formatDate(contract.endDate) : '—'}</td>
-                  <td className="pr-3 text-right">{contract.status === 'DRAFT' ? <Button variant="secondary" onClick={() => sign.mutate(contract.id)} disabled={sign.isPending}>Sign</Button> : null}</td>
+                  <td className="space-y-2 pe-3 text-end">
+                    {contract.status === 'DRAFT' ? <Button variant="secondary" onClick={() => sign.mutate(contract.id)} disabled={sign.isPending}>Sign</Button> : null}
+                    <SendForSignature contractId={contract.id} documentName={contract.name} />
+                  </td>
                 </tr>
               ))}
             </tbody>

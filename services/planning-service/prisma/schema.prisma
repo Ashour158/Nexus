@@ -22,6 +22,7 @@ model QuotaPlan {
   targets   QuotaTarget[]
 
   @@index([tenantId, year])
+  @@unique([id, tenantId])
 }
 
 model QuotaTarget {
@@ -37,6 +38,7 @@ model QuotaTarget {
 
   @@unique([planId, ownerId])
   @@index([tenantId, ownerId])
+  @@unique([id, tenantId])
 }
 
 model ForecastSubmission {
@@ -53,6 +55,7 @@ model ForecastSubmission {
 
   @@unique([tenantId, ownerId, period])
   @@index([tenantId, ownerId, period])
+  @@unique([id, tenantId])
 }
 
 model ForecastReview {
@@ -66,9 +69,51 @@ model ForecastReview {
   reviewedAt     DateTime           @default(now())
 }
 
+// ─── Prompt 31 — Forecast Manager Override ───────────────────────────────────
+
+model ForecastOverride {
+  id              String   @id @default(cuid())
+  tenantId        String
+  periodKey       String
+  repId           String
+  managerId       String
+  originalValue   Decimal  @db.Decimal(18, 2)
+  overrideValue   Decimal  @db.Decimal(18, 2)
+  note            String?
+  scopePipelineId String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, periodKey, repId, scopePipelineId])
+  @@index([tenantId, periodKey])
+  @@index([tenantId, repId])
+  @@unique([id, tenantId])
+}
+
 enum QuotaType {
   REVENUE
   DEAL_COUNT
   ACTIVITY_COUNT
   NEW_LOGOS
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
 }

@@ -1,688 +1,798 @@
 'use client';
 
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useEffect, useMemo, useState, type JSX } from 'react';
-import { useParams } from 'next/navigation';
-import { useInfiniteQuery } from '@tanstack/react-query';
-import type {
-  Activity,
-  Contact,
-  Deal,
-  Note,
-  PaginatedResult,
-  TimelineEvent,
-} from '@nexus/shared-types';
-import type { CreateActivityInput } from '@nexus/validation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/cn';
-import { formatCurrency, formatDateTime } from '@/lib/format';
-import { api } from '@/lib/api-client';
+import { useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { Account, AccountHealthInsight, Contact, Deal, PaginatedResult } from '@nexus/shared-types';
+import type { UpdateAccountInput } from '@nexus/validation';
 import {
-  accountKeys,
+  ArrowLeft,
+  BadgeDollarSign,
+  Building2,
+  Edit3,
+  FileText,
+  Globe2,
+  Landmark,
+  MapPin,
+  PackageCheck,
+  Phone,
+  ShieldCheck,
+  Tag,
+  UploadCloud,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import {
   useAccount,
   useAccountContacts,
   useAccountDeals,
   useAccountHealth,
+  useAccountOrders,
+  useAccountQuotes,
   useUpdateAccount,
 } from '@/hooks/use-accounts';
-import {
-  useActivities,
-  useCompleteActivity,
-  useCreateActivity,
-  useDeleteActivity,
-} from '@/hooks/use-activities';
-import {
-  useCreateNote,
-  useDeleteNote,
-  useNotes,
-  usePinNote,
-} from '@/hooks/use-notes';
-import { useAccountEmailThreads } from '@/hooks/use-email-threads';
+import { api } from '@/lib/api-client';
+import { formatCurrency, formatDate } from '@/lib/format';
+import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/auth.store';
-import { useUiStore } from '@/stores/ui.store';
+import { useRealtimeAccount } from '@/hooks/use-realtime';
 
-type TabId = 'overview' | 'timeline' | 'activities' | 'notes' | 'deals' | 'emails';
+type AccountTab =
+  | 'contacts'
+  | 'deals'
+  | 'quotes'
+  | 'orders'
+  | 'documents'
+  | 'hierarchy'
+  | 'governance'
+  | 'fieldHistory'
+  | 'audit'
+  | 'outbox'
+  | 'duplicates';
 
-function normalizeWebsiteForPatch(raw: string): string | undefined {
-  const w = raw.trim();
-  if (!w) return undefined;
-  if (w.startsWith('http://') || w.startsWith('https://')) return w;
-  return `https://${w}`;
+interface HierarchyNode {
+  id: string;
+  name: string;
+  children?: HierarchyNode[];
 }
 
-export default function AccountDetailPage(): JSX.Element {
-  const params = useParams<{ id: string }>();
-  const accountId = params?.id ?? '';
-  const userId = useAuthStore((s) => s.userId);
-  const pushToast = useUiStore((s) => s.pushToast);
-  const [tab, setTab] = useState<TabId>('overview');
-
+export default function AccountDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const accountId = params.id as string;
+  const [tab, setTab] = useState<AccountTab>('quotes');
+  const [editOpen, setEditOpen] = useState(false);
+  const documentInputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const isDevPreview = process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS !== 'false';
+  const canRead = hasPermission('accounts:read') || isDevPreview;
+  const canUpdate = hasPermission('accounts:update') || isDevPreview;
   const accountQuery = useAccount(accountId);
-  const account = accountQuery.data;
+  const contactsQuery = useAccountContacts(accountId);
+  const dealsQuery = useAccountDeals(accountId);
+  const quotesQuery = useAccountQuotes(accountId);
+  const ordersQuery = useAccountOrders(accountId);
   const healthQuery = useAccountHealth(accountId);
-  const dealsQuery = useAccountDeals(accountId, { limit: 50, page: 1 });
-  const contactsQuery = useAccountContacts(accountId, { limit: 25, page: 1 });
-  const deals = dealsQuery.data?.data ?? [];
-  const contacts = contactsQuery.data?.data ?? [];
-
-  const timelineInfinite = useInfiniteQuery({
-    queryKey: accountKeys.timeline(accountId, { limit: 20 }),
-    queryFn: ({ pageParam }) =>
-      api.get<PaginatedResult<TimelineEvent>>(`/accounts/${accountId}/timeline`, {
-        params: { page: typeof pageParam === 'number' ? pageParam : 1, limit: 20 },
-      }),
-    initialPageParam: 1,
-    getNextPageParam: (last) => (last.hasNextPage ? last.page + 1 : undefined),
-    enabled: Boolean(accountId && account),
-  });
-  const timelineEvents = useMemo(
-    () => timelineInfinite.data?.pages.flatMap((p) => p.data) ?? [],
-    [timelineInfinite.data]
-  );
-
-  const activitiesQuery = useActivities({ accountId, limit: 100, page: 1 });
-  const activities = activitiesQuery.data?.data ?? [];
-
-  const notesQuery = useNotes({ accountId, limit: 100, page: 1 });
-  const notes = notesQuery.data?.data ?? [];
-  const emailThreadsQuery = useAccountEmailThreads(accountId);
-  const emailThreads = emailThreadsQuery.data ?? [];
-
   const updateAccount = useUpdateAccount();
-  const createActivity = useCreateActivity();
-  const completeActivity = useCompleteActivity();
-  const deleteActivity = useDeleteActivity();
-  const createNote = useCreateNote();
-  const deleteNote = useDeleteNote();
-  const pinNote = usePinNote();
+  useRealtimeAccount(accountId);
 
-  const [draft, setDraft] = useState({
-    name: '',
-    website: '',
-    industry: '',
-    phone: '',
-    email: '',
+  const hierarchyQuery = useQuery<HierarchyNode>({
+    queryKey: ['accounts', accountId, 'hierarchy'],
+    queryFn: () => api.get<HierarchyNode>(`/accounts/${accountId}/hierarchy`),
+    enabled: Boolean(accountId) && tab === 'hierarchy',
+  });
+  const documentsQuery = useQuery<Record<string, unknown>[]>({
+    queryKey: ['accounts', accountId, 'documents'],
+    queryFn: () => api.get<Record<string, unknown>[]>(`/accounts/${accountId}/documents`),
+    enabled: Boolean(accountId) && tab === 'documents',
+  });
+  const fieldHistoryQuery = useQuery<Record<string, unknown>[]>({
+    queryKey: ['accounts', accountId, 'field-history'],
+    queryFn: () => api.get<Record<string, unknown>[]>(`/accounts/${accountId}/field-history`),
+    enabled: Boolean(accountId) && tab === 'fieldHistory',
+  });
+  const auditQuery = useQuery<Record<string, unknown>[]>({
+    queryKey: ['accounts', accountId, 'audit'],
+    queryFn: () => api.get<Record<string, unknown>[]>(`/accounts/${accountId}/audit`),
+    enabled: Boolean(accountId) && tab === 'audit',
+  });
+  const outboxQuery = useQuery<Record<string, unknown>[]>({
+    queryKey: ['accounts', accountId, 'outbox'],
+    queryFn: () => api.get<Record<string, unknown>[]>(`/accounts/${accountId}/outbox`),
+    enabled: Boolean(accountId) && tab === 'outbox',
+  });
+  const duplicatesQuery = useQuery<Record<string, unknown>[]>({
+    queryKey: ['accounts', accountId, 'duplicates'],
+    queryFn: () => api.get<Record<string, unknown>[]>(`/accounts/${accountId}/duplicates`),
+    enabled: Boolean(accountId) && tab === 'duplicates',
+  });
+  const uploadDocument = useMutation({
+    mutationFn: (file: File) =>
+      api.post<Record<string, unknown>[]>(`/accounts/${accountId}/documents`, {
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type || 'application/octet-stream',
+        category: 'account',
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['accounts', accountId, 'documents'] }),
   });
 
-  useEffect(() => {
-    if (!account) return;
-    setDraft({
-      name: account.name,
-      website: account.website ?? '',
-      industry: account.industry ?? '',
-      phone: account.phone ?? '',
-      email: account.email ?? '',
-    });
-  }, [account]);
+  const account = accountQuery.data;
+  const health = healthQuery.data;
 
-  const [activityForm, setActivityForm] = useState<{
-    type: CreateActivityInput['type'];
-    subject: string;
-    dueDate: string;
-  }>({ type: 'TASK', subject: '', dueDate: '' });
-  const [noteBody, setNoteBody] = useState('');
-
-  function onSave(e: React.FormEvent) {
-    e.preventDefault();
-    if (!account) return;
-    updateAccount.mutate(
-      {
-        id: account.id,
-        data: {
-          name: draft.name.trim(),
-          website: normalizeWebsiteForPatch(draft.website),
-          industry: draft.industry.trim() || undefined,
-          phone: draft.phone.trim() || undefined,
-          email: draft.email.trim() || undefined,
-        },
-      },
-      {
-        onSuccess: () =>
-          pushToast({ variant: 'success', title: 'Account updated' }),
-        onError: (err) =>
-          pushToast({
-            variant: 'error',
-            title: 'Update failed',
-            description: err.message,
-          }),
-      }
-    );
-  }
-
-  function onCreateActivity(e: React.FormEvent) {
-    e.preventDefault();
-    if (!account || !userId) return;
-    if (!activityForm.subject.trim()) {
-      pushToast({ variant: 'warning', title: 'Subject is required' });
-      return;
-    }
-    createActivity.mutate(
-      {
-        type: activityForm.type,
-        subject: activityForm.subject.trim(),
-        priority: 'NORMAL',
-        ownerId: userId,
-        accountId: account.id,
-        dueDate: activityForm.dueDate
-          ? new Date(activityForm.dueDate).toISOString()
-          : undefined,
-        customFields: {},
-      },
-      {
-        onSuccess: () => {
-          pushToast({ variant: 'success', title: 'Activity created' });
-          setActivityForm({ type: 'TASK', subject: '', dueDate: '' });
-          activitiesQuery.refetch();
-          timelineInfinite.refetch();
-        },
-        onError: (err) =>
-          pushToast({
-            variant: 'error',
-            title: 'Could not create activity',
-            description: err.message,
-          }),
-      }
-    );
-  }
-
-  function onCreateNote(e: React.FormEvent) {
-    e.preventDefault();
-    if (!account) return;
-    if (!noteBody.trim()) return;
-    createNote.mutate(
-      { content: noteBody.trim(), accountId: account.id, isPinned: false },
-      {
-        onSuccess: () => {
-          pushToast({ variant: 'success', title: 'Note added' });
-          setNoteBody('');
-          notesQuery.refetch();
-          timelineInfinite.refetch();
-        },
-        onError: (err) =>
-          pushToast({
-            variant: 'error',
-            title: 'Could not save note',
-            description: err.message,
-          }),
-      }
+  if (!canRead) {
+    return (
+      <div className="px-6 py-8">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
+          You do not have permission to view accounts.
+        </div>
+      </div>
     );
   }
 
   if (accountQuery.isLoading) {
     return (
-      <main className="px-6 py-6">
-        <p className="text-sm text-slate-500">Loading account…</p>
-      </main>
+      <div className="space-y-4 px-6 py-8">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-96" />
+      </div>
     );
   }
 
   if (accountQuery.isError || !account) {
     return (
-      <main className="px-6 py-6">
-        <p className="text-sm text-red-600">
-          {accountQuery.error instanceof Error
-            ? accountQuery.error.message
-            : 'Account not found'}
-        </p>
-        <Link href="/accounts" className="mt-2 inline-block text-sm text-slate-700 underline">
-          Back to accounts
-        </Link>
-      </main>
+      <div className="px-6 py-8">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+          Failed to load account: {accountQuery.error instanceof Error ? accountQuery.error.message : 'Unknown error'}
+        </div>
+      </div>
     );
   }
 
-  const health = healthQuery.data;
+  const tabs: { id: AccountTab; label: string }[] = [
+    { id: 'quotes', label: 'CPQ Quotes' },
+    { id: 'orders', label: 'Orders' },
+    { id: 'documents', label: 'Documents' },
+    { id: 'contacts', label: 'Contacts' },
+    { id: 'deals', label: 'Deals' },
+    { id: 'hierarchy', label: 'Hierarchy' },
+    { id: 'governance', label: 'Governance' },
+    { id: 'fieldHistory', label: 'Field History' },
+    { id: 'audit', label: 'Audit' },
+    { id: 'outbox', label: 'Outbox' },
+    { id: 'duplicates', label: 'Duplicates' },
+  ];
 
   return (
-    <main className="space-y-4 px-6 py-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <Link href="/accounts" className="hover:text-slate-800">
-              Accounts
-            </Link>
-            <span>/</span>
-            <span className="text-xs">{account.type} · {account.tier}</span>
-          </div>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">{account.name}</h1>
-          {account.website ? (
-            <a
-              href={
-                account.website.startsWith('http')
-                  ? account.website
-                  : `https://${account.website}`
-              }
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm text-blue-700 hover:underline"
-            >
-              {account.website}
-            </a>
-          ) : null}
-        </div>
-        {health ? (
-          <div className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-right text-sm">
-            <p className="text-xs uppercase text-slate-500">Health score</p>
-            <p className="text-2xl font-bold text-slate-900">{health.score ?? '—'}</p>
-          </div>
-        ) : null}
-      </header>
-
-      {contacts.length > 0 ? (
-        <section className="rounded-lg border border-slate-100 bg-slate-50/80 p-3 text-sm">
-          <p className="text-xs font-semibold uppercase text-slate-500">Key contacts</p>
-          <ul className="mt-2 flex flex-wrap gap-2">
-            {contacts.slice(0, 6).map((c: Contact) => (
-              <li key={c.id}>
-                <Link
-                  href={`/contacts/${c.id}`}
-                  className="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs hover:bg-slate-50"
-                >
-                  {c.firstName} {c.lastName}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      <nav className="flex flex-wrap gap-1 border-b border-slate-200">
-        {(
-          [
-            ['overview', 'Overview'],
-            ['timeline', 'Timeline'],
-            ['activities', 'Activities'],
-            ['notes', 'Notes'],
-            ['deals', 'Deals'],
-            ['emails', 'Emails'],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setTab(id)}
-            className={cn(
-              '-mb-px border-b-2 px-3 py-2 text-sm',
-              tab === id
-                ? 'border-slate-900 font-semibold text-slate-900'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
-
-      {tab === 'overview' ? (
-        <form
-          onSubmit={onSave}
-          className="max-w-2xl space-y-4 rounded-lg border border-slate-200 bg-white p-5"
-        >
-          <h2 className="text-sm font-semibold text-slate-900">Company</h2>
-          <label className="block text-sm">
-            <span className="text-xs font-medium text-slate-600">Name</span>
-            <Input
-              value={draft.name}
-              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              className="mt-1"
-            />
-          </label>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm">
-              <span className="text-xs font-medium text-slate-600">Website</span>
-              <Input
-                value={draft.website}
-                onChange={(e) => setDraft({ ...draft, website: e.target.value })}
-                className="mt-1"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="text-xs font-medium text-slate-600">Industry</span>
-              <Input
-                value={draft.industry}
-                onChange={(e) => setDraft({ ...draft, industry: e.target.value })}
-                className="mt-1"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="text-xs font-medium text-slate-600">Phone</span>
-              <Input
-                value={draft.phone}
-                onChange={(e) => setDraft({ ...draft, phone: e.target.value })}
-                className="mt-1"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="text-xs font-medium text-slate-600">Email</span>
-              <Input
-                type="email"
-                value={draft.email}
-                onChange={(e) => setDraft({ ...draft, email: e.target.value })}
-                className="mt-1"
-              />
-            </label>
-          </div>
-          <div className="flex justify-end">
-            <Button type="submit" disabled={updateAccount.isPending}>
-              {updateAccount.isPending ? 'Saving…' : 'Save changes'}
-            </Button>
-          </div>
-          <dl className="grid gap-2 border-t border-slate-100 pt-4 text-sm text-slate-600 sm:grid-cols-2">
-            <div>
-              <dt className="text-xs uppercase text-slate-400">Status</dt>
-              <dd>{account.status}</dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase text-slate-400">Annual revenue</dt>
-              <dd>
-                {account.annualRevenue
-                  ? formatCurrency(Number(account.annualRevenue))
-                  : '—'}
-              </dd>
-            </div>
-          </dl>
-        </form>
-      ) : null}
-
-      {tab === 'timeline' ? (
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Timeline</h2>
-          {timelineInfinite.isLoading ? (
-            <p className="mt-4 text-sm text-slate-500">Loading…</p>
-          ) : timelineEvents.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500">No events yet.</p>
-          ) : (
-            <ul className="mt-4 space-y-3">
-              {timelineEvents.map((ev: TimelineEvent) => (
-                <li
-                  key={ev.id}
-                  className="border-l-2 border-slate-200 pl-3 text-sm"
-                >
-                  <div className="flex flex-wrap items-baseline gap-2">
-                    <span className="font-medium text-slate-900">{ev.title}</span>
-                    <span className="text-xs text-slate-400">
-                      {formatDateTime(ev.at)}
-                    </span>
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] uppercase text-slate-600">
-                      {ev.type}
-                    </span>
-                  </div>
-                  {ev.description ? (
-                    <p className="mt-1 whitespace-pre-wrap text-slate-600">
-                      {ev.description}
-                    </p>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-          {timelineInfinite.hasNextPage ? (
-            <Button
+    <div className="space-y-6 bg-slate-50 px-4 py-6 sm:px-6">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-6 py-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <button
               type="button"
-              variant="secondary"
-              className="mt-4"
-              onClick={() => timelineInfinite.fetchNextPage()}
-              disabled={timelineInfinite.isFetchingNextPage}
+              onClick={() => router.push('/accounts')}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
             >
-              {timelineInfinite.isFetchingNextPage ? 'Loading…' : 'Load more'}
-            </Button>
-          ) : null}
-        </section>
-      ) : null}
-
-      {tab === 'activities' ? (
-        <div className="grid gap-4 lg:grid-cols-3">
-          <form
-            onSubmit={onCreateActivity}
-            className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 lg:col-span-1"
-          >
-            <h2 className="text-sm font-semibold text-slate-900">New activity</h2>
-            <label className="block text-sm">
-              <span className="text-xs text-slate-600">Type</span>
-              <select
-                value={activityForm.type}
-                onChange={(e) =>
-                  setActivityForm({
-                    ...activityForm,
-                    type: e.target.value as CreateActivityInput['type'],
-                  })
-                }
-                className="mt-1 w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm"
-              >
-                <option value="TASK">TASK</option>
-                <option value="CALL">CALL</option>
-                <option value="EMAIL">EMAIL</option>
-                <option value="MEETING">MEETING</option>
-              </select>
-            </label>
-            <label className="block text-sm">
-              <span className="text-xs text-slate-600">Subject</span>
-              <Input
-                value={activityForm.subject}
-                onChange={(e) =>
-                  setActivityForm({ ...activityForm, subject: e.target.value })
-                }
-                className="mt-1"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="text-xs text-slate-600">Due</span>
-              <Input
-                type="datetime-local"
-                value={activityForm.dueDate}
-                onChange={(e) =>
-                  setActivityForm({ ...activityForm, dueDate: e.target.value })
-                }
-                className="mt-1"
-              />
-            </label>
-            <Button type="submit" disabled={createActivity.isPending} className="w-full">
-              {createActivity.isPending ? 'Creating…' : 'Add activity'}
-            </Button>
-          </form>
-          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white lg:col-span-2">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-3 py-2">Subject</th>
-                  <th className="px-3 py-2">Due</th>
-                  <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {activities.map((a: Activity) => (
-                  <tr key={a.id}>
-                    <td className="px-3 py-2 font-medium">{a.subject}</td>
-                    <td className="px-3 py-2 text-slate-600">
-                      {formatDateTime(a.dueDate)}
-                    </td>
-                    <td className="px-3 py-2">{a.status}</td>
-                    <td className="px-3 py-2 text-right">
-                      {a.status !== 'COMPLETED' && a.status !== 'CANCELLED' ? (
-                        <div className="inline-flex gap-1">
-                          <button
-                            type="button"
-                            className="rounded border border-slate-200 px-2 py-0.5 text-xs hover:bg-slate-50"
-                            onClick={() =>
-                              completeActivity.mutate(
-                                { id: a.id, outcome: 'Completed' },
-                                {
-                                  onSuccess: () => {
-                                    pushToast({
-                                      variant: 'success',
-                                      title: 'Completed',
-                                    });
-                                    activitiesQuery.refetch();
-                                  },
-                                }
-                              )
-                            }
-                          >
-                            Done
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-700 hover:bg-red-50"
-                            onClick={() => {
-                              if (!confirm('Remove this activity?')) return;
-                              deleteActivity.mutate(a.id, {
-                                onSuccess: () => activitiesQuery.refetch(),
-                              });
-                            }}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {activities.length === 0 ? (
-              <p className="p-6 text-center text-sm text-slate-500">No activities.</p>
-            ) : null}
+              <ArrowLeft className="h-4 w-4" />
+              Back to accounts
+            </button>
+            {canUpdate ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="secondary" onClick={() => setEditOpen((open) => !open)}>
+                  <Edit3 className="h-4 w-4" />
+                  Edit Account
+                </Button>
+                <Button
+                  onClick={() =>
+                    updateAccount.mutate({
+                      id: account.id,
+                      data: { customFields: { ...(account.customFields ?? {}), reviewedAt: new Date().toISOString() } },
+                    })
+                  }
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  Mark Reviewed
+                </Button>
+              </div>
+            ) : (
+              <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+                Editing is restricted by role permissions.
+              </p>
+            )}
           </div>
         </div>
-      ) : null}
 
-      {tab === 'notes' ? (
-        <div className="space-y-4">
-          <form
-            onSubmit={onCreateNote}
-            className="rounded-lg border border-slate-200 bg-white p-4"
-          >
-            <h2 className="text-sm font-semibold text-slate-900">Add note</h2>
-            <Textarea
-              value={noteBody}
-              onChange={(e) => setNoteBody(e.target.value)}
-              rows={3}
-              className="mt-2"
-            />
-            <div className="mt-2 flex justify-end">
-              <Button type="submit" disabled={createNote.isPending}>
-                Save note
-              </Button>
+        <div className="grid gap-6 p-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="space-y-4">
+            <div className="rounded-xl border border-slate-100 bg-white p-5">
+              <p className="font-mono text-xs font-bold uppercase tracking-wider text-blue-700">{account.code ?? account.id}</p>
+              <h1 className="mt-2 text-2xl font-bold text-slate-950">{account.name}</h1>
+              <p className="mt-1 text-sm text-slate-500">{account.legalName ?? account.tradeName ?? 'Legal name not captured'}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Badge>{account.type}</Badge>
+                <Badge>{account.tier}</Badge>
+                <Badge tone={account.status === 'AT_RISK' ? 'amber' : account.status === 'CHURNED' ? 'rose' : 'emerald'}>{account.status}</Badge>
+              </div>
             </div>
-          </form>
-          <ul className="space-y-2">
-            {notes.map((n: Note) => (
-              <li
-                key={n.id}
-                className="rounded-lg border border-slate-200 bg-white p-3 text-sm"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <p className="whitespace-pre-wrap text-slate-800">{n.content}</p>
-                  <div className="flex shrink-0 gap-1">
-                    <button
-                      type="button"
-                      className="text-xs text-slate-600 hover:underline"
-                      onClick={() =>
-                        pinNote.mutate(
-                          { id: n.id, pinned: !n.isPinned },
-                          { onSuccess: () => notesQuery.refetch() }
-                        )
-                      }
-                    >
-                      {n.isPinned ? 'Unpin' : 'Pin'}
-                    </button>
-                    <button
-                      type="button"
-                      className="text-xs text-red-600 hover:underline"
-                      onClick={() => {
-                        if (!confirm('Delete this note?')) return;
-                        deleteNote.mutate(n.id, {
-                          onSuccess: () => notesQuery.refetch(),
-                        });
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-                <p className="mt-2 text-xs text-slate-400">
-                  {formatDateTime(n.createdAt)}
-                </p>
-              </li>
-            ))}
-          </ul>
-          {notes.length === 0 ? (
-            <p className="text-sm text-slate-500">No notes yet.</p>
-          ) : null}
-        </div>
-      ) : null}
 
-      {tab === 'deals' ? (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-3 py-2">Deal</th>
-                <th className="px-3 py-2">Amount</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Stage</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {deals.map((d: Deal) => (
-                <tr key={d.id} className="hover:bg-slate-50">
-                  <td className="px-3 py-2">
-                    <Link
-                      href={`/deals/${d.id}`}
-                      className="font-medium text-slate-900 hover:underline"
-                    >
-                      {d.name}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs">
-                    {d.currency} {d.amount}
-                  </td>
-                  <td className="px-3 py-2">{d.status}</td>
-                  <td className="px-3 py-2 font-mono text-[11px] text-slate-500">
-                    {d.stageId.slice(0, 8)}…
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {deals.length === 0 ? (
-            <p className="p-6 text-center text-sm text-slate-500">No deals.</p>
-          ) : null}
-        </div>
-      ) : null}
+            <InfoCard title="Health" icon={<ShieldCheck className="h-4 w-4" />}>
+              <HealthBlock health={health} fallbackScore={account.healthScore} />
+            </InfoCard>
 
-      {tab === 'emails' ? (
-        <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Email threads</h2>
-          {emailThreadsQuery.isLoading ? (
-            <p className="text-sm text-slate-500">Loading…</p>
-          ) : emailThreads.length === 0 ? (
-            <p className="text-sm text-slate-500">No email threads.</p>
-          ) : (
-            <ul className="space-y-2">
-              {emailThreads.map((t) => (
-                <li key={t.id} className="rounded border border-slate-200 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium">{t.subject}</p>
-                    {!t.isRead ? (
-                      <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
-                        Unread
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">{t.snippet ?? 'No snippet'}</p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {formatDateTime(t.lastMessageAt)} · {t.messageCount} messages
-                  </p>
-                </li>
-              ))}
-            </ul>
+            <InfoCard title="Commercial Controls" icon={<BadgeDollarSign className="h-4 w-4" />}>
+              <DetailItem label="Payment terms" value={account.paymentTerms ?? 'Not set'} />
+              <DetailItem label="Credit limit" value={money(account.creditLimit, account.currency)} />
+              <DetailItem label="Currency" value={account.currency ?? 'USD'} />
+              <DetailItem label="Price book" value={account.priceBookId ?? 'Default'} />
+              <DetailItem label="Territory" value={account.territoryId ?? 'Unassigned'} />
+            </InfoCard>
+
+            <InfoCard title="Tags" icon={<Tag className="h-4 w-4" />}>
+              <TagCloud values={account.tags} />
+            </InfoCard>
+          </aside>
+
+          <main className="space-y-6">
+            {editOpen && (
+              <AccountEditPanel
+                account={account}
+                isSaving={updateAccount.isPending}
+                onCancel={() => setEditOpen(false)}
+                onSave={(data) =>
+                  updateAccount.mutate(
+                    { id: account.id, data },
+                    { onSuccess: () => setEditOpen(false) }
+                  )
+                }
+              />
+            )}
+            <div className="grid gap-4 lg:grid-cols-2">
+              <InfoCard title="Account Identity" icon={<Building2 className="h-4 w-4" />}>
+                <DetailItem label="Account name" value={account.name} />
+                <DetailItem label="Code" value={account.code ?? account.id} />
+                <DetailItem label="Industry" value={[account.industry, account.subIndustry].filter(Boolean).join(' / ') || 'Not set'} />
+                <DetailItem label="Lifecycle" value={account.lifecycleStage ?? 'Not set'} />
+                <DetailItem label="Founded" value={account.foundedYear?.toString() ?? 'Not set'} />
+                <DetailItem label="Employees" value={account.employeeCount?.toString() ?? 'Not set'} />
+              </InfoCard>
+
+              <InfoCard title="Communication" icon={<Phone className="h-4 w-4" />}>
+                <DetailItem label="Email" value={account.email ?? 'Not set'} />
+                <DetailItem label="Phone" value={account.phone ?? 'Not set'} />
+                <DetailItem label="Fax" value={account.fax ?? 'Not set'} />
+                <DetailItem label="Website" value={link(account.website)} />
+                <DetailItem label="LinkedIn" value={link(account.linkedInUrl)} />
+              </InfoCard>
+
+              <InfoCard title="Billing Address" icon={<Landmark className="h-4 w-4" />}>
+                <AddressBlock account={account} prefix="billing" />
+              </InfoCard>
+
+              <InfoCard title="Shipping Address" icon={<PackageCheck className="h-4 w-4" />}>
+                <AddressBlock account={account} prefix="shipping" />
+                <DetailItem label="Instructions" value={account.shippingInstructions ?? 'None'} />
+              </InfoCard>
+
+              <InfoCard title="Location" icon={<MapPin className="h-4 w-4" />}>
+                <DetailItem label="Country" value={account.country ?? 'Not set'} />
+                <DetailItem label="City" value={account.city ?? 'Not set'} />
+                <DetailItem label="Main address" value={[account.address, account.zipCode].filter(Boolean).join(', ') || 'Not set'} />
+                <DetailItem label="Coordinates" value={coordinates(account.lat, account.lng) || coordinates(account.billingLatitude, account.billingLongitude) || 'Not mapped'} />
+              </InfoCard>
+
+              <InfoCard title="Compliance" icon={<FileText className="h-4 w-4" />}>
+                <DetailItem label="Tax ID" value={account.taxId ?? 'Not set'} />
+                <DetailItem label="VAT" value={account.vatNumber ?? 'Not set'} />
+                <DetailItem label="Commercial reg." value={account.commercialRegistrationNumber ?? 'Not set'} />
+                <DetailItem label="SIC" value={account.sicCode ?? 'Not set'} />
+                <DetailItem label="NAICS" value={account.naicsCode ?? 'Not set'} />
+              </InfoCard>
+            </div>
+          </main>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-950">Account Workspace</h2>
+            <p className="mt-1 text-sm text-slate-500">Company master data connected to quotes, orders, contacts, and deals.</p>
+          </div>
+        </div>
+        <div className="grid gap-2 border-b border-slate-200 px-6 py-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+          {tabs.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setTab(item.id)}
+              className={cn(
+                'rounded-lg border px-3 py-2 text-sm font-semibold transition',
+                tab === item.id
+                  ? 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'
+              )}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="p-6">
+          {tab === 'quotes' && <CommercialTab icon="quote" rows={quotesQuery.data?.data ?? []} isLoading={quotesQuery.isLoading} empty="No quotes linked to this account." />}
+          {tab === 'orders' && <CommercialTab icon="order" rows={ordersQuery.data?.data ?? []} isLoading={ordersQuery.isLoading} empty="No orders linked to this account." />}
+          {tab === 'documents' && (
+            <DocumentsTab
+              rows={documentsQuery.data ?? []}
+              isLoading={documentsQuery.isLoading}
+              canUpdate={canUpdate}
+              inputRef={documentInputRef}
+              onUpload={(file) => uploadDocument.mutate(file)}
+              isUploading={uploadDocument.isPending}
+            />
           )}
-        </section>
-      ) : null}
-    </main>
+          {tab === 'contacts' && <ContactsTab data={contactsQuery.data} isLoading={contactsQuery.isLoading} />}
+          {tab === 'deals' && <DealsTab data={dealsQuery.data} isLoading={dealsQuery.isLoading} />}
+          {tab === 'hierarchy' && <HierarchyTab data={hierarchyQuery.data} isLoading={hierarchyQuery.isLoading} />}
+          {tab === 'governance' && <GovernanceTab account={account} />}
+          {tab === 'fieldHistory' && <RecordsTab rows={fieldHistoryQuery.data ?? []} isLoading={fieldHistoryQuery.isLoading} title="No field changes" icon="HIST" />}
+          {tab === 'audit' && <RecordsTab rows={auditQuery.data ?? []} isLoading={auditQuery.isLoading} title="No audit events" icon="AUD" />}
+          {tab === 'outbox' && <RecordsTab rows={outboxQuery.data ?? []} isLoading={outboxQuery.isLoading} title="No outbox events" icon="EVT" />}
+          {tab === 'duplicates' && <RecordsTab rows={duplicatesQuery.data ?? []} isLoading={duplicatesQuery.isLoading} title="No duplicate accounts found" icon="DUP" />}
+        </div>
+      </section>
+    </div>
   );
+}
+
+function InfoCard({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-900">
+        <span className="text-blue-600">{icon}</span>
+        {title}
+      </div>
+      <dl className="space-y-2 text-sm">{children}</dl>
+    </div>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[132px_minmax(0,1fr)] gap-3">
+      <dt className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</dt>
+      <dd className="min-w-0 break-words text-slate-700">{value || 'Not set'}</dd>
+    </div>
+  );
+}
+
+function Badge({ children, tone = 'blue' }: { children: ReactNode; tone?: 'blue' | 'emerald' | 'amber' | 'rose' }) {
+  const tones = {
+    blue: 'bg-blue-50 text-blue-700',
+    emerald: 'bg-emerald-50 text-emerald-700',
+    amber: 'bg-amber-50 text-amber-700',
+    rose: 'bg-rose-50 text-rose-700',
+  };
+  return <span className={cn('rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider', tones[tone])}>{children}</span>;
+}
+
+function HealthBlock({ health, fallbackScore }: { health: AccountHealthInsight | undefined; fallbackScore: number | null }) {
+  const score = health?.score ?? fallbackScore ?? 0;
+  return (
+    <div className="space-y-3">
+      <div className="flex items-end justify-between">
+        <span className="text-3xl font-bold text-slate-950">{score}</span>
+        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{health?.status ?? 'UNKNOWN'}</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+        <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.max(0, Math.min(100, score))}%` }} />
+      </div>
+      {(health?.factors ?? []).slice(0, 2).map((factor) => (
+        <p key={factor.code} className="text-xs text-slate-500">
+          {factor.label}: <span className="font-semibold text-slate-700">{String(factor.value)}</span>
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function AddressBlock({ account, prefix }: { account: Account; prefix: 'billing' | 'shipping' }) {
+  const capital = prefix === 'billing' ? 'Billing' : 'Shipping';
+  return (
+    <>
+      <DetailItem label="Line 1" value={account[`${prefix}AddressLine1` as keyof Account] as string | null} />
+      <DetailItem label="Line 2" value={account[`${prefix}AddressLine2` as keyof Account] as string | null} />
+      <DetailItem label={`${capital} city`} value={account[`${prefix}City` as keyof Account] as string | null} />
+      <DetailItem label="State" value={account[`${prefix}State` as keyof Account] as string | null} />
+      <DetailItem label="Postal code" value={account[`${prefix}PostalCode` as keyof Account] as string | null} />
+      <DetailItem label="Country" value={account[`${prefix}Country` as keyof Account] as string | null} />
+    </>
+  );
+}
+
+function CommercialTab({ rows, isLoading, empty, icon }: { rows: Record<string, unknown>[]; isLoading: boolean; empty: string; icon: 'quote' | 'order' }) {
+  if (isLoading) return <Skeleton className="h-48" />;
+  if (rows.length === 0) return <EmptyState icon={icon === 'quote' ? '📄' : '📦'} title={icon === 'quote' ? 'No quotes' : 'No orders'} description={empty} />;
+  return (
+    <div className="grid gap-3 lg:grid-cols-2">
+      {rows.map((row) => (
+        <div key={String(row.id)} className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-mono text-xs font-bold text-blue-700">{String(row.quoteNumber ?? row.orderNumber ?? row.id)}</p>
+              <h3 className="mt-1 text-sm font-bold text-slate-950">{String(row.name ?? 'Commercial record')}</h3>
+            </div>
+            <Badge tone={String(row.status).includes('PENDING') ? 'amber' : 'blue'}>{String(row.status ?? 'OPEN')}</Badge>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+            <DetailMini label="Total" value={money(row.total, row.currency)} />
+            <DetailMini label="Currency" value={String(row.currency ?? 'USD')} />
+            <DetailMini label="Deal" value={String(row.dealId ?? 'None')} />
+            <DetailMini label="Updated" value={formatDate(String(row.updatedAt ?? row.createdAt ?? new Date().toISOString()))} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ContactsTab({ data, isLoading }: { data: PaginatedResult<Contact> | undefined; isLoading: boolean }) {
+  if (isLoading) return <Skeleton className="h-48" />;
+  const contacts = data?.data ?? [];
+  if (contacts.length === 0) return <EmptyState icon="👥" title="No contacts" description="No contacts linked to this account." />;
+  return (
+    <div className="grid gap-3 lg:grid-cols-2">
+      {contacts.map((contact) => (
+        <Link key={contact.id} href={`/contacts/${contact.id}`} className="rounded-xl border border-slate-200 bg-white p-4 hover:border-blue-200 hover:bg-blue-50/30">
+          <p className="text-sm font-bold text-slate-950">{contact.firstName} {contact.lastName}</p>
+          <p className="mt-1 text-xs text-slate-500">{contact.jobTitle ?? 'Stakeholder'} · {contact.email ?? 'No email'}</p>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function DealsTab({ data, isLoading }: { data: PaginatedResult<Deal> | undefined; isLoading: boolean }) {
+  if (isLoading) return <Skeleton className="h-48" />;
+  const deals = data?.data ?? [];
+  if (deals.length === 0) return <EmptyState icon="🤝" title="No deals" description="No deals linked to this account." />;
+  return (
+    <div className="grid gap-3 lg:grid-cols-2">
+      {deals.map((deal) => (
+        <Link key={deal.id} href={`/deals/${deal.id}`} className="rounded-xl border border-slate-200 bg-white p-4 hover:border-blue-200 hover:bg-blue-50/30">
+          <p className="text-sm font-bold text-slate-950">{deal.name}</p>
+          <p className="mt-1 text-xs text-slate-500">{formatCurrency(deal.amount, deal.currency)} · {deal.probability}% · {deal.status}</p>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function HierarchyTab({ data, isLoading }: { data: HierarchyNode | undefined; isLoading: boolean }) {
+  if (isLoading) return <Skeleton className="h-48" />;
+  const root = data;
+  if (!root) return <EmptyState icon="🏢" title="No hierarchy" description="This account has no parent or child accounts." />;
+  return <HierarchyNodeItem node={root} depth={0} />;
+}
+
+function HierarchyNodeItem({ node, depth }: { node: HierarchyNode; depth: number }) {
+  return (
+    <div className="space-y-2">
+      <div className="rounded-lg border border-slate-200 bg-white p-3" style={{ marginLeft: depth * 18 }}>
+        <Link href={`/accounts/${node.id}`} className="text-sm font-bold text-slate-900 hover:underline">{node.name}</Link>
+      </div>
+      {node.children?.map((child) => <HierarchyNodeItem key={child.id} node={child} depth={depth + 1} />)}
+    </div>
+  );
+}
+
+function GovernanceTab({ account }: { account: Account }) {
+  const fields = account.customFields ?? {};
+  const rows = [
+    ['Owner', account.ownerId],
+    ['Risk level', account.riskLevel ?? 'Not set'],
+    ['Last activity', account.lastActivityAt ? formatDate(account.lastActivityAt) : 'Not set'],
+    ['Data source', String(fields.source ?? 'CRM')],
+    ['Buying center', String(fields.buyingCenter ?? 'Not set')],
+    ['Compliance profile', String(fields.complianceProfile ?? 'Not set')],
+    ['Reviewed at', String(fields.reviewedAt ?? 'Not reviewed')],
+  ];
+  return (
+    <div className="grid gap-3 lg:grid-cols-2">
+      {rows.map(([label, value]) => (
+        <div key={label} className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
+          <p className="mt-1 text-sm font-semibold text-slate-800">{value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DocumentsTab({
+  rows,
+  isLoading,
+  canUpdate,
+  inputRef,
+  onUpload,
+  isUploading,
+}: {
+  rows: Record<string, unknown>[];
+  isLoading: boolean;
+  canUpdate: boolean;
+  inputRef: RefObject<HTMLInputElement>;
+  onUpload: (file: File) => void;
+  isUploading: boolean;
+}) {
+  if (isLoading) return <Skeleton className="h-48" />;
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-bold text-slate-950">Account documents</h3>
+          <p className="mt-1 text-xs text-slate-500">Contracts, tax records, commercial registration, shipping files, and account evidence.</p>
+        </div>
+        {canUpdate && (
+          <>
+            <input
+              ref={inputRef}
+              type="file"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) onUpload(file);
+                event.currentTarget.value = '';
+              }}
+            />
+            <Button onClick={() => inputRef.current?.click()} disabled={isUploading}>
+              <UploadCloud className="h-4 w-4" />
+              {isUploading ? 'Uploading' : 'Upload Document'}
+            </Button>
+          </>
+        )}
+      </div>
+      {rows.length === 0 ? (
+        <EmptyState icon="DOC" title="No account documents" description="Upload account documents to keep the company record complete." />
+      ) : (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {rows.map((row) => (
+            <div key={String(row.id ?? row.fileName)} className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg bg-blue-50 p-2 text-blue-700">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-slate-950">{String(row.fileName ?? row.name ?? 'Document')}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {String(row.mimeType ?? row.type ?? 'file')} · {formatFileSize(row.fileSize ?? row.size)}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-400">Uploaded {formatDate(String(row.createdAt ?? row.updatedAt ?? new Date().toISOString()))}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RecordsTab({ rows, isLoading, title, icon }: { rows: Record<string, unknown>[]; isLoading: boolean; title: string; icon: string }) {
+  if (isLoading) return <Skeleton className="h-48" />;
+  if (rows.length === 0) return <EmptyState icon={icon} title={title} description="No records were found for this account." />;
+  return (
+    <div className="space-y-3">
+      {rows.map((row, index) => (
+        <div key={String(row.id ?? index)} className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-slate-950">{String(row.description ?? row.type ?? row.eventType ?? row.fieldName ?? row.name ?? 'Record')}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                {String(row.actorName ?? row.changedByName ?? row.status ?? row.score ?? 'System')} · {formatDate(String(row.createdAt ?? row.changedAt ?? row.updatedAt ?? new Date().toISOString()))}
+              </p>
+            </div>
+            {row.score ? <Badge tone={Number(row.score) >= 70 ? 'amber' : 'blue'}>{String(row.score)}%</Badge> : null}
+          </div>
+          <pre className="mt-3 max-h-40 overflow-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+            {JSON.stringify(row.metadata ?? row.payload ?? row.duplicateSignals ?? row, null, 2)}
+          </pre>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AccountEditPanel({
+  account,
+  isSaving,
+  onCancel,
+  onSave,
+}: {
+  account: Account;
+  isSaving: boolean;
+  onCancel: () => void;
+  onSave: (data: UpdateAccountInput) => void;
+}) {
+  return (
+    <form
+      className="rounded-xl border border-blue-100 bg-blue-50/40 p-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        const data: UpdateAccountInput = {
+          name: text(form, 'name'),
+          legalName: text(form, 'legalName'),
+          tradeName: text(form, 'tradeName'),
+          code: text(form, 'code'),
+          industry: text(form, 'industry'),
+          subIndustry: text(form, 'subIndustry'),
+          lifecycleStage: text(form, 'lifecycleStage'),
+          email: text(form, 'email'),
+          phone: text(form, 'phone'),
+          fax: text(form, 'fax'),
+          website: text(form, 'website'),
+          linkedInUrl: text(form, 'linkedInUrl'),
+          taxId: text(form, 'taxId'),
+          vatNumber: text(form, 'vatNumber'),
+          commercialRegistrationNumber: text(form, 'commercialRegistrationNumber'),
+          paymentTerms: text(form, 'paymentTerms'),
+          currency: text(form, 'currency'),
+          priceBookId: text(form, 'priceBookId'),
+          territoryId: text(form, 'territoryId'),
+          riskLevel: riskValue(form, 'riskLevel'),
+          creditLimit: numberValue(form, 'creditLimit'),
+          annualRevenue: numberValue(form, 'annualRevenue'),
+          employeeCount: numberValue(form, 'employeeCount'),
+          foundedYear: numberValue(form, 'foundedYear'),
+          billingAddressLine1: text(form, 'billingAddressLine1'),
+          billingAddressLine2: text(form, 'billingAddressLine2'),
+          billingCity: text(form, 'billingCity'),
+          billingState: text(form, 'billingState'),
+          billingPostalCode: text(form, 'billingPostalCode'),
+          billingCountry: text(form, 'billingCountry'),
+          shippingAddressLine1: text(form, 'shippingAddressLine1'),
+          shippingAddressLine2: text(form, 'shippingAddressLine2'),
+          shippingCity: text(form, 'shippingCity'),
+          shippingState: text(form, 'shippingState'),
+          shippingPostalCode: text(form, 'shippingPostalCode'),
+          shippingCountry: text(form, 'shippingCountry'),
+          shippingInstructions: text(form, 'shippingInstructions'),
+          tags: text(form, 'tags')?.split(',').map((tag) => tag.trim()).filter(Boolean),
+        };
+        onSave(data);
+      }}
+    >
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-bold text-slate-950">Edit account master data</h2>
+          <p className="mt-1 text-xs text-slate-500">Role-controlled changes are audited and feed duplicate checks, account health, quotes, and orders.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
+          <Button type="submit" disabled={isSaving}>{isSaving ? 'Saving' : 'Save Changes'}</Button>
+        </div>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <EditField label="Account name" name="name" value={account.name} required />
+        <EditField label="Account code" name="code" value={account.code} />
+        <EditField label="Legal name" name="legalName" value={account.legalName} />
+        <EditField label="Trade name" name="tradeName" value={account.tradeName} />
+        <EditField label="Industry" name="industry" value={account.industry} />
+        <EditField label="Sub industry" name="subIndustry" value={account.subIndustry} />
+        <EditField label="Lifecycle" name="lifecycleStage" value={account.lifecycleStage} />
+        <EditField label="Email" name="email" value={account.email} />
+        <EditField label="Phone" name="phone" value={account.phone} />
+        <EditField label="Fax" name="fax" value={account.fax} />
+        <EditField label="Website" name="website" value={account.website} />
+        <EditField label="LinkedIn" name="linkedInUrl" value={account.linkedInUrl} />
+        <EditField label="Tax ID" name="taxId" value={account.taxId} />
+        <EditField label="VAT number" name="vatNumber" value={account.vatNumber} />
+        <EditField label="Commercial reg." name="commercialRegistrationNumber" value={account.commercialRegistrationNumber} />
+        <EditField label="Payment terms" name="paymentTerms" value={account.paymentTerms} />
+        <EditField label="Credit limit" name="creditLimit" value={account.creditLimit} type="number" />
+        <EditField label="Currency" name="currency" value={account.currency ?? 'USD'} />
+        <EditField label="Price book" name="priceBookId" value={account.priceBookId} />
+        <EditField label="Territory" name="territoryId" value={account.territoryId} />
+        <EditField label="Risk level" name="riskLevel" value={account.riskLevel} />
+        <EditField label="Annual revenue" name="annualRevenue" value={account.annualRevenue} type="number" />
+        <EditField label="Employees" name="employeeCount" value={account.employeeCount} type="number" />
+        <EditField label="Founded year" name="foundedYear" value={account.foundedYear} type="number" />
+        <EditField label="Billing line 1" name="billingAddressLine1" value={account.billingAddressLine1} />
+        <EditField label="Billing line 2" name="billingAddressLine2" value={account.billingAddressLine2} />
+        <EditField label="Billing city" name="billingCity" value={account.billingCity} />
+        <EditField label="Billing state" name="billingState" value={account.billingState} />
+        <EditField label="Billing postal" name="billingPostalCode" value={account.billingPostalCode} />
+        <EditField label="Billing country" name="billingCountry" value={account.billingCountry} />
+        <EditField label="Shipping line 1" name="shippingAddressLine1" value={account.shippingAddressLine1} />
+        <EditField label="Shipping line 2" name="shippingAddressLine2" value={account.shippingAddressLine2} />
+        <EditField label="Shipping city" name="shippingCity" value={account.shippingCity} />
+        <EditField label="Shipping state" name="shippingState" value={account.shippingState} />
+        <EditField label="Shipping postal" name="shippingPostalCode" value={account.shippingPostalCode} />
+        <EditField label="Shipping country" name="shippingCountry" value={account.shippingCountry} />
+        <EditField label="Shipping instructions" name="shippingInstructions" value={account.shippingInstructions} />
+        <EditField label="Tags" name="tags" value={account.tags.join(', ')} />
+      </div>
+    </form>
+  );
+}
+
+function EditField({ label, name, value, type = 'text', required = false }: { label: string; name: string; value: unknown; type?: string; required?: boolean }) {
+  return (
+    <label className="block">
+      <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</span>
+      <input
+        name={name}
+        type={type}
+        required={required}
+        defaultValue={value === null || value === undefined ? '' : String(value)}
+        className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+      />
+    </label>
+  );
+}
+
+function DetailMini({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="mt-1 min-w-0 break-words font-semibold text-slate-800">{value}</p>
+    </div>
+  );
+}
+
+function TagCloud({ values }: { values: string[] }) {
+  if (!values.length) return <p className="text-sm text-slate-500">No tags</p>;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {values.map((value) => <span key={value} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{value}</span>)}
+    </div>
+  );
+}
+
+function link(value: string | null | undefined) {
+  if (!value) return 'Not set';
+  return (
+    <a href={value} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-blue-700 hover:underline">
+      <Globe2 className="h-3.5 w-3.5" />
+      {value}
+    </a>
+  );
+}
+
+function money(value: unknown, currency: unknown = 'USD') {
+  const n = Number(value ?? 0);
+  if (!Number.isFinite(n) || n <= 0) return 'Not set';
+  return formatCurrency(n, String(currency ?? 'USD'));
+}
+
+function formatFileSize(value: unknown) {
+  const bytes = Number(value ?? 0);
+  if (!Number.isFinite(bytes) || bytes <= 0) return 'size unknown';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function text(form: FormData, name: string) {
+  const value = String(form.get(name) ?? '').trim();
+  return value || undefined;
+}
+
+function numberValue(form: FormData, name: string) {
+  const raw = text(form, name);
+  if (!raw) return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function riskValue(form: FormData, name: string) {
+  const raw = text(form, name)?.toUpperCase();
+  if (raw === 'LOW' || raw === 'MEDIUM' || raw === 'HIGH' || raw === 'CRITICAL') return raw;
+  return undefined;
+}
+
+function coordinates(lat: unknown, lng: unknown) {
+  if (typeof lat !== 'number' || typeof lng !== 'number') return '';
+  return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 }

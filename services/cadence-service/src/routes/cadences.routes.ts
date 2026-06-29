@@ -47,7 +47,7 @@ export async function registerCadencesRoutes(
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const { id } = Id.parse(request.params);
     const data = await cadences.getCadence(tenantId, id);
-    if (!data) return reply.code(404).send({ success: false, error: 'Not found' });
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found', requestId: request.id } });
     return reply.send({ success: true, data });
   });
 
@@ -56,7 +56,7 @@ export async function registerCadencesRoutes(
     const { id } = Id.parse(request.params);
     const body = CadenceSchema.partial().parse(request.body);
     const data = await cadences.updateCadence(tenantId, id, body);
-    if (!data) return reply.code(404).send({ success: false, error: 'Not found' });
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found', requestId: request.id } });
     return reply.send({ success: true, data });
   });
 
@@ -64,7 +64,7 @@ export async function registerCadencesRoutes(
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const { id } = Id.parse(request.params);
     const data = await cadences.deleteCadence(tenantId, id);
-    if (!data) return reply.code(404).send({ success: false, error: 'Not found' });
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found', requestId: request.id } });
     return reply.send({ success: true, data });
   });
 

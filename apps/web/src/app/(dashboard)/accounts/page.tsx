@@ -1,19 +1,27 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useMemo, useState, type ReactElement } from 'react';
-import { GoogleMap, InfoWindow, Marker, useJsApiLoader } from '@react-google-maps/api';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { Building2, List, Map as MapIcon, Search, ShieldCheck, TrendingUp, Users } from 'lucide-react';
 import type { Account } from '@nexus/shared-types';
 import { cn } from '@/lib/cn';
 import { formatCurrency, formatDate } from '@/lib/format';
+
+const AccountMapView = dynamic(() => import('./map-view'), { ssr: false, loading: () => <div className="p-10 text-center text-sm text-slate-500">Loading map…</div> });
 import { useAuthStore } from '@/stores/auth.store';
+import { ExportButton } from '@/components/export/ExportButton';
 import {
   useAccounts,
+  useUpdateAccount,
   type AccountListFilters,
 } from '@/hooks/use-accounts';
 import { useUsers } from '@/hooks/use-users';
 import { XIcon } from '@/components/ui/icons';
 import { TableSkeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ColumnChooser, useColumnVisibility } from '@/components/ui/column-chooser';
+import { EditableCell, EditableSelectCell } from '@/components/ui/editable-cell';
 
 /**
  * Accounts list page. Mirrors the contacts page: filterable table with a
@@ -44,16 +52,9 @@ function tierColor(tier: Account['tier']): string {
   }
 }
 
-function markerIcon(status: AccountWithGeo['status']): string {
-  const color =
-    status === 'CHURNED' ? '#dc2626' : status === 'AT_RISK' ? '#d97706' : '#16a34a';
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><circle cx="16" cy="16" r="10" fill="${color}" stroke="white" stroke-width="3"/></svg>`
-  )}`;
-}
-
 export default function AccountsPage(): ReactElement {
   const hasPermission = useAuthStore((s) => s.hasPermission);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   const [search, setSearch] = useState('');
   const [industry, setIndustry] = useState('');
@@ -65,6 +66,16 @@ export default function AccountsPage(): ReactElement {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [mapAccount, setMapAccount] = useState<AccountWithGeo | null>(null);
 
+  const accountCols = useColumnVisibility('accounts', [
+    { key: 'name', label: 'Name' },
+    { key: 'industry', label: 'Industry' },
+    { key: 'arr', label: 'ARR' },
+    { key: 'tier', label: 'Tier' },
+    { key: 'owner', label: 'Owner' },
+    { key: 'status', label: 'Status' },
+    { key: 'created', label: 'Created' },
+  ]);
+
   const { data, isLoading, isError, error } = useAccounts({
     search: search || undefined,
     industry: industry || undefined,
@@ -75,30 +86,7 @@ export default function AccountsPage(): ReactElement {
   });
   const users = useUsers();
 
-  const accounts = data?.data ?? [];
-  const mappedAccounts = useMemo(
-    () =>
-      (accounts as AccountWithGeo[]).filter(
-        (a) => typeof a.lat === 'number' && typeof a.lng === 'number'
-      ),
-    [accounts]
-  );
-  const mapCenter = useMemo(() => {
-    if (mappedAccounts.length === 0) return { lat: 25.2048, lng: 55.2708 };
-    return {
-      lat:
-        mappedAccounts.reduce((sum, a) => sum + (a.lat ?? 0), 0) /
-        mappedAccounts.length,
-      lng:
-        mappedAccounts.reduce((sum, a) => sum + (a.lng ?? 0), 0) /
-        mappedAccounts.length,
-    };
-  }, [mappedAccounts]);
-  const mapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
-  const maps = useJsApiLoader({
-    googleMapsApiKey: mapsApiKey,
-    id: 'nexus-google-maps',
-  });
+  const accounts = useMemo(() => data?.data ?? [], [data]);
 
   const ownerMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -114,7 +102,29 @@ export default function AccountsPage(): ReactElement {
     return Array.from(set).sort();
   }, [accounts]);
 
+  const accountStats = useMemo(() => {
+    const totalArr = accounts.reduce((sum, account) => sum + Number(account.annualRevenue ?? 0), 0);
+    const strategic = accounts.filter((account) => account.tier === 'STRATEGIC').length;
+    const activeCount = accounts.filter((account) => account.status === 'ACTIVE').length;
+    const atRisk = accounts.filter((account) => account.status === 'AT_RISK').length;
+    return { totalArr, strategic, activeCount, atRisk };
+  }, [accounts]);
+
   const canRead = hasPermission('accounts:read');
+  const canUpdate = hasPermission('accounts:update');
+  const updateAccount = useUpdateAccount();
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  if (!isHydrated) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <TableSkeleton rows={6} cols={7} />
+      </div>
+    );
+  }
 
   if (!canRead) {
     return (
@@ -125,38 +135,75 @@ export default function AccountsPage(): ReactElement {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold text-slate-900">Accounts</h1>
-        <div className="inline-flex rounded-md border border-slate-200 bg-white p-0.5">
+    <div className="space-y-5">
+      <section className="overflow-hidden rounded-lg border border-[#dbe7f3] bg-white shadow-sm">
+        <div className="h-1.5 bg-gradient-to-r from-blue-600 via-emerald-500 to-amber-400" />
+        <div className="p-4 sm:p-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-200">
+                <Building2 className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase text-blue-700">Customer foundation</p>
+                <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">Accounts command center</h1>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+                  Govern companies, billing and shipping profiles, account health, ownership, contacts, territories, and customer hierarchy from one operating view.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+        <ExportButton module="accounts" />
+        <ColumnChooser
+          allColumns={accountCols.allColumns}
+          visibleKeys={accountCols.visibleKeys}
+          onChange={accountCols.setVisibleKeys}
+          onReset={accountCols.reset}
+        />
+        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
           <button
             type="button"
             onClick={() => setViewMode('list')}
             className={cn(
-              'rounded px-3 py-1 text-xs font-medium',
+              'inline-flex h-9 items-center gap-2 rounded-md px-3 text-xs font-bold transition',
               viewMode === 'list'
-                ? 'bg-slate-900 text-white'
-                : 'text-slate-600 hover:bg-slate-100'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-white'
             )}
           >
+            <List className="h-3.5 w-3.5" />
             List
           </button>
           <button
             type="button"
             onClick={() => setViewMode('map')}
             className={cn(
-              'rounded px-3 py-1 text-xs font-medium',
+              'inline-flex h-9 items-center gap-2 rounded-md px-3 text-xs font-bold transition',
               viewMode === 'map'
-                ? 'bg-slate-900 text-white'
-                : 'text-slate-600 hover:bg-slate-100'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-white'
             )}
           >
+            <MapIcon className="h-3.5 w-3.5" />
             Map
           </button>
         </div>
-      </div>
+            </div>
+          </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Visible ARR" value={formatCurrency(accountStats.totalArr, 'USD')} note="Filtered account value" tone="blue" />
+            <StatCard icon={<ShieldCheck className="h-4 w-4" />} label="Strategic" value={String(accountStats.strategic)} note="High-priority accounts" tone="violet" />
+            <StatCard icon={<Users className="h-4 w-4" />} label="Active" value={String(accountStats.activeCount)} note="Accounts in motion" tone="emerald" />
+            <StatCard icon={<Building2 className="h-4 w-4" />} label="At Risk" value={String(accountStats.atRisk)} note="Need attention" tone="amber" />
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-[#e7edf3] bg-white p-4 shadow-sm">
+        <div className="grid gap-3 lg:grid-cols-[minmax(260px,1.5fr)_repeat(3,minmax(160px,1fr))]">
+        <label className="relative block">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           type="search"
           value={search}
@@ -165,15 +212,16 @@ export default function AccountsPage(): ReactElement {
             setSearch(e.target.value);
           }}
           placeholder="Search account name…"
-          className="h-9 w-64 rounded-md border border-slate-200 px-3 text-sm"
+          className="h-11 w-full rounded-lg border border-slate-200 bg-slate-100 pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
         />
+        </label>
         <select
           value={industry}
           onChange={(e) => {
             setPage(1);
             setIndustry(e.target.value);
           }}
-          className="h-9 rounded-md border border-slate-200 px-2 text-sm"
+          className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
         >
           <option value="">All industries</option>
           {industries.map((i) => (
@@ -188,7 +236,7 @@ export default function AccountsPage(): ReactElement {
             setPage(1);
             setTier(e.target.value as AccountListFilters['tier'] | '');
           }}
-          className="h-9 rounded-md border border-slate-200 px-2 text-sm"
+          className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
         >
           <option value="">All tiers</option>
           {TIERS.map((t) => (
@@ -203,7 +251,7 @@ export default function AccountsPage(): ReactElement {
             setPage(1);
             setOwnerId(e.target.value);
           }}
-          className="h-9 rounded-md border border-slate-200 px-2 text-sm"
+          className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
         >
           <option value="">All owners</option>
           {(users.data?.data ?? []).map((u) => (
@@ -212,7 +260,8 @@ export default function AccountsPage(): ReactElement {
             </option>
           ))}
         </select>
-      </div>
+        </div>
+      </section>
 
       {isLoading ? (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
@@ -223,69 +272,34 @@ export default function AccountsPage(): ReactElement {
           Failed to load: {error instanceof Error ? error.message : 'Unknown error'}
         </div>
       ) : accounts.length === 0 ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
-          No accounts match your filters.
+        <div className="rounded-lg border border-slate-200 bg-white">
+          <EmptyState
+            icon="🏢"
+            title="No accounts yet"
+            description="Accounts represent the companies you sell to"
+            cta={{ label: '+ Add Account', href: '/accounts/new' }}
+          />
         </div>
       ) : viewMode === 'map' ? (
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          {!mapsApiKey ? (
-            <div className="p-10 text-center text-sm text-slate-500">
-              Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to enable the map.
-            </div>
-          ) : !maps.isLoaded ? (
-            <div className="p-10 text-center text-sm text-slate-500">Loading map…</div>
-          ) : mappedAccounts.length === 0 ? (
-            <div className="p-10 text-center text-sm text-slate-500">
-              No visible accounts have coordinates yet.
-            </div>
-          ) : (
-            <GoogleMap
-              mapContainerStyle={{ height: 640, width: '100%' }}
-              center={mapCenter}
-              zoom={mappedAccounts.length === 1 ? 10 : 5}
-            >
-              {mappedAccounts.map((a) => (
-                <Marker
-                  key={a.id}
-                  position={{ lat: a.lat as number, lng: a.lng as number }}
-                  icon={markerIcon(a.status)}
-                  onClick={() => setMapAccount(a)}
-                />
-              ))}
-              {mapAccount?.lat && mapAccount.lng ? (
-                <InfoWindow
-                  position={{ lat: mapAccount.lat, lng: mapAccount.lng }}
-                  onCloseClick={() => setMapAccount(null)}
-                >
-                  <div className="max-w-xs text-sm">
-                    <Link href={`/accounts/${mapAccount.id}`} className="font-semibold text-slate-900 underline">
-                      {mapAccount.name}
-                    </Link>
-                    <p className="mt-1 text-slate-600">{mapAccount.industry ?? 'No industry'}</p>
-                    <p className="text-slate-600">
-                      ARR:{' '}
-                      {mapAccount.annualRevenue
-                        ? formatCurrency(mapAccount.annualRevenue, 'USD')
-                        : '—'}
-                    </p>
-                  </div>
-                </InfoWindow>
-              ) : null}
-            </GoogleMap>
-          )}
+          <AccountMapView
+            accounts={accounts as AccountWithGeo[]}
+            mapAccount={mapAccount}
+            onMapAccountChange={setMapAccount}
+          />
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500">
+            <thead className="bg-slate-50 text-start text-xs uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-4 py-2">Name</th>
-                <th className="px-4 py-2">Industry</th>
-                <th className="px-4 py-2">ARR</th>
-                <th className="px-4 py-2">Tier</th>
-                <th className="px-4 py-2">Owner</th>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2">Created</th>
+                {accountCols.visibleKeys.includes('name') ? <th className="px-4 py-2">Name</th> : null}
+                {accountCols.visibleKeys.includes('industry') ? <th className="px-4 py-2">Industry</th> : null}
+                {accountCols.visibleKeys.includes('arr') ? <th className="px-4 py-2">ARR</th> : null}
+                {accountCols.visibleKeys.includes('tier') ? <th className="px-4 py-2">Tier</th> : null}
+                {accountCols.visibleKeys.includes('owner') ? <th className="px-4 py-2">Owner</th> : null}
+                {accountCols.visibleKeys.includes('status') ? <th className="px-4 py-2">Status</th> : null}
+                {accountCols.visibleKeys.includes('created') ? <th className="px-4 py-2">Created</th> : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -298,42 +312,100 @@ export default function AccountsPage(): ReactElement {
                   }}
                   className="cursor-pointer hover:bg-slate-50"
                 >
-                  <td className="px-4 py-2 font-medium text-slate-900">
-                    <Link
-                      href={`/accounts/${a.id}`}
-                      className="text-brand-700 hover:underline"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {a.name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2 text-slate-600">{a.industry ?? '—'}</td>
-                  <td className="px-4 py-2 text-slate-600">
-                    {a.annualRevenue
-                      ? formatCurrency(a.annualRevenue, 'USD')
-                      : '—'}
-                  </td>
-                  <td className="px-4 py-2">
-                    <span
-                      className={cn(
-                        'rounded-full px-2 py-0.5 text-[11px]',
-                        tierColor(a.tier)
-                      )}
-                    >
-                      {a.tier}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 text-slate-600">
-                    {ownerMap.get(a.ownerId) ?? a.ownerId.slice(0, 6)}
-                  </td>
-                  <td className="px-4 py-2">
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
-                      {a.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 text-slate-500">
-                    {formatDate(a.createdAt)}
-                  </td>
+                  {accountCols.visibleKeys.includes('name') ? (
+                    <td className="px-4 py-2 font-medium text-slate-900">
+                      <EditableCell value={a.name} onSave={(v) => updateAccount.mutate({ id: a.id, data: { name: v } })} disabled={!canUpdate}>
+                        <Link
+                          href={`/accounts/${a.id}`}
+                          className="text-brand-700 hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {a.name}
+                        </Link>
+                      </EditableCell>
+                    </td>
+                  ) : null}
+                  {accountCols.visibleKeys.includes('industry') ? (
+                    <td className="px-4 py-2 text-slate-600">
+                      <EditableCell value={a.industry ?? ''} onSave={(v) => updateAccount.mutate({ id: a.id, data: { industry: v || undefined } })} disabled={!canUpdate}>
+                        {a.industry ?? '—'}
+                      </EditableCell>
+                    </td>
+                  ) : null}
+                  {accountCols.visibleKeys.includes('arr') ? (
+                    <td className="px-4 py-2 text-slate-600">
+                      <EditableCell
+                        value={a.annualRevenue ? String(a.annualRevenue) : ''}
+                        onSave={(v) => {
+                          const num = Number(v);
+                          if (!Number.isNaN(num)) updateAccount.mutate({ id: a.id, data: { annualRevenue: num } });
+                        }}
+                        disabled={!canUpdate}
+                      >
+                        {a.annualRevenue ? formatCurrency(a.annualRevenue, 'USD') : '—'}
+                      </EditableCell>
+                    </td>
+                  ) : null}
+                  {accountCols.visibleKeys.includes('tier') ? (
+                    <td className="px-4 py-2">
+                      <EditableSelectCell
+                        value={a.tier}
+                        options={[
+                          { label: 'SMB', value: 'SMB' },
+                          { label: 'Mid Market', value: 'MID_MARKET' },
+                          { label: 'Enterprise', value: 'ENTERPRISE' },
+                          { label: 'Strategic', value: 'STRATEGIC' },
+                        ]}
+                        onSave={(v) => updateAccount.mutate({ id: a.id, data: { tier: v } })}
+                        disabled={!canUpdate}
+                      >
+                        <span
+                          className={cn(
+                            'rounded-full px-2 py-0.5 text-[11px]',
+                            tierColor(a.tier)
+                          )}
+                        >
+                          {a.tier}
+                        </span>
+                      </EditableSelectCell>
+                    </td>
+                  ) : null}
+                  {accountCols.visibleKeys.includes('owner') ? (
+                    <td className="px-4 py-2 text-slate-600">
+                      <EditableSelectCell
+                        value={a.ownerId}
+                        options={(users.data?.data ?? []).map((u) => ({ label: `${u.firstName} ${u.lastName}`, value: u.id }))}
+                        onSave={(v) => updateAccount.mutate({ id: a.id, data: { ownerId: v } })}
+                        disabled={!canUpdate}
+                      >
+                        {ownerMap.get(a.ownerId) ?? a.ownerId.slice(0, 6)}
+                      </EditableSelectCell>
+                    </td>
+                  ) : null}
+                  {accountCols.visibleKeys.includes('status') ? (
+                    <td className="px-4 py-2">
+                      <EditableSelectCell
+                        value={a.status}
+                        options={[
+                          { label: 'Active', value: 'ACTIVE' },
+                          { label: 'Inactive', value: 'INACTIVE' },
+                          { label: 'At Risk', value: 'AT_RISK' },
+                          { label: 'Churned', value: 'CHURNED' },
+                        ]}
+                        onSave={(v) => updateAccount.mutate({ id: a.id, data: { status: v } })}
+                        disabled={!canUpdate}
+                      >
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
+                          {a.status}
+                        </span>
+                      </EditableSelectCell>
+                    </td>
+                  ) : null}
+                  {accountCols.visibleKeys.includes('created') ? (
+                    <td className="px-4 py-2 text-slate-500">
+                      {formatDate(a.createdAt)}
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
@@ -476,10 +548,55 @@ function InfoRow({
 }): ReactElement {
   return (
     <div className="flex items-start gap-2 py-1">
-      <span className="w-28 shrink-0 text-xs uppercase tracking-wider text-slate-400">
-        {label}
-      </span>
-      <span className="flex-1 text-sm text-slate-700">{value}</span>
+      <div className="w-28 shrink-0 rounded bg-slate-50 p-1 text-xs text-slate-500">{label}</div>
+      <div className="flex-1 text-sm text-slate-800">{value}</div>
+    </div>
+  );
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  note,
+  tone,
+}: {
+  icon: ReactElement;
+  label: string;
+  value: string;
+  note: string;
+  tone: 'blue' | 'emerald' | 'amber' | 'violet';
+}): ReactElement {
+  const tones = {
+    blue: {
+      bar: 'from-blue-500 to-cyan-400',
+      badge: 'border-blue-100 bg-blue-50 text-blue-700',
+    },
+    emerald: {
+      bar: 'from-emerald-500 to-teal-400',
+      badge: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+    },
+    amber: {
+      bar: 'from-amber-500 to-orange-400',
+      badge: 'border-amber-100 bg-amber-50 text-amber-700',
+    },
+    violet: {
+      bar: 'from-violet-500 to-indigo-400',
+      badge: 'border-violet-100 bg-violet-50 text-violet-700',
+    },
+  }[tone];
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-[#e7edf3] bg-[#f9f9ff]">
+      <div className={cn('h-1.5 bg-gradient-to-r', tones.bar)} />
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
+          <span className={cn('rounded-lg border p-2', tones.badge)}>{icon}</span>
+        </div>
+        <p className="mt-3 text-2xl font-bold text-slate-950">{value}</p>
+        <p className="mt-1 text-sm text-slate-500">{note}</p>
+      </div>
     </div>
   );
 }

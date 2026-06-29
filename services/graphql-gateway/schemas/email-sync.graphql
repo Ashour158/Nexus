@@ -1,0 +1,112 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  emailConnections(limit: Int, offset: Int): [EmailConnection!]!
+  emailConnection(id: ID!): EmailConnection
+  emailConnectionByUser(userId: String!): EmailConnection
+  emailMessages(limit: Int, offset: Int, userId: String, threadId: String): [EmailMessage!]!
+  emailMessage(id: ID!): EmailMessage
+  emailThreads(userId: String!, limit: Int, offset: Int): [EmailThread!]!
+}
+
+type Mutation {
+  createEmailConnection(input: CreateEmailConnectionInput!): EmailConnection!
+  updateEmailConnection(id: ID!, input: UpdateEmailConnectionInput!): EmailConnection!
+  deleteEmailConnection(id: ID!): Boolean!
+  createEmailMessage(input: CreateEmailMessageInput!): EmailMessage!
+  updateEmailMessage(id: ID!, input: UpdateEmailMessageInput!): EmailMessage!
+  deleteEmailMessage(id: ID!): Boolean!
+}
+
+type EmailConnection @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  userId: String!
+  provider: String!
+  email: String!
+  accessToken: String!
+  refreshToken: String
+  tokenExpiry: DateTime
+  syncEnabled: Boolean!
+  lastSyncAt: DateTime
+  createdAt: DateTime!
+}
+
+type EmailMessage @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  userId: String!
+  provider: String!
+  messageId: String!
+  threadId: String!
+  subject: String!
+  from: String!
+  to: String!
+  snippet: String
+  body: String!
+  isRead: Boolean!
+  isInbound: Boolean!
+  sentAt: DateTime!
+  contactId: String
+  dealId: String
+  createdAt: DateTime!
+}
+
+type EmailThread @key(fields: "id") {
+  id: ID!
+  userId: String!
+  subject: String!
+  from: String!
+  snippet: String
+  sentAt: DateTime!
+  isRead: Boolean!
+  messageCount: Int!
+  dealId: String
+  contactId: String
+}
+
+input CreateEmailConnectionInput {
+  tenantId: String!
+  userId: String!
+  provider: String!
+  email: String!
+  accessToken: String!
+  refreshToken: String
+  tokenExpiry: DateTime
+}
+
+input UpdateEmailConnectionInput {
+  accessToken: String
+  refreshToken: String
+  tokenExpiry: DateTime
+  syncEnabled: Boolean
+  lastSyncAt: DateTime
+}
+
+input CreateEmailMessageInput {
+  tenantId: String!
+  userId: String!
+  provider: String!
+  messageId: String!
+  threadId: String!
+  subject: String!
+  from: String!
+  to: String!
+  snippet: String
+  body: String!
+  isRead: Boolean
+  isInbound: Boolean!
+  sentAt: DateTime!
+  contactId: String
+  dealId: String
+}
+
+input UpdateEmailMessageInput {
+  isRead: Boolean
+  contactId: String
+  dealId: String
+}

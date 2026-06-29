@@ -44,6 +44,16 @@ export function useUnreadNotificationsCount() {
   });
 }
 
+export function useMarkNotificationRead() {
+  const qc = useQueryClient();
+  return useMutation<{ id: string; isRead: boolean }, Error, string>({
+    mutationFn: (id) => apiClients.notification.patch<{ id: string; isRead: boolean }>(`/notifications/${id}/read`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: notificationKeys.all });
+    },
+  });
+}
+
 export function useMarkAllNotificationsRead() {
   const qc = useQueryClient();
   return useMutation<{ count: number }, Error, void>({

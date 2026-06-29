@@ -1,106 +1,139 @@
 'use client';
 
-import { useMemo, useState, type JSX } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { EmptyState } from '@/components/ui/EmptyState';
 
-const TERRITORIES = [
-  { id: 't1', name: 'North America Enterprise', rep: 'Carlos Mendez', deals: 27, pipeline: 410000, ytd: 680000, quota: 82, leads: 44, region: 'North America', winRate: 42, growth: 12 },
-  { id: 't2', name: 'EMEA Mid-Market', rep: 'Sofia Rodriguez', deals: 21, pipeline: 290000, ytd: 510000, quota: 76, leads: 37, region: 'EMEA', winRate: 38, growth: 9 },
-  { id: 't3', name: 'APAC Growth', rep: 'Marcus Chen', deals: 18, pipeline: 245000, ytd: 430000, quota: 68, leads: 33, region: 'APAC', winRate: 35, growth: 7 },
-];
+const TERRITORY_SERVICE = '/api/territory';
 
-const LEAKAGE = [
-  { deal: 'Apex Rollout', contact: 'Nina Volkov', contactRegion: 'EMEA', assignedRep: 'Carlos Mendez', correctRep: 'Sofia Rodriguez' },
-  { deal: 'Kite Renewal', contact: 'Arun Patel', contactRegion: 'APAC', assignedRep: 'Sofia Rodriguez', correctRep: 'Marcus Chen' },
-  { deal: 'Helio Migration', contact: 'Claire Dubois', contactRegion: 'North America', assignedRep: 'Marcus Chen', correctRep: 'Carlos Mendez' },
-];
+interface Territory {
+  id: string;
+  name: string;
+  region: string;
+  country: string;
+  currency?: string;
+  managerId?: string;
+  managerName?: string;
+  repCount?: number;
+  dealCount?: number;
+  revenue?: number;
+  isActive: boolean;
+}
 
-export default function TerritoriesPage(): JSX.Element {
-  const [region, setRegion] = useState('all');
+export default function TerritoriesPage() {
+  const [territories, setTerritories] = useState<Territory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ name: '', region: '', country: '', currency: 'USD' });
 
-  const filtered = useMemo(
-    () => TERRITORIES.filter((t) => region === 'all' || t.region === region),
-    [region]
-  );
+  const fetchTerritories = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${TERRITORY_SERVICE}/territories`);
+      const data = await res.json();
+      setTerritories(data.data || data || []);
+    } catch {
+      setTerritories([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchTerritories();
+  }, [fetchTerritories]);
+
+  const handleCreate = async () => {
+    await fetch(`${TERRITORY_SERVICE}/territories`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    });
+    setShowCreate(false);
+    setForm({ name: '', region: '', country: '', currency: 'USD' });
+    void fetchTerritories();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this territory?')) return;
+    await fetch(`${TERRITORY_SERVICE}/territories/${id}`, { method: 'DELETE' });
+    void fetchTerritories();
+  };
 
   return (
-    <main className="space-y-6 p-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+    <div className="p-6">
+      <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Territory Dashboard</h1>
-          <p className="text-sm text-slate-500">Regional performance and assignment leakage visibility.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Territories</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage sales territories and regional assignments
+          </p>
         </div>
-        <select value={region} onChange={(e) => setRegion(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
-          <option value="all">All regions</option>
-          <option value="North America">North America</option>
-          <option value="EMEA">EMEA</option>
-          <option value="APAC">APAC</option>
-        </select>
-      </header>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+        >
+          + New Territory
+        </button>
+      </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Regional map placeholder</h2>
-        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-          Interactive map is disabled without API key. Use territory cards and comparison table below.
+      {showCreate ? (
+        <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <div className="mb-3 grid grid-cols-4 gap-3">
+            <input placeholder="Name" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+            <input placeholder="Region" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" value={form.region} onChange={(e) => setForm((f) => ({ ...f, region: e.target.value }))} />
+            <input placeholder="Country (e.g. SA)" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))} />
+            <input placeholder="Currency" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))} />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleCreate} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm text-white">Create</button>
+            <button onClick={() => setShowCreate(false)} className="rounded-lg bg-gray-200 px-3 py-1.5 text-sm text-gray-700">Cancel</button>
+          </div>
         </div>
-      </section>
+      ) : null}
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {filtered.map((t) => (
-          <article key={t.id} className="rounded-xl border border-slate-200 bg-white p-4">
-            <h3 className="text-sm font-semibold text-slate-900">{t.name}</h3>
-            <p className="text-xs text-slate-500">Assigned rep: {t.rep}</p>
-            <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
-              <div><dt className="text-slate-500">Deals</dt><dd className="font-semibold">{t.deals}</dd></div>
-              <div><dt className="text-slate-500">Pipeline</dt><dd className="font-semibold">${t.pipeline.toLocaleString()}</dd></div>
-              <div><dt className="text-slate-500">YTD revenue</dt><dd className="font-semibold">${t.ytd.toLocaleString()}</dd></div>
-              <div><dt className="text-slate-500">Quota attainment</dt><dd className="font-semibold">{t.quota}%</dd></div>
-              <div><dt className="text-slate-500">Open leads</dt><dd className="font-semibold">{t.leads}</dd></div>
-            </dl>
-          </article>
-        ))}
-      </section>
-
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Territory comparison</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-2 py-2">Territory</th><th className="px-2 py-2">Rep</th><th className="px-2 py-2">Leads</th><th className="px-2 py-2">Deals</th><th className="px-2 py-2">Revenue</th><th className="px-2 py-2">Win rate</th><th className="px-2 py-2">Growth vs last quarter</th></tr></thead>
-            <tbody>
-              {filtered.map((row) => (
-                <tr key={row.id} className="border-t border-slate-100">
-                  <td className="px-2 py-2 font-medium">{row.name}</td>
-                  <td className="px-2 py-2">{row.rep}</td>
-                  <td className="px-2 py-2">{row.leads}</td>
-                  <td className="px-2 py-2">{row.deals}</td>
-                  <td className="px-2 py-2">${row.ytd.toLocaleString()}</td>
-                  <td className="px-2 py-2">{row.winRate}%</td>
-                  <td className="px-2 py-2">{row.growth > 0 ? '+' : ''}{row.growth}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-32 animate-pulse rounded-xl bg-gray-100" />
+          ))}
         </div>
-      </section>
-
-      <section className="rounded-xl border border-rose-200 bg-rose-50 p-4">
-        <h2 className="mb-3 text-sm font-semibold text-rose-800">Leakage alert</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm text-rose-900">
-            <thead className="text-left text-xs uppercase tracking-wide text-rose-600"><tr><th className="px-2 py-2">Deal</th><th className="px-2 py-2">Contact</th><th className="px-2 py-2">Contact region</th><th className="px-2 py-2">Assigned rep</th><th className="px-2 py-2">Correct rep</th></tr></thead>
-            <tbody>
-              {LEAKAGE.map((row) => (
-                <tr key={row.deal} className="border-t border-rose-200">
-                  <td className="px-2 py-2 font-medium">{row.deal}</td>
-                  <td className="px-2 py-2">{row.contact}</td>
-                  <td className="px-2 py-2">{row.contactRegion}</td>
-                  <td className="px-2 py-2">{row.assignedRep}</td>
-                  <td className="px-2 py-2 font-semibold">{row.correctRep}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      ) : territories.length === 0 ? (
+        <EmptyState
+          icon="🗺️"
+          title="No territories yet"
+          description="Create territories to assign reps and track regional performance"
+          cta={{ label: '+ Add Territory', onClick: () => setShowCreate(true) }}
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {territories.map((t) => (
+            <div key={t.id} className="rounded-xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-sm">
+              <div className="mb-3 flex items-start justify-between">
+                <div>
+                  <h3 className="font-semibold text-gray-900">{t.name}</h3>
+                  <p className="text-sm text-gray-500">
+                    {t.region} · {t.country}
+                  </p>
+                </div>
+                <span className={`rounded-full px-2 py-0.5 text-xs ${t.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {t.isActive ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+              <div className="mb-3 grid grid-cols-3 gap-2 text-center">
+                <div><p className="text-lg font-bold text-gray-900">{t.repCount ?? 0}</p><p className="text-xs text-gray-500">Reps</p></div>
+                <div><p className="text-lg font-bold text-gray-900">{t.dealCount ?? 0}</p><p className="text-xs text-gray-500">Deals</p></div>
+                <div><p className="text-sm font-bold text-gray-900">{t.currency || 'USD'}</p><p className="text-xs text-gray-500">Currency</p></div>
+              </div>
+              <div className="flex items-center justify-between text-xs text-gray-400">
+                {t.managerName ? <span>MGR: {t.managerName}</span> : <span />}
+                <button onClick={() => handleDelete(t.id)} className="ms-auto text-red-400 hover:text-red-600">
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-      </section>
-    </main>
+      )}
+    </div>
   );
 }

@@ -10,7 +10,8 @@ import type {
   CreateContactInput,
   UpdateContactInput,
 } from '@nexus/validation';
-import { api } from '@/lib/api-client';
+import { api, apiClients } from '@/lib/api-client';
+import { notify } from '@/lib/toast';
 
 /**
  * React Query hooks for the Contacts domain.
@@ -53,7 +54,7 @@ export function useContacts(filters: ContactListFilters = {}) {
   return useQuery<ContactListResponse>({
     queryKey: contactKeys.list(normalized),
     queryFn: () =>
-      api.get<ContactListResponse>('/contacts', { params: normalized }),
+      apiClients.contacts.get<ContactListResponse>('/contacts', { params: normalized }),
     staleTime: 30_000,
     placeholderData: (prev) => prev,
   });
@@ -62,7 +63,7 @@ export function useContacts(filters: ContactListFilters = {}) {
 export function useContact(id: string) {
   return useQuery<Contact>({
     queryKey: contactKeys.detail(id),
-    queryFn: () => api.get<Contact>(`/contacts/${id}`),
+    queryFn: () => apiClients.contacts.get<Contact>(`/contacts/${id}`),
     enabled: Boolean(id),
   });
 }
@@ -70,9 +71,13 @@ export function useContact(id: string) {
 export function useCreateContact() {
   const qc = useQueryClient();
   return useMutation<Contact, Error, CreateContactInput>({
-    mutationFn: (data) => api.post<Contact>('/contacts', data),
+    mutationFn: (data) => apiClients.contacts.post<Contact>('/contacts', data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: contactKeys.lists() });
+      notify.success('Contact created');
+    },
+    onError: (err) => {
+      notify.error('Failed to create contact', err.message);
     },
   });
 }
@@ -84,10 +89,14 @@ export function useUpdateContact() {
     Error,
     { id: string; data: UpdateContactInput }
   >({
-    mutationFn: ({ id, data }) => api.patch<Contact>(`/contacts/${id}`, data),
+    mutationFn: ({ id, data }) => apiClients.contacts.patch<Contact>(`/contacts/${id}`, data),
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: contactKeys.detail(id) });
       qc.invalidateQueries({ queryKey: contactKeys.lists() });
+      notify.success('Contact updated');
+    },
+    onError: (err) => {
+      notify.error('Failed to update contact', err.message);
     },
   });
 }
@@ -126,7 +135,7 @@ export function useDeleteContact() {
     previous: Array<[QueryKey, ContactListResponse | undefined]>;
   }
   return useMutation<void, Error, string, DelCtx>({
-    mutationFn: (id) => api.delete<void>(`/contacts/${id}`),
+    mutationFn: (id) => apiClients.contacts.delete<void>(`/contacts/${id}`),
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: contactKeys.lists() });
       const previous = qc.getQueriesData<ContactListResponse>({
@@ -149,10 +158,12 @@ export function useDeleteContact() {
       ctx?.previous.forEach(([key, data]) => {
         if (data !== undefined) qc.setQueryData(key, data);
       });
+      notify.error('Failed to delete contact');
     },
     onSettled: (_d, _e, id) => {
       qc.removeQueries({ queryKey: contactKeys.detail(id) });
       qc.invalidateQueries({ queryKey: contactKeys.lists() });
+      if (!_e) notify.success('Contact deleted');
     },
   });
 }

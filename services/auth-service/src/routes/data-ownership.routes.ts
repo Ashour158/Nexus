@@ -55,36 +55,9 @@ export async function registerDataOwnershipRoutes(
       });
     });
 
-    r.post('/data-ownership/gdpr-erasure', async (req, reply) => {
-      const jwt = (req as any).user as JwtPayload;
-      if (!isAdmin(jwt)) return reply.code(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Forbidden', requestId: req.id } });
-      const { contactEmail, reason } = req.body as { contactEmail?: string; reason?: string };
-      if (!contactEmail) return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'contactEmail required', requestId: req.id } });
-
-      await (prisma as any).auditLog.create({
-        data: {
-          tenantId: jwt.tenantId,
-          userId: jwt.sub,
-          action: 'GDPR_ERASURE_REQUESTED',
-          resource: 'contact',
-          resourceId: contactEmail,
-          newValue: { reason: reason ?? null, requestedAt: new Date().toISOString() },
-        },
-      });
-
-      await producer.publish('data.gdpr.erasure', {
-        type: 'data.gdpr.erasure',
-        tenantId: jwt.tenantId,
-        contactEmail,
-        reason: reason ?? null,
-        requestedBy: jwt.sub,
-        requestedAt: new Date().toISOString(),
-      });
-
-      return reply.send({
-        success: true,
-        message: 'GDPR erasure request submitted. All personal data will be removed within 72 hours and an audit log will be retained as required by law.',
-      });
+    // Deprecated: use POST /gdpr/erasure instead (canonical endpoint with DB record + audit trail)
+    r.post('/data-ownership/gdpr-erasure', async (_req, reply) => {
+      return reply.code(301).redirect('/api/v1/gdpr/erasure');
     });
 
     r.get('/data-ownership/audit', async (req, reply) => {

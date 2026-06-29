@@ -351,6 +351,8 @@ export class CpqPricingEngine {
         discountPercent: discountPercent.toNumber(),
         discountAmount: discountAmount.toNumber(),
         total: total.toNumber(),
+        taxPercent: 0,
+        taxAmount: 0,
         billingType: product.billingType,
       });
     }
@@ -374,12 +376,18 @@ export class CpqPricingEngine {
       new Decimal(0)
     );
     const taxRate = await this.getTaxRate(req.tenantId);
-    const taxTotal = lineItems
-      .filter((i) => productMap.get(i.productId)?.taxable)
-      .reduce(
-        (sum, i) => sum.plus(new Decimal(i.total).times(taxRate)),
-        new Decimal(0)
-      );
+
+    // Stamp per-line tax now that taxRate is known
+    for (const item of lineItems) {
+      const taxable = productMap.get(item.productId)?.taxable ?? false;
+      item.taxPercent = taxable ? taxRate * 100 : 0;
+      item.taxAmount = taxable ? new Decimal(item.total).times(taxRate).toNumber() : 0;
+    }
+
+    const taxTotal = lineItems.reduce(
+      (sum, i) => sum.plus(new Decimal(i.taxAmount)),
+      new Decimal(0)
+    );
 
     // Increment uses counter for promo codes that were actually applied
     if (promoCodesUsed && req.appliedPromos && req.appliedPromos.length > 0) {
@@ -547,6 +555,8 @@ export class CpqPricingEngine {
         discountPercent: 100,
         discountAmount: item.listPrice,
         total: 0,
+        taxPercent: 0,
+        taxAmount: 0,
         notes: 'BOGO free item',
       });
     }

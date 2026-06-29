@@ -24,6 +24,7 @@ export interface EmailEnvelope {
   subject: string;
   html: string;
   text?: string;
+  from?: string;
 }
 
 export interface EmailChannel {

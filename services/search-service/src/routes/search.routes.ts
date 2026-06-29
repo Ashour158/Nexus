@@ -11,7 +11,7 @@ import { LEADS_INDEX } from '../indexes/leads.index.js';
 const SearchQuerySchema = z.object({
   q: z.string().min(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
-  offset: z.coerce.number().int().min(0).default(0),
+  page: z.coerce.number().int().min(1).default(1),
 });
 
 export async function registerSearchRoutes(app: FastifyInstance, client: MeiliSearch): Promise<void> {
@@ -20,7 +20,8 @@ export async function registerSearchRoutes(app: FastifyInstance, client: MeiliSe
       const parsed = SearchQuerySchema.safeParse(request.query);
       if (!parsed.success) throw new ValidationError('Invalid query', parsed.error.flatten());
       const jwt = request.user as JwtPayload;
-      const { q, limit, offset } = parsed.data;
+      const { q, limit, page } = parsed.data;
+      const offset = (page - 1) * limit;
       const filter = `tenantId = '${jwt.tenantId}'`;
       const [deals, contacts, accounts, leads] = await Promise.all([
         client.index(DEALS_INDEX).search(q, { filter, limit, offset }),
@@ -47,7 +48,7 @@ export async function registerSearchRoutes(app: FastifyInstance, client: MeiliSe
       const result = await client.index(DEALS_INDEX).search(parsed.data.q, {
         filter: `tenantId = '${jwt.tenantId}'`,
         limit: parsed.data.limit,
-        offset: parsed.data.offset,
+        offset: (parsed.data.page - 1) * parsed.data.limit,
       });
       return reply.send({ success: true, data: result.hits });
     });
@@ -59,7 +60,7 @@ export async function registerSearchRoutes(app: FastifyInstance, client: MeiliSe
       const result = await client.index(CONTACTS_INDEX).search(parsed.data.q, {
         filter: `tenantId = '${jwt.tenantId}'`,
         limit: parsed.data.limit,
-        offset: parsed.data.offset,
+        offset: (parsed.data.page - 1) * parsed.data.limit,
       });
       return reply.send({ success: true, data: result.hits });
     });
@@ -71,7 +72,7 @@ export async function registerSearchRoutes(app: FastifyInstance, client: MeiliSe
       const result = await client.index(ACCOUNTS_INDEX).search(parsed.data.q, {
         filter: `tenantId = '${jwt.tenantId}'`,
         limit: parsed.data.limit,
-        offset: parsed.data.offset,
+        offset: (parsed.data.page - 1) * parsed.data.limit,
       });
       return reply.send({ success: true, data: result.hits });
     });

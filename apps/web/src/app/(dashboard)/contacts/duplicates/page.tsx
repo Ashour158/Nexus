@@ -65,7 +65,7 @@ export default function ContactDuplicatesPage() {
                     <p className="bg-green-50">{c.email}</p>
                     <p className="bg-yellow-50">{c.company}</p>
                     <p className="bg-green-50">{c.phone}</p>
-                    <label className="mt-2 block text-xs"><input type="checkbox" className="mr-1" defaultChecked />Keep this record fields</label>
+                    <label className="mt-2 block text-xs"><input type="checkbox" className="me-1" defaultChecked />Keep this record fields</label>
                   </div>
                 ))}
               </div>
@@ -86,7 +86,7 @@ export default function ContactDuplicatesPage() {
             </article>
           );
         })}
-        {scan.isSuccess && filtered.length === 0 ? <p className="text-sm text-slate-500">No duplicate groups matched current filter.</p> : null}
+        {scan.isSuccess && filtered.length === 0 ? <p className="text-sm text-slate-500">No duplicates found. Your contacts are clean!</p> : null}
       </section>
     </main>
   );

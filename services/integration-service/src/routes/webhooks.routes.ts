@@ -53,7 +53,19 @@ export async function registerWebhooksRoutes(
           const params = IdParamSchema.safeParse(request.params);
           if (!params.success) throw new ValidationError('Invalid params', params.error.flatten());
           await webhooks.deleteSubscription(params.data.id);
-          return reply.code(204).send();
+          return reply.send({ success: true, data: { id: params.data.id, deleted: true } });
+        }
+      );
+
+      r.post(
+        '/integrations/webhooks/deliveries/:id/replay',
+        { preHandler: requirePermission(PERMISSIONS.INTEGRATIONS.MANAGE) },
+        async (request, reply) => {
+          const params = IdParamSchema.safeParse(request.params);
+          if (!params.success) throw new ValidationError('Invalid params', params.error.flatten());
+          const ok = await webhooks.replayDelivery(params.data.id);
+          if (!ok) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Delivery not found or subscription inactive' } });
+          return reply.send({ success: true, data: { id: params.data.id, replayed: true } });
         }
       );
     },

@@ -8,7 +8,7 @@ function serviceFor(entityType: EntityType): string {
 }
 
 export function createPortalService(prisma: PortalPrisma) {
-  return {
+  const service = {
     async createToken(
       tenantId: string,
       entityType: EntityType,
@@ -71,14 +71,24 @@ export function createPortalService(prisma: PortalPrisma) {
       };
     },
 
-    async recordAction(token: string, action: 'viewed' | 'accepted' | 'rejected' | 'downloaded') {
-      return { token, action, recordedAt: new Date().toISOString() };
+    async recordAction(token: string, action: 'viewed' | 'accepted' | 'rejected' | 'downloaded', tenantId?: string, entityType?: string, entityId?: string) {
+      const row = await prisma.portalToken.findUnique({ where: { token } });
+      const log = await (prisma as any).portalAuditLog.create({
+        data: {
+          tenantId: tenantId ?? row?.tenantId ?? 'unknown',
+          token,
+          entityType: entityType ?? row?.entityType ?? 'UNKNOWN',
+          entityId: entityId ?? row?.entityId ?? 'unknown',
+          action,
+        },
+      });
+      return log;
     },
 
     async accept(token: string) {
       const row = await prisma.portalToken.findUnique({ where: { token } });
       if (!row) return null;
-      await this.recordAction(token, 'accepted');
+      await service.recordAction(token, 'accepted', row.tenantId, row.entityType, row.entityId);
       await fetch(`${serviceFor(row.entityType)}/api/v1/quotes/${row.entityId}/accept`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${process.env.INTERNAL_SERVICE_TOKEN ?? ''}` },
@@ -89,7 +99,7 @@ export function createPortalService(prisma: PortalPrisma) {
     async reject(token: string, reason?: string) {
       const row = await prisma.portalToken.findUnique({ where: { token } });
       if (!row) return null;
-      await this.recordAction(token, 'rejected');
+      await service.recordAction(token, 'rejected', row.tenantId, row.entityType, row.entityId);
       await fetch(`${serviceFor(row.entityType)}/api/v1/quotes/${row.entityId}/reject`, {
         method: 'POST',
         headers: {
@@ -116,4 +126,6 @@ export function createPortalService(prisma: PortalPrisma) {
       });
     },
   };
+
+  return service;
 }

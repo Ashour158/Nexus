@@ -1,18 +1,32 @@
 import createNextIntlPlugin from 'next-intl/plugin';
 import { withSentryConfig } from '@sentry/nextjs';
+import bundleAnalyzer from '@next/bundle-analyzer';
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
+const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === 'true' });
+const isDevelopment = process.env.NODE_ENV === 'development';
+const shouldUseStandaloneOutput =
+  process.env.FORCE_STANDALONE_OUTPUT === '1' ||
+  (process.platform !== 'win32' && process.env.SKIP_STANDALONE_OUTPUT !== '1');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'standalone',
+  // Standalone output uses symlinks; local Windows builds commonly fail with EPERM.
+  // Linux/Docker keeps standalone by default, Windows can opt in with FORCE_STANDALONE_OUTPUT=1.
+  ...(shouldUseStandaloneOutput ? { output: 'standalone' } : {}),
   poweredByHeader: false,
+  compress: true,
   images: {
-    domains: ['localhost', 'storage.googleapis.com'],
+    formats: ['image/avif', 'image/webp'],
+    remotePatterns: [
+      { protocol: 'http', hostname: 'localhost' },
+      { protocol: 'https', hostname: 'storage.googleapis.com' },
+    ],
   },
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client'],
+    optimizePackageImports: ['lucide-react', '@nexus/shared-types'],
   },
   async headers() {
     return [
@@ -31,7 +45,9 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self'",
-              "connect-src 'self' wss: https:",
+              isDevelopment
+                ? "connect-src 'self' http://localhost:* ws://localhost:* wss: https:"
+                : "connect-src 'self' wss: https:",
               "frame-ancestors 'self'",
             ].join('; '),
           },
@@ -43,11 +59,15 @@ const nextConfig = {
 
 const withIntl = withNextIntl(nextConfig);
 
-export default withSentryConfig(withIntl, {
+const finalConfig = withSentryConfig(withIntl, {
   silent: true,
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   widenClientFileUpload: true,
   hideSourceMaps: true,
-  disableLogger: true,
+  bundleSizeOptimizations: {
+    excludeDebugStatements: true,
+  },
 });
+
+export default withBundleAnalyzer(finalConfig);

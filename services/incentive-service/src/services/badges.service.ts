@@ -46,7 +46,8 @@ export function createBadgesService(prisma: IncentivePrisma) {
     },
     async checkAndAward(tenantId: string, ownerId: string, metric: string, value: number) {
       await this.seedSystemBadges();
-      const badges = await prisma.badge.findMany({ where: { OR: [{ tenantId: null }, { tenantId }] } });
+      const badges = await prisma.badge.findMany({
+    take: 500, where: { OR: [{ tenantId: null }, { tenantId }] } });
       const awarded = [];
       for (const badge of badges) {
         const condition = badge.condition as { metric?: string; operator?: string; value?: number };

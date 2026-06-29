@@ -1,42 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 
-function mockUsers() {
-  return Array.from({ length: 180 }).map((_, i) => ({
-    id: String(i + 1),
-    name: `User ${i + 1}`,
-    email: `user${i + 1}@nexuscrm.app`,
-    role: i % 6 === 0 ? 'admin' : i % 3 === 0 ? 'manager' : 'ae',
-    tenant: `Tenant ${(i % 8) + 1}`,
-    status: i % 9 === 0 ? 'Suspended' : i % 11 === 0 ? 'Invited' : 'Active',
-    joined: new Date(Date.now() - i * 86400000).toISOString(),
-    lastActive: new Date(Date.now() - i * 3600000).toISOString(),
-  }));
-}
+const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://auth-service:3010/api/v1';
 
 export async function GET(req: NextRequest) {
   try {
     await requireAdmin(req);
+    const auth = req.headers.get('authorization') ?? '';
+
     const { searchParams } = new URL(req.url);
-    const q = (searchParams.get('q') ?? '').toLowerCase();
+    const q = searchParams.get('q') ?? '';
     const tenant = searchParams.get('tenant') ?? 'all';
     const role = searchParams.get('role') ?? 'all';
     const status = searchParams.get('status') ?? 'all';
-    const page = Number(searchParams.get('page') ?? '1');
-    const limit = Number(searchParams.get('limit') ?? '50');
+    const page = searchParams.get('page') ?? '1';
+    const limit = searchParams.get('limit') ?? '50';
 
-    const filtered = mockUsers().filter((u) => {
-      const matchesQ = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
-      const matchesTenant = tenant === 'all' || u.tenant === tenant;
-      const matchesRole = role === 'all' || u.role === role;
-      const matchesStatus = status === 'all' || u.status === status;
-      return matchesQ && matchesTenant && matchesRole && matchesStatus;
+    // Build upstream query params
+    const upstreamParams = new URLSearchParams();
+    if (q) upstreamParams.set('search', q);
+    if (page) upstreamParams.set('page', page);
+    if (limit) upstreamParams.set('limit', limit);
+    // Note: auth-service may not support tenant/role/status filters;
+    // we forward what we can and filter client-side as fallback.
+
+    const queryString = upstreamParams.toString();
+    const res = await fetch(`${AUTH_URL}/users${queryString ? `?${queryString}` : ''}`, {
+      headers: { Authorization: auth },
     });
 
-    const start = (page - 1) * limit;
-    const data = filtered.slice(start, start + limit);
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: 'Upstream error' }));
+      return NextResponse.json(error, { status: res.status });
+    }
 
-    return NextResponse.json({ data, page, limit, total: filtered.length, totalPages: Math.ceil(filtered.length / limit) });
+    const data = await res.json();
+
+    // Client-side filtering for fields auth-service may not support
+    let users = Array.isArray(data.data) ? data.data : [];
+    if (tenant !== 'all') {
+      users = users.filter((u: Record<string, unknown>) => u.tenantId === tenant || u.tenant === tenant);
+    }
+    if (role !== 'all') {
+      users = users.filter((u: Record<string, unknown>) => {
+        const roles = Array.isArray(u.roles) ? u.roles : [];
+        return roles.includes(role) || u.role === role;
+      });
+    }
+    if (status !== 'all') {
+      users = users.filter((u: Record<string, unknown>) => u.status === status || u.isActive === (status === 'Active'));
+    }
+
+    const total = data.total ?? users.length;
+    return NextResponse.json({
+      data: users,
+      page: Number(page),
+      limit: Number(limit),
+      total,
+      totalPages: Math.ceil(total / Number(limit)),
+    });
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -45,8 +67,17 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     await requireAdmin(req);
-    const body = await req.json();
-    return NextResponse.json({ id: crypto.randomUUID(), ...body, createdAt: new Date().toISOString() }, { status: 201 });
+    const auth = req.headers.get('authorization') ?? '';
+    const body = await req.text();
+
+    const res = await fetch(`${AUTH_URL}/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: auth },
+      body,
+    });
+
+    const data = await res.json().catch(() => ({}));
+    return NextResponse.json(data, { status: res.status });
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nexus
+  annotations:
+    linkerd.io/inject: enabled
+---
+apiVersion: policy.linkerd.io/v1beta1
+kind: ServerAuthorization
+metadata:
+  name: allow-internal
+  namespace: nexus
+spec:
+  server:
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: nexus-crm
+  client:
+    meshTLS:
+      serviceAccounts:
+        - name: nexus-crm
+          namespace: nexus
+---
+apiVersion: policy.linkerd.io/v1beta2
+kind: HTTPRoute
+metadata:
+  name: nexus-health-check
+  namespace: nexus
+spec:
+  parentRefs:
+    - name: nexus-crm
+      kind: Service
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /health
+      backendRefs:
+        - name: nexus-crm
+          port: 3000

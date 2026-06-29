@@ -33,7 +33,8 @@ export function createContestsService(prisma: IncentivePrisma) {
     async updateLeaderboard(tenantId: string, contestId: string) {
       const contest = await prisma.contest.findFirst({ where: { tenantId, id: contestId } });
       if (!contest) return null;
-      const rows = await prisma.contestEntry.findMany({ where: { tenantId, contestId }, orderBy: { currentValue: 'desc' } });
+      const rows = await prisma.contestEntry.findMany({
+    take: 500, where: { tenantId, contestId }, orderBy: { currentValue: 'desc' } });
       let rank = 1;
       for (const row of rows) {
         await prisma.contestEntry.update({ where: { id: row.id }, data: { rank } });
@@ -43,7 +44,8 @@ export function createContestsService(prisma: IncentivePrisma) {
     },
     startContestWorker() {
       const timer = setInterval(() => {
-        void prisma.contest.findMany({ where: { isActive: true, endDate: { gte: new Date() } } }).then((contests) =>
+        void prisma.contest.findMany({
+    take: 500, where: { isActive: true, endDate: { gte: new Date() } } }).then((contests) =>
           Promise.all(contests.map((contest) => this.updateLeaderboard(contest.tenantId, contest.id)))
         );
       }, 30 * 60 * 1000);

@@ -21,6 +21,7 @@ model ApprovalPolicy {
   requests    ApprovalRequest[]
 
   @@index([tenantId, module])
+  @@unique([id, tenantId])
 }
 
 model ApprovalRequest {
@@ -41,6 +42,8 @@ model ApprovalRequest {
 
   @@index([tenantId, module, recordId])
   @@index([tenantId, status])
+  @@index([tenantId, requestedBy, status])
+  @@unique([id, tenantId])
 }
 
 model ApprovalStep {
@@ -72,4 +75,25 @@ enum StepStatus {
   REJECTED
   SKIPPED
   DELEGATED
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
 }

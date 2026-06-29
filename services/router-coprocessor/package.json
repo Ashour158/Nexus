@@ -1,0 +1,24 @@
+{
+    "name":  "@nexus/router-coprocessor",
+    "version":  "1.0.0",
+    "private":  true,
+    "type":  "module",
+    "scripts":  {
+                    "dev":  "tsx watch src/index.ts",
+                    "build":  "tsc --project tsconfig.json",
+                    "start":  "node dist/index.js",
+                    "typecheck":  "tsc --noEmit"
+                },
+    "dependencies":  {
+                         "fastify":  "^4.28.1",
+                         "graphql":  "^16.9.0",
+                         "@fastify/swagger":  "^9.0.0",
+                         "@fastify/swagger-ui":  "^5.0.0",
+                         "@nexus/service-utils":  "workspace:*"
+                     },
+    "devDependencies":  {
+                            "@types/node":  "^20.14.9",
+                            "tsx":  "^4.21.0",
+                            "typescript":  "^5.5.3"
+                        }
+}

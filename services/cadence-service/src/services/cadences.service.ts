@@ -101,10 +101,11 @@ export function createCadencesService(prisma: CadencePrisma) {
 
     async getAnalytics(tenantId: string, cadenceId: string) {
       const [enrollments, steps, executions] = await Promise.all([
-        prisma.cadenceEnrollment.findMany({ where: { tenantId, cadenceId } }),
-        prisma.cadenceStep.findMany({ where: { cadenceId }, orderBy: { position: 'asc' } }),
+        prisma.cadenceEnrollment.findMany({ where: { tenantId, cadenceId }, take: 5000 }),
+        prisma.cadenceStep.findMany({ where: { cadenceId }, orderBy: { position: 'asc' }, take: 100 }),
         prisma.stepExecution.findMany({
           where: { enrollment: { tenantId, cadenceId } },
+          take: 5000,
         }),
       ]);
       const totalEnrollments = enrollments.length;

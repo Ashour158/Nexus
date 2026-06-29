@@ -6,6 +6,14 @@ import {
 import { Prisma } from '../../../../../node_modules/.prisma/crm-client/index.js';
 import { createDealsService } from '../deals.service.js';
 
+const { mockAssertValidStageTransition } = vi.hoisted(() => ({
+  mockAssertValidStageTransition: vi.fn(),
+}));
+
+vi.mock('../../lib/blueprint-client.js', () => ({
+  assertValidStageTransition: mockAssertValidStageTransition,
+}));
+
 /**
  * Unit tests for the deals service (Section 34.2). All Prisma and Kafka
  * dependencies are mocked with `vi.fn()` — no DB or broker is started. We
@@ -15,6 +23,11 @@ import { createDealsService } from '../deals.service.js';
 
 const TENANT = 'tenant_1';
 const OTHER_TENANT = 'tenant_2';
+
+beforeEach(() => {
+  mockAssertValidStageTransition.mockReset();
+  mockAssertValidStageTransition.mockResolvedValue(undefined);
+});
 
 function makeDeal(over: Partial<Record<string, unknown>> = {}) {
   return {
@@ -40,8 +53,6 @@ function makeDeal(over: Partial<Record<string, unknown>> = {}) {
     lostDetail: null,
     meddicicData: {},
     meddicicScore: null,
-    aiWinProbability: null,
-    aiInsights: null,
     version: 1,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
@@ -336,6 +347,8 @@ describe('moveDealToStage', () => {
     ctx.prisma.deal.update.mockResolvedValue(
       makeDeal({ stageId: 'stage_2', probability: 60 })
     );
+    ctx.prisma.dealContact.findMany.mockResolvedValue([]);
+    ctx.prisma.activity.findMany.mockResolvedValue([]);
 
     await ctx.service.moveDealToStage(TENANT, 'deal_1', 'stage_2');
 
@@ -347,6 +360,35 @@ describe('moveDealToStage', () => {
       newStageId: 'stage_2',
       ownerId: 'user_1',
     });
+    expect(mockAssertValidStageTransition).toHaveBeenCalledWith(
+      TENANT,
+      'pipe_1',
+      'stage_1',
+      'stage_2',
+      expect.objectContaining({
+        amount: 100000,
+        name: 'Acme Expansion',
+      })
+    );
+  });
+
+  it('blocks the transition when blueprint validation rejects it', async () => {
+    ctx.prisma.deal.findFirst.mockResolvedValue(makeDeal());
+    ctx.prisma.stage.findFirst.mockResolvedValue(
+      makeStage({ id: 'stage_2', probability: 60 })
+    );
+    ctx.prisma.dealContact.findMany.mockResolvedValue([]);
+    ctx.prisma.activity.findMany.mockResolvedValue([]);
+    mockAssertValidStageTransition.mockRejectedValueOnce(
+      new BusinessRuleError('Stage transition blocked: quote required')
+    );
+
+    await expect(ctx.service.moveDealToStage(TENANT, 'deal_1', 'stage_2')).rejects.toBeInstanceOf(
+      BusinessRuleError
+    );
+
+    expect(ctx.prisma.deal.update).not.toHaveBeenCalled();
+    expect(ctx.producer.publish).not.toHaveBeenCalled();
   });
 
   it('returns existing deal unchanged when stageId is the same', async () => {

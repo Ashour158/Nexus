@@ -134,6 +134,7 @@ export function createRequestsService(prisma: ApprovalPrisma, producer: NexusPro
       const allSteps = await prisma.approvalStep.findMany({
         where: { requestId },
         orderBy: { order: 'asc' },
+        take: 100,
       });
       const allApproved = allSteps.every((s) => s.status === 'APPROVED');
       if (allApproved) {
@@ -144,7 +145,14 @@ export function createRequestsService(prisma: ApprovalPrisma, producer: NexusPro
         await producer.publish(TOPICS.WORKFLOWS, {
           type: 'approval.request.approved',
           tenantId,
-          payload: { requestId },
+          payload: {
+            requestId,
+            module: req.module,
+            recordId: req.recordId,
+            entityType: (req.data as Record<string, unknown>)?.entityType,
+            entityId: (req.data as Record<string, unknown>)?.entityId,
+            data: req.data,
+          },
         });
       } else {
         await prisma.approvalRequest.update({
@@ -188,7 +196,15 @@ export function createRequestsService(prisma: ApprovalPrisma, producer: NexusPro
       await producer.publish(TOPICS.WORKFLOWS, {
         type: 'approval.request.rejected',
         tenantId,
-        payload: { requestId, comment },
+        payload: {
+          requestId,
+          module: req.module,
+          recordId: req.recordId,
+          entityType: (req.data as Record<string, unknown>)?.entityType,
+          entityId: (req.data as Record<string, unknown>)?.entityId,
+          data: req.data,
+          comment,
+        },
       });
       return this.getRequest(tenantId, requestId);
     },

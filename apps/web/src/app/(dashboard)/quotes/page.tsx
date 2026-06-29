@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TableSkeleton } from '@/components/ui/skeleton';
@@ -13,6 +13,7 @@ import {
   type Quote,
 } from '@/hooks/use-quotes';
 import { formatCurrency, formatDate } from '@/lib/format';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function QuotesPage(): JSX.Element {
   const [status, setStatus] = useState<Quote['status'] | ''>('');
@@ -20,6 +21,13 @@ export default function QuotesPage(): JSX.Element {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const roles = useAuthStore((s) => s.roles);
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canUseStandaloneQuoteBuilder =
+    roles.some((role) => role.toLowerCase() === 'admin') ||
+    hasPermission('quotes:admin') ||
+    hasPermission('admin:*');
 
   const query = useQuotes({
     status: status || undefined,
@@ -43,6 +51,18 @@ export default function QuotesPage(): JSX.Element {
     []
   );
 
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  if (!isHydrated) {
+    return (
+      <main className="space-y-4 px-6 py-6">
+        <TableSkeleton rows={8} cols={10} />
+      </main>
+    );
+  }
+
   return (
     <main className="space-y-4 px-6 py-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -50,9 +70,15 @@ export default function QuotesPage(): JSX.Element {
           <h1 className="text-2xl font-bold text-slate-900">Quotes</h1>
           <p className="text-sm text-slate-600">Finance quote lifecycle and actions.</p>
         </div>
-        <Link href="/quotes/new">
-          <Button type="button">New Quote</Button>
-        </Link>
+        {canUseStandaloneQuoteBuilder ? (
+          <Link href="/quotes/new">
+            <Button type="button">Admin quote builder</Button>
+          </Link>
+        ) : (
+          <Link href="/rfqs">
+            <Button type="button">Start from RFQ</Button>
+          </Link>
+        )}
       </header>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4">
@@ -102,16 +128,16 @@ export default function QuotesPage(): JSX.Element {
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>
-                <th className="px-3 py-2 text-left">Quote #</th>
-                <th className="px-3 py-2 text-left">Deal</th>
-                <th className="px-3 py-2 text-left">Account</th>
-                <th className="px-3 py-2 text-left">Status</th>
-                <th className="px-3 py-2 text-right">Total</th>
+                <th className="px-3 py-2 text-start">Quote #</th>
+                <th className="px-3 py-2 text-start">Deal</th>
+                <th className="px-3 py-2 text-start">Account</th>
+                <th className="px-3 py-2 text-start">Status</th>
+                <th className="px-3 py-2 text-end">Total</th>
                 <th className="px-3 py-2 text-center">Version</th>
-                <th className="px-3 py-2 text-left">Expires</th>
-                <th className="px-3 py-2 text-left">Owner</th>
-                <th className="px-3 py-2 text-left">Created</th>
-                <th className="px-3 py-2 text-right">Actions</th>
+                <th className="px-3 py-2 text-start">Expires</th>
+                <th className="px-3 py-2 text-start">Owner</th>
+                <th className="px-3 py-2 text-start">Created</th>
+                <th className="px-3 py-2 text-end">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -131,7 +157,7 @@ export default function QuotesPage(): JSX.Element {
                   <td className="px-3 py-2">
                     <StatusPill status={q.status} />
                   </td>
-                  <td className="px-3 py-2 text-right">{formatCurrency(q.total, q.currency)}</td>
+                  <td className="px-3 py-2 text-end">{formatCurrency(q.total, q.currency)}</td>
                   <td className="px-3 py-2 text-center">{q.version}</td>
                   <td className="px-3 py-2">{formatDate(q.expiresAt ?? q.validUntil)}</td>
                   <td className="px-3 py-2">{q.ownerId.slice(0, 8)}…</td>

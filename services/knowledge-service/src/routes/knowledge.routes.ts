@@ -49,14 +49,14 @@ export async function registerKnowledgeRoutes(
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const { id } = z.object({ id: z.string().cuid() }).parse(request.params);
     const data = await knowledge.getArticle(tenantId, id);
-    if (!data) return reply.code(404).send({ success: false, error: 'Article not found' });
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Article not found', requestId: request.id } });
     return reply.send({ success: true, data });
   });
   app.patch('/api/v1/knowledge/articles/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const { id } = z.object({ id: z.string().cuid() }).parse(request.params);
     const data = await knowledge.updateArticle(tenantId, id, ArticleBody.partial().parse(request.body));
-    if (!data) return reply.code(404).send({ success: false, error: 'Article not found' });
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Article not found', requestId: request.id } });
     return reply.send({ success: true, data });
   });
   app.post('/api/v1/knowledge/articles/:id/publish', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {

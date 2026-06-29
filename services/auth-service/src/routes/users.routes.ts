@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import type { JwtPayload } from '@nexus/shared-types';
 import { PERMISSIONS, requirePermission, ValidationError } from '@nexus/service-utils';
 import {
@@ -121,7 +122,7 @@ export async function registerUsersRoutes(
               timezone: true,
             },
           });
-          if (!user) return reply.code(404).send({ success: false, error: 'Rep not found' });
+          if (!user) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Rep not found', requestId: request.id } });
           const slots: string[] = [];
           const cursor = new Date();
           cursor.setHours(9, 0, 0, 0);
@@ -206,4 +207,17 @@ export async function registerUsersRoutes(
     },
     { prefix: '/api/v1' }
   );
+
+  // Public booking token validation (used by CRM scheduler)
+  app.get('/api/v1/users/by-booking-token/:token', async (request, reply) => {
+    const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
+    const user = await prisma.user.findFirst({
+      where: { bookingToken: token, isActive: true },
+      select: { id: true, tenantId: true, firstName: true, lastName: true, email: true, timezone: true },
+    });
+    if (!user) {
+      return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Invalid booking token', requestId: request.id } });
+    }
+    return reply.send({ success: true, data: user });
+  });
 }

@@ -5,6 +5,7 @@ import {
   PERMISSIONS,
   requirePermission,
   ValidationError,
+  createHttpClient,
 } from '@nexus/service-utils';
 import type { NexusProducer } from '@nexus/kafka';
 import {
@@ -19,11 +20,12 @@ import {
   UpdateDealSchema,
 } from '@nexus/validation';
 import type { CrmPrisma } from '../prisma.js';
-import {
-  createDealsService,
-  type DealListFilters,
-} from '../services/deals.service.js';
+import { createDealsService } from '../services/deals.service.js';
 import { createAttachmentsService } from '../services/attachments.service.js';
+import { getFieldHistory } from '../lib/field-history.js';
+import { uploadToStorage } from '../lib/storage.js';
+import { createSalesRecordsUseCase } from '../use-cases/sales-records.use-case.js';
+import type { EngineContext } from '@nexus/domain-core';
 
 // ─── Local param schemas ────────────────────────────────────────────────────
 
@@ -53,27 +55,6 @@ const AttachmentIdParamSchema = z.object({
   attachmentId: z.string().cuid(),
 });
 
-async function uploadToStorage(payload: {
-  fileName: string;
-  mimeType: string;
-  contentBase64?: string;
-}): Promise<string> {
-  if (!payload.contentBase64) return `manual/${Date.now()}-${payload.fileName}`;
-  const base = process.env.STORAGE_SERVICE_URL ?? 'http://localhost:3008';
-  const token = process.env.INTERNAL_SERVICE_TOKEN ?? '';
-  const res = await fetch(`${base}/api/v1/objects`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw new Error('Storage upload failed');
-  const body = (await res.json()) as { data?: { storageKey?: string } };
-  return body.data?.storageKey ?? `fallback/${Date.now()}-${payload.fileName}`;
-}
-
 // ─── Registration ───────────────────────────────────────────────────────────
 
 /**
@@ -85,6 +66,13 @@ async function uploadToStorage(payload: {
  * {@link CrmPrisma}, but every handler still asserts `tenantId` on the
  * inputs it passes to the service layer to keep the contract explicit.
  */
+const dataServiceProxyClient = createHttpClient({
+  baseURL: process.env.DATA_SERVICE_URL ?? 'http://localhost:3015',
+});
+const quoteProjectionClient = createHttpClient({
+  baseURL: process.env.DEALS_SERVICE_URL ?? 'http://localhost:3042',
+});
+
 export async function registerDealsRoutes(
   app: FastifyInstance,
   prisma: CrmPrisma,
@@ -92,6 +80,52 @@ export async function registerDealsRoutes(
 ): Promise<void> {
   const deals = createDealsService(prisma, producer);
   const attachments = createAttachmentsService(prisma);
+  const salesRecords = createSalesRecordsUseCase({
+    leads: {
+      create: async () => undefined,
+      get: async () => ({}),
+      update: async () => undefined,
+      archive: async () => undefined,
+      restore: async () => undefined,
+      convert: async () => undefined,
+      findDuplicates: async () => [],
+    },
+    deals: {
+      create: (tenantId, data) => deals.createDeal(tenantId, data as never),
+      get: (tenantId, id) => deals.getDealById(tenantId, id) as Promise<Record<string, unknown>>,
+      update: (tenantId, id, data, actor) => deals.updateDeal(tenantId, id, data as never, actor),
+      archive: (tenantId, id) => deals.deleteDeal(tenantId, id),
+      restore: (tenantId, id) => deals.restoreDeal(tenantId, id),
+      moveStage: (tenantId, id, stageId) => deals.moveDealToStage(tenantId, id, stageId),
+      markWon: (tenantId, id) => deals.markDealWon(tenantId, id),
+      markLost: (tenantId, id, reason, detail) => deals.markDealLost(tenantId, id, reason, detail),
+    },
+    repositories: {
+      lead: prisma.lead as never,
+      deal: prisma.deal as never,
+    },
+    recycle: async (input) => {
+      await dataServiceProxyClient.post('/api/v1/recycle', input, { Authorization: `Bearer ${process.env.INTERNAL_SERVICE_TOKEN ?? ''}` });
+    },
+  });
+
+  function engineContextFromJwt(requestId: string, jwt: JwtPayload): EngineContext {
+    return {
+      audit: {
+        actor: {
+          userId: jwt.sub,
+          tenantId: jwt.tenantId,
+          email: jwt.email,
+          roles: jwt.roles ?? [],
+          permissions: jwt.permissions ?? [],
+        },
+        requestId,
+        correlationId: requestId,
+        source: 'api',
+      },
+      now: new Date(),
+    };
+  }
 
   await app.register(
     async (r) => {
@@ -106,14 +140,7 @@ export async function registerDealsRoutes(
           }
           const jwt = request.user as JwtPayload;
           const q = parsed.data;
-          const ALLOWED_SORT = [
-            'createdAt',
-            'updatedAt',
-            'amount',
-            'expectedCloseDate',
-          ] as const;
-          const narrowedSortBy = ALLOWED_SORT.find((f) => f === q.sortBy);
-          const filters: DealListFilters = {
+          const result = await deals.listDeals(jwt.tenantId, {
             pipelineId: q.pipelineId,
             stageId: q.stageId,
             ownerId: q.ownerId,
@@ -123,11 +150,10 @@ export async function registerDealsRoutes(
             minAmount: q.minAmount,
             maxAmount: q.maxAmount,
             includeDeleted: q.includeDeleted,
-          };
-          const result = await deals.listDeals(jwt.tenantId, filters, {
+          }, {
             page: q.page,
             limit: q.limit,
-            sortBy: narrowedSortBy,
+            sortBy: q.sortBy as import('../services/deals.service.js').DealListPagination['sortBy'],
             sortDir: q.sortDir,
           });
           return reply.send({ success: true, data: result });
@@ -144,7 +170,10 @@ export async function registerDealsRoutes(
             throw new ValidationError('Invalid body', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
-          const deal = await deals.createDeal(jwt.tenantId, parsed.data);
+          const deal = await salesRecords.create(engineContextFromJwt(request.id, jwt), {
+            entityType: 'deal',
+            data: parsed.data as Record<string, unknown>,
+          });
           return reply.code(201).send({ success: true, data: deal });
         }
       );
@@ -155,8 +184,21 @@ export async function registerDealsRoutes(
         { preHandler: requirePermission(PERMISSIONS.DEALS.READ) },
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
+          const q = PaginationSchema.parse(request.query);
           const jwt = request.user as JwtPayload;
-          const data = await attachments.listAttachments(jwt.tenantId, 'deal', id);
+          const data = await attachments.listAttachments(jwt.tenantId, 'deal', id, { page: q.page, limit: q.limit });
+          return reply.send({ success: true, data });
+        }
+      );
+
+      r.get(
+        '/deals/:id/documents',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.READ) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const q = PaginationSchema.parse(request.query);
+          const jwt = request.user as JwtPayload;
+          const data = await attachments.listAttachments(jwt.tenantId, 'deal', id, { page: q.page, limit: q.limit });
           return reply.send({ success: true, data });
         }
       );
@@ -189,6 +231,106 @@ export async function registerDealsRoutes(
         }
       );
 
+      r.post(
+        '/deals/:id/documents',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.UPDATE) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const body = AttachmentBodySchema.parse(request.body);
+          const jwt = request.user as JwtPayload;
+          const storageKey = body.storageKey ?? (await uploadToStorage({
+            fileName: body.fileName,
+            mimeType: body.mimeType,
+            contentBase64: body.contentBase64,
+          }));
+          const data = await attachments.createAttachment(
+            jwt.tenantId,
+            'deal',
+            id,
+            {
+              fileName: body.fileName,
+              fileSize: body.fileSize,
+              mimeType: body.mimeType,
+              storageKey,
+            },
+            jwt.sub
+          );
+          return reply.code(201).send({ success: true, data });
+        }
+      );
+
+      r.get(
+        '/deals/:id/field-history',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.READ) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          await deals.getDealById(jwt.tenantId, id);
+          const data = await getFieldHistory(prisma, jwt.tenantId, 'deal', id);
+          return reply.send({ success: true, data });
+        }
+      );
+
+      r.get(
+        '/deals/:id/audit',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.READ) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          await deals.getDealById(jwt.tenantId, id);
+          const [fieldChanges, attachmentsRows] = await Promise.all([
+            getFieldHistory(prisma, jwt.tenantId, 'deal', id),
+            prisma.attachment.findMany({
+              where: { tenantId: jwt.tenantId, module: 'deal', recordId: id },
+              orderBy: { createdAt: 'desc' },
+              take: 50,
+            }),
+          ]);
+          const data = [
+            ...fieldChanges.map((item) => ({
+              id: item.id,
+              type: 'field.changed',
+              actorId: item.changedBy,
+              actorName: item.changedByName,
+              description: `${item.fieldName} changed`,
+              createdAt: item.changedAt,
+              metadata: item,
+            })),
+            ...attachmentsRows.map((item) => ({
+              id: item.id,
+              type: 'document.attached',
+              actorId: item.uploadedBy,
+              actorName: null,
+              description: `${item.fileName} attached`,
+              createdAt: item.createdAt,
+              metadata: item,
+            })),
+          ].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+          return reply.send({ success: true, data });
+        }
+      );
+
+      r.get(
+        '/deals/:id/outbox',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.READ) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          await deals.getDealById(jwt.tenantId, id);
+          const data = await prisma.outboxMessage.findMany({
+            where: {
+              OR: [
+                { aggregateId: id },
+                { payload: { path: ['payload', 'dealId'], equals: id } },
+              ],
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+          });
+          return reply.send({ success: true, data });
+        }
+      );
+
       r.delete(
         '/deals/:id/attachments/:attachmentId',
         { preHandler: requirePermission(PERMISSIONS.DEALS.UPDATE) },
@@ -196,7 +338,7 @@ export async function registerDealsRoutes(
           const p = AttachmentIdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
           const data = await attachments.deleteAttachment(jwt.tenantId, p.attachmentId);
-          if (!data) return reply.code(404).send({ success: false, error: 'Not found' });
+          if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Attachment not found', requestId: request.id } });
           return reply.send({ success: true, data });
         }
       );
@@ -207,8 +349,9 @@ export async function registerDealsRoutes(
         async (request, reply) => {
           const body = DealMassUpdateSchema.parse(request.body);
           const jwt = request.user as JwtPayload;
-          const data = await prisma.deal.updateMany({
-            where: { tenantId: jwt.tenantId, id: { in: body.ids } },
+          const data = await salesRecords.massUpdate(engineContextFromJwt(request.id, jwt), {
+            entityType: 'deal',
+            ids: body.ids,
             data: body.data,
           });
           return reply.send({ success: true, data });
@@ -221,8 +364,9 @@ export async function registerDealsRoutes(
         async (request, reply) => {
           const body = MassIdsSchema.parse(request.body);
           const jwt = request.user as JwtPayload;
-          const data = await prisma.deal.deleteMany({
-            where: { tenantId: jwt.tenantId, id: { in: body.ids } },
+          const data = await salesRecords.massArchive(engineContextFromJwt(request.id, jwt), {
+            entityType: 'deal',
+            ids: body.ids,
           });
           return reply.send({ success: true, data });
         }
@@ -303,23 +447,15 @@ export async function registerDealsRoutes(
           const { id } = IdParamSchema.parse(request.params);
           const q = PaginationSchema.parse(request.query);
           const jwt = request.user as JwtPayload;
-          const result = await deals.listDealQuotes(jwt.tenantId, id, {
-            page: q.page,
-            limit: q.limit,
-          });
-          return reply.send({ success: true, data: result });
-        }
-      );
-
-      // ─── AI INSIGHTS ────────────────────────────────────────────────────
-      r.get(
-        '/deals/:id/ai-insights',
-        { preHandler: requirePermission(PERMISSIONS.DEALS.READ) },
-        async (request, reply) => {
-          const { id } = IdParamSchema.parse(request.params);
-          const jwt = request.user as JwtPayload;
-          const insights = await deals.getDealAiInsights(jwt.tenantId, id);
-          return reply.send({ success: true, data: insights });
+          const authorization = request.headers.authorization;
+          const result = await quoteProjectionClient.get(
+            `/api/v1/data/quote-projections/deal/${encodeURIComponent(id)}?page=${q.page}&limit=${q.limit}`,
+            {
+              ...(authorization ? { Authorization: authorization } : {}),
+              'x-tenant-id': jwt.tenantId,
+            }
+          );
+          return reply.send(result);
         }
       );
 
@@ -334,11 +470,10 @@ export async function registerDealsRoutes(
             throw new ValidationError('Invalid body', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
-          const deal = await deals.moveDealToStage(
-            jwt.tenantId,
-            id,
-            parsed.data.stageId
-          );
+          const deal = await salesRecords.moveDealStage(engineContextFromJwt(request.id, jwt), {
+            dealId: id,
+            stageId: parsed.data.stageId,
+          });
           return reply.send({ success: true, data: deal });
         }
       );
@@ -370,7 +505,7 @@ export async function registerDealsRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
-          const deal = await deals.markDealWon(jwt.tenantId, id);
+          const deal = await salesRecords.markDealWon(engineContextFromJwt(request.id, jwt), { dealId: id });
           return reply.send({ success: true, data: deal });
         }
       );
@@ -386,12 +521,11 @@ export async function registerDealsRoutes(
             throw new ValidationError('Invalid body', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
-          const deal = await deals.markDealLost(
-            jwt.tenantId,
-            id,
-            parsed.data.reason,
-            parsed.data.detail
-          );
+          const deal = await salesRecords.markDealLost(engineContextFromJwt(request.id, jwt), {
+            dealId: id,
+            reason: parsed.data.reason,
+            detail: parsed.data.detail,
+          });
           return reply.send({ success: true, data: deal });
         }
       );
@@ -419,8 +553,28 @@ export async function registerDealsRoutes(
             throw new ValidationError('Invalid body', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
-          const deal = await deals.updateDeal(jwt.tenantId, id, parsed.data);
+          const deal = await salesRecords.update(engineContextFromJwt(request.id, jwt), {
+            entityType: 'deal',
+            id,
+            data: parsed.data as Record<string, unknown>,
+          });
           return reply.send({ success: true, data: deal });
+        }
+      );
+
+      r.post(
+        '/deals/:id/clone',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.CREATE) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const Body = z.object({ name: z.string().max(200).optional() });
+          const parsed = Body.safeParse(request.body ?? {});
+          if (!parsed.success) {
+            throw new ValidationError('Invalid body', parsed.error.flatten());
+          }
+          const jwt = request.user as JwtPayload;
+          const deal = await deals.cloneDeal(jwt.tenantId, id, parsed.data.name);
+          return reply.code(201).send({ success: true, data: deal });
         }
       );
 
@@ -431,11 +585,19 @@ export async function registerDealsRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
-          await deals.deleteDeal(jwt.tenantId, id);
-          return reply.send({
-            success: true,
-            data: { id, deleted: true },
-          });
+          const data = await salesRecords.archive(engineContextFromJwt(request.id, jwt), { entityType: 'deal', id });
+          return reply.send({ success: true, data });
+        }
+      );
+
+      r.post(
+        '/deals/:id/restore',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.UPDATE) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const deal = await salesRecords.restore(engineContextFromJwt(request.id, jwt), { entityType: 'deal', id });
+          return reply.send({ success: true, data: deal });
         }
       );
     },

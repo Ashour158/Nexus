@@ -10,13 +10,18 @@ out/
 # Turbo
 .turbo/
 
-# Prisma (local SQLite dev DBs only — keep committed: schema, migrations, seed)
+# Prisma (local SQLite dev DBs only - keep committed: schema, migrations, seed)
 *.db
 *.db-journal
 
 # Test / coverage
 coverage/
 *.lcov
+
+# Secrets (production credentials mounted as Docker secrets)
+secrets/*.txt
+secrets/*.pem
+secrets/*.key
 
 # Env
 .env
@@ -34,11 +39,26 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 .idea/
-.vscode/*
-!.vscode/extensions.json
+.vscode/
 
 # Misc
 *.tsbuildinfo
+
+# Assistant / one-off generated artifacts
+.claude/
+.codex-logs/
+_incidents/
+CURSOR_*.md
+cursor-*.skill
+*GAP_ANALYSIS*.md
+*Gap_Analysis*.docx
+*GAP_AUDIT*.md
+*BUILD_AUDIT*.md
+*READINESS*.md
+typecheck_output*.txt
+**/tsc-output.txt
+~$*.docx
+*.backup-*
 
 # Local environment files - NEVER commit
 .env.local

@@ -1,0 +1,110 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  kbCategories(limit: Int, offset: Int): [KbCategory!]!
+  kbCategory(id: ID!): KbCategory
+  kbArticles(limit: Int, offset: Int, status: String): [KbArticle!]!
+  kbArticle(id: ID!): KbArticle
+  kbViews(articleId: ID!): [KbView!]!
+}
+
+type Mutation {
+  createKbCategory(input: CreateKbCategoryInput!): KbCategory!
+  updateKbCategory(id: ID!, input: UpdateKbCategoryInput!): KbCategory!
+  deleteKbCategory(id: ID!): Boolean!
+  createKbArticle(input: CreateKbArticleInput!): KbArticle!
+  updateKbArticle(id: ID!, input: UpdateKbArticleInput!): KbArticle!
+  deleteKbArticle(id: ID!): Boolean!
+  createKbView(input: CreateKbViewInput!): KbView!
+}
+
+type KbCategory @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  icon: String
+  position: Int!
+  parentCategoryId: String
+  parent: KbCategory
+  children: [KbCategory!]!
+  articles: [KbArticle!]!
+}
+
+type KbArticle @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  categoryId: String
+  category: KbCategory
+  title: String!
+  slug: String!
+  body: String!
+  tags: [String!]!
+  status: ArticleStatus!
+  authorId: String!
+  version: Int!
+  viewCount: Int!
+  dealStages: [String!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  views: [KbView!]!
+}
+
+type KbView @key(fields: "id") {
+  id: ID!
+  articleId: String!
+  article: KbArticle
+  viewedBy: String!
+  dealStage: String
+  viewedAt: DateTime!
+}
+
+enum ArticleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+input CreateKbCategoryInput {
+  name: String!
+  icon: String
+  position: Int
+  parentCategoryId: String
+}
+
+input UpdateKbCategoryInput {
+  name: String
+  icon: String
+  position: Int
+  parentCategoryId: String
+}
+
+input CreateKbArticleInput {
+  categoryId: String
+  title: String!
+  slug: String!
+  body: String!
+  tags: [String!]
+  status: ArticleStatus
+  authorId: String!
+  dealStages: [String!]
+}
+
+input UpdateKbArticleInput {
+  categoryId: String
+  title: String
+  slug: String
+  body: String
+  tags: [String!]
+  status: ArticleStatus
+  dealStages: [String!]
+}
+
+input CreateKbViewInput {
+  articleId: String!
+  viewedBy: String!
+  dealStage: String
+}

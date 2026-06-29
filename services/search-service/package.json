@@ -20,7 +20,12 @@
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
     "meilisearch": "^0.46.0",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "@fastify/swagger": "^9.0.0",
+    "@fastify/swagger-ui": "^5.0.0",
+    "graphql": "^16.13.2",
+    "graphql-yoga": "^5.21.0",
+    "@apollo/subgraph": "^2.13.3"
   },
   "devDependencies": {
     "@types/node": "^20.14.9",

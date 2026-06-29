@@ -2,6 +2,39 @@ import { TOPICS, type NexusProducer } from '@nexus/kafka';
 import type { CadencePrisma } from '../prisma.js';
 
 export function createQueueService(prisma: CadencePrisma, producer: NexusProducer) {
+  async function resolveEmail(enrollment: {
+    objectType: string;
+    objectId: string;
+    tenantId: string;
+  }): Promise<string | null> {
+    const token = process.env.INTERNAL_SERVICE_TOKEN ?? '';
+    if (enrollment.objectType === 'CONTACT') {
+      const url = `${process.env.CRM_SERVICE_URL ?? 'http://localhost:3001'}/api/v1/contacts/${enrollment.objectId}`;
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }).catch(() => null);
+      if (!res?.ok) return null;
+      const json = (await res.json().catch(() => null)) as { data?: { email?: string | null } } | null;
+      return json?.data?.email ?? null;
+    }
+    if (enrollment.objectType === 'LEAD') {
+      const url = `${process.env.CRM_SERVICE_URL ?? 'http://localhost:3001'}/api/v1/leads/${enrollment.objectId}`;
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }).catch(() => null);
+      if (!res?.ok) return null;
+      const json = (await res.json().catch(() => null)) as { data?: { email?: string | null } } | null;
+      return json?.data?.email ?? null;
+    }
+    return null;
+  }
+
   async function processQueue() {
     const due = await prisma.stepExecution.findMany({
       where: { status: 'PENDING', scheduledAt: { lte: new Date() } },
@@ -31,18 +64,27 @@ export function createQueueService(prisma: CadencePrisma, producer: NexusProduce
           const payload = useB
             ? (step.variantB as { subject?: string; body?: string })
             : { subject: step.subject, body: step.body };
-          await fetch(`${process.env.COMM_SERVICE_URL}/api/v1/emails`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${process.env.INTERNAL_SERVICE_TOKEN ?? ''}`,
-            },
-            body: JSON.stringify({
-              to: [`owner+${enrollment.ownerId}@example.com`],
-              subject: payload.subject ?? 'Cadence email',
-              htmlBody: payload.body ?? '',
-            }),
-          }).catch(() => undefined);
+
+          const email = await resolveEmail(enrollment);
+          if (!email) {
+            status = 'SKIPPED';
+            result = 'no email found for contact/lead';
+          } else {
+            await fetch(`${process.env.COMM_SERVICE_URL}/api/v1/internal/outbox/email-broadcast`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '',
+              },
+              body: JSON.stringify({
+                tenantId: enrollment.tenantId,
+                recipients: [email],
+                subject: payload.subject ?? 'Cadence email',
+                htmlBody: payload.body ?? '',
+              }),
+            }).catch(() => undefined);
+          }
+
           await prisma.stepExecution.update({
             where: { id: execution.id },
             data: { variant },

@@ -1,4 +1,5 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { DEV_PREVIEW_ENABLED, getDevPreviewState } from '@/lib/server/dev-preview-data';
 
 function toNum(value: unknown): number {
   const n = Number(value);
@@ -8,6 +9,58 @@ function toNum(value: unknown): number {
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization') ?? '';
   const tenantId = req.headers.get('x-tenant-id') ?? '';
+
+  if (DEV_PREVIEW_ENABLED) {
+    const state = getDevPreviewState();
+    const openDeals = state.deals.filter((deal) => deal.status === 'OPEN');
+    const wonDeals = state.deals.filter((deal) => deal.status === 'WON');
+    const pipeline = openDeals.reduce((sum, deal) => sum + toNum(deal.amount), 0);
+    const revenueThisMonth = wonDeals.reduce((sum, deal) => sum + toNum(deal.amount), 0);
+    const byStageMap = new Map<string, { name: string; value: number }>();
+
+    for (const deal of openDeals) {
+      const stageName =
+        typeof deal.stage === 'object' && deal.stage !== null && 'name' in deal.stage
+          ? String((deal.stage as { name: unknown }).name)
+          : 'Unknown';
+      byStageMap.set(stageName, {
+        name: stageName,
+        value: (byStageMap.get(stageName)?.value ?? 0) + toNum(deal.amount),
+      });
+    }
+
+    return NextResponse.json({
+      tenantId: tenantId || 'default',
+      pipeline,
+      dealsOpen: openDeals.length,
+      dealsWonThisMonth: wonDeals.length,
+      revenueThisMonth,
+      contacts: state.contacts.length,
+      newContactsThisWeek: state.contacts.filter(
+        (contact) => Date.now() - new Date(String(contact.createdAt)).getTime() < 7 * 86400000
+      ).length,
+      activitiesToday: state.activities.filter(
+        (activity) =>
+          activity.createdAt && new Date(String(activity.createdAt)).toDateString() === new Date().toDateString()
+      ).length,
+      overdueActivities: state.activities.filter(
+        (activity) =>
+          activity.dueDate &&
+          new Date(String(activity.dueDate)).getTime() < Date.now() &&
+          activity.status !== 'COMPLETED'
+      ).length,
+      winRate: state.deals.length ? Math.round((wonDeals.length / state.deals.length) * 100) : 0,
+      avgDealSize: wonDeals.length ? Math.round(revenueThisMonth / wonDeals.length) : 0,
+      pipelineByStage: Array.from(byStageMap.values()),
+      revenueByMonth: [
+        { month: 'Jan', revenue: 82000 },
+        { month: 'Feb', revenue: 138000 },
+        { month: 'Mar', revenue: 221000 },
+        { month: 'Apr', revenue: 298000 },
+        { month: 'May', revenue: revenueThisMonth },
+      ],
+    });
+  }
 
   try {
     const [dealsRes, contactsRes, activitiesRes] = await Promise.allSettled([

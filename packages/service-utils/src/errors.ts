@@ -76,8 +76,12 @@ export function globalErrorHandler(
   if (error instanceof NexusError) {
     reply.code(error.statusCode).send({
       success: false,
-      error: error.code,
-      message: error.message,
+      error: {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        requestId: request.id,
+      },
     });
     return;
   }
@@ -85,8 +89,11 @@ export function globalErrorHandler(
   if ((error as { code?: string }).code === 'P2002') {
     reply.code(409).send({
       success: false,
-      error: 'CONFLICT',
-      message: 'Resource already exists',
+      error: {
+        code: 'CONFLICT',
+        message: 'Resource already exists',
+        requestId: request.id,
+      },
     });
     return;
   }
@@ -94,8 +101,11 @@ export function globalErrorHandler(
   if ((error as { code?: string }).code === 'P2025') {
     reply.code(404).send({
       success: false,
-      error: 'NOT_FOUND',
-      message: 'Record not found',
+      error: {
+        code: 'NOT_FOUND',
+        message: 'Record not found',
+        requestId: request.id,
+      },
     });
     return;
   }
@@ -103,15 +113,21 @@ export function globalErrorHandler(
   if (error.validation) {
     reply.code(422).send({
       success: false,
-      error: 'VALIDATION_ERROR',
-      message: 'Validation failed',
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Validation failed',
+        requestId: request.id,
+      },
     });
     return;
   }
 
   reply.code(500).send({
     success: false,
-    error: 'INTERNAL_ERROR',
-    message: 'An unexpected error occurred',
+    error: {
+      code: 'INTERNAL_ERROR',
+      message: 'An unexpected error occurred',
+      requestId: request.id,
+    },
   });
 }

@@ -2,6 +2,7 @@ import type { NexusProducer } from '@nexus/kafka';
 import type { WorkflowPrisma } from '../prisma.js';
 import type { ExecutionContext, NodeResult, WorkflowEdge, WorkflowNode } from './types.js';
 import { handleActionNode } from './nodes/action.node.js';
+import { handleApprovalRequestNode } from './nodes/approval-request.node.js';
 import { handleAssignNode } from './nodes/assign.node.js';
 import { handleConditionNode } from './nodes/condition.node.js';
 import { handleCreateActivityNode } from './nodes/create-activity.node.js';
@@ -13,6 +14,8 @@ import { handleJoinNode } from './nodes/join.node.js';
 import { handleNotifyNode } from './nodes/notify.node.js';
 import { handleSetFieldNode } from './nodes/set-field.node.js';
 import { handleTriggerNode } from './nodes/trigger.node.js';
+import { handleSlaCheckNode } from './nodes/sla-check.node.js';
+import { handleValidationRuleNode } from './nodes/validation-rule.node.js';
 import { handleWaitNode } from './nodes/wait.node.js';
 import { handleWebhookNode } from './nodes/webhook.node.js';
 
@@ -49,11 +52,21 @@ export class WorkflowExecutor {
       currentNodeId,
     };
 
+    const visitedCount = new Map<string, number>();
+    const CYCLE_LIMIT = 100;
+
     try {
       while (currentNodeId) {
         const node = nodeById.get(currentNodeId);
         if (!node) break;
         context.currentNodeId = currentNodeId;
+
+        // Cycle detection — safety cap
+        const visits = (visitedCount.get(currentNodeId) ?? 0) + 1;
+        visitedCount.set(currentNodeId, visits);
+        if (visits > CYCLE_LIMIT) {
+          throw new Error(`Cycle limit exceeded at node ${currentNodeId}`);
+        }
         await this.prisma.workflowStep.create({
           data: {
             executionId: execution.id,
@@ -65,7 +78,7 @@ export class WorkflowExecutor {
           },
         });
 
-        const result = await this.executeNode(node, context);
+        const result = await this.executeNode(node, context, edges);
         const latestStep = await this.prisma.workflowStep.findFirst({
           where: { executionId: execution.id, nodeId: node.id },
           orderBy: { startedAt: 'desc' },
@@ -96,7 +109,9 @@ export class WorkflowExecutor {
         if (result.nextNodeId !== undefined) {
           currentNodeId = result.nextNodeId;
         } else {
-          const edge = edges.find((e) => e.from === node.id);
+          // Follow unconditional outgoing edge; if multiple exist, pick first
+          const outgoing = edges.filter((e) => e.from === node.id);
+          const edge = outgoing.find((e) => !e.condition) ?? outgoing[0];
           currentNodeId = edge?.to ?? null;
         }
 
@@ -124,7 +139,7 @@ export class WorkflowExecutor {
       if (execution.parentExecId) {
         await this.prisma.workflowExecution.update({
           where: { id: execution.parentExecId },
-          data: { resumeAt: new Date(0) },
+          data: { resumeAt: new Date() }, // resume parent immediately after child branch completes
         });
         await this.resume(execution.parentExecId);
       }
@@ -170,13 +185,14 @@ export class WorkflowExecutor {
 
   private async executeNode(
     node: WorkflowNode,
-    context: ExecutionContext
+    context: ExecutionContext,
+    edges: WorkflowEdge[]
   ): Promise<NodeResult> {
     switch (node.type) {
       case 'TRIGGER':
         return handleTriggerNode(node, context);
       case 'CONDITION':
-        return handleConditionNode(node, context);
+        return handleConditionNode(node, context, edges);
       case 'WAIT':
         return handleWaitNode(node, context);
       case 'ACTION':
@@ -201,8 +217,14 @@ export class WorkflowExecutor {
         return handleJoinNode(node, context, this.prisma);
       case 'END':
         return handleEndNode(node, context);
+      case 'APPROVAL_REQUEST':
+        return handleApprovalRequestNode(node, context);
+      case 'VALIDATION_RULE':
+        return handleValidationRuleNode(node, context);
+      case 'SLA_CHECK':
+        return handleSlaCheckNode(node, context);
       default:
-        return {};
+        throw new Error(`Unsupported workflow node type: ${String(node.type)}`);
     }
   }
 }

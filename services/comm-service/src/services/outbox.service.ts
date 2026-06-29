@@ -1,7 +1,6 @@
 import type { PaginatedResult } from '@nexus/shared-types';
 import { NotFoundError } from '@nexus/service-utils';
-import type { OutboxMessage } from '../../../../node_modules/.prisma/comm-client/index.js';
-import type { Prisma } from '../../../../node_modules/.prisma/comm-client/index.js';
+type CommOutbox = any;
 import type { CommPrisma } from '../prisma.js';
 import type { EmailChannel } from '../channels/smtp.channel.js';
 import type { SmsChannel } from '../channels/sms.channel.js';
@@ -41,8 +40,8 @@ export function createOutboxService(
         entityType?: string;
         entityId?: string;
       }
-    ): Promise<OutboxMessage> {
-      return prisma.outboxMessage.create({
+    ): Promise<CommOutbox> {
+      return (prisma as any).commOutbox.create({
         data: {
           tenantId,
           channel: 'EMAIL',
@@ -66,8 +65,8 @@ export function createOutboxService(
         entityType?: string;
         entityId?: string;
       }
-    ): Promise<OutboxMessage> {
-      return prisma.outboxMessage.create({
+    ): Promise<CommOutbox> {
+      return (prisma as any).commOutbox.create({
         data: {
           tenantId,
           channel: 'SMS',
@@ -83,51 +82,63 @@ export function createOutboxService(
     },
 
     async processQueue(tenantId: string): Promise<{ sent: number; failed: number }> {
-      const rows = await prisma.outboxMessage.findMany({
+      const rows = await (prisma as any).commOutbox.findMany({
         where: { tenantId, status: 'QUEUED' },
         orderBy: { createdAt: 'asc' },
         take: 50,
       });
       let sent = 0;
       let failed = 0;
-      for (const row of rows) {
-        try {
-          if (row.channel === 'EMAIL') {
-            await email.send({
-              to: row.to,
-              subject: row.subject ?? '(no subject)',
-              html: row.body,
-              text: row.body.replace(/<[^>]+>/g, ' ').slice(0, 8000),
+      // Process with bounded concurrency to improve throughput under load
+      const CONCURRENCY = 10;
+      for (let i = 0; i < rows.length; i += CONCURRENCY) {
+        const chunk = rows.slice(i, i + CONCURRENCY);
+        const results = await Promise.allSettled(
+          chunk.map(async (row: any) => {
+            if (row.channel === 'EMAIL') {
+              await email.send({
+                to: row.to,
+                subject: row.subject ?? '(no subject)',
+                html: row.body,
+                text: row.body.replace(/<[^>]+>/g, ' ').slice(0, 8000),
+              });
+            } else if (row.channel === 'SMS') {
+              await sms.send({ to: row.to, body: row.body });
+            }
+            await (prisma as any).commOutbox.update({
+              where: { id: row.id },
+              data: { status: 'SENT', sentAt: new Date(), errorMessage: null },
             });
-          } else if (row.channel === 'SMS') {
-            await sms.send({ to: row.to, body: row.body });
+          })
+        );
+        for (let r = 0; r < results.length; r++) {
+          if (results[r].status === 'fulfilled') {
+            sent += 1;
+          } else {
+            const rejected = results[r] as PromiseRejectedResult;
+            const msg = rejected.reason instanceof Error
+              ? rejected.reason.message
+              : String(rejected.reason);
+            await (prisma as any).commOutbox.update({
+              where: { id: chunk[r].id },
+              data: { status: 'FAILED', errorMessage: msg },
+            });
+            failed += 1;
           }
-          await prisma.outboxMessage.update({
-            where: { id: row.id },
-            data: { status: 'SENT', sentAt: new Date(), errorMessage: null },
-          });
-          sent += 1;
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          await prisma.outboxMessage.update({
-            where: { id: row.id },
-            data: { status: 'FAILED', errorMessage: msg },
-          });
-          failed += 1;
         }
       }
       return { sent, failed };
     },
 
     async trackOpen(messageId: string): Promise<void> {
-      await prisma.outboxMessage.updateMany({
+      await (prisma as any).commOutbox.updateMany({
         where: { id: messageId },
         data: { openedAt: new Date(), status: 'DELIVERED' },
       });
     },
 
     async trackClick(messageId: string): Promise<void> {
-      await prisma.outboxMessage.updateMany({
+      await (prisma as any).commOutbox.updateMany({
         where: { id: messageId },
         data: { clickedAt: new Date() },
       });
@@ -142,8 +153,8 @@ export function createOutboxService(
         dateTo?: Date;
       },
       pagination: { page: number; limit: number }
-    ): Promise<PaginatedResult<OutboxMessage>> {
-      const where: Prisma.OutboxMessageWhereInput = { tenantId };
+    ): Promise<PaginatedResult<CommOutbox>> {
+      const where: any = { tenantId };
       if (filters.status) where.status = filters.status;
       if (filters.channel) where.channel = filters.channel;
       if (filters.dateFrom || filters.dateTo) {
@@ -153,8 +164,8 @@ export function createOutboxService(
       }
       const { page, limit } = pagination;
       const [total, data] = await Promise.all([
-        prisma.outboxMessage.count({ where }),
-        prisma.outboxMessage.findMany({
+        (prisma as any).commOutbox.count({ where }),
+        (prisma as any).commOutbox.findMany({
           where,
           skip: (page - 1) * limit,
           take: limit,
@@ -164,9 +175,9 @@ export function createOutboxService(
       return toPaginated(data, total, page, limit);
     },
 
-    async getById(tenantId: string, id: string): Promise<OutboxMessage> {
-      const row = await prisma.outboxMessage.findFirst({ where: { id, tenantId } });
-      if (!row) throw new NotFoundError('OutboxMessage', id);
+    async getById(tenantId: string, id: string): Promise<CommOutbox> {
+      const row = await (prisma as any).commOutbox.findFirst({ where: { id, tenantId } });
+      if (!row) throw new NotFoundError('CommOutbox', id);
       return row;
     },
   };

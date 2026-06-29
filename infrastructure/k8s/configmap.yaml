@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nexus-config
+  namespace: nexus
+data:
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  API_VERSION: "v1"
+  KAFKA_CLIENT_ID: "nexus-crm"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.monitoring:4317"
+  REDIS_URL: "redis://redis.nexus:6379"
+  DATABASE_PGBOUNCER: "true"
+  # PgBouncer endpoint for all services (replaces direct postgres connections)
+  DATABASE_URL: "postgresql://nexus@pgbouncer.nexus:6432/nexus?pgbouncer=true"
+  # Read replica routing — services should use packages/service-utils createPrismaClientWithReplicas
+  DATABASE_READ_REPLICA_URL: ""

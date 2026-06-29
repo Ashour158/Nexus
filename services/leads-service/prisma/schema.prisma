@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/leads-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("LEADS_DATABASE_URL")
+}
+
+model Lead {
+  id               String       @id @default(cuid())
+  tenantId         String
+  ownerId          String
+  code             String?
+  firstName        String
+  lastName         String
+  email            String?
+  phone            String?
+  company          String?
+  jobTitle         String?
+  source           LeadSource   @default(MANUAL)
+  status           LeadStatus   @default(NEW)
+  score            Int          @default(0)
+  aiScore          Float?
+  aiScoreReason    String?
+  rating           LeadRating   @default(COLD)
+  industry         String?
+  website          String?
+  annualRevenue    Decimal?     @db.Decimal(18, 2)
+  employeeCount    Int?
+  country          String?
+  city             String?
+  address          String?
+  linkedInUrl      String?
+  twitterHandle    String?
+  utmSource        String?
+  utmMedium        String?
+  utmCampaign      String?
+  utmContent       String?
+  utmTerm          String?
+  convertedAt      DateTime?
+  convertedToId    String?
+  customFields     Json         @default("{}")
+  tags             String[]
+  doNotContact     Boolean      @default(false)
+  gdprConsent      Boolean      @default(false)
+  gdprConsentAt    DateTime?
+  territoryId      String?
+  assignedTo       String?
+  priority         String?      @default("medium")
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  scoreRecord      LeadScore?
+  routingEvents    LeadRoutingEvent[]
+  dataQualityScore Int?
+  deletedAt        DateTime?
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, ownerId])
+  @@index([tenantId, email])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, updatedAt])
+  @@unique([id, tenantId])
+}
+
+enum LeadSource {
+  MANUAL
+  IMPORT
+  WEB_FORM
+  EMAIL_CAMPAIGN
+  SOCIAL_MEDIA
+  PAID_ADS
+  REFERRAL
+  PARTNER
+  CHAT
+  EVENT
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  ASSIGNED
+  WORKING
+  QUALIFIED
+  UNQUALIFIED
+  CONVERTED
+}
+
+enum LeadRating {
+  HOT
+  WARM
+  COLD
+}
+
+model LeadScore {
+  id              String   @id @default(uuid())
+  tenantId        String
+  leadId          String   @unique
+  lead            Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  score           Int      @default(0)
+  tier            String   @default("cold")
+  signals         Json     @default("{}")
+  scoredAt        DateTime @default(now())
+  confidence      Float?
+  routingDecision Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@index([tenantId])
+  @@index([tenantId, tier])
+  @@unique([id, tenantId])
+}
+
+model LeadScoringRule {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  signal    String
+  points    Int
+  condition Json     @default("{}")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([tenantId])
+  @@unique([tenantId, signal, name])
+  @@unique([id, tenantId])
+}
+
+model LeadRoutingEvent {
+  id         String   @id @default(uuid())
+  tenantId   String
+  leadId     String
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  territoryId String
+  salesRepId String
+  priority   String   @default("medium")
+  reason     String
+  confidence Float    @default(0.5)
+  alternativeRoutes Json?
+  createdAt  DateTime @default(now())
+  @@index([tenantId])
+  @@index([leadId])
+  @@index([territoryId])
+  @@index([salesRepId])
+  @@index([priority])
+  @@unique([id, tenantId])
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
+}

@@ -9,17 +9,21 @@ export interface AttachmentMeta {
 
 export function createAttachmentsService(prisma: CrmPrisma) {
   return {
-    async listAttachments(tenantId: string, module: string, recordId: string) {
+    async listAttachments(tenantId: string, module: string, recordId: string, opts: { page?: number; limit?: number } = {}) {
+      const page = Math.max(1, opts.page ?? 1);
+      const limit = Math.min(100, opts.limit ?? 50);
       return prisma.attachment.findMany({
         where: { tenantId, module, recordId },
         orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
       });
     },
 
     async deleteAttachment(tenantId: string, id: string) {
       const item = await prisma.attachment.findFirst({ where: { id, tenantId } });
       if (!item) return null;
-      return prisma.attachment.delete({ where: { id } });
+      return prisma.attachment.update({ where: { id }, data: { deletedAt: new Date() } });
     },
 
     async createAttachment(

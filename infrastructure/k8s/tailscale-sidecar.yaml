@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus-crm-with-tailscale
+  namespace: nexus
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nexus-crm
+  template:
+    metadata:
+      labels:
+        app: nexus-crm
+    spec:
+      containers:
+        - name: nexus-crm
+          image: nexus-crm/nexus-crm:latest
+          ports:
+            - containerPort: 3000
+        - name: tailscale
+          image: tailscale/tailscale:latest
+          env:
+            - name: TS_AUTHKEY
+              valueFrom:
+                secretKeyRef:
+                  name: tailscale-auth
+                  key: authkey
+            - name: TS_USERSPACE
+              value: "true"
+            - name: TS_ACCEPT_DNS
+              value: "true"
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+          resources:
+            limits:
+              cpu: 100m
+              memory: 64Mi
+            requests:
+              cpu: 10m
+              memory: 16Mi

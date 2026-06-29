@@ -65,7 +65,7 @@ export async function registerPlaybooksRoutes(
           const params = IdParamSchema.safeParse(request.params);
           if (!params.success) throw new ValidationError('Invalid params', params.error.flatten());
           await playbooks.delete(params.data.id);
-          return reply.code(204).send();
+          return reply.send({ success: true, data: { id: params.data.id, deleted: true } });
         }
       );
 

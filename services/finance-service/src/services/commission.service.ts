@@ -16,7 +16,7 @@ import type {
   CommissionStatus,
 } from '../../../../node_modules/.prisma/finance-client/index.js';
 import type { FinancePrisma } from '../prisma.js';
-import { toPaginatedResult } from '../lib/pagination.js';
+import { toPaginatedResult } from '@nexus/shared-types';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

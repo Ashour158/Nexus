@@ -1,127 +1,257 @@
 ﻿'use client';
 
-import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle, Save } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth.store';
+import { notify } from '@/lib/toast';
 
-type ForecastCategory = 'commit' | 'best_case' | 'pipeline' | 'omitted';
 
-interface ForecastSubmission {
-  id: string;
-  weekOf: string;
-  commit: number;
-  bestCase: number;
-  pipeline: number;
-  notes?: string;
-  submittedAt: string;
-}
-
-interface DealForecast {
-  id: string;
-  name: string;
-  amount: number;
-  stage: string;
-  closeDate: string;
-  category: ForecastCategory;
+interface ForecastStage {
+  stageId: string;
+  stageName: string;
   probability: number;
+  dealCount: number;
+  totalAmount: number;
+  weightedAmount: number;
 }
+
+interface ForecastSummary {
+  pipeline: number;
+  weighted: number;
+  committed: number;
+  closed: number;
+  stages: ForecastStage[];
+}
+
+type TeamRepRow = {
+  repId: string;
+  repName: string;
+  weightedCommit: number;
+  override: number | null;
+  attainment: number;
+};
+
+type TeamSummaryPayload = {
+  reps: TeamRepRow[];
+  totals: { repTotal: number; managerTotal: number };
+};
 
 export default function ForecastPage() {
-  const roles = useAuthStore((s) => s.roles);
-  const isManager = roles.includes('manager') || roles.includes('admin') || roles.includes('SALES_MANAGER') || roles.includes('ADMIN');
-  const [activeView, setActiveView] = useState<'submit' | 'history' | 'team'>(isManager ? 'team' : 'submit');
-  const [notes, setNotes] = useState('');
-  const [saved, setSaved] = useState(false);
-  const [dealCategories, setDealCategories] = useState<Record<string, ForecastCategory>>({});
-  const qc = useQueryClient();
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const tenantId = useAuthStore((s) => s.tenantId);
+  const userId = useAuthStore((s) => s.userId);
+  const [data, setData] = useState<ForecastSummary | null>(null);
+  const [teamData, setTeamData] = useState<TeamSummaryPayload | null>(null);
+  const [teamError, setTeamError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [period, setPeriod] = useState('this_quarter');
+  const [, setDraftOverrides] = useState<Record<string, string>>({});
 
-  const weekOf = getMonday(new Date()).toISOString().split('T')[0];
+  const authHeaders = useMemo(() => {
+    const h: Record<string, string> = {};
+    if (accessToken) h.Authorization = `Bearer ${accessToken}`;
+    if (tenantId) h['x-tenant-id'] = tenantId;
+    return h;
+  }, [accessToken, tenantId]);
 
-  const { data: deals = [] } = useQuery<DealForecast[]>({ queryKey: ['forecast-deals'], queryFn: () => fetch('/api/forecast/deals').then((r) => r.json()) });
-  const { data: history = [] } = useQuery<ForecastSubmission[]>({ queryKey: ['forecast-history'], queryFn: () => fetch('/api/forecast/history').then((r) => r.json()) });
-  const { data: teamForecast = [] } = useQuery<any[]>({ queryKey: ['forecast-team'], queryFn: () => fetch('/api/forecast/team').then((r) => r.json()), enabled: isManager });
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/crm/forecast?period=${period}`, { headers: authHeaders })
+      .then((r) => r.json())
+      .then((d) => {
+        setData(d);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [period, authHeaders]);
 
-  const submitMutation = useMutation({
-    mutationFn: (payload: { weekOf: string; dealCategories: Record<string, ForecastCategory>; notes: string }) =>
-      fetch('/api/forecast/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then((r) => r.json()),
-    onSuccess: () => {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-      void qc.invalidateQueries({ queryKey: ['forecast-history'] });
-      void qc.invalidateQueries({ queryKey: ['forecast-team'] });
+  useEffect(() => {
+    if (!accessToken) {
+      setTeamData(null);
+      setTeamError(null);
+      return;
+    }
+    setTeamLoading(true);
+    setTeamError(null);
+    const qs = new URLSearchParams({ periodKey: period }).toString();
+    fetch(`/api/planning/forecast-overrides/team-summary?${qs}`, { headers: authHeaders })
+      .then(async (r) => {
+        const j = (await r.json()) as {
+          success?: boolean;
+          data?: TeamSummaryPayload;
+          error?: string;
+        };
+        if (!r.ok) {
+          setTeamError(typeof j.error === 'string' ? j.error : 'Could not load team summary');
+          setTeamData(null);
+          return;
+        }
+        setTeamData(j.data ?? null);
+      })
+      .catch(() => setTeamError('Could not load team summary'))
+      .finally(() => setTeamLoading(false));
+  }, [period, accessToken, authHeaders]);
+
+  const fmt = (n: number) =>
+    new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(n);
+
+  const overrideMutation = useMutation({
+    mutationFn: async ({ repId, value }: { repId: string; value: number | null }) => {
+      const res = await fetch('/api/planning/forecast-overrides', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ repId, periodKey: period, managerOverride: value, adjustedBy: userId }),
+      });
+      if (!res.ok) throw new Error('Failed to save override');
+      const qs = new URLSearchParams({ periodKey: period }).toString();
+      const sum = await fetch(`/api/planning/forecast-overrides/team-summary?${qs}`, { headers: authHeaders });
+      const j = (await sum.json()) as { data?: TeamSummaryPayload };
+      setTeamData(j.data ?? null);
+      setDraftOverrides((prev) => { const next = { ...prev }; delete next[repId]; return next; });
     },
+    onSuccess: () => notify.success('Override saved'),
+    onError: () => notify.error('Failed to save override'),
   });
 
-  const totals = useMemo(() => deals.reduce((acc, deal) => {
-    const cat = dealCategories[deal.id] ?? deal.category;
-    if (cat === 'commit') acc.commit += deal.amount;
-    if (cat === 'commit' || cat === 'best_case') acc.bestCase += deal.amount;
-    if (cat !== 'omitted') acc.pipeline += deal.amount;
-    return acc;
-  }, { commit: 0, bestCase: 0, pipeline: 0 }), [deals, dealCategories]);
-
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold text-gray-900">Forecast</h1><p className="mt-0.5 text-sm text-gray-500">Week of {weekOf}</p></div>
-        <div className="flex overflow-hidden rounded-lg border border-gray-200">
-          {[{ key: 'submit', label: 'My Forecast' }, { key: 'history', label: 'History' }, ...(isManager ? [{ key: 'team', label: 'Team Roll-up' }] : [])].map((v) => (
-            <button key={v.key} onClick={() => setActiveView(v.key as any)} className={`px-4 py-2 text-sm font-medium transition-colors ${activeView === v.key ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>{v.label}</button>
-          ))}
+    <div className="p-6">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Sales Forecast</h1>
+          <p className="mt-1 text-sm text-gray-500">Pipeline weighted by deal probability</p>
         </div>
+        <select
+          value={period}
+          onChange={(e) => setPeriod(e.target.value)}
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+        >
+          <option value="this_month">This Month</option>
+          <option value="this_quarter">This Quarter</option>
+          <option value="this_year">This Year</option>
+          <option value="next_quarter">Next Quarter</option>
+        </select>
       </div>
 
-      {activeView === 'submit' ? (
+      {loading ? (
+        <div className="mb-6 grid grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-24 animate-pulse rounded-xl bg-gray-100" />
+          ))}
+        </div>
+      ) : !data ? (
+        <div className="py-16 text-center text-gray-400">Unable to load forecast</div>
+      ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {[{ label: 'Commit', value: totals.commit, color: 'text-blue-700', bg: 'bg-blue-50' }, { label: 'Best Case', value: totals.bestCase, color: 'text-amber-700', bg: 'bg-amber-50' }, { label: 'Pipeline', value: totals.pipeline, color: 'text-gray-700', bg: 'bg-gray-50' }].map((card) => (
-              <div key={card.label} className={`${card.bg} rounded-xl p-5`}><p className="mb-1 text-sm text-gray-500">{card.label}</p><p className={`text-3xl font-bold ${card.color}`}>${(card.value / 1000).toFixed(1)}K</p></div>
+          <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+            {[
+              { label: 'Pipeline', value: fmt(data.pipeline), color: 'bg-gray-50 border-gray-200' },
+              { label: 'Weighted', value: fmt(data.weighted), color: 'bg-indigo-50 border-indigo-200' },
+              { label: 'Committed', value: fmt(data.committed), color: 'bg-blue-50 border-blue-200' },
+              { label: 'Closed Won', value: fmt(data.closed), color: 'bg-green-50 border-green-200' },
+            ].map((card) => (
+              <div key={card.label} className={`rounded-xl border p-4 ${card.color}`}>
+                <p className="mb-1 text-xs text-gray-500">{card.label}</p>
+                <p className="text-xl font-bold text-gray-900">{card.value}</p>
+              </div>
             ))}
           </div>
 
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-            <div className="border-b border-gray-100 px-5 py-4"><h2 className="font-semibold text-gray-900">Categorize Your Deals</h2></div>
-            <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-gray-100 text-xs uppercase text-gray-500"><th className="px-5 py-3 text-start font-medium">Deal</th><th className="px-5 py-3 text-start font-medium">Stage</th><th className="px-5 py-3 text-start font-medium">Amount</th><th className="px-5 py-3 text-start font-medium">Close Date</th><th className="px-5 py-3 text-start font-medium">Category</th></tr></thead><tbody>
-              {deals.map((deal, i) => {
-                const cat = dealCategories[deal.id] ?? deal.category;
-                return <tr key={deal.id} className={`border-b border-gray-50 ${i % 2 ? 'bg-gray-50/50' : ''}`}><td className="px-5 py-3 font-medium text-gray-900">{deal.name}</td><td className="px-5 py-3 text-gray-500">{deal.stage}</td><td className="px-5 py-3 font-medium">${deal.amount.toLocaleString()}</td><td className="px-5 py-3 text-gray-500">{new Date(deal.closeDate).toLocaleDateString()}</td><td className="px-5 py-3"><select value={cat} onChange={(e) => setDealCategories((prev) => ({ ...prev, [deal.id]: e.target.value as ForecastCategory }))} className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium"><option value="commit">Commit</option><option value="best_case">Best Case</option><option value="pipeline">Pipeline</option><option value="omitted">Omitted</option></select></td></tr>;
-              })}
-            </tbody></table></div>
-          </div>
-
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <label className="mb-2 block text-sm font-medium text-gray-700">Forecast Notes (optional)</label>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-            <div className="mt-3 flex items-center justify-end gap-3">
-              {saved ? <span className="flex items-center gap-1.5 text-sm text-green-600"><CheckCircle className="h-4 w-4" /> Forecast submitted</span> : null}
-              <button onClick={() => submitMutation.mutate({ weekOf, dealCategories, notes })} disabled={submitMutation.isPending} className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Save className="h-4 w-4" />{submitMutation.isPending ? 'Submitting...' : 'Submit Forecast'}</button>
-            </div>
+            <table className="w-full text-sm">
+              <thead className="border-b border-gray-100 bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-start font-medium text-gray-500">Stage</th>
+                  <th className="px-4 py-3 text-end font-medium text-gray-500">Probability</th>
+                  <th className="px-4 py-3 text-end font-medium text-gray-500">Deals</th>
+                  <th className="px-4 py-3 text-end font-medium text-gray-500">Pipeline</th>
+                  <th className="px-4 py-3 text-end font-medium text-gray-500">Weighted</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {data.stages.map((s) => (
+                  <tr key={s.stageId} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-gray-900">{s.stageName}</td>
+                    <td className="px-4 py-3 text-end text-gray-600">{s.probability}%</td>
+                    <td className="px-4 py-3 text-end text-gray-700">{s.dealCount}</td>
+                    <td className="px-4 py-3 text-end text-gray-700">{fmt(s.totalAmount)}</td>
+                    <td className="px-4 py-3 text-end font-semibold text-indigo-700">
+                      {fmt(s.weightedAmount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </>
-      ) : null}
+      )}
 
-      {activeView === 'history' ? (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-          <div className="border-b border-gray-100 px-5 py-4"><h2 className="font-semibold text-gray-900">Submission History</h2></div>
-          <table className="w-full text-sm"><thead><tr className="border-b border-gray-100 text-xs uppercase text-gray-500"><th className="px-5 py-3 text-start font-medium">Week Of</th><th className="px-5 py-3 text-start font-medium">Commit</th><th className="px-5 py-3 text-start font-medium">Best Case</th><th className="px-5 py-3 text-start font-medium">Pipeline</th><th className="px-5 py-3 text-start font-medium">Submitted</th></tr></thead><tbody>{history.map((h, i) => <tr key={h.id} className={`border-b border-gray-50 ${i % 2 ? 'bg-gray-50/50' : ''}`}><td className="px-5 py-3 font-medium">{h.weekOf}</td><td className="px-5 py-3 text-blue-700 font-medium">${(h.commit / 1000).toFixed(1)}K</td><td className="px-5 py-3 text-amber-700">${(h.bestCase / 1000).toFixed(1)}K</td><td className="px-5 py-3 text-gray-600">${(h.pipeline / 1000).toFixed(1)}K</td><td className="px-5 py-3 text-gray-400">{new Date(h.submittedAt).toLocaleDateString()}</td></tr>)}</tbody></table>
-        </div>
-      ) : null}
+      {!accessToken ? (
+        <p className="mt-8 text-sm text-gray-500">Sign in to view team rollup and manager overrides.</p>
+      ) : (
+        <section className="mt-10">
+          <h2 className="text-lg font-semibold text-gray-900">Team rollup & overrides</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Rep commits from CRM weighted totals; managers can persist an override per rep for this period.
+          </p>
 
-      {activeView === 'team' && isManager ? (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-          <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4"><h2 className="font-semibold text-gray-900">Team Forecast Roll-up</h2><span className="text-sm text-gray-500">{teamForecast.length} reps</span></div>
-          <table className="w-full text-sm"><thead><tr className="border-b border-gray-100 text-xs uppercase text-gray-500"><th className="px-5 py-3 text-start font-medium">Rep</th><th className="px-5 py-3 text-start font-medium">Quota</th><th className="px-5 py-3 text-start font-medium">Commit</th><th className="px-5 py-3 text-start font-medium">Best Case</th><th className="px-5 py-3 text-start font-medium">Pipeline</th><th className="px-5 py-3 text-start font-medium">Status</th></tr></thead><tbody>{teamForecast.map((rep, i) => <tr key={rep.userId ?? i} className={`border-b border-gray-50 ${i % 2 ? 'bg-gray-50/50' : ''}`}><td className="px-5 py-3 font-medium text-gray-900">{rep.name ?? rep.userId}</td><td className="px-5 py-3 text-gray-500">${((Number(rep.quota) || 0) / 1000).toFixed(0)}K</td><td className="px-5 py-3 text-blue-700 font-semibold">${((Number(rep.commit) || 0) / 1000).toFixed(1)}K</td><td className="px-5 py-3 text-amber-700">${((Number(rep.bestCase) || 0) / 1000).toFixed(1)}K</td><td className="px-5 py-3">${((Number(rep.pipeline) || 0) / 1000).toFixed(1)}K</td><td className="px-5 py-3">{rep.submitted ? <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">Submitted</span> : <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-600">Pending</span>}</td></tr>)}</tbody></table>
-        </div>
-      ) : null}
+          {teamLoading ? (
+            <div className="mt-4 h-32 animate-pulse rounded-xl bg-gray-100" />
+          ) : teamError ? (
+            <p className="mt-4 text-sm text-amber-700">{teamError}</p>
+          ) : teamData ? (
+            <>
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border border-gray-200 bg-slate-50 p-4">
+                  <p className="text-xs text-gray-500">Sum (rep commits)</p>
+                  <p className="text-lg font-semibold text-gray-900">{fmt(teamData.totals.repTotal)}</p>
+                </div>
+                <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+                  <p className="text-xs text-indigo-700">Sum (after overrides)</p>
+                  <p className="text-lg font-semibold text-indigo-900">{fmt(teamData.totals.managerTotal)}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-gray-100 bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-start font-medium text-gray-500">Rep</th>
+                      <th className="px-4 py-3 text-end font-medium text-gray-500">Weighted commit</th>
+                      <th className="px-4 py-3 text-end font-medium text-gray-500">Override</th>
+                      <th className="px-4 py-3 text-end font-medium text-gray-500">% Attainment</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(teamData.reps ?? []).map((rep) => (
+                      <tr key={rep.repId} className="border-t border-gray-100 hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium text-gray-900">{rep.repName}</td>
+                        <td className="px-4 py-3 text-end text-gray-700">{fmt(rep.weightedCommit)}</td>
+                        <td className="px-4 py-3 text-end">
+                          <input
+                            type="number"
+                            defaultValue={rep.override ?? ''}
+                            onBlur={(e) => overrideMutation?.mutate({ repId: rep.repId, value: e.target.value ? Number(e.target.value) : null })}
+                            placeholder="—"
+                            className="w-28 rounded border border-gray-200 px-2 py-1 text-end text-sm"
+                          />
+                        </td>
+                        <td className={`px-4 py-3 text-end font-medium ${rep.attainment >= 100 ? 'text-emerald-600' : rep.attainment >= 70 ? 'text-amber-600' : 'text-rose-600'}`}>
+                          {rep.attainment.toFixed(1)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
+        </section>
+      )}
     </div>
   );
-}
-
-function getMonday(d: Date): Date {
-  const date = new Date(d);
-  const day = date.getDay();
-  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-  date.setDate(diff);
-  return date;
 }

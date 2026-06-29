@@ -21,6 +21,7 @@ model PortalToken {
 
   @@index([token])
   @@index([tenantId, entityId])
+  @@unique([id, tenantId])
 }
 
 model PortalBranding {
@@ -30,6 +31,7 @@ model PortalBranding {
   primaryColor String   @default("#3B82F6")
   companyName  String?
   updatedAt    DateTime @updatedAt
+  @@unique([id, tenantId])
 }
 
 enum EntityType {
@@ -37,4 +39,43 @@ enum EntityType {
   CONTRACT
   INVOICE
   ACCOUNT
+}
+
+model PortalAuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String
+  token      String
+  entityType String
+  entityId   String
+  action     String
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([token])
+  @@index([entityId])
+  @@index([createdAt])
+  @@unique([id, tenantId])
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
 }

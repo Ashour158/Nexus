@@ -1,0 +1,356 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+type Query {
+  contacts(limit: Int, offset: Int): [Contact!]!
+  contact(id: ID!): Contact
+  consentRecords(limit: Int, offset: Int): [ConsentRecord!]!
+  consentRecord(id: ID!): ConsentRecord
+  accounts(limit: Int, offset: Int): [Account!]!
+  account(id: ID!): Account
+  companies(limit: Int, offset: Int): [Company!]!
+  company(id: ID!): Company
+  notes(limit: Int, offset: Int): [Note!]!
+  note(id: ID!): Note
+}
+
+type Mutation {
+  createContact(input: CreateContactInput!): Contact!
+  updateContact(id: ID!, input: UpdateContactInput!): Contact!
+  deleteContact(id: ID!): Boolean!
+  createConsentRecord(input: CreateConsentRecordInput!): ConsentRecord!
+  updateConsentRecord(id: ID!, input: UpdateConsentRecordInput!): ConsentRecord!
+  deleteConsentRecord(id: ID!): Boolean!
+  createAccount(input: CreateAccountInput!): Account!
+  updateAccount(id: ID!, input: UpdateAccountInput!): Account!
+  deleteAccount(id: ID!): Boolean!
+  createCompany(input: CreateCompanyInput!): Company!
+  updateCompany(id: ID!, input: UpdateCompanyInput!): Company!
+  deleteCompany(id: ID!): Boolean!
+  createNote(input: CreateNoteInput!): Note!
+  updateNote(id: ID!, input: UpdateNoteInput!): Note!
+  deleteNote(id: ID!): Boolean!
+}
+
+type Contact @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  ownerId: ID!
+  accountId: ID!
+  code: String
+  firstName: String!
+  lastName: String!
+  email: String
+  phone: String
+  mobile: String
+  jobTitle: String
+  department: String
+  linkedInUrl: String
+  twitterHandle: String
+  country: String
+  city: String
+  address: String
+  timezone: String
+  preferredChannel: String
+  doNotEmail: Boolean!
+  doNotCall: Boolean!
+  gdprConsent: Boolean!
+  gdprConsentAt: DateTime
+  lastContactedAt: DateTime
+  customFields: JSON
+  tags: [String!]!
+  isActive: Boolean!
+  dataQualityScore: Int
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type ConsentRecord @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  contactId: ID!
+  channel: String!
+  status: String!
+  grantedAt: DateTime
+  withdrawnAt: DateTime
+  expiresAt: DateTime
+  source: String
+  ipAddress: String
+  notes: String
+  recordedBy: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Account @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  ownerId: ID!
+  parentAccountId: ID
+  name: String!
+  website: String
+  phone: String
+  email: String
+  industry: String
+  type: String!
+  tier: String!
+  status: String!
+  annualRevenue: Float
+  employeeCount: Int
+  country: String
+  city: String
+  address: String
+  zipCode: String
+  linkedInUrl: String
+  description: String
+  sicCode: String
+  naicsCode: String
+  healthScore: Int
+  npsScore: Int
+  customFields: JSON
+  lat: Float
+  lng: Float
+  tags: [String!]!
+  dataQualityScore: Int
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Company @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  ownerId: ID!
+  name: String!
+  website: String
+  phone: String
+  email: String
+  industry: String
+  type: String!
+  size: String
+  annualRevenue: Float
+  employeeCount: Int
+  country: String
+  city: String
+  address: String
+  zipCode: String
+  linkedInUrl: String
+  description: String
+  customFields: JSON
+  tags: [String!]!
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Note @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  authorId: ID!
+  content: String!
+  isPinned: Boolean!
+  leadId: ID
+  contactId: ID
+  accountId: ID
+  dealId: ID
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+input CreateContactInput {
+  tenantId: ID!
+  ownerId: ID!
+  accountId: ID!
+  code: String
+  firstName: String!
+  lastName: String!
+  email: String
+  phone: String
+  mobile: String
+  jobTitle: String
+  department: String
+  linkedInUrl: String
+  twitterHandle: String
+  country: String
+  city: String
+  address: String
+  timezone: String
+  preferredChannel: String
+  customFields: JSON
+  tags: [String!]
+}
+
+input UpdateContactInput {
+  ownerId: ID
+  accountId: ID
+  firstName: String
+  lastName: String
+  email: String
+  phone: String
+  mobile: String
+  jobTitle: String
+  department: String
+  linkedInUrl: String
+  twitterHandle: String
+  country: String
+  city: String
+  address: String
+  timezone: String
+  preferredChannel: String
+  doNotEmail: Boolean
+  doNotCall: Boolean
+  gdprConsent: Boolean
+  customFields: JSON
+  tags: [String!]
+  isActive: Boolean
+}
+
+input CreateConsentRecordInput {
+  tenantId: ID!
+  contactId: ID!
+  channel: String!
+  status: String!
+  grantedAt: DateTime
+  withdrawnAt: DateTime
+  expiresAt: DateTime
+  source: String
+  ipAddress: String
+  notes: String
+  recordedBy: String
+}
+
+input UpdateConsentRecordInput {
+  channel: String
+  status: String
+  grantedAt: DateTime
+  withdrawnAt: DateTime
+  expiresAt: DateTime
+  source: String
+  ipAddress: String
+  notes: String
+  recordedBy: String
+}
+
+input CreateAccountInput {
+  tenantId: ID!
+  ownerId: ID!
+  parentAccountId: ID
+  name: String!
+  website: String
+  phone: String
+  email: String
+  industry: String
+  type: String
+  tier: String
+  status: String
+  annualRevenue: Float
+  employeeCount: Int
+  country: String
+  city: String
+  address: String
+  zipCode: String
+  linkedInUrl: String
+  description: String
+  sicCode: String
+  naicsCode: String
+  customFields: JSON
+  lat: Float
+  lng: Float
+  tags: [String!]
+}
+
+input UpdateAccountInput {
+  ownerId: ID
+  parentAccountId: ID
+  name: String
+  website: String
+  phone: String
+  email: String
+  industry: String
+  type: String
+  tier: String
+  status: String
+  annualRevenue: Float
+  employeeCount: Int
+  country: String
+  city: String
+  address: String
+  zipCode: String
+  linkedInUrl: String
+  description: String
+  sicCode: String
+  naicsCode: String
+  healthScore: Int
+  npsScore: Int
+  customFields: JSON
+  lat: Float
+  lng: Float
+  tags: [String!]
+  dataQualityScore: Int
+}
+
+input CreateCompanyInput {
+  tenantId: ID!
+  ownerId: ID!
+  name: String!
+  website: String
+  phone: String
+  email: String
+  industry: String
+  type: String
+  size: String
+  annualRevenue: Float
+  employeeCount: Int
+  country: String
+  city: String
+  address: String
+  zipCode: String
+  linkedInUrl: String
+  description: String
+  customFields: JSON
+  tags: [String!]
+}
+
+input UpdateCompanyInput {
+  ownerId: ID
+  name: String
+  website: String
+  phone: String
+  email: String
+  industry: String
+  type: String
+  size: String
+  annualRevenue: Float
+  employeeCount: Int
+  country: String
+  city: String
+  address: String
+  zipCode: String
+  linkedInUrl: String
+  description: String
+  customFields: JSON
+  tags: [String!]
+  isActive: Boolean
+}
+
+input CreateNoteInput {
+  tenantId: ID!
+  authorId: ID!
+  content: String!
+  isPinned: Boolean
+  leadId: ID
+  contactId: ID
+  accountId: ID
+  dealId: ID
+}
+
+input UpdateNoteInput {
+  content: String
+  isPinned: Boolean
+  leadId: ID
+  contactId: ID
+  accountId: ID
+  dealId: ID
+}
+
+scalar DateTime
+scalar JSON

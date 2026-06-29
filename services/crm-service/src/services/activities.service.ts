@@ -11,7 +11,7 @@ import { NexusProducer, TOPICS } from '@nexus/kafka';
 import { Prisma } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { Activity } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { CrmPrisma } from '../prisma.js';
-import { toPaginatedResult } from '../lib/pagination.js';
+import { toPaginatedResult } from '@nexus/shared-types';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -286,16 +286,25 @@ export function createActivitiesService(
     },
 
     /**
-     * Soft-delete — flips `status` to `CANCELLED` so audits and the activity
+     * Soft-delete — sets `deletedAt` so audits and the activity
      * feed still reflect the row. Per spec we explicitly do not hard delete.
      */
     async deleteActivity(tenantId: string, id: string): Promise<void> {
       const existing = await loadOrThrow(tenantId, id);
-      if (existing.status === 'CANCELLED') return;
+      if (existing.deletedAt) return;
       await prisma.activity.update({
         where: { id },
-        data: { status: 'CANCELLED' },
+        data: { deletedAt: new Date() },
       });
+    },
+
+    async restoreActivity(tenantId: string, id: string): Promise<Activity> {
+      const result = await prisma.activity.updateMany({
+        where: { id, tenantId, deletedAt: { not: null } },
+        data: { deletedAt: null },
+      });
+      if (result.count === 0) throw new NotFoundError('Activity', id);
+      return prisma.activity.findFirstOrThrow({ where: { id, tenantId } });
     },
 
     async completeActivity(
@@ -420,10 +429,12 @@ export function createActivitiesService(
     async getUpcomingActivities(
       tenantId: string,
       ownerId: string,
-      daysAhead: number
+      daysAhead: number,
+      opts: { limit?: number } = {}
     ): Promise<Activity[]> {
       const now = new Date();
       const cutoff = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+      const limit = Math.min(200, opts.limit ?? 50);
       return prisma.activity.findMany({
         where: {
           tenantId,
@@ -432,7 +443,7 @@ export function createActivitiesService(
           dueDate: { gte: now, lte: cutoff },
         },
         orderBy: { dueDate: 'asc' },
-        take: 50,
+        take: limit,
       });
     },
   };

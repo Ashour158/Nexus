@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { startTracing } from '@nexus/service-utils/tracing';
 import {
   checkDatabase,
   createService,
@@ -11,10 +12,22 @@ import {
 import rateLimit from '@fastify/rate-limit';
 import { NexusProducer } from '@nexus/kafka';
 import { PrismaClient } from '../../../node_modules/.prisma/finance-client/index.js';
+import { buildDatabaseUrl } from '@nexus/service-utils/db';
 import { createFinancePrisma } from './prisma.js';
 import { registerAllRoutes } from './routes/index.js';
+import { registerGraphQL } from './graphql/index.js';
+import { startAutoQuoteConsumer } from './consumers/auto-quote.consumer.js';
+import { startGdprConsumer } from './consumers/gdpr.consumer.js';
+import { startApprovalConsumer } from './consumers/approval.consumer.js';
 
-const prismaHealth = new PrismaClient();
+startTracing({ serviceName: 'finance-service' });
+const prismaHealth = new PrismaClient({
+  datasources: {
+    db: {
+      url: buildDatabaseUrl({ connectionLimit: 5, poolTimeout: 10 }),
+    },
+  },
+});
 const prisma = createFinancePrisma();
 const producer = new NexusProducer('finance-service');
 
@@ -53,11 +66,34 @@ try {
   app.log.warn({ err }, 'Kafka producer connect failed; continuing without event publishing');
 }
 
-app.addHook('onClose', async () => {
-  try { await producer.disconnect(); } catch { /* ignore */ }
-  await prismaHealth.$disconnect();
+let autoQuoteConsumer: Awaited<ReturnType<typeof startAutoQuoteConsumer>> | null = null;
+try {
+  autoQuoteConsumer = await startAutoQuoteConsumer(prisma, app.log, producer);
+  app.log.info('Auto-quote consumer started');
+} catch (err) {
+  app.log.warn({ err }, 'Auto-quote consumer failed to start; continuing without auto-quoting');
+}
+
+const gdprConsumer = await startGdprConsumer(prisma).catch((err) => {
+  app.log.warn({ err }, 'GDPR consumer failed to start; continuing');
+  return null;
 });
 
-await startService(app, port, async (a) => {
-  await registerAllRoutes(a, prisma, producer);
+const approvalConsumer = await startApprovalConsumer(prisma, app.log).catch((err) => {
+  app.log.warn({ err }, 'Approval consumer failed to start; continuing');
+  return null;
+});
+
+app.addHook('onClose', async () => {
+  try { await producer.disconnect(); } catch { /* ignore */ }
+  try { await autoQuoteConsumer?.disconnect(); } catch { /* ignore */ }
+  try { await gdprConsumer?.disconnect(); } catch { /* ignore */ }
+  try { await approvalConsumer?.disconnect(); } catch { /* ignore */ }
+});
+
+await registerAllRoutes(app, prisma, producer);
+await registerGraphQL(app, prisma);
+
+await startService(app, port, async () => {
+  await prismaHealth.$disconnect();
 });

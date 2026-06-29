@@ -11,7 +11,7 @@ import type {
   Product,
 } from '../../../../node_modules/.prisma/finance-client/index.js';
 import type { FinancePrisma } from '../prisma.js';
-import { toPaginatedResult } from '../lib/pagination.js';
+import { toPaginatedResult } from '@nexus/shared-types';
 
 export type ProductWithTiers = Prisma.ProductGetPayload<{ include: { priceTiers: true } }>;
 
@@ -38,8 +38,10 @@ function buildWhere(
     const q = filters.search.trim();
     where.OR = [
       { name: { contains: q, mode: 'insensitive' } },
+      { nameAr: { contains: q, mode: 'insensitive' } },
       { sku: { contains: q, mode: 'insensitive' } },
       { description: { contains: q, mode: 'insensitive' } },
+      { descriptionAr: { contains: q, mode: 'insensitive' } },
     ];
   }
   return where;
@@ -106,7 +108,10 @@ export function createProductsService(prisma: FinancePrisma) {
           tenantId,
           sku: data.sku,
           name: data.name,
+          nameAr: data.nameAr ?? null,
           description: data.description ?? null,
+          descriptionAr: data.descriptionAr ?? null,
+          unitAr: data.unitAr ?? null,
           type: data.type,
           category: data.category ?? null,
           currency: data.currency,
@@ -148,7 +153,10 @@ export function createProductsService(prisma: FinancePrisma) {
       const update: Prisma.ProductUpdateInput = {};
       if (data.sku !== undefined) update.sku = data.sku;
       if (data.name !== undefined) update.name = data.name;
+      if (data.nameAr !== undefined) update.nameAr = data.nameAr;
       if (data.description !== undefined) update.description = data.description;
+      if (data.descriptionAr !== undefined) update.descriptionAr = data.descriptionAr;
+      if (data.unitAr !== undefined) update.unitAr = data.unitAr;
       if (data.type !== undefined) update.type = data.type;
       if (data.category !== undefined) update.category = data.category;
       if (data.currency !== undefined) update.currency = data.currency;

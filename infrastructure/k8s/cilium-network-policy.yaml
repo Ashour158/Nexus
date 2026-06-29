@@ -1,0 +1,47 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: nexus-l7-policy
+  namespace: nexus
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: nexus-crm
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: nexus-crm
+      toPorts:
+        - ports:
+            - port: "3000"
+              protocol: TCP
+          rules:
+            http:
+              - method: "GET"
+                path: "/health"
+              - method: "GET"
+                path: "/ready"
+              - method: "GET"
+                path: "/metrics"
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            app: postgres
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            app: redis
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            app: kafka
+      toPorts:
+        - ports:
+            - port: "9092"
+              protocol: TCP

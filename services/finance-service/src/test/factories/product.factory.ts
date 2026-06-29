@@ -1,0 +1,28 @@
+export function productFactory(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'prd_' + Math.random().toString(36).slice(2, 11),
+    tenantId: 'ten_test',
+    sku: 'SKU-' + Math.random().toString(36).slice(2, 7).toUpperCase(),
+    name: 'Test Product',
+    nameAr: null,
+    description: 'A test product',
+    descriptionAr: null,
+    unitAr: null,
+    type: 'PHYSICAL',
+    category: null,
+    currency: 'USD',
+    listPrice: 100,
+    cost: 50,
+    billingType: 'ONE_TIME',
+    billingPeriod: null,
+    taxable: true,
+    taxCode: null,
+    isActive: true,
+    pricingRules: {},
+    customFields: {},
+    priceTiers: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...overrides,
+  };
+}

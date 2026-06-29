@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { UserPlus } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
+import { contactSchema } from '@/lib/schemas';
+import { notify } from '@/lib/toast';
 
 interface Props {
   onCreated: (contact: { id: string; name: string; email: string }) => void;
@@ -17,9 +19,27 @@ export function QuickCreateContact({ onCreated, onCancel }: Props) {
   const [email, setEmail] = useState('');
   const [company, setCompany] = useState('');
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const create = useMutation({
     mutationFn: async () => {
+      const parsed = contactSchema.safeParse({
+        firstName,
+        lastName: lastName || 'Contact',
+        email,
+        phone: '',
+        jobTitle: '',
+      });
+      if (!parsed.success) {
+        const next: Record<string, string> = {};
+        parsed.error.errors.forEach((issue) => {
+          const key = String(issue.path[0] ?? 'form');
+          if (!next[key]) next[key] = issue.message;
+        });
+        setFieldErrors(next);
+        throw new Error(parsed.error.errors[0]?.message ?? 'Validation failed');
+      }
+      setFieldErrors({});
       const res = await fetch('/api/contacts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -31,8 +51,12 @@ export function QuickCreateContact({ onCreated, onCancel }: Props) {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['contacts'] });
       onCreated({ id: data.id, name: `${firstName} ${lastName}`.trim(), email });
+      notify.success('Contact created');
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => {
+      setError(err.message);
+      notify.error('Failed to create contact', err.message);
+    },
   });
 
   return (
@@ -46,6 +70,7 @@ export function QuickCreateContact({ onCreated, onCancel }: Props) {
           <div>
             <label className="text-xs font-medium text-gray-600">First name *</label>
             <input required value={firstName} onChange={(e) => setFirstName(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+            {fieldErrors.firstName ? <p className="mt-1 text-xs text-red-500">{fieldErrors.firstName}</p> : null}
           </div>
           <div>
             <label className="text-xs font-medium text-gray-600">Last name</label>
@@ -55,6 +80,7 @@ export function QuickCreateContact({ onCreated, onCancel }: Props) {
         <div>
           <label className="text-xs font-medium text-gray-600">Email *</label>
           <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+            {fieldErrors.email ? <p className="mt-1 text-xs text-red-500">{fieldErrors.email}</p> : null}
         </div>
         <div>
           <label className="text-xs font-medium text-gray-600">Company</label>

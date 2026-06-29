@@ -13,7 +13,7 @@ const IdParamSchema = z.object({ id: z.string().cuid() });
 
 const ListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(25),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
   isRead: z
     .enum(['true', 'false'])
     .transform((v) => v === 'true')
@@ -106,7 +106,7 @@ export async function registerNotificationsRoutes(
           }
           const jwt = request.user as JwtPayload;
           await svc.deleteNotification(jwt.tenantId, jwt.sub, params.data.id);
-          return reply.code(204).send();
+          return reply.send({ success: true, data: { id: params.data.id, deleted: true } });
         }
       );
 

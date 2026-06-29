@@ -1,84 +1,236 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { TableSkeleton } from '@/components/ui/skeleton';
+import { useCadence } from '@/hooks/use-cadences';
+import { useContacts } from '@/hooks/use-contacts';
+import { useLeads } from '@/hooks/use-leads';
+import { apiClients } from '@/lib/api-client';
+import { notify } from '@/lib/toast';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function EnrollPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [emails, setEmails] = useState('');
-  const [error, setError] = useState('');
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canUpdate = hasPermission('workflows:update');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [entityType, setEntityType] = useState<'CONTACT' | 'LEAD'>('CONTACT');
+  const [search, setSearch] = useState('');
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrolledCount, setEnrolledCount] = useState<number | null>(null);
 
-  const enroll = useMutation({
-    mutationFn: async (contactEmails: string[]) => {
-      const res = await fetch(`/api/cadences/${id}/enroll`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emails: contactEmails }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error((data as { error?: string }).error ?? 'Failed to enroll contacts');
-      }
-      return data as { count?: number };
-    },
-    onSuccess: (data) => {
-      router.push(`/cadences/${id}?enrolled=${data.count ?? 0}`);
-    },
-    onError: (err: Error) => setError(err.message),
-  });
+  const cadenceQuery = useCadence(id);
+  const contactsQuery = useContacts({ search: search || undefined, limit: 50 });
+  const leadsQuery = useLeads({ search: search || undefined, limit: 50 });
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError('');
-    const list = emails
-      .split(/[\n,]+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
+  if (!canUpdate) {
+    return (
+      <main className="p-6">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          You do not have permission to enroll contacts in cadences.
+        </div>
+      </main>
+    );
+  }
 
-    if (list.length === 0) {
-      setError('Enter at least one email address');
-      return;
-    }
+  const cadence = cadenceQuery.data;
+  const items = entityType === 'CONTACT'
+    ? (contactsQuery.data?.data ?? [])
+    : (leadsQuery.data?.data ?? []);
 
-    enroll.mutate(list);
+  const toggle = (contactId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(contactId)) next.delete(contactId);
+      else next.add(contactId);
+      return next;
+    });
   };
 
+  async function handleEnroll() {
+    if (selectedIds.size === 0) {
+      notify.error('Select at least one contact or lead');
+      return;
+    }
+    setEnrolling(true);
+    let success = 0;
+    let failed = 0;
+    for (const contactId of selectedIds) {
+      try {
+        await apiClients.workflow.post(`/journeys/${id}/enroll`, { contactId });
+        success++;
+      } catch {
+        failed++;
+      }
+    }
+    setEnrolling(false);
+    setEnrolledCount(success);
+    if (success > 0) {
+      notify.success(`Enrolled ${success} ${entityType.toLowerCase()}s`);
+    }
+    if (failed > 0) {
+      notify.error(`Failed to enroll ${failed} ${entityType.toLowerCase()}s`);
+    }
+  }
+
+  if (cadenceQuery.isLoading) {
+    return (
+      <main className="p-6">
+        <TableSkeleton rows={4} cols={3} />
+      </main>
+    );
+  }
+
+  if (!cadence) {
+    return (
+      <main className="p-6">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Cadence not found.
+        </div>
+      </main>
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-lg p-8">
-      <h1 className="mb-6 text-2xl font-bold text-gray-900">Enroll contacts in cadence</h1>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Email addresses (one per line or comma-separated)
-          </label>
-          <textarea
-            value={emails}
-            onChange={(e) => setEmails(e.target.value)}
-            rows={8}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-            placeholder="john@acme.com&#10;jane@corp.com"
-          />
+    <main className="mx-auto max-w-3xl space-y-6 p-6">
+      <header>
+        <div className="text-sm text-slate-500">
+          <Link href={`/cadences/${id}`} className="hover:text-slate-800">
+            {cadence.name}
+          </Link>
+          <span> / </span>
+          <span>Enroll</span>
         </div>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <div className="flex gap-3">
-          <button
-            type="submit"
-            disabled={enroll.isPending}
-            className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
-          >
-            {enroll.isPending ? 'Enrolling...' : 'Enroll contacts'}
-          </button>
-          <button
+        <h1 className="mt-1 text-2xl font-bold text-slate-900">
+          Enroll in {cadence.name}
+        </h1>
+        <p className="text-sm text-slate-600">
+          Select {entityType.toLowerCase()}s to add to this cadence.
+        </p>
+      </header>
+
+      {enrolledCount !== null && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+          <p className="font-medium">Enrollment complete</p>
+          <p>{enrolledCount} {entityType.toLowerCase()}s enrolled successfully.</p>
+          <Button
             type="button"
-            onClick={() => router.back()}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-50"
+            variant="secondary"
+            className="mt-2"
+            onClick={() => router.push(`/cadences/${id}`)}
           >
-            Cancel
-          </button>
+            Back to cadence
+          </Button>
         </div>
-      </form>
-    </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="inline-flex rounded-lg border p-0.5">
+          {(['CONTACT', 'LEAD'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => {
+                setEntityType(t);
+                setSelectedIds(new Set());
+              }}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                entityType === t
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {t}s
+            </button>
+          ))}
+        </div>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={`Search ${entityType.toLowerCase()}s...`}
+          className="h-9 rounded-lg border border-slate-300 px-3 text-sm"
+        />
+        <div className="ms-auto text-sm text-slate-500">
+          {selectedIds.size} selected
+        </div>
+      </div>
+
+      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        {entityType === 'CONTACT' && contactsQuery.isLoading ? (
+          <TableSkeleton rows={6} cols={3} />
+        ) : entityType === 'LEAD' && leadsQuery.isLoading ? (
+          <TableSkeleton rows={6} cols={3} />
+        ) : items.length === 0 ? (
+          <div className="p-8 text-center text-sm text-slate-500">
+            No {entityType.toLowerCase()}s found.
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-start text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size === items.length && items.length > 0}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedIds(new Set(items.map((i) => i.id)));
+                      } else {
+                        setSelectedIds(new Set());
+                      }
+                    }}
+                  />
+                </th>
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3">Company</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {items.map((item) => {
+                const record = item as { id: string; firstName?: string | null; lastName?: string | null; email?: string | null; accountId?: string | null; company?: string | null };
+                const name = `${record.firstName ?? ''} ${record.lastName ?? ''}`;
+                const email = record.email ?? '—';
+                const company =
+                  entityType === 'CONTACT'
+                    ? record.accountId ?? '—'
+                    : record.company ?? '—';
+                return (
+                  <tr key={item.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(item.id)}
+                        onChange={() => toggle(item.id)}
+                      />
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-900">{name.trim() || '—'}</td>
+                    <td className="px-4 py-3 text-slate-600">{email}</td>
+                    <td className="px-4 py-3 text-slate-600">{company}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <div className="flex gap-3">
+        <Button
+          type="button"
+          onClick={handleEnroll}
+          disabled={enrolling || selectedIds.size === 0}
+        >
+          {enrolling ? 'Enrolling…' : `Enroll ${selectedIds.size} ${entityType.toLowerCase()}s`}
+        </Button>
+        <Button type="button" variant="secondary" onClick={() => router.back()}>
+          Cancel
+        </Button>
+      </div>
+    </main>
   );
 }

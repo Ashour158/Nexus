@@ -80,13 +80,13 @@ export default function AdminTenantDetailPage({ params }: { params: { id: string
       <section className="grid gap-3 md:grid-cols-4">
         <Card label="Users" value={String(data?.users ?? 0)} />
         <Card label="Active deals" value={String(data?.activeDeals ?? 0)} />
-        <Card label="Revenue tracked" value={typeof data?.revenueTracked === 'number' ? `$${data.revenueTracked.toLocaleString()}` : '—'} />
-        <Card label="Storage used" value={data?.storageUsed ?? '—'} />
+        <Card label="Revenue tracked" value={typeof data?.revenueTracked === 'number' ? `$${data.revenueTracked.toLocaleString()}` : 'Â—'} />
+        <Card label="Storage used" value={data?.storageUsed ?? 'Â—'} />
       </section>
 
       <section className="rounded-xl border border-gray-800 bg-gray-900 p-4">
         <h3 className="mb-3 font-semibold">Subscription</h3>
-        <p className="text-sm text-gray-300">Plan: {data?.plan ?? '—'} · Renewal: {data?.renewalDate ?? '—'} · Usage limits editable below.</p>
+        <p className="text-sm text-gray-300">Plan: {data?.plan ?? 'Â—'} Â· Renewal: {data?.renewalDate ?? 'Â—'} Â· Usage limits editable below.</p>
       </section>
 
       <section className="rounded-xl border border-gray-800 bg-gray-900 p-4">

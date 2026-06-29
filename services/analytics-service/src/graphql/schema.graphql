@@ -1,0 +1,78 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  pipelineAnalytics(tenantId: String!, pipelineId: String): PipelineAnalytics
+  revenueAnalytics(tenantId: String!, period: String!): RevenueAnalytics
+  activityAnalytics(tenantId: String!, ownerId: String): ActivityAnalytics
+  forecastAnalytics(tenantId: String!, period: String!): ForecastAnalytics
+  analyticsHealth: Health!
+}
+
+type Mutation {
+  trackEvent(input: TrackEventInput!): Boolean!
+}
+
+type PipelineAnalytics @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  pipelineId: String
+  totalDeals: Int!
+  totalValue: String!
+  avgDealSize: String!
+  winRate: String!
+  avgSalesCycleDays: Int!
+  stageBreakdown: JSON!
+  updatedAt: DateTime!
+}
+
+type RevenueAnalytics @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  period: String!
+  revenue: String!
+  newRevenue: String!
+  expansionRevenue: String!
+  churnedRevenue: String!
+  netRevenueRetention: String!
+  updatedAt: DateTime!
+}
+
+type ActivityAnalytics @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  ownerId: String
+  totalActivities: Int!
+  emailsSent: Int!
+  callsMade: Int!
+  meetingsHeld: Int!
+  tasksCompleted: Int!
+  updatedAt: DateTime!
+}
+
+type ForecastAnalytics @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  period: String!
+  weightedForecast: String!
+  bestCaseForecast: String!
+  commitForecast: String!
+  pipelineCoverage: String!
+  updatedAt: DateTime!
+}
+
+type Health {
+  status: String!
+  service: String!
+}
+
+input TrackEventInput {
+  tenantId: String!
+  eventType: String!
+  entityType: String
+  entityId: String
+  metadata: JSON
+}

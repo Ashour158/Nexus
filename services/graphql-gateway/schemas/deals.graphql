@@ -1,0 +1,386 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+type Query {
+  deals(limit: Int, offset: Int): [Deal!]!
+  deal(id: ID!): Deal
+  pipelines(limit: Int, offset: Int): [Pipeline!]!
+  pipeline(id: ID!): Pipeline
+  stages(pipelineId: ID!): [Stage!]!
+  stage(id: ID!): Stage
+  dealContacts(limit: Int, offset: Int): [DealContact!]!
+  dealContact(id: ID!): DealContact
+  dealStakeholders(limit: Int, offset: Int): [DealStakeholder!]!
+  dealStakeholder(id: ID!): DealStakeholder
+  dealRooms(limit: Int, offset: Int): [DealRoom!]!
+  dealRoom(id: ID!): DealRoom
+  quotes(limit: Int, offset: Int): [Quote!]!
+  quote(id: ID!): Quote
+  competitors(limit: Int, offset: Int): [Competitor!]!
+  competitor(id: ID!): Competitor
+}
+
+type Mutation {
+  createDeal(input: CreateDealInput!): Deal!
+  updateDeal(id: ID!, input: UpdateDealInput!): Deal!
+  deleteDeal(id: ID!): Boolean!
+  createPipeline(input: CreatePipelineInput!): Pipeline!
+  updatePipeline(id: ID!, input: UpdatePipelineInput!): Pipeline!
+  deletePipeline(id: ID!): Boolean!
+  createStage(input: CreateStageInput!): Stage!
+  updateStage(id: ID!, input: UpdateStageInput!): Stage!
+  deleteStage(id: ID!): Boolean!
+  createDealContact(input: CreateDealContactInput!): DealContact!
+  updateDealContact(id: ID!, input: UpdateDealContactInput!): DealContact!
+  deleteDealContact(id: ID!): Boolean!
+  createDealStakeholder(input: CreateDealStakeholderInput!): DealStakeholder!
+  updateDealStakeholder(id: ID!, input: UpdateDealStakeholderInput!): DealStakeholder!
+  deleteDealStakeholder(id: ID!): Boolean!
+  createDealRoom(input: CreateDealRoomInput!): DealRoom!
+  updateDealRoom(id: ID!, input: UpdateDealRoomInput!): DealRoom!
+  deleteDealRoom(id: ID!): Boolean!
+  createCompetitor(input: CreateCompetitorInput!): Competitor!
+  updateCompetitor(id: ID!, input: UpdateCompetitorInput!): Competitor!
+  deleteCompetitor(id: ID!): Boolean!
+}
+
+type Deal @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  ownerId: ID!
+  accountId: ID!
+  pipelineId: ID!
+  stageId: ID!
+  name: String!
+  amount: Float!
+  currency: String!
+  probability: Int!
+  expectedCloseDate: DateTime
+  actualCloseDate: DateTime
+  status: String!
+  lostReason: String
+  lostDetail: String
+  forecastCategory: String!
+  meddicicScore: Int!
+  meddicicData: JSON
+  aiWinProbability: Float
+  aiInsights: JSON
+  competitors: [String!]!
+  source: String
+  campaignId: ID
+  customFields: JSON
+  tags: [String!]!
+  version: Int!
+  closeReason: String
+  dataQualityScore: Int
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Pipeline @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  name: String!
+  type: String!
+  currency: String!
+  isDefault: Boolean!
+  isActive: Boolean!
+  description: String
+  ownedBy: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Stage @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  pipelineId: ID!
+  name: String!
+  order: Int!
+  probability: Int!
+  rottenDays: Int!
+  requiredFields: JSON
+  entryConditions: JSON
+  color: String!
+  isWon: Boolean!
+  isLost: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type DealContact @key(fields: "id") {
+  id: ID!
+  dealId: ID!
+  contactId: ID!
+  role: String
+  isPrimary: Boolean!
+}
+
+type DealStakeholder @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  dealId: ID!
+  contactId: ID!
+  role: String!
+  influence: Int!
+  sentiment: String!
+  reportsToId: ID
+  notes: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type DealRoom @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  dealId: ID!
+  title: String!
+  slug: String!
+  isPublished: Boolean!
+  buyerEmails: JSON
+  lastViewedAt: DateTime
+  viewCount: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Quote @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  dealId: ID!
+  ownerId: ID!
+  quoteNumber: String!
+  name: String!
+  status: String!
+  validUntil: DateTime
+  currency: String!
+  subtotal: Float!
+  discountAmount: Float!
+  taxAmount: Float!
+  total: Float!
+  approvalStatus: String
+  approvedById: ID
+  approvedAt: DateTime
+  sentAt: DateTime
+  viewedAt: DateTime
+  acceptedAt: DateTime
+  terms: String
+  notes: String
+  lineItems: JSON
+  customFields: JSON
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Competitor @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  name: String!
+  website: String
+  description: String
+  strengths: [String!]!
+  weaknesses: [String!]!
+  winRateAgainst: Float
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+input CreateDealInput {
+  tenantId: ID!
+  ownerId: ID!
+  accountId: ID!
+  pipelineId: ID!
+  stageId: ID!
+  name: String!
+  amount: Float
+  currency: String
+  probability: Int
+  expectedCloseDate: DateTime
+  status: String
+  forecastCategory: String
+  source: String
+  campaignId: ID
+  customFields: JSON
+  tags: [String!]
+}
+
+input UpdateDealInput {
+  ownerId: ID
+  accountId: ID
+  pipelineId: ID
+  stageId: ID
+  name: String
+  amount: Float
+  currency: String
+  probability: Int
+  expectedCloseDate: DateTime
+  actualCloseDate: DateTime
+  status: String
+  lostReason: String
+  lostDetail: String
+  forecastCategory: String
+  source: String
+  campaignId: ID
+  customFields: JSON
+  tags: [String!]
+  closeReason: String
+}
+
+input CreatePipelineInput {
+  tenantId: ID!
+  name: String!
+  type: String
+  currency: String
+  isDefault: Boolean
+  isActive: Boolean
+  description: String
+  ownedBy: String
+}
+
+input UpdatePipelineInput {
+  name: String
+  type: String
+  currency: String
+  isDefault: Boolean
+  isActive: Boolean
+  description: String
+  ownedBy: String
+}
+
+input CreateStageInput {
+  tenantId: ID!
+  pipelineId: ID!
+  name: String!
+  order: Int!
+  probability: Int
+  rottenDays: Int
+  requiredFields: JSON
+  entryConditions: JSON
+  color: String
+  isWon: Boolean
+  isLost: Boolean
+}
+
+input UpdateStageInput {
+  pipelineId: ID
+  name: String
+  order: Int
+  probability: Int
+  rottenDays: Int
+  requiredFields: JSON
+  entryConditions: JSON
+  color: String
+  isWon: Boolean
+  isLost: Boolean
+}
+
+input CreateDealContactInput {
+  dealId: ID!
+  contactId: ID!
+  role: String
+  isPrimary: Boolean
+}
+
+input UpdateDealContactInput {
+  dealId: ID
+  contactId: ID
+  role: String
+  isPrimary: Boolean
+}
+
+input CreateDealStakeholderInput {
+  tenantId: ID!
+  dealId: ID!
+  contactId: ID!
+  role: String!
+  influence: Int
+  sentiment: String
+  reportsToId: ID
+  notes: String
+}
+
+input UpdateDealStakeholderInput {
+  dealId: ID
+  contactId: ID
+  role: String
+  influence: Int
+  sentiment: String
+  reportsToId: ID
+  notes: String
+}
+
+input CreateDealRoomInput {
+  tenantId: ID!
+  dealId: ID!
+  title: String!
+  slug: String!
+  isPublished: Boolean
+  buyerEmails: JSON
+}
+
+input UpdateDealRoomInput {
+  dealId: ID
+  title: String
+  slug: String
+  isPublished: Boolean
+  buyerEmails: JSON
+}
+
+input CreateQuoteInput {
+  tenantId: ID!
+  dealId: ID!
+  ownerId: ID!
+  quoteNumber: String!
+  name: String!
+  currency: String
+  subtotal: Float
+  discountAmount: Float
+  taxAmount: Float
+  total: Float
+  validUntil: DateTime
+  terms: String
+  notes: String
+  lineItems: JSON
+  customFields: JSON
+}
+
+input UpdateQuoteInput {
+  dealId: ID
+  ownerId: ID
+  quoteNumber: String
+  name: String
+  status: String
+  currency: String
+  subtotal: Float
+  discountAmount: Float
+  taxAmount: Float
+  total: Float
+  validUntil: DateTime
+  terms: String
+  notes: String
+  lineItems: JSON
+  customFields: JSON
+}
+
+input CreateCompetitorInput {
+  tenantId: ID!
+  name: String!
+  website: String
+  description: String
+  strengths: [String!]
+  weaknesses: [String!]
+  winRateAgainst: Float
+}
+
+input UpdateCompetitorInput {
+  name: String
+  website: String
+  description: String
+  strengths: [String!]
+  weaknesses: [String!]
+  winRateAgainst: Float
+}
+
+scalar DateTime
+scalar JSON

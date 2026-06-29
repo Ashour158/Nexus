@@ -22,34 +22,37 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, info: { componentStack: string }) {
-    console.error('ErrorBoundary caught:', error, info);
-    if (typeof window !== 'undefined' && (window as { __sentry__?: unknown }).__sentry__) {
-      (window as { Sentry?: { captureException: (err: Error) => void } }).Sentry?.captureException(error);
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
+    // Report to Sentry if available
+    if (typeof window !== 'undefined' && 'Sentry' in window) {
+      (window as unknown as { Sentry: { captureException: (error: Error, extra: { extra: React.ErrorInfo }) => void } }).Sentry.captureException(error, { extra: errorInfo });
     }
+    // eslint-disable-next-line no-console
+    console.error('ErrorBoundary caught error:', error, errorInfo);
   }
 
-  render() {
+  render(): ReactNode {
     if (this.state.hasError) {
-      if (this.props.fallback) return this.props.fallback;
       return (
-        <div className="flex min-h-[200px] flex-col items-center justify-center p-8 text-center">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-            <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M12 3a9 9 0 110 18A9 9 0 0112 3z" />
-            </svg>
+        this.props.fallback ?? (
+          <div className="flex min-h-screen items-center justify-center p-6">
+            <div className="max-w-md rounded-xl border border-red-200 bg-red-50 p-6 text-center dark:border-red-900 dark:bg-red-950">
+              <h2 className="text-lg font-semibold text-red-800 dark:text-red-200">
+                Something went wrong
+              </h2>
+              <p className="mt-2 text-sm text-red-700 dark:text-red-300">
+                {this.state.error?.message ?? 'An unexpected error occurred.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => this.setState({ hasError: false })}
+                className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
+              >
+                Try again
+              </button>
+            </div>
           </div>
-          <h3 className="mb-1 text-sm font-medium text-gray-900">Something went wrong</h3>
-          <p className="mb-4 max-w-xs text-xs text-gray-500">
-            {this.state.error?.message ?? 'An unexpected error occurred.'}
-          </p>
-          <button
-            onClick={() => this.setState({ hasError: false, error: undefined })}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            Try Again
-          </button>
-        </div>
+        )
       );
     }
     return this.props.children;

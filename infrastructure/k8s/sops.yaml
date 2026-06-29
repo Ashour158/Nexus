@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nexus-postgres
+  namespace: nexus
+stringData:
+  url: ENC[AES256_GCM,data:encrypted...,iv:...,tag:...,type:str]
+sops:
+  kms: []
+  gcp_kms: []
+  azure_kv: []
+  hc_vault: []
+  age: []
+  lastmodified: '2024-01-01T00:00:00Z'
+  mac: ENC[AES256_GCM,data:...,iv:...,tag:...,type:str]
+  pgp: []
+  unencrypted_suffix: _unencrypted
+  version: 3.8.1
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nexus-redis
+  namespace: nexus
+stringData:
+  url: ENC[AES256_GCM,data:encrypted...,iv:...,tag:...,type:str]
+sops:
+  kms: []
+  gcp_kms: []
+  azure_kv: []
+  hc_vault: []
+  age: []
+  lastmodified: '2024-01-01T00:00:00Z'
+  mac: ENC[AES256_GCM,data:...,iv:...,tag:...,type:str]
+  pgp: []
+  unencrypted_suffix: _unencrypted
+  version: 3.8.1

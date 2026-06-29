@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/quotes-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("QUOTES_DATABASE_URL")
+}
+
+model Quote {
+  id              String      @id @default(cuid())
+  tenantId        String
+  dealId          String
+  ownerId         String
+  quoteNumber     String
+  name            String
+  status          QuoteStatus @default(DRAFT)
+  validUntil      DateTime?
+  currency        String      @default("USD")
+  subtotal        Decimal     @default(0) @db.Decimal(18, 2)
+  discountAmount  Decimal     @default(0) @db.Decimal(18, 2)
+  taxAmount       Decimal     @default(0) @db.Decimal(18, 2)
+  total           Decimal     @default(0) @db.Decimal(18, 2)
+  approvalStatus  String?
+  approvedById    String?
+  approvedAt      DateTime?
+  sentAt          DateTime?
+  viewedAt        DateTime?
+  acceptedAt      DateTime?
+  terms           String?
+  notes           String?
+  lineItems       Json        @default("[]")
+  customFields    Json        @default("{}")
+  version         Int         @default(1)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  deletedAt       DateTime?
+  @@unique([tenantId, quoteNumber])
+  @@index([tenantId, dealId])
+  @@unique([id, tenantId])
+}
+
+enum QuoteStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SENT
+  VIEWED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
+model DealRoom {
+  id           String   @id @default(cuid())
+  tenantId     String
+  dealId       String   @unique
+  title        String
+  slug         String   @unique
+  isPublished  Boolean  @default(false)
+  buyerEmails  Json     @default("[]")
+  lastViewedAt DateTime?
+  viewCount    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+  items        MutualActionItem[]
+  documents    DealRoomDocument[]
+  @@index([tenantId])
+  @@unique([id, tenantId])
+}
+
+model MutualActionItem {
+  id          String    @id @default(cuid())
+  dealRoomId  String
+  title       String
+  description String?
+  owner       String
+  ownerName   String?
+  dueDate     DateTime?
+  completedAt DateTime?
+  position    Int       @default(0)
+  createdAt   DateTime  @default(now())
+  dealRoom    DealRoom  @relation(fields: [dealRoomId], references: [id], onDelete: Cascade)
+  @@index([dealRoomId])
+}
+
+model DealRoomDocument {
+  id         String   @id @default(cuid())
+  dealRoomId String
+  name       String
+  url        String
+  fileType   String?
+  uploadedBy String
+  createdAt  DateTime @default(now())
+  dealRoom   DealRoom @relation(fields: [dealRoomId], references: [id], onDelete: Cascade)
+  @@index([dealRoomId])
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
+}

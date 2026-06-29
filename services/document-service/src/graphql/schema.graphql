@@ -1,0 +1,122 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  documents(limit: Int, offset: Int, folderId: String): [Document!]!
+  document(id: ID!): Document
+  folders(limit: Int, offset: Int, parentId: String): [Folder!]!
+  folder(id: ID!): Folder
+  documentVersions(documentId: ID!): [DocumentVersion!]!
+  documentPermissions(documentId: ID!): [DocumentPermission!]!
+}
+
+type Mutation {
+  createDocument(input: CreateDocumentInput!): Document!
+  updateDocument(id: ID!, input: UpdateDocumentInput!): Document!
+  deleteDocument(id: ID!): Boolean!
+  createFolder(input: CreateFolderInput!): Folder!
+  updateFolder(id: ID!, input: UpdateFolderInput!): Folder!
+  deleteFolder(id: ID!): Boolean!
+  createDocumentVersion(input: CreateDocumentVersionInput!): DocumentVersion!
+  createDocumentPermission(input: CreateDocumentPermissionInput!): DocumentPermission!
+  deleteDocumentPermission(id: ID!): Boolean!
+}
+
+type Document @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  ownerId: String!
+  name: String!
+  description: String
+  mimeType: String!
+  sizeBytes: Int!
+  storageKey: String!
+  folderId: String
+  folder: Folder
+  versions: [DocumentVersion!]!
+  permissions: [DocumentPermission!]!
+  tags: [String!]!
+  isDeleted: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type DocumentVersion @key(fields: "id") {
+  id: ID!
+  documentId: String!
+  document: Document
+  versionNumber: Int!
+  storageKey: String!
+  sizeBytes: Int!
+  createdById: String!
+  createdAt: DateTime!
+}
+
+type Folder @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  parentId: String
+  parent: Folder
+  children: [Folder!]!
+  documents: [Document!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type DocumentPermission @key(fields: "id") {
+  id: ID!
+  documentId: String!
+  document: Document
+  userId: String!
+  role: String!
+  createdAt: DateTime!
+}
+
+input CreateDocumentInput {
+  tenantId: String!
+  ownerId: String!
+  name: String!
+  description: String
+  mimeType: String!
+  sizeBytes: Int!
+  storageKey: String!
+  folderId: String
+  tags: [String!]
+}
+
+input UpdateDocumentInput {
+  name: String
+  description: String
+  folderId: String
+  tags: [String!]
+  isDeleted: Boolean
+}
+
+input CreateFolderInput {
+  tenantId: String!
+  name: String!
+  parentId: String
+}
+
+input UpdateFolderInput {
+  name: String
+  parentId: String
+}
+
+input CreateDocumentVersionInput {
+  documentId: String!
+  versionNumber: Int!
+  storageKey: String!
+  sizeBytes: Int!
+  createdById: String!
+}
+
+input CreateDocumentPermissionInput {
+  documentId: String!
+  userId: String!
+  role: String!
+}

@@ -87,7 +87,7 @@ export function createReportsService(prisma: ReportingPrisma) {
       reportId: string,
       input: { cron: string; format?: string; recipients: string[] }
     ) {
-      return prisma.reportSchedule.create({
+      return prisma.definitionReportSchedule.create({
         data: {
           tenantId,
           reportId,
@@ -100,30 +100,53 @@ export function createReportsService(prisma: ReportingPrisma) {
     },
 
     async listSchedules(tenantId: string, reportId: string) {
-      return prisma.reportSchedule.findMany({
+      return prisma.definitionReportSchedule.findMany({
         where: { tenantId, reportId },
         orderBy: { createdAt: 'desc' },
       });
     },
 
     async deleteSchedule(tenantId: string, scheduleId: string) {
-      return prisma.reportSchedule.deleteMany({ where: { tenantId, id: scheduleId } });
+      return prisma.definitionReportSchedule.deleteMany({ where: { tenantId, id: scheduleId } });
     },
 
     async processSchedules() {
-      const due = await prisma.reportSchedule.findMany({
+      const due = await prisma.definitionReportSchedule.findMany({
         where: { isActive: true, nextRunAt: { lte: new Date() } },
         include: { report: true },
         take: 25,
       });
       for (const schedule of due) {
         await this.runReport(schedule.tenantId, schedule.reportId, {});
-        await prisma.reportSchedule.update({
+        await prisma.definitionReportSchedule.update({
           where: { id: schedule.id },
           data: { lastRunAt: new Date(), nextRunAt: nextRunFromCron(schedule.cron) },
         });
       }
       return { processed: due.length };
+    },
+
+    async getPerformanceReport(_tenantId: string) {
+      // Placeholder: returns aggregated performance metrics
+      // In production this would query ClickHouse or CRM internal APIs
+      return {
+        reps: [] as unknown[],
+        totalRevenue: 0,
+        totalDeals: 0,
+        avgDealSize: 0,
+        winRate: 0,
+        period: 'last_30_days',
+      };
+    },
+
+    async getManagerReport(_tenantId: string) {
+      // Placeholder: returns manager-focused pipeline and coaching data
+      return {
+        forecast: [] as unknown[],
+        pipelineRisk: [] as unknown[],
+        coachingOpportunities: [] as unknown[],
+        period: 'current_quarter',
+      };
     },
   };
 }

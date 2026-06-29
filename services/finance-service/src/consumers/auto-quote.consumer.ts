@@ -1,7 +1,12 @@
-import { NexusConsumer, TOPICS } from '@nexus/kafka';
+import { NexusConsumer, NexusProducer, TOPICS } from '@nexus/kafka';
+import type { EngineContext } from '@nexus/domain-core';
+import { BusinessRuleError, ValidationError } from '@nexus/service-utils';
 import type { FinancePrisma } from '../prisma.js';
 import { CpqPricingEngine } from '../cpq/pricing-engine.js';
-import { Decimal } from 'decimal.js';
+import { createCommercialRecordsUseCase } from '../use-cases/commercial-records.use-case.js';
+import { createQuotesService } from '../services/quotes.service.js';
+import { createDiscountRequestsService } from '../services/discount-requests.service.js';
+import { checkDiscountApproval } from '../lib/discount-approval.js';
 
 interface LoggerLike {
   info: (...args: unknown[]) => void;
@@ -18,133 +23,122 @@ function getNumber(value: unknown): number | null {
   return null;
 }
 
+type AutoQuoteEventLike = {
+  type?: string;
+  tenantId?: string;
+  correlationId?: string;
+  payload?: Record<string, unknown>;
+};
+
+type AutoQuoteAuthority = {
+  convertRfq(ctx: EngineContext, rfqId: string): Promise<unknown>;
+};
+
+function defaultAuthority(prisma: FinancePrisma, producer: NexusProducer): AutoQuoteAuthority {
+  return createCommercialRecordsUseCase({
+    prisma,
+    producer,
+    quotes: createQuotesService(prisma, producer),
+    discountRequests: createDiscountRequestsService(prisma, producer),
+    pricingEngine: new CpqPricingEngine(prisma),
+    checkDiscountApproval,
+  });
+}
+
+function engineContextForAutoQuote(event: AutoQuoteEventLike, actorId: string): EngineContext {
+  return {
+    audit: {
+      actor: {
+        tenantId: String(event.tenantId ?? ''),
+        userId: actorId,
+        roles: ['SYSTEM'],
+        permissions: ['quotes:create', 'rfqs:update'],
+      },
+      requestId: event.correlationId ?? `auto-quote:${String(event.payload?.rfqId ?? event.payload?.dealId ?? '')}`,
+      source: 'worker',
+    },
+    now: new Date(),
+  };
+}
+
+export async function handleAutoQuoteDealStageChanged(
+  prisma: FinancePrisma,
+  log: LoggerLike,
+  event: AutoQuoteEventLike,
+  authority: AutoQuoteAuthority
+) {
+  if (event.type && event.type !== 'deal.stage_changed') return;
+  const payload = event.payload ?? {};
+  const tenantId = String(event.tenantId ?? '');
+  const dealId = String(payload.dealId ?? '');
+  const accountId = String(payload.accountId ?? '');
+  const rfqId = String(payload.rfqId ?? '');
+  const actorId = String(payload.ownerId ?? payload.actorId ?? 'system');
+
+  if (!tenantId || !dealId || !accountId || !rfqId) {
+    log.warn({ tenantId, dealId, accountId, rfqId }, 'Auto quote skipped: missing commercial anchors');
+    return;
+  }
+
+  const rules = await prisma.quoteAutomationRule.findMany({
+    where: { tenantId, isActive: true, trigger: 'deal_stage_changed' },
+    orderBy: { createdAt: 'asc' },
+  });
+  if (rules.length === 0) return;
+
+  for (const rule of rules) {
+    const conditions = (rule.conditions ?? {}) as Record<string, unknown>;
+    const stageId = typeof payload.stageId === 'string' ? payload.stageId : null;
+    const expectedStage = typeof conditions.stageId === 'string' ? conditions.stageId : null;
+    if (expectedStage && expectedStage !== stageId) continue;
+
+    const dealValue = getNumber(payload.amount) ?? 0;
+    const min = getNumber(conditions.dealValueMin);
+    const max = getNumber(conditions.dealValueMax);
+    if (min !== null && dealValue < min) continue;
+    if (max !== null && dealValue > max) continue;
+
+    const rfq = await prisma.rFQ.findFirst({ where: { id: rfqId, tenantId } });
+    if (!rfq) {
+      log.warn({ tenantId, dealId, accountId, rfqId, ruleId: rule.id }, 'Auto quote skipped: RFQ not found');
+      continue;
+    }
+    if (String(rfq.convertedQuoteId ?? '') || String(rfq.status) === 'CONVERTED') {
+      log.info(
+        { tenantId, dealId, rfqId, convertedQuoteId: rfq.convertedQuoteId, ruleId: rule.id },
+        'Auto quote skipped: RFQ already converted'
+      );
+      continue;
+    }
+
+    try {
+      const result = await authority.convertRfq(engineContextForAutoQuote(event, actorId), rfqId);
+      log.info({ tenantId, dealId, rfqId, ruleId: rule.id, result }, 'Auto quote routed through finance authority');
+    } catch (err) {
+      if (err instanceof BusinessRuleError || err instanceof ValidationError) {
+        log.warn({ err, tenantId, dealId, rfqId, ruleId: rule.id }, 'Auto quote skipped by finance authority');
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 export async function startAutoQuoteConsumer(
   prisma: FinancePrisma,
-  log: LoggerLike
+  log: LoggerLike,
+  producer: NexusProducer = new NexusProducer('finance-service.auto-quote')
 ): Promise<NexusConsumer> {
   const consumer = new NexusConsumer('finance-service.auto-quote');
+  const authority = defaultAuthority(prisma, producer);
 
   consumer.on('deal.stage_changed', async (event) => {
-    if (event.type !== 'deal.stage_changed') return;
-    const payload = event.payload as Record<string, unknown>;
-    const tenantId = event.tenantId;
-    const dealId = String(payload.dealId ?? '');
-    if (!dealId) return;
-
-    const rules = await prisma.quoteAutomationRule.findMany({
-      where: { tenantId, isActive: true, trigger: 'deal_stage_changed' },
-      orderBy: { createdAt: 'asc' },
-    });
-    if (rules.length === 0) return;
-
-    for (const rule of rules) {
-      const conditions = (rule.conditions ?? {}) as Record<string, unknown>;
-      const stageId = typeof payload.stageId === 'string' ? payload.stageId : null;
-      const expectedStage = typeof conditions.stageId === 'string' ? conditions.stageId : null;
-      if (expectedStage && expectedStage !== stageId) continue;
-
-      const dealValue = getNumber(payload.amount) ?? 0;
-      const min = getNumber(conditions.dealValueMin);
-      const max = getNumber(conditions.dealValueMax);
-      if (min !== null && dealValue < min) continue;
-      if (max !== null && dealValue > max) continue;
-
-      const quoteCount = await prisma.quote.count({ where: { tenantId } });
-      const quoteName = `Auto Quote for ${dealId}`;
-      const currency = String(payload.currency ?? 'USD');
-      const accountId = String(payload.accountId ?? dealId);
-
-      let lineItems: unknown[] = [];
-      let pricingBreakdown: Record<string, unknown> = {};
-      let subtotal = new Decimal(0);
-      let total = new Decimal(0);
-      let discountAmount = new Decimal(0);
-      let taxAmount = new Decimal(0);
-      let taxBreakdown: unknown[] = [];
-
-      // Try to build real line items from the price book
-      if (rule.priceBookId) {
-        try {
-          const entries = await prisma.priceBookEntry.findMany({
-            where: { priceBookId: rule.priceBookId, tenantId },
-            include: { product: true } as any,
-            take: 50,
-          });
-
-          if (entries.length > 0) {
-            const engine = new CpqPricingEngine(prisma);
-            const cpqResult = await engine.calculate({
-              tenantId,
-              accountId,
-              currency,
-              items: entries.map((e) => ({
-                productId: e.productId,
-                quantity: 1,
-              })),
-            });
-
-            lineItems = cpqResult.items;
-            subtotal = new Decimal(cpqResult.subtotal);
-            discountAmount = new Decimal(cpqResult.discountTotal);
-            taxAmount = new Decimal(cpqResult.taxTotal);
-            total = new Decimal(cpqResult.total);
-            pricingBreakdown = {
-              appliedRules: cpqResult.appliedRules,
-              floorPriceWarnings: cpqResult.floorPriceWarnings,
-              approvalRequired: cpqResult.approvalRequired,
-              approvalReasons: cpqResult.approvalReasons,
-            };
-            taxBreakdown = [{ rate: 0.1, amount: cpqResult.taxTotal, name: 'Standard Tax' }];
-          }
-        } catch (engineErr) {
-          log.warn({ engineErr, dealId, ruleId: rule.id }, 'CPQ engine failed for auto-quote; falling back to deal-value line item');
-        }
-      }
-
-      // Fallback: create a single line item from the deal value if no products were priced
-      if (lineItems.length === 0) {
-        const dealValue = new Decimal(getNumber(payload.amount) ?? 0);
-        lineItems = [
-          {
-            name: quoteName,
-            quantity: 1,
-            unitPrice: dealValue.toNumber(),
-            listPrice: dealValue.toNumber(),
-            discountPercent: 0,
-            discountAmount: 0,
-            total: dealValue.toNumber(),
-            billingType: 'ONE_TIME',
-          },
-        ];
-        subtotal = dealValue;
-        total = dealValue;
-        pricingBreakdown = { source: 'deal_value_fallback', dealValue: dealValue.toNumber() };
-        taxBreakdown = [];
-      }
-
-      const quote = await prisma.quote.create({
-        data: {
-          tenantId,
-          dealId,
-          accountId,
-          ownerId: String(payload.ownerId ?? 'system'),
-          quoteNumber: `Q-${String(quoteCount + 1).padStart(6, '0')}`,
-          name: quoteName,
-          currency,
-          subtotal,
-          total,
-          discountAmount,
-          taxAmount,
-          lineItems,
-          pricingBreakdown,
-          customFields: {},
-          templateId: rule.templateId ?? null,
-          priceBookId: rule.priceBookId ?? null,
-          taxBreakdown,
-        },
-      });
-      log.info({ dealId, quoteId: quote.id, ruleId: rule.id, lineItemCount: lineItems.length, total: total.toNumber() }, 'Auto quote created');
-    }
+    await handleAutoQuoteDealStageChanged(prisma, log, {
+      type: event.type,
+      tenantId: event.tenantId,
+      correlationId: event.correlationId,
+      payload: event.payload as Record<string, unknown>,
+    }, authority);
   });
 
   await consumer.subscribe([TOPICS.DEALS]);

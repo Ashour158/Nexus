@@ -1,0 +1,27 @@
+{
+  "name": "@nexus/cqrs",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsc --project tsconfig.json --watch"
+  },
+  "dependencies": {
+    "@nexus/kafka": "workspace:*",
+    "@nexus/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.9",
+    "typescript": "^5.5.3"
+  }
+}

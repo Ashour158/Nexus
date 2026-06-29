@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { startTracing } from '@nexus/service-utils/tracing';
 import rateLimit from '@fastify/rate-limit';
 import {
   checkDatabase,
@@ -8,12 +9,21 @@ import {
   startService,
 } from '@nexus/service-utils';
 import { PrismaClient } from '../../../node_modules/.prisma/storage-client/index.js';
+import { buildDatabaseUrl } from '@nexus/service-utils/db';
 import { createStoragePrisma } from './prisma.js';
 import { createMinioClient, ensureBucket } from './minio.js';
 import { createFilesService } from './services/files.service.js';
 import { registerFilesRoutes } from './routes/files.routes.js';
+import { registerGraphQL } from './graphql/index.js';
 
-const prismaHealth = new PrismaClient();
+startTracing({ serviceName: 'storage-service' });
+const prismaHealth = new PrismaClient({
+  datasources: {
+    db: {
+      url: buildDatabaseUrl({ connectionLimit: 5, poolTimeout: 10, databaseUrl: process.env.STORAGE_DATABASE_URL }),
+    },
+  },
+});
 const prisma = createStoragePrisma();
 const minio = createMinioClient();
 const bucket = process.env.MINIO_BUCKET ?? 'nexus-files';
@@ -54,6 +64,8 @@ app.addHook('onClose', async () => {
 });
 
 const files = createFilesService(prisma, minio, bucket);
+
+await registerGraphQL(app, prisma);
 
 await startService(app, port, async (a) => {
   await registerFilesRoutes(a, files);

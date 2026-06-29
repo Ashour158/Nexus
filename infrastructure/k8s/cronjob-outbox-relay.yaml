@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: outbox-relay
+  namespace: nexus
+spec:
+  schedule: "*/1 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: outbox-relay
+              image: nexus-crm/outbox-relay:latest
+              envFrom:
+                - configMapRef:
+                    name: nexus-config
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: nexus-postgres
+                      key: url
+                - name: KAFKA_BROKERS
+                  valueFrom:
+                    secretKeyRef:
+                      name: nexus-kafka
+                      key: brokers
+              resources:
+                limits:
+                  cpu: 1000m
+                  memory: 512Mi
+                requests:
+                  cpu: 250m
+                  memory: 256Mi

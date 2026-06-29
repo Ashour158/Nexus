@@ -10,8 +10,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate deploy",
-    "db:push": "prisma db push"
+    "db:migrate": "prisma migrate deploy"
   },
   "dependencies": {
     "@fastify/multipart": "^8.3.0",
@@ -22,11 +21,19 @@
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
     "minio": "^8.0.1",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "@nexus/validation": "workspace:*",
+    "@nexus/kafka": "workspace:*",
+    "@fastify/swagger": "^9.0.0",
+    "@fastify/swagger-ui": "^5.0.0",
+    "graphql": "^16.13.2",
+    "graphql-yoga": "^5.21.0",
+    "@apollo/subgraph": "^2.13.3",
+    "dataloader": "^2.2.3"
   },
   "devDependencies": {
     "@types/node": "^20.14.9",
-    "prisma": "^5.15.0",
+    "prisma": "^5.22.0",
     "tsx": "^4.16.0",
     "typescript": "^5.5.3",
     "vitest": "^1.6.0"

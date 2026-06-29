@@ -44,7 +44,7 @@ export async function registerForecastsRoutes(
     const { id } = z.object({ id: z.string().cuid() }).parse(request.params);
     const body = ReviewBody.parse(request.body);
     const data = await forecasts.reviewForecast(user.tenantId, id, user.sub, body);
-    if (!data) return reply.code(404).send({ success: false, error: 'Submission not found' });
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Submission not found', requestId: request.id } });
     return reply.send({ success: true, data });
   });
 }

@@ -6,7 +6,7 @@ import { Modal } from '@/components/ui/modal';
 type Flag = { name: string; description: string; enabled: boolean; tenants: string[]; users: string; rollout: number; modifiedBy: string; modifiedAt: string };
 
 const INITIAL_FLAGS: Flag[] = [
-  { name: 'AI_FORECASTING', description: 'Enable AI-powered deal scoring and forecast', enabled: true, tenants: [], users: '', rollout: 50, modifiedBy: 'system', modifiedAt: new Date().toISOString() },
+  { name: 'RULE_FORECASTING', description: 'Enable rule-based deal scoring and forecast', enabled: true, tenants: [], users: '', rollout: 50, modifiedBy: 'system', modifiedAt: new Date().toISOString() },
   { name: 'CALLING_MODULE', description: 'Show calling/dialer UI', enabled: false, tenants: [], users: '', rollout: 0, modifiedBy: 'system', modifiedAt: new Date().toISOString() },
   { name: 'EMAIL_SEQUENCES', description: 'Enable cadence email builder', enabled: true, tenants: ['Tenant 1'], users: '', rollout: 100, modifiedBy: 'system', modifiedAt: new Date().toISOString() },
   { name: 'WHATSAPP_INTEGRATION', description: 'WhatsApp message sending from contacts', enabled: false, tenants: [], users: '', rollout: 20, modifiedBy: 'system', modifiedAt: new Date().toISOString() },

@@ -1,0 +1,45 @@
+apiVersion: flagger.app/v1beta1
+kind: Canary
+metadata:
+  name: nexus-crm
+  namespace: nexus
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nexus-crm
+  service:
+    port: 3000
+    gateways:
+      - nexus-gateway
+    hosts:
+      - api.nexus-crm.io
+  analysis:
+    interval: 30s
+    threshold: 5
+    maxWeight: 50
+    stepWeight: 10
+    metrics:
+      - name: request-success-rate
+        thresholdRange:
+          min: 99
+        interval: 1m
+      - name: request-duration
+        thresholdRange:
+          max: 2000
+        interval: 1m
+    webhooks:
+      - name: load-test
+        type: pre-rollout
+        url: http://flagger-loadtester.nexus/
+        timeout: 5s
+        metadata:
+          cmd: "hey -z 1m -q 10 -c 2 http://nexus-crm-canary:3000/health"
+      - name: conformance-test
+        type: pre-rollout
+        url: http://flagger-loadtester.nexus/
+        timeout: 30s
+        metadata:
+          type: bash
+          cmd: "curl -sf http://nexus-crm-canary:3000/ready"
+  progressDeadlineSeconds: 600

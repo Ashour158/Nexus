@@ -69,7 +69,7 @@ export async function registerContractsRoutes(
 
       r.patch(
         '/contracts/:id',
-        { preHandler: requirePermission(PERMISSIONS.CONTRACTS.CREATE) },
+        { preHandler: requirePermission(PERMISSIONS.CONTRACTS.UPDATE) },
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const parsed = UpdateContractSchema.safeParse(request.body);
@@ -107,7 +107,7 @@ export async function registerContractsRoutes(
 
       r.post(
         '/contracts/:id/terminate',
-        { preHandler: requirePermission(PERMISSIONS.CONTRACTS.CREATE) },
+        { preHandler: requirePermission(PERMISSIONS.CONTRACTS.DELETE) },
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;

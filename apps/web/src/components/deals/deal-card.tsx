@@ -6,6 +6,17 @@ import type { Deal } from '@nexus/shared-types';
 import { cn } from '@/lib/cn';
 import { formatCurrency } from '@/lib/format';
 
+function DataQualityBadge({ score }: { score?: number | null }) {
+  if (score == null) return null;
+  const color =
+    score >= 80 ? 'bg-green-100 text-green-700' : score >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700';
+  return (
+    <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${color}`} title="Data Quality Score">
+      {score}%
+    </span>
+  );
+}
+
 interface DealCardProps {
   deal: Deal;
   /**
@@ -64,12 +75,11 @@ export function DealCard({
       )}
     >
       <div className="mb-1 flex items-start justify-between gap-2">
-        <h4 className="line-clamp-2 flex-1 text-sm font-medium text-foreground">
-          {deal.name}
-        </h4>
-        <span className="shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">
-          {probability}%
-        </span>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          <h4 className="line-clamp-2 text-sm font-medium text-foreground">{deal.name}</h4>
+          <DataQualityBadge score={(deal as Deal & { dataQualityScore?: number | null }).dataQualityScore} />
+        </div>
+        <span className="shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">{probability}%</span>
       </div>
 
       <div className="mb-2 text-base font-semibold tabular-nums text-foreground">

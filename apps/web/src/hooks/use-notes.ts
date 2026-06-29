@@ -6,7 +6,7 @@ import {
 } from '@tanstack/react-query';
 import type { Note, PaginatedResult } from '@nexus/shared-types';
 import type { CreateNoteInput, UpdateNoteInput } from '@nexus/validation';
-import { api } from '@/lib/api-client';
+import { api, apiClients } from '@/lib/api-client';
 
 /**
  * React Query hooks for the Notes domain — Section 39.1.
@@ -49,7 +49,7 @@ export function useNotes(filters: NoteListFilters = {}) {
   };
   return useQuery<NoteListResponse>({
     queryKey: noteKeys.list(normalized),
-    queryFn: () => api.get<NoteListResponse>('/notes', { params: normalized }),
+    queryFn: () => apiClients.notes.get<NoteListResponse>('/notes', { params: normalized }),
     staleTime: 30_000,
     placeholderData: (prev) => prev,
   });
@@ -58,7 +58,7 @@ export function useNotes(filters: NoteListFilters = {}) {
 export function useNote(id: string) {
   return useQuery<Note>({
     queryKey: noteKeys.detail(id),
-    queryFn: () => api.get<Note>(`/notes/${id}`),
+    queryFn: () => apiClients.notes.get<Note>(`/notes/${id}`),
     enabled: Boolean(id),
   });
 }
@@ -101,7 +101,7 @@ export function useLeadNotes(leadId: string) {
 export function useCreateNote() {
   const qc = useQueryClient();
   return useMutation<Note, Error, CreateNoteInput>({
-    mutationFn: (data) => api.post<Note>('/notes', data),
+    mutationFn: (data) => apiClients.notes.post<Note>('/notes', data),
     onSuccess: (note) => {
       qc.invalidateQueries({ queryKey: noteKeys.lists() });
       if (note.dealId) {
@@ -120,7 +120,7 @@ export function useCreateNote() {
 export function useUpdateNote() {
   const qc = useQueryClient();
   return useMutation<Note, Error, { id: string; data: UpdateNoteInput }>({
-    mutationFn: ({ id, data }) => api.patch<Note>(`/notes/${id}`, data),
+    mutationFn: ({ id, data }) => apiClients.notes.patch<Note>(`/notes/${id}`, data),
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: noteKeys.detail(id) });
       qc.invalidateQueries({ queryKey: noteKeys.all });
@@ -131,7 +131,7 @@ export function useUpdateNote() {
 export function useDeleteNote() {
   const qc = useQueryClient();
   return useMutation<void, Error, string>({
-    mutationFn: (id) => api.delete<void>(`/notes/${id}`),
+    mutationFn: (id) => apiClients.notes.delete<void>(`/notes/${id}`),
     onSuccess: (_d, id) => {
       qc.removeQueries({ queryKey: noteKeys.detail(id) });
       qc.invalidateQueries({ queryKey: noteKeys.all });

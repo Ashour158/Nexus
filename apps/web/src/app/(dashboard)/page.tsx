@@ -1,267 +1,513 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
 } from 'recharts';
-import {
-  Briefcase,
-  Calendar,
-  DollarSign,
-  Mail,
-  Phone,
-  Percent,
-  Target,
-  TrendingUp,
-} from 'lucide-react';
-import { StatCard } from '@/components/dashboard/StatCard';
-import { DateRangePicker } from '@/components/dashboard/DateRangePicker';
-import { Sparkline } from '@/components/dashboard/Sparkline';
-import { OnboardingChecklist } from '@/components/onboarding/onboarding-checklist';
+
+import { KpiCard } from '@/components/ui/kpi-card';
+import { ChartCard } from '@/components/ui/chart-card';
+import { EventFeed } from '@/components/ui/event-feed';
+import { DataTable } from '@/components/ui/data-table';
+import { Skeleton, StatCardSkeleton, TableSkeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/auth.store';
+import { formatCurrency } from '@/lib/format';
+import type { FeedEvent } from '@/components/ui/event-feed';
+import { useDeals } from '@/hooks/use-deals';
+import { useActivities } from '@/hooks/use-activities';
+import { useUsers } from '@/hooks/use-users';
+import { usePipelines } from '@/hooks/use-pipelines';
 
-const REVENUE_TREND = [
-  { day: 'Mon', won: 12000, pipeline: 150000 },
-  { day: 'Tue', won: 18000, pipeline: 152000 },
-  { day: 'Wed', won: 22000, pipeline: 149000 },
-  { day: 'Thu', won: 16000, pipeline: 158000 },
-  { day: 'Fri', won: 28000, pipeline: 166000 },
-  { day: 'Sat', won: 9000, pipeline: 164000 },
-  { day: 'Sun', won: 14000, pipeline: 170000 },
-];
+interface DashboardStats {
+  pipeline: number;
+  dealsOpen: number;
+  dealsWonThisMonth: number;
+  revenueThisMonth: number;
+  contacts: number;
+  newContactsThisWeek: number;
+  activitiesToday: number;
+  overdueActivities: number;
+  winRate: number;
+  avgDealSize: number;
+  pipelineByStage: Array<{ name: string; value: number }>;
+  revenueByMonth: Array<{ month: string; revenue: number }>;
+}
 
-const STAGE_DISTRIBUTION = [
-  { name: 'Qualification', count: 14, value: 84000 },
-  { name: 'Proposal', count: 9, value: 102000 },
-  { name: 'Negotiation', count: 6, value: 79000 },
-  { name: 'Commit', count: 4, value: 54000 },
-];
+interface StrategicWin {
+  id: string;
+  client: string;
+  executiveLead: string;
+  amount: number;
+  region: string;
+  vertical: string;
+  impactScore: number;
+}
 
-const TASKS = [
-  { id: 't1', title: 'Follow up Acme renewal', contact: 'Nina Volkov', time: '09:30', priority: 'high' },
-  { id: 't2', title: 'Prepare Q2 pricing deck', contact: 'Carlos Mendez', time: '11:00', priority: 'medium' },
-  { id: 't3', title: 'Send legal redlines', contact: 'Marcus Chen', time: '14:15', priority: 'low' },
-];
+const PIPELINE_COLORS = ['#4F6CF7', '#3D56C5', '#7B8FFA', '#A5B4FD'];
 
-const STALE_DEALS = [
-  { id: 'd1', name: 'Globex Expansion', value: 48000, days: 10 },
-  { id: 'd2', name: 'Apex Rollout', value: 72000, days: 13 },
-  { id: 'd3', name: 'Nexa Migration', value: 39000, days: 9 },
-  { id: 'd4', name: 'Northwind Renewal', value: 31000, days: 8 },
-  { id: 'd5', name: 'Octane Pilot', value: 27000, days: 16 },
-];
+function timeAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
 
-const MEETINGS = [
-  { id: 'm1', title: 'Acme discovery', time: '10:00 - 10:45', attendees: ['NV', 'CM'], link: 'https://meet.google.com/' },
-  { id: 'm2', title: 'Quarterly forecast review', time: '13:00 - 13:45', attendees: ['AR', 'MK'], link: 'https://meet.google.com/' },
-  { id: 'm3', title: 'Procurement negotiation', time: 'Tomorrow 09:00', attendees: ['RS', 'LT'], link: 'https://meet.google.com/' },
-];
-
-const TEAM_ROWS = [
-  { name: 'Carlos Mendez', won: 12, revenue: 182000, winRate: 44, quota: 91, trend: [8, 12, 9, 13, 14, 16, 18] },
-  { name: 'Sofia Rodriguez', won: 11, revenue: 168000, winRate: 41, quota: 86, trend: [6, 8, 10, 9, 12, 14, 16] },
-  { name: 'Marcus Chen', won: 9, revenue: 151000, winRate: 39, quota: 78, trend: [5, 7, 8, 8, 11, 12, 13] },
-  { name: 'Nina Volkov', won: 8, revenue: 130000, winRate: 36, quota: 71, trend: [4, 6, 7, 7, 9, 10, 11] },
-];
-
-function badgeForRank(index: number) {
-  if (index === 0) return '??';
-  if (index === 1) return '??';
-  if (index === 2) return '??';
-  return `${index + 1}`;
+function computeDelta(current: number, previous: number): number {
+  if (previous === 0) return 0;
+  return Number((((current - previous) / previous) * 100).toFixed(1));
 }
 
 export default function DashboardPage() {
-  const [doneTasks, setDoneTasks] = useState<string[]>([]);
-  const userId = useAuthStore((s) => s.userId) ?? 'Teammate';
-  const roles = useAuthStore((s) => s.roles);
-  const firstName = userId.split(/[._-]/)[0] || 'there';
+  const userId = useAuthStore((s) => s.userId) ?? 'teammate';
 
-  const todayDate = useMemo(
-    () => new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }),
-    []
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    isError: statsError,
+    refetch: refetchStats,
+  } = useQuery<DashboardStats>({
+    queryKey: ['dashboard-stats'],
+    queryFn: async () => {
+      const r = await fetch('/api/dashboard/stats');
+      if (!r.ok) throw new Error('Failed to load dashboard');
+      return r.json();
+    },
+    refetchInterval: 5 * 60 * 1000,
+  });
+
+  const {
+    data: dealsResult,
+    isLoading: dealsLoading,
+    isError: dealsError,
+  } = useDeals({ limit: 500 });
+
+  const {
+    data: activitiesResult,
+    isLoading: activitiesLoading,
+    isError: activitiesError,
+  } = useActivities({ limit: 5 });
+
+  const { data: usersResult, isLoading: usersLoading } = useUsers({ limit: 500 });
+  const { data: pipelines } = usePipelines();
+
+  const allDeals = useMemo(() => dealsResult?.data ?? [], [dealsResult]);
+  const wonDeals = useMemo(() => allDeals.filter((d) => d.status === 'WON'), [allDeals]);
+  const openDeals = useMemo(() => allDeals.filter((d) => d.status === 'OPEN'), [allDeals]);
+
+  const users = useMemo(() => usersResult?.data ?? [], [usersResult]);
+  const userMap = useMemo(
+    () => new Map(users.map((u) => [u.id, `${u.firstName} ${u.lastName}`.trim()])),
+    [users]
   );
 
-  const revenue = 119000;
-  const pipelineValue = 319000;
-  const won = 19;
-  const lost = 11;
-  const winRate = (won / (won + lost)) * 100;
-  const avgDealSize = won > 0 ? revenue / won : 0;
-  const activitiesToday = 34;
-  const openDealsCount = 33;
-  const tasksDueToday = TASKS.length - doneTasks.length;
-  const showLeaderboard = roles.includes('manager') || roles.includes('admin');
+  const stages = useMemo(() => pipelines?.flatMap((p) => p.stages ?? []) ?? [], [pipelines]);
+  const stageMap = useMemo(() => new Map(stages.map((s) => [s.id, s.name])), [stages]);
+
+  // Monthly metrics for sparklines and deltas
+  const monthlyMetrics = useMemo(() => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const result = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+      return { month: months[d.getMonth()], won: 0, total: 0, open: 0, revenue: 0 };
+    });
+
+    allDeals.forEach((deal) => {
+      const date = new Date(deal.createdAt);
+      const monthStr = months[date.getMonth()];
+      const entry = result.find((r) => r.month === monthStr);
+      if (entry) {
+        entry.total++;
+        if (deal.status === 'WON') {
+          entry.won++;
+          entry.revenue += parseFloat(deal.amount) || 0;
+        }
+        if (deal.status === 'OPEN') entry.open++;
+      }
+    });
+
+    return result;
+  }, [allDeals]);
+
+  // KPIs derived from real deal data
+  const totalRevenue = useMemo(
+    () => wonDeals.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0),
+    [wonDeals]
+  );
+  const winRate = allDeals.length > 0 ? (wonDeals.length / allDeals.length) * 100 : 0;
+  const avgDealSize = wonDeals.length > 0 ? totalRevenue / wonDeals.length : 0;
+  const activeDeals = openDeals.length;
+
+  const revenueDelta = computeDelta(
+    monthlyMetrics[5]?.revenue ?? 0,
+    monthlyMetrics[4]?.revenue ?? 0
+  );
+  const winRateDelta = computeDelta(
+    monthlyMetrics[5]?.total ? (monthlyMetrics[5].won / monthlyMetrics[5].total) * 100 : 0,
+    monthlyMetrics[4]?.total ? (monthlyMetrics[4].won / monthlyMetrics[4].total) * 100 : 0
+  );
+  const activeDealsDelta = computeDelta(monthlyMetrics[5]?.open ?? 0, monthlyMetrics[4]?.open ?? 0);
+  const avgDealSizeDelta = computeDelta(
+    monthlyMetrics[5]?.won ? monthlyMetrics[5].revenue / monthlyMetrics[5].won : 0,
+    monthlyMetrics[4]?.won ? monthlyMetrics[4].revenue / monthlyMetrics[4].won : 0
+  );
+
+  // Sparklines derived from current deal data
+  const revenueSparkline = monthlyMetrics.map((m) => m.revenue);
+  const winRateSparkline = monthlyMetrics.map((m) => (m.total > 0 ? (m.won / m.total) * 100 : 0));
+  const activeDealsSparkline = monthlyMetrics.map((m) => m.open);
+  const avgDealSizeSparkline = monthlyMetrics.map((m) => (m.won > 0 ? m.revenue / m.won : 0));
+
+  // Revenue chart data grouped by month from won deals
+  const revenueData = useMemo(() => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const result = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+      return {
+        month: months[d.getMonth()],
+        revenue: 0,
+        target: 0,
+      };
+    });
+
+    wonDeals.forEach((deal) => {
+      const closeDate = deal.actualCloseDate ? new Date(deal.actualCloseDate) : new Date(deal.updatedAt);
+      const monthStr = months[closeDate.getMonth()];
+      const entry = result.find((r) => r.month === monthStr);
+      if (entry) {
+        entry.revenue += parseFloat(deal.amount) || 0;
+      }
+    });
+
+    result.forEach((r) => {
+      r.target = Math.round(r.revenue * 1.05);
+    });
+
+    return result;
+  }, [wonDeals]);
+
+  // Pipeline velocity from stats or derived from open deals
+  const pipelineVelocityData = useMemo(() => {
+    if (stats?.pipelineByStage?.length) {
+      return stats.pipelineByStage.slice(0, 4);
+    }
+    const grouped = new Map<string, number>();
+    openDeals.forEach((d) => {
+      grouped.set(d.stageId, (grouped.get(d.stageId) || 0) + 1);
+    });
+    const computed = Array.from(grouped.entries())
+      .map(([stageId, value]) => ({
+        name: stageMap.get(stageId) || stageId.slice(0, 6),
+        value,
+      }))
+      .slice(0, 4);
+    return computed.length > 0
+      ? computed
+      : [
+          { name: 'Qualified', value: 0 },
+          { name: 'Proposal', value: 0 },
+          { name: 'Negotiation', value: 0 },
+          { name: 'Closing', value: 0 },
+        ];
+  }, [stats, openDeals, stageMap]);
+
+  // Strategic wins from real won deals
+  const strategicWins = useMemo<StrategicWin[]>(() => {
+    return wonDeals
+      .sort((a, b) => (parseFloat(b.amount) || 0) - (parseFloat(a.amount) || 0))
+      .slice(0, 5)
+      .map((deal) => ({
+        id: deal.id,
+        client: deal.name,
+        executiveLead: userMap.get(deal.ownerId) || deal.ownerId,
+        amount: parseFloat(deal.amount) || 0,
+        region: (deal.customFields?.region as string) || deal.tags[0] || 'Global',
+        vertical: (deal.customFields?.vertical as string) || deal.tags[1] || 'Enterprise',
+        impactScore: Math.min(5, Math.max(1, Math.round((deal.meddicicScore || 50) / 20))),
+      }));
+  }, [wonDeals, userMap]);
+
+  // Recent events from real activities
+  const recentEvents = useMemo<FeedEvent[]>(() => {
+    const activities = activitiesResult?.data ?? [];
+    return activities.map((activity) => {
+      let type: FeedEvent['type'] = 'deal_moved';
+      if (activity.type === 'EMAIL') type = 'email_sent';
+      else if (activity.type === 'TASK' && activity.status === 'COMPLETED') type = 'task_completed';
+      else if (activity.type === 'NOTE') type = 'contact_created';
+
+      const actor = userMap.get(activity.ownerId) || activity.ownerId;
+      const action = activity.subject || `${activity.type.toLowerCase().replace('_', ' ')} activity`;
+
+      return {
+        id: activity.id,
+        type,
+        actor,
+        action,
+        timestamp: timeAgo(activity.createdAt),
+      };
+    });
+  }, [activitiesResult, userMap]);
+
+  const hasError = statsError || dealsError || activitiesError;
 
   return (
-    <main className="mx-auto max-w-7xl space-y-6 overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8">
-      <OnboardingChecklist />
+    <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      {hasError ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+          Failed to load some dashboard data.{" "}
+          <button onClick={() => void refetchStats()} className="font-medium underline">
+            Retry
+          </button>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Good morning, {firstName} ??</h1>
-          <p className="mt-0.5 text-sm text-gray-500">
-            {todayDate} ? {openDealsCount} open deals ? {tasksDueToday} tasks due today
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+            Welcome, {userId.split(/[._-]/)[0]}
+          </h1>
+          <p className="mt-0.5 text-sm" style={{ color: 'var(--text-muted)' }}>
+            Live CRM dashboard
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <DateRangePicker />
-          <Link href="/deals/new" className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">+ New Deal</Link>
+          <Link
+            href="/deals/new"
+            className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-dark transition"
+          >
+            + New Deal
+          </Link>
         </div>
       </div>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-        <StatCard label="Revenue" value={revenue} format="currency" delta={12.4} icon={<DollarSign className="h-5 w-5" />} iconBg="bg-emerald-100 text-emerald-700" />
-        <StatCard label="Pipeline Value" value={pipelineValue} format="currency" delta={4.8} icon={<Briefcase className="h-5 w-5" />} iconBg="bg-blue-100 text-blue-700" />
-        <StatCard label="Win Rate" value={winRate} format="percent" delta={-1.2} icon={<Percent className="h-5 w-5" />} iconBg="bg-violet-100 text-violet-700" />
-        <StatCard label="Avg Deal Size" value={avgDealSize} format="currency" delta={6.1} icon={<Target className="h-5 w-5" />} iconBg="bg-amber-100 text-amber-700" />
-        <StatCard label="Activities Today" value={activitiesToday} format="number" delta={9.3} icon={<TrendingUp className="h-5 w-5" />} iconBg="bg-slate-100 text-slate-700" />
+      {/* KPI Strip */}
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {dealsLoading || statsLoading || usersLoading ? (
+          Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
+        ) : (
+          <>
+            <KpiCard
+              label="Total Revenue"
+              value={totalRevenue}
+              format="currency"
+              delta={revenueDelta}
+              sparklineData={revenueSparkline}
+            />
+            <KpiCard
+              label="Win Rate"
+              value={winRate}
+              format="percent"
+              delta={winRateDelta}
+              sparklineData={winRateSparkline}
+            />
+            <KpiCard
+              label="Active Deals"
+              value={activeDeals}
+              format="number"
+              delta={activeDealsDelta}
+              sparklineData={activeDealsSparkline}
+            />
+            <KpiCard
+              label="Avg Deal Size"
+              value={avgDealSize}
+              format="currency"
+              delta={avgDealSizeDelta}
+              sparklineData={avgDealSizeSparkline}
+            />
+          </>
+        )}
       </section>
 
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-[60%_40%]">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 xl:col-span-3">
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">Revenue over time</h2>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={REVENUE_TREND}>
-                <defs>
-                  <linearGradient id="wonFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.45} />
-                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0.04} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="day" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Area type="monotone" dataKey="won" name="Closed Won" stroke="#2563eb" fill="url(#wonFill)" strokeWidth={2} />
-                <Area type="monotone" dataKey="pipeline" name="Pipeline Value" stroke="#64748b" fill="transparent" strokeDasharray="6 4" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 xl:col-span-2">
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">Pipeline by stage</h2>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={STAGE_DISTRIBUTION} dataKey="value" nameKey="name" innerRadius={52} outerRadius={82} paddingAngle={2} fill="#2563eb" />
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <ul className="space-y-2 text-sm">
-            {STAGE_DISTRIBUTION.map((stage) => (
-              <li key={stage.name} className="flex items-center justify-between">
-                <span>{stage.name} ({stage.count})</span>
-                <span className="font-medium">${stage.value.toLocaleString()}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
+      {/* Charts Row */}
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <ChartCard
+          title="Revenue Performance"
+          subtitle="Monthly revenue vs target (last 6 months)"
+          className="lg:col-span-2"
+        >
+          {dealsLoading ? (
+            <div className="h-72 flex items-center justify-center">
+              <Skeleton className="h-64 w-full" />
+            </div>
+          ) : (
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={revenueData} barGap={4}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fontSize: 12, fill: 'var(--text-secondary)' }}
+                    axisLine={{ stroke: 'var(--border-color)' }}
+                  />
+                  <YAxis
+                    tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                    tick={{ fontSize: 12, fill: 'var(--text-secondary)' }}
+                    axisLine={{ stroke: 'var(--border-color)' }}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => formatCurrency(value)}
+                    contentStyle={{
+                      backgroundColor: 'var(--surface)',
+                      borderColor: 'var(--border-color)',
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="revenue" name="Actual" fill="#4F6CF7" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="target" name="Target" fill="#E2E8F0" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </ChartCard>
 
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-900">My Tasks today</h3>
-            <Link href="/tasks" className="text-xs text-blue-700 hover:underline">View all tasks</Link>
-          </div>
-          <ul className="space-y-2">
-            {TASKS.map((task) => (
-              <li key={task.id} className="flex items-center gap-2 rounded-md border border-slate-100 px-2 py-2">
-                <input type="checkbox" checked={doneTasks.includes(task.id)} onChange={() => setDoneTasks((prev) => prev.includes(task.id) ? prev.filter((id) => id !== task.id) : [...prev, task.id])} />
-                <span className={`h-2 w-2 rounded-full ${task.priority === 'high' ? 'bg-red-500' : task.priority === 'medium' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{task.title}</p>
-                  <p className="text-xs text-slate-500"><Link href="/contacts" className="hover:underline">{task.contact}</Link> ? {task.time}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h3 className="mb-3 text-sm font-semibold text-slate-900">My deals - activity needed</h3>
-          <ul className="space-y-2">
-            {STALE_DEALS.map((deal) => (
-              <li key={deal.id} className="rounded-md border border-slate-100 p-2">
-                <p className="text-sm font-medium">{deal.name}</p>
-                <p className="text-xs text-slate-500">${deal.value.toLocaleString()} ? {deal.days} days since last touch</p>
-                <div className="mt-2 flex gap-2">
-                  <button className="rounded border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50"><Phone className="h-3.5 w-3.5" /></button>
-                  <button className="rounded border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50"><Mail className="h-3.5 w-3.5" /></button>
-                  <button className="rounded border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50"><Calendar className="h-3.5 w-3.5" /></button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h3 className="mb-3 text-sm font-semibold text-slate-900">Upcoming meetings</h3>
-          <ul className="space-y-2">
-            {MEETINGS.map((meeting) => (
-              <li key={meeting.id} className="rounded-md border border-slate-100 p-2">
-                <p className="text-sm font-medium">{meeting.title}</p>
-                <p className="text-xs text-slate-500">{meeting.time}</p>
-                <div className="mt-2 flex items-center justify-between">
-                  <div className="flex -space-x-2">
-                    {meeting.attendees.map((attendee) => (
-                      <span key={attendee} className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-white bg-slate-200 text-[10px] font-semibold">{attendee}</span>
+        <ChartCard title="Pipeline Velocity" subtitle={`${activeDeals} active deals`}>
+          {statsLoading || dealsLoading ? (
+            <div className="h-72 flex items-center justify-center">
+              <Skeleton className="h-64 w-full" />
+            </div>
+          ) : (
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pipelineVelocityData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={90}
+                    paddingAngle={3}
+                    dataKey="value"
+                    nameKey="name"
+                  >
+                    {pipelineVelocityData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={PIPELINE_COLORS[index % PIPELINE_COLORS.length]} />
                     ))}
-                  </div>
-                  <a href={meeting.link} target="_blank" rel="noreferrer" className="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white">Join</a>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'var(--surface)',
+                      borderColor: 'var(--border-color)',
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </ChartCard>
       </section>
 
-      {showLeaderboard ? (
-        <section className="rounded-xl border border-slate-200 bg-white p-4">
-          <h3 className="mb-3 text-sm font-semibold text-slate-900">Team Leaderboard</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-2 py-2">Rank</th>
-                  <th className="px-2 py-2">Rep</th>
-                  <th className="px-2 py-2">Deals won</th>
-                  <th className="px-2 py-2">Revenue</th>
-                  <th className="px-2 py-2">Win rate</th>
-                  <th className="px-2 py-2">Quota %</th>
-                  <th className="px-2 py-2">Trend</th>
-                </tr>
-              </thead>
-              <tbody>
-                {TEAM_ROWS.map((row, index) => (
-                  <tr key={row.name} className="border-b border-gray-50 even:bg-gray-50/50 transition-colors hover:bg-blue-50/40">
-                    <td className="px-2 py-2">{badgeForRank(index)}</td>
-                    <td className="px-2 py-2 font-medium">{row.name}</td>
-                    <td className="px-2 py-2">{row.won}</td>
-                    <td className="px-2 py-2">${row.revenue.toLocaleString()}</td>
-                    <td className="px-2 py-2">{row.winRate}%</td>
-                    <td className="px-2 py-2">{row.quota}%</td>
-                    <td className="px-2 py-2"><Sparkline data={row.trend} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ) : null}
+      {/* Table + Activity Row */}
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <ChartCard title="Top Strategic Wins" subtitle="Top 5 closed-won deals this quarter">
+            {dealsLoading || usersLoading ? (
+              <TableSkeleton rows={5} cols={6} />
+            ) : (
+              <DataTable
+                data={strategicWins}
+                keyExtractor={(row) => row.id}
+                columns={[
+                  {
+                    key: 'client',
+                    header: 'Enterprise Client',
+                    cell: (row) => (
+                      <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                        {row.client}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'executiveLead',
+                    header: 'Executive Lead',
+                    cell: (row) => <span style={{ color: 'var(--text-secondary)' }}>{row.executiveLead}</span>,
+                  },
+                  {
+                    key: 'amount',
+                    header: 'Amount',
+                    align: 'right',
+                    cell: (row) => (
+                      <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        {formatCurrency(row.amount)}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'region',
+                    header: 'Region',
+                    cell: (row) => <span style={{ color: 'var(--text-secondary)' }}>{row.region}</span>,
+                  },
+                  {
+                    key: 'vertical',
+                    header: 'Vertical',
+                    cell: (row) => <span style={{ color: 'var(--text-secondary)' }}>{row.vertical}</span>,
+                  },
+                  {
+                    key: 'impactScore',
+                    header: 'Impact',
+                    align: 'center',
+                    cell: (row) => (
+                      <div className="flex justify-center gap-0.5">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <span key={i} className={i < row.impactScore ? 'text-amber-400' : 'text-gray-200'}>
+                            ★
+                          </span>
+                        ))}
+                      </div>
+                    ),
+                  },
+                ]}
+              />
+            )}
+          </ChartCard>
+        </div>
+
+        <ChartCard
+          title="Recent Activity"
+          action={
+            <Link href="/activities" className="text-xs font-medium text-primary hover:underline">
+              View all
+            </Link>
+          }
+        >
+          {activitiesLoading || usersLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <Skeleton className="h-7 w-7 rounded-full" />
+                  <div className="flex-1 space-y-1">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/4" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EventFeed events={recentEvents} />
+          )}
+        </ChartCard>
+      </section>
     </main>
   );
 }

@@ -1,41 +1,60 @@
-import Fastify from 'fastify';
-import fastifyJwt from '@fastify/jwt';
-import rateLimit from '@fastify/rate-limit';
-import { globalErrorHandler, startService } from '@nexus/service-utils';
+import 'dotenv/config';
+import { startTracing } from '@nexus/service-utils/tracing';
+import { createService, startService, globalErrorHandler, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
 import { getPrisma } from './prisma.js';
 import { createReportsService } from './services/reports.service.js';
 import { registerReportsRoutes } from './routes/reports.routes.js';
+import { registerSavedReportsRoutes } from './routes/saved-reports.routes.js';
+import { registerDashboardsRoutes } from './routes/dashboards.routes.js';
+import { registerFunnelRoutes } from './routes/funnel.routes.js';
+import { registerExportRoutes } from './routes/export.routes.js';
+import { startSnapshotScheduler } from './lib/snapshot.job.js';
+import { startScheduleRunner } from './lib/schedule-runner.js';
+import { registerGraphQL } from './graphql/index.js';
 
-const app = Fastify({ logger: true });
+startTracing({ serviceName: 'reporting-service' });
+const port = parseInt(process.env.PORT ?? '3021', 10);
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret || jwtSecret.length < 32) {
+  throw new Error('JWT_SECRET must be set to at least 32 characters.');
+}
+
+const app = await createService({
+  name: 'reporting-service',
+  port,
+  jwtSecret,
+  corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(',').map((s) => s.trim()),
+});
+
 const prisma = getPrisma();
 const reports = createReportsService(prisma);
 
-await app.register(fastifyJwt, {
-  secret: process.env.JWT_SECRET ?? 'nexus-development-secret-at-least-32',
-});
-await app.register(rateLimit, {
-  global: true,
-  max: 300,
-  timeWindow: '1 minute',
-  errorResponseBuilder: (_req, context) => ({
-    success: false,
-    error: 'RATE_LIMIT_EXCEEDED',
-    message: `Too many requests. Retry after ${context.after}.`,
-  }),
-});
 app.setErrorHandler(globalErrorHandler);
 
-app.addHook('onRequest', async (request, reply) => {
-  try {
-    await request.jwtVerify();
-  } catch {
-    return reply.code(401).send({ success: false, error: 'Unauthorized' });
-  }
+registerHealthRoutes(app, 'reporting-service', [() => checkDatabase(prisma)]);
+
+app.addHook('onClose', async () => {
+  await prisma.$disconnect();
 });
 
-await registerReportsRoutes(app, reports);
+await registerGraphQL(app, prisma);
 
-const port = parseInt(process.env.PORT ?? '3021', 10);
-await startService(app, port, async () => {
-  await prisma.$disconnect();
+await startService(app, port, async (a) => {
+  await registerReportsRoutes(a, reports);
+  await registerSavedReportsRoutes(a, prisma);
+  await registerDashboardsRoutes(a, prisma);
+  await registerFunnelRoutes(a, prisma);
+  await registerExportRoutes(a, reports);
+
+  // Start background jobs (non-blocking)
+  try {
+    startSnapshotScheduler(prisma);
+  } catch (err) {
+    a.log.warn({ err }, 'Snapshot scheduler failed to start');
+  }
+  try {
+    startScheduleRunner(prisma);
+  } catch (err) {
+    a.log.warn({ err }, 'Schedule runner failed to start');
+  }
 });

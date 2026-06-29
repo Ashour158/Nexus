@@ -1,22 +1,29 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { useAuthStore } from '@/stores/auth.store';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const roles = useAuthStore((s) => s.roles);
-  const isAdmin = roles.includes('admin');
+  const roles = useAuthStore((s) => s.roles ?? []);
+  const [hydrated, setHydrated] = useState(false);
+  const isAdmin = roles.some((role) => role.toLowerCase() === 'admin');
 
   useEffect(() => {
-    if (!isAdmin) {
+    setHydrated(useAuthStore.persist?.hasHydrated?.() ?? true);
+    const unsubscribe = useAuthStore.persist?.onFinishHydration?.(() => setHydrated(true));
+    return () => unsubscribe?.();
+  }, []);
+
+  useEffect(() => {
+    if (hydrated && !isAdmin) {
       router.replace('/');
     }
-  }, [isAdmin, router]);
+  }, [hydrated, isAdmin, router]);
 
-  if (!isAdmin) {
+  if (!hydrated || !isAdmin) {
     return <div className="p-8 text-sm text-gray-300">Redirecting...</div>;
   }
 

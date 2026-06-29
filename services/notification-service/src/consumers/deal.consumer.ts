@@ -89,53 +89,30 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
   consumer.on('deal.stage_changed', async (event) => {
     if (event.type !== 'deal.stage_changed') return;
     const { payload } = event;
-    // Enrich against the CRM service to check whether the deal has been in the
-    // stage longer than the stage's `rottenDays`. If so, surface a prompt.
-    const base = process.env.CRM_SERVICE_URL ?? 'http://localhost:3001/api/v1';
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5_000);
-      const res = (await fetch(`${base}/deals/${payload.dealId}`, {
-        headers: { 'x-internal-service': 'notification-service' },
-        signal: controller.signal,
-      }).finally(() => clearTimeout(timer))) as unknown as {
-        ok: boolean;
-        status: number;
-        json: () => Promise<unknown>;
-      };
-      if (!res.ok) throw new Error(`CRM ${res.status}`);
-      const json = (await res.json()) as { data?: unknown };
-      const body = (json.data ?? json) as {
-        stage?: { rottenDays?: number };
-        stageEnteredAt?: string;
-      };
-      const rottenDays: number | undefined = body?.stage?.rottenDays;
-      const stageEnteredAt = body?.stageEnteredAt
-        ? new Date(body.stageEnteredAt).getTime()
-        : null;
-      if (rottenDays && stageEnteredAt) {
-        const daysInStage = Math.floor(
-          (Date.now() - stageEnteredAt) / (1000 * 60 * 60 * 24)
-        );
-        if (daysInStage > rottenDays) {
-          await deps.inApp.send({
-            tenantId: event.tenantId,
-            userId: payload.ownerId,
-            type: 'deal.rotten',
-            title: '⏰ Deal is stalling',
-            body: `Deal ${payload.dealId} has been in stage for ${daysInStage} days (limit ${rottenDays}). Time to nudge it.`,
-            entityType: 'Deal',
-            entityId: payload.dealId,
-            actionUrl: `/deals/${payload.dealId}`,
-            metadata: { daysInStage, rottenDays },
-          });
-        }
-      }
-    } catch (err) {
-      deps.log.warn(
-        { err },
-        'Could not enrich deal.stage_changed; skipping rotten-deal check'
+    // Architectural fix: rotten-deal data must travel in the event payload.
+    // Services must NOT make synchronous HTTP calls inside consumers — it creates
+    // temporal coupling and failure cascades.
+    const rottenDays = payload.rottenDays;
+    const stageChangedAt = payload.stageChangedAt
+      ? new Date(payload.stageChangedAt).getTime()
+      : null;
+    if (rottenDays && stageChangedAt) {
+      const daysInStage = Math.floor(
+        (Date.now() - stageChangedAt) / (1000 * 60 * 60 * 24)
       );
+      if (daysInStage > rottenDays) {
+        await deps.inApp.send({
+          tenantId: event.tenantId,
+          userId: payload.ownerId,
+          type: 'deal.rotten',
+          title: '⏰ Deal is stalling',
+          body: `Deal ${payload.dealId} has been in stage for ${daysInStage} days (limit ${rottenDays}). Time to nudge it.`,
+          entityType: 'Deal',
+          entityId: payload.dealId,
+          actionUrl: `/deals/${payload.dealId}`,
+          metadata: { daysInStage, rottenDays },
+        });
+      }
     }
   });
 

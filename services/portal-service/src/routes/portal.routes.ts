@@ -10,14 +10,14 @@ export async function registerPortalRoutes(
   app.get('/portal/:token', async (request, reply) => {
     const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
     const data = await portal.getPortalContext(token);
-    if (!data) return reply.code(404).send({ success: false, error: 'Portal link expired or invalid' });
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Portal link expired or invalid', requestId: request.id } });
     return reply.send({ success: true, data });
   });
 
   app.post('/portal/:token/accept', async (request, reply) => {
     const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
     const data = await portal.accept(token);
-    if (!data) return reply.code(404).send({ success: false, error: 'Portal link expired or invalid' });
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Portal link expired or invalid', requestId: request.id } });
     return reply.send({ success: true, data });
   });
 
@@ -25,20 +25,20 @@ export async function registerPortalRoutes(
     const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
     const body = z.object({ reason: z.string().optional() }).parse(request.body ?? {});
     const data = await portal.reject(token, body.reason);
-    if (!data) return reply.code(404).send({ success: false, error: 'Portal link expired or invalid' });
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Portal link expired or invalid', requestId: request.id } });
     return reply.send({ success: true, data });
   });
 
   app.get('/portal/:token/download', async (request, reply) => {
     const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
     const ctx = await portal.getPortalContext(token);
-    if (!ctx) return reply.code(404).send({ success: false, error: 'Portal link expired or invalid' });
+    if (!ctx) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Portal link expired or invalid', requestId: request.id } });
     await portal.recordAction(token, 'downloaded');
     const documentUrl = process.env.DOCUMENT_SERVICE_URL ?? 'http://localhost:3016';
     const res = await fetch(`${documentUrl}/api/v1/documents/quotes/${ctx.entityId}/pdf`, {
       headers: { Authorization: `Bearer ${process.env.INTERNAL_SERVICE_TOKEN ?? ''}` },
     });
-    if (!res.ok) return reply.code(502).send({ success: false, error: 'Could not generate PDF' });
+    if (!res.ok) return reply.code(502).send({ success: false, error: { code: 'BAD_GATEWAY', message: 'Could not generate PDF', requestId: request.id } });
     return reply.header('content-type', 'application/pdf').send(Buffer.from(await res.arrayBuffer()));
   });
 

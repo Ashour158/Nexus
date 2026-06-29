@@ -14,10 +14,12 @@ import { Prisma } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type {
   Deal,
   DealContact,
-  Quote,
 } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { CrmPrisma } from '../prisma.js';
-import { toPaginatedResult } from '../lib/pagination.js';
+import { recordFieldChanges } from '../lib/field-history.js';
+import { toPaginatedResult } from '@nexus/shared-types';
+import { updateDealDataQuality } from '../lib/data-quality.js';
+import { assertValidStageTransition } from '../lib/blueprint-client.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -35,13 +37,6 @@ export type DealWithRelations = Prisma.DealGetPayload<{
 export type DealContactWithContact = Prisma.DealContactGetPayload<{
   include: { contact: true };
 }>;
-
-/** AI-insights payload for `GET /deals/:id/ai-insights` (Section 34.2). */
-export interface DealAiInsights {
-  dealId: string;
-  aiWinProbability: number | null;
-  aiInsights: unknown;
-}
 
 /** Filters for `listDeals` (derived from `DealListQuerySchema`). */
 export interface DealListFilters {
@@ -79,6 +74,10 @@ function buildDealListWhere(
     where.status = { not: 'DORMANT' };
   }
 
+  if (filters.includeDeleted) {
+    where.deletedAt = {};
+  }
+
   if (filters.pipelineId) where.pipelineId = filters.pipelineId;
   if (filters.stageId) where.stageId = filters.stageId;
   if (filters.ownerId) where.ownerId = filters.ownerId;
@@ -114,6 +113,22 @@ function resolveSortField(
 
 function decimalToNumber(value: Prisma.Decimal): number {
   return Number(value.toFixed(2));
+}
+
+function dealSnapshotForHistory(d: Deal): Record<string, unknown> {
+  return {
+    name: d.name,
+    amount: d.amount.toFixed(2),
+    stageId: d.stageId,
+    pipelineId: d.pipelineId,
+    probability: d.probability,
+    expectedCloseDate: d.expectedCloseDate?.toISOString() ?? null,
+    ownerId: d.ownerId,
+    accountId: d.accountId,
+    closeReason: d.closeReason ?? null,
+    lostReason: d.lostReason ?? null,
+    status: d.status,
+  };
 }
 
 function computeMeddicicScore(data: MeddicicDataInput): number {
@@ -286,6 +301,8 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         },
       });
 
+      updateDealDataQuality(prisma, created.id).catch(() => undefined);
+
       return created;
     },
 
@@ -299,7 +316,8 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
     async updateDeal(
       tenantId: string,
       id: string,
-      data: UpdateDealInput
+      data: UpdateDealInput,
+      actor?: { userId: string; userEmail?: string }
     ): Promise<Deal> {
       const existing = await loadDealOrThrow(tenantId, id);
 
@@ -325,6 +343,26 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         }
       }
 
+      // Blueprint validation when stage actually changes
+      if (data.stageId && data.stageId !== existing.stageId) {
+        const [contacts, activities] = await Promise.all([
+          prisma.dealContact.findMany({ where: { dealId: id }, include: { contact: true } }),
+          prisma.activity.findMany({ where: { dealId: id, tenantId } }),
+        ]);
+        const safeContacts = contacts ?? [];
+        const safeActivities = activities ?? [];
+        await assertValidStageTransition(tenantId, targetPipelineId, existing.stageId, data.stageId, {
+          amount: Number(existing.amount),
+          name: existing.name,
+          expectedCloseDate: existing.expectedCloseDate?.toISOString(),
+          probability: existing.probability,
+          contactId: safeContacts.find(c => c.isPrimary)?.contactId,
+          linkedContacts: safeContacts.map(c => ({ id: c.contactId })),
+          completedActivityTypes: safeActivities.filter(a => a.status === 'COMPLETED').map(a => a.type),
+          activities: safeActivities.map(a => ({ type: a.type, completed: a.status === 'COMPLETED' })),
+        });
+      }
+
       const updateData: Prisma.DealUpdateInput = {
         version: { increment: 1 },
       };
@@ -345,6 +383,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
       if (data.tags !== undefined) updateData.tags = data.tags;
       if (data.status !== undefined) updateData.status = data.status;
       if (data.lostReason !== undefined) updateData.lostReason = data.lostReason;
+      if (data.closeReason !== undefined) updateData.closeReason = data.closeReason;
       if (data.forecastCategory !== undefined) {
         updateData.forecastCategory = data.forecastCategory;
       }
@@ -362,35 +401,131 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         updateData.stage = { connect: { id: data.stageId } };
       }
 
-      return prisma.deal.update({
+      const updated = await prisma.deal.update({
         where: { id },
         data: updateData,
+      });
+
+      if (actor) {
+        await recordFieldChanges(
+          prisma,
+          tenantId,
+          'deal',
+          id,
+          dealSnapshotForHistory(existing),
+          dealSnapshotForHistory(updated),
+          actor.userId,
+          actor.userEmail
+        );
+      }
+
+      await producer.publish(TOPICS.DEALS, {
+        type: 'deal.updated',
+        tenantId,
+        payload: {
+          dealId: updated.id,
+          ownerId: updated.ownerId,
+          accountId: updated.accountId,
+          pipelineId: updated.pipelineId,
+          stageId: updated.stageId,
+          status: updated.status,
+          amount: decimalToNumber(updated.amount),
+          currency: updated.currency,
+          changedFields: Object.keys(updateData).filter((field) => field !== 'version'),
+        },
+      });
+
+      updateDealDataQuality(prisma, id).catch(() => undefined);
+
+      return updated;
+    },
+
+    /** Duplicate deal fields excluding contacts / activities / notes / deal room relations. */
+    async cloneDeal(
+      tenantId: string,
+      sourceId: string,
+      cloneName?: string
+    ): Promise<Deal> {
+      const source = await loadDealOrThrow(tenantId, sourceId);
+      return prisma.deal.create({
+        data: {
+          tenantId,
+          ownerId: source.ownerId,
+          accountId: source.accountId,
+          pipelineId: source.pipelineId,
+          stageId: source.stageId,
+          name:
+            cloneName?.trim() && cloneName.trim().length > 0
+              ? cloneName.trim()
+              : `${source.name} (Copy)`,
+          amount: source.amount,
+          currency: source.currency,
+          probability: source.probability,
+          expectedCloseDate: source.expectedCloseDate,
+          actualCloseDate: null,
+          status: 'OPEN',
+          lostReason: null,
+          lostDetail: null,
+          closeReason: null,
+          forecastCategory: source.forecastCategory,
+          meddicicScore: source.meddicicScore,
+          meddicicData: source.meddicicData as Prisma.InputJsonValue,
+          competitors: source.competitors,
+          source: source.source,
+          campaignId: source.campaignId,
+          customFields: source.customFields as Prisma.InputJsonValue,
+          tags: source.tags,
+          version: 1,
+        },
       });
     },
 
     /**
-     * Soft-deletes the deal by setting `status=DORMANT` and recording a
-     * deletion timestamp in `customFields._deletedAt`. The row is preserved
+     * Soft-deletes the deal by setting `deletedAt`. The row is preserved
      * so relations (activities, notes, quotes) remain intact.
      */
     async deleteDeal(tenantId: string, id: string): Promise<void> {
       const existing = await loadDealOrThrow(tenantId, id);
-      if (existing.status === 'DORMANT') {
+      if (existing.deletedAt) {
         return;
       }
-      const customFields =
-        (existing.customFields as Record<string, unknown> | null) ?? {};
       await prisma.deal.update({
         where: { id },
         data: {
-          status: 'DORMANT',
-          customFields: {
-            ...customFields,
-            _deletedAt: new Date().toISOString(),
-          } as Prisma.InputJsonValue,
+          deletedAt: new Date(),
           version: { increment: 1 },
         },
       });
+      await producer.publish(TOPICS.DEALS, {
+        type: 'deal.archived',
+        tenantId,
+        payload: {
+          dealId: existing.id,
+          ownerId: existing.ownerId,
+          accountId: existing.accountId,
+          status: existing.status,
+        },
+      });
+    },
+
+    async restoreDeal(tenantId: string, id: string): Promise<Deal> {
+      const result = await prisma.deal.updateMany({
+        where: { id, tenantId, deletedAt: { not: null } },
+        data: { deletedAt: null },
+      });
+      if (result.count === 0) throw new NotFoundError('Deal', id);
+      const restored = await prisma.deal.findFirstOrThrow({ where: { id, tenantId } });
+      await producer.publish(TOPICS.DEALS, {
+        type: 'deal.restored',
+        tenantId,
+        payload: {
+          dealId: restored.id,
+          ownerId: restored.ownerId,
+          accountId: restored.accountId,
+          status: restored.status,
+        },
+      });
+      return restored;
     },
 
     /**
@@ -423,6 +558,24 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         return existing;
       }
 
+      // Blueprint validation: enforce stage-transition rules
+      const [contacts, activities] = await Promise.all([
+        prisma.dealContact.findMany({ where: { dealId: id }, include: { contact: true } }),
+        prisma.activity.findMany({ where: { dealId: id, tenantId } }),
+      ]);
+      const safeContacts = contacts ?? [];
+      const safeActivities = activities ?? [];
+      await assertValidStageTransition(tenantId, existing.pipelineId, existing.stageId, stageId, {
+        amount: Number(existing.amount),
+        name: existing.name,
+        expectedCloseDate: existing.expectedCloseDate?.toISOString(),
+        probability: existing.probability,
+        contactId: safeContacts.find(c => c.isPrimary)?.contactId,
+        linkedContacts: safeContacts.map(c => ({ id: c.contactId })),
+        completedActivityTypes: safeActivities.filter(a => a.status === 'COMPLETED').map(a => a.type),
+        activities: safeActivities.map(a => ({ type: a.type, completed: a.status === 'COMPLETED' })),
+      });
+
       const updated = await prisma.deal.update({
         where: { id },
         data: {
@@ -441,6 +594,8 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           newStageId: stage.id,
           ownerId: updated.ownerId,
           amount: decimalToNumber(updated.amount),
+          rottenDays: stage.rottenDays,
+          stageChangedAt: new Date().toISOString(),
         },
       });
 
@@ -514,6 +669,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           forecastCategory: 'OMITTED',
           lostReason: reason,
           lostDetail: detail ?? null,
+          closeReason: reason,
           version: { increment: 1 },
         },
       });
@@ -543,7 +699,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
     ): Promise<Deal> {
       await loadDealOrThrow(tenantId, id);
       const score = computeMeddicicScore(meddicicData);
-      return prisma.deal.update({
+      const updated = await prisma.deal.update({
         where: { id },
         data: {
           meddicicData: meddicicData as Prisma.InputJsonValue,
@@ -551,6 +707,17 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           version: { increment: 1 },
         },
       });
+      await producer.publish(TOPICS.DEALS, {
+        type: 'deal.meddic_updated',
+        tenantId,
+        payload: {
+          dealId: updated.id,
+          ownerId: updated.ownerId,
+          accountId: updated.accountId,
+          meddicicScore: score,
+        },
+      });
+      return updated;
     },
 
     /**
@@ -694,46 +861,6 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
       });
     },
 
-    /**
-     * Lists quotes attached to the deal, newest first. Tenant scoping is
-     * enforced on the `Quote` model directly (it carries `tenantId`).
-     */
-    async listDealQuotes(
-      tenantId: string,
-      dealId: string,
-      pagination: { page: number; limit: number }
-    ): Promise<PaginatedResult<Quote>> {
-      await loadDealOrThrow(tenantId, dealId);
-      const { page, limit } = pagination;
-      const where: Prisma.QuoteWhereInput = { tenantId, dealId };
-      const [total, rows] = await Promise.all([
-        prisma.quote.count({ where }),
-        prisma.quote.findMany({
-          where,
-          orderBy: { createdAt: 'desc' },
-          skip: (page - 1) * limit,
-          take: limit,
-        }),
-      ]);
-      return toPaginatedResult(rows, total, page, limit);
-    },
-
-    /**
-     * Returns the deal's AI win probability and insights blob (populated by
-     * the AI service in later phases; returns `null` / `{}` defaults until
-     * then — see Section 32 for the event flow).
-     */
-    async getDealAiInsights(
-      tenantId: string,
-      dealId: string
-    ): Promise<DealAiInsights> {
-      const deal = await loadDealOrThrow(tenantId, dealId);
-      return {
-        dealId: deal.id,
-        aiWinProbability: deal.aiWinProbability ?? null,
-        aiInsights: deal.aiInsights,
-      };
-    },
   };
 }
 

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { timingSafeEqual } from 'crypto';
 import { ValidationError } from '@nexus/service-utils';
 import { ValidateTransitionSchema } from '@nexus/validation';
 import type { createValidationService } from '../services/validation.service.js';
@@ -11,7 +12,10 @@ export async function registerBlueprintInternalRoutes(
   app.post('/api/v1/blueprints/internal/validate-transition', async (request, reply) => {
     const expected = process.env.BLUEPRINT_SERVICE_TOKEN;
     const token = String(request.headers['x-blueprint-service-token'] ?? '');
-    if (!expected || token !== expected) {
+    const isValid = expected && token
+      ? timingSafeEqual(Buffer.from(token), Buffer.from(expected))
+      : false;
+    if (!isValid) {
       return reply.code(401).send({
         success: false,
         error: { code: 'UNAUTHORIZED', message: 'Invalid or missing service token' },

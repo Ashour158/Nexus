@@ -1,0 +1,44 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: nexus
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secrets.yaml
+  - service-account.yaml
+  - rbac.yaml
+  - postgres-deployment.yaml
+  - redis-deployment.yaml
+  - kafka-deployment.yaml
+  - clickhouse-deployment.yaml
+  - meilisearch-deployment.yaml
+  - minio-deployment.yaml
+  - network-policy.yaml
+  - pod-disruption-budget.yaml
+  - cronjob-outbox-relay.yaml
+  - cronjob-jwt-rotation.yaml
+  - cronjob-backup-verify.yaml
+  - hpa.yaml
+  - vpa.yaml
+  - keda-scaledobject.yaml
+  - ingress-nginx.yaml
+  - cert-manager-certificate.yaml
+  - servicemonitor.yaml
+  - alerts.yaml
+
+configMapGenerator:
+  - name: nexus-config
+    literals:
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+
+secretGenerator:
+  - name: nexus-postgres
+    literals:
+      - url=postgresql://user:pass@postgres:5432/nexus
+
+images:
+  - name: nexus-crm/nexus-crm
+    newTag: latest

@@ -18,6 +18,7 @@ type DeliveryWithSub = Awaited<
     PrismaClient['webhookDelivery']['findMany']
   >
 >[number] & {
+  idempotencyKey?: string;
   subscription: {
     targetUrl: string;
     secret: string;
@@ -93,6 +94,7 @@ export function createWebhooksService(deps: {
       id: row.id,
       type: row.eventType,
       payload: row.payload,
+      idempotencyKey: row.idempotencyKey ?? row.id,
     });
     const sig = signWebhookBody(plainSecret, body);
     const attempt = row.attemptCount + 1;
@@ -132,7 +134,8 @@ export function createWebhooksService(deps: {
 
   return {
     async listSubscriptions() {
-      const rows = await prisma.webhookSubscription.findMany({ orderBy: { createdAt: 'desc' } });
+      const rows = await prisma.webhookSubscription.findMany({
+    take: 500, orderBy: { createdAt: 'desc' } });
       return rows.map(({ secret: _s, ...r }) => r);
     },
 
@@ -193,6 +196,19 @@ export function createWebhooksService(deps: {
       });
     },
 
+    async replayDelivery(deliveryId: string): Promise<boolean> {
+      const row = await raw.webhookDelivery.findFirst({
+        where: { id: deliveryId },
+        include: { subscription: true },
+      });
+      if (!row || !row.subscription?.isActive) return false;
+      await raw.webhookDelivery.update({
+        where: { id: deliveryId },
+        data: { status: 'PENDING', attemptCount: 0, nextRetryAt: null, responseBody: null, httpStatus: null },
+      });
+      return true;
+    },
+
     async processDeliveryQueue(batch = 25): Promise<number> {
       const now = new Date();
       const pending = await raw.webhookDelivery.findMany({
@@ -210,10 +226,15 @@ export function createWebhooksService(deps: {
         include: { subscription: true },
       });
 
+      // Deliver webhooks with bounded concurrency to avoid head-of-line blocking
+      const CONCURRENCY = 10;
       let done = 0;
-      for (const d of pending) {
-        await deliverOne(d as DeliveryWithSub);
-        done += 1;
+      for (let i = 0; i < pending.length; i += CONCURRENCY) {
+        const chunk = pending.slice(i, i + CONCURRENCY);
+        await Promise.allSettled(
+          chunk.map((d) => deliverOne(d as unknown as DeliveryWithSub))
+        );
+        done += chunk.length;
       }
       return done;
     },

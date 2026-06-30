@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { createService, registerHealthRoutes, startService, checkDatabase, requireEnv } from '@nexus/service-utils';
 import { startTracing } from '@nexus/service-utils/tracing';
+import rateLimit from '@fastify/rate-limit';
 import { createLeadsPrisma, tenantAls } from './prisma.js';
 import { registerRoutes } from './routes/index.js';
 import { registerGraphQL } from './graphql/index.js';
@@ -17,6 +18,17 @@ const app = await createService({
   port,
   jwtSecret: env.JWT_SECRET,
   corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(',').map((s) => s.trim()),
+});
+
+await app.register(rateLimit, {
+  global: true,
+  max: 300,
+  timeWindow: '1 minute',
+  errorResponseBuilder: (_req: any, context: any) => ({
+    success: false,
+    error: 'RATE_LIMIT_EXCEEDED',
+    message: `Too many requests. Retry after ${context.after}.`,
+  }),
 });
 
 // Bridge Fastify request-context tenantId into Prisma tenant ALS

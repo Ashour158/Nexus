@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify';
+import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
 import type { JwtPayload } from '@nexus/shared-types';
 import { Prisma } from '../../../../node_modules/.prisma/planning-client/index.js';
 import type { PlanningPrisma } from '../prisma.js';
 
 export async function registerForecastOverrideRoutes(app: FastifyInstance, prisma: PlanningPrisma): Promise<void> {
-  app.get('/api/v1/forecast-overrides', async (request, reply) => {
+  app.get('/api/v1/forecast-overrides', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
     const jwt = (request as any).user as JwtPayload;
     const { periodKey, pipelineScope } = request.query as {
       periodKey?: string;
@@ -22,7 +23,7 @@ export async function registerForecastOverrideRoutes(app: FastifyInstance, prism
     return reply.send({ success: true, data: overrides });
   });
 
-  app.put('/api/v1/forecast-overrides', async (request, reply) => {
+  app.put('/api/v1/forecast-overrides', { preHandler: requirePermission(PERMISSIONS.SETTINGS.WRITE) }, async (request, reply) => {
     const jwt = (request as any).user as JwtPayload;
     const body = request.body as {
       periodKey: string;
@@ -66,7 +67,7 @@ export async function registerForecastOverrideRoutes(app: FastifyInstance, prism
     return reply.send({ success: true, data: ov });
   });
 
-  app.delete('/api/v1/forecast-overrides/:id', async (request, reply) => {
+  app.delete('/api/v1/forecast-overrides/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.WRITE) }, async (request, reply) => {
     const jwt = (request as any).user as JwtPayload;
     const { id } = request.params as { id: string };
     const existing = await prisma.forecastOverride.findFirst({
@@ -77,7 +78,7 @@ export async function registerForecastOverrideRoutes(app: FastifyInstance, prism
     return reply.send({ success: true });
   });
 
-  app.get('/api/v1/forecast-overrides/team-summary', async (request, reply) => {
+  app.get('/api/v1/forecast-overrides/team-summary', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
     const jwt = (request as any).user as JwtPayload;
     const { periodKey } = request.query as { periodKey?: string };
     if (!periodKey) return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'periodKey required', requestId: request.id } });

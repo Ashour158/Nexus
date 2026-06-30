@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { startTracing } from '@nexus/service-utils/tracing';
 import { createService, startService, globalErrorHandler, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
+import rateLimit from '@fastify/rate-limit';
 import { getPrisma } from './prisma.js';
 import { createReportsService } from './services/reports.service.js';
 import { registerReportsRoutes } from './routes/reports.routes.js';
@@ -30,6 +31,17 @@ const prisma = getPrisma();
 const reports = createReportsService(prisma);
 
 app.setErrorHandler(globalErrorHandler);
+
+await app.register(rateLimit, {
+  global: true,
+  max: 300,
+  timeWindow: '1 minute',
+  errorResponseBuilder: (_req: any, context: any) => ({
+    success: false,
+    error: 'RATE_LIMIT_EXCEEDED',
+    message: `Too many requests. Retry after ${context.after}.`,
+  }),
+});
 
 registerHealthRoutes(app, 'reporting-service', [() => checkDatabase(prisma)]);
 

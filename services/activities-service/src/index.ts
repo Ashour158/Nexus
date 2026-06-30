@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { startTracing } from '@nexus/service-utils/tracing';
 import { createService, startService, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
+import rateLimit from '@fastify/rate-limit';
 import { NexusProducer } from '@nexus/kafka';
 import { createActivitiesPrisma } from './prisma.js';
 import { registerActivitiesHealthRoutes } from './routes/health.routes.js';
@@ -22,6 +23,17 @@ const app = await createService({ name: 'activities-service', port, jwtSecret, c
 
 const prisma = createActivitiesPrisma();
 const producer = new NexusProducer('activities-service');
+
+await app.register(rateLimit, {
+  global: true,
+  max: 300,
+  timeWindow: '1 minute',
+  errorResponseBuilder: (_req: any, context: any) => ({
+    success: false,
+    error: 'RATE_LIMIT_EXCEEDED',
+    message: `Too many requests. Retry after ${context.after}.`,
+  }),
+});
 
 registerActivitiesHealthRoutes(app, prisma);
 registerHealthRoutes(app, 'activities-service', [() => checkDatabase(prisma)]);

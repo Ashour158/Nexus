@@ -26,7 +26,8 @@ route:
 receivers:
   - name: 'default'
     slack_configs:
-      - send_resolved: true
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        send_resolved: true
         title: '{{ .GroupLabels.alertname }}'
         text: 'NEXUS Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
 

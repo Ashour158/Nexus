@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify';
+import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
 import type { JwtPayload } from '@nexus/shared-types';
 import { Prisma } from '../../../../node_modules/.prisma/reporting-client/index.js';
 import type { ReportingPrisma } from '../prisma.js';
 
 export async function registerDashboardsRoutes(app: FastifyInstance, prisma: ReportingPrisma): Promise<void> {
-  app.get('/api/v1/dashboards', async (req, reply) => {
+  app.get('/api/v1/dashboards', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const dashboards = await prisma.dashboard.findMany({
       where: { tenantId: jwt.tenantId },
@@ -14,7 +15,7 @@ export async function registerDashboardsRoutes(app: FastifyInstance, prisma: Rep
     return reply.send({ success: true, data: dashboards });
   });
 
-  app.get('/api/v1/dashboards/:id', async (req, reply) => {
+  app.get('/api/v1/dashboards/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { id } = req.params as { id: string };
     const dashboard = await prisma.dashboard.findFirst({
@@ -25,7 +26,7 @@ export async function registerDashboardsRoutes(app: FastifyInstance, prisma: Rep
     return reply.send({ success: true, data: dashboard });
   });
 
-  app.post('/api/v1/dashboards', async (req, reply) => {
+  app.post('/api/v1/dashboards', { preHandler: requirePermission(PERMISSIONS.SETTINGS.WRITE) }, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const body = req.body as { name: string; isShared?: boolean };
     const dashboard = await prisma.dashboard.create({
@@ -39,7 +40,7 @@ export async function registerDashboardsRoutes(app: FastifyInstance, prisma: Rep
     return reply.code(201).send({ success: true, data: dashboard });
   });
 
-  app.patch('/api/v1/dashboards/:id', async (req, reply) => {
+  app.patch('/api/v1/dashboards/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.WRITE) }, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { id } = req.params as { id: string };
     const body = req.body as { name?: string; isPinned?: boolean; isShared?: boolean };
@@ -60,14 +61,14 @@ export async function registerDashboardsRoutes(app: FastifyInstance, prisma: Rep
     return reply.send({ success: true, data: updated });
   });
 
-  app.delete('/api/v1/dashboards/:id', async (req, reply) => {
+  app.delete('/api/v1/dashboards/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.WRITE) }, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { id } = req.params as { id: string };
     await prisma.dashboard.deleteMany({ where: { id, tenantId: jwt.tenantId } });
     return reply.send({ success: true });
   });
 
-  app.post('/api/v1/dashboards/:id/widgets', async (req, reply) => {
+  app.post('/api/v1/dashboards/:id/widgets', { preHandler: requirePermission(PERMISSIONS.SETTINGS.WRITE) }, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { id } = req.params as { id: string };
     const dash = await prisma.dashboard.findFirst({
@@ -98,7 +99,7 @@ export async function registerDashboardsRoutes(app: FastifyInstance, prisma: Rep
     return reply.code(201).send({ success: true, data: widget });
   });
 
-  app.patch('/api/v1/dashboards/widgets/:widgetId', async (req, reply) => {
+  app.patch('/api/v1/dashboards/widgets/:widgetId', { preHandler: requirePermission(PERMISSIONS.SETTINGS.WRITE) }, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { widgetId } = req.params as { widgetId: string };
     const existing = await prisma.dashboardWidget.findFirst({
@@ -116,7 +117,7 @@ export async function registerDashboardsRoutes(app: FastifyInstance, prisma: Rep
     return reply.send({ success: true, data: widget });
   });
 
-  app.delete('/api/v1/dashboards/widgets/:widgetId', async (req, reply) => {
+  app.delete('/api/v1/dashboards/widgets/:widgetId', { preHandler: requirePermission(PERMISSIONS.SETTINGS.WRITE) }, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { widgetId } = req.params as { widgetId: string };
     const existing = await prisma.dashboardWidget.findFirst({
@@ -130,7 +131,7 @@ export async function registerDashboardsRoutes(app: FastifyInstance, prisma: Rep
     return reply.send({ success: true });
   });
 
-  app.put('/api/v1/dashboards/:id/widgets/reorder', async (req, reply) => {
+  app.put('/api/v1/dashboards/:id/widgets/reorder', { preHandler: requirePermission(PERMISSIONS.SETTINGS.WRITE) }, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { id } = req.params as { id: string };
     const dash = await prisma.dashboard.findFirst({

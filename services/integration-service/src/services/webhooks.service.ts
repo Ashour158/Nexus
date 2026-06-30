@@ -5,6 +5,7 @@ import type { IntegrationPrisma } from '../prisma.js';
 import type { createFieldCrypto } from '../lib/crypto.js';
 import { signWebhookBody } from '../lib/crypto.js';
 import { randomBytes } from 'node:crypto';
+import { lookup } from 'node:dns/promises';
 import type {
   CreateWebhookSubscriptionInput,
   UpdateWebhookSubscriptionInput,
@@ -12,6 +13,27 @@ import type {
 import { alsStore } from '../request-context.js';
 
 type Crypto = ReturnType<typeof createFieldCrypto>;
+
+const PRIVATE_IP_RE = [
+  /^10\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^192\.168\./,
+  /^127\./,
+  /^169\.254\./,
+  /^::1$/,
+  /^fc[0-9a-f]{2}:/i,
+  /^fd[0-9a-f]{2}:/i,
+];
+
+async function isSsrfSafe(url: string): Promise<boolean> {
+  try {
+    const { hostname } = new URL(url);
+    const { address } = await lookup(hostname);
+    return !PRIVATE_IP_RE.some((re) => re.test(address));
+  } catch {
+    return false;
+  }
+}
 
 type DeliveryWithSub = Awaited<
   ReturnType<
@@ -86,6 +108,14 @@ export function createWebhooksService(deps: {
       await raw.webhookDelivery.update({
         where: { id: row.id },
         data: { status: 'FAILED', responseBody: 'decrypt_failed' },
+      });
+      return;
+    }
+
+    if (!(await isSsrfSafe(row.subscription.targetUrl))) {
+      await raw.webhookDelivery.update({
+        where: { id: row.id },
+        data: { status: 'FAILED', responseBody: 'ssrf_blocked_private_ip' },
       });
       return;
     }

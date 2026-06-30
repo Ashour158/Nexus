@@ -61,5 +61,5 @@ authentication:
 # For OSS, implement via Kong/NGINX upstream
 
 override_subgraph_url:
-  auth: http://auth-service:3010/graphql
+  auth: http://auth-service:3000/graphql
   crm: http://crm-service:3001/graphql

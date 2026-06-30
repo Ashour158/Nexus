@@ -126,4 +126,22 @@ subgraphs:
     schema:
       file: ./schemas/email-sync.graphql
 
+  contacts:
+    routing_url: http://contacts-service:3041/graphql
+    schema:
+      file: ./schemas/contacts.graphql
 
+  deals:
+    routing_url: http://deals-service:3042/graphql
+    schema:
+      file: ./schemas/deals.graphql
+
+  leads:
+    routing_url: http://leads-service:3030/graphql
+    schema:
+      file: ./schemas/leads.graphql
+
+  accounts:
+    routing_url: http://accounts-service:3031/graphql
+    schema:
+      file: ./schemas/accounts.graphql

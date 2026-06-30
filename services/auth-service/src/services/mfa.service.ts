@@ -3,7 +3,11 @@ import QRCode from 'qrcode';
 import { createHash, randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 import type { AuthPrisma } from '../prisma.js';
 
-const ENCRYPTION_KEY = process.env.MFA_ENCRYPTION_KEY ?? process.env.JWT_SECRET ?? 'fallback-key-min-32-chars-long!!';
+const _mfaKey = process.env.MFA_ENCRYPTION_KEY ?? process.env.JWT_SECRET;
+if (!_mfaKey || _mfaKey.length < 32) {
+  throw new Error('MFA_ENCRYPTION_KEY or JWT_SECRET must be at least 32 characters');
+}
+const ENCRYPTION_KEY = _mfaKey;
 
 function deriveKey(): Buffer {
   return createHash('sha256').update(ENCRYPTION_KEY).digest();

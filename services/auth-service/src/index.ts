@@ -94,7 +94,9 @@ await app.register(rateLimit, {
 app.addHook('onRoute', (routeOptions: RouteOptions) => {
   if (
     routeOptions.url.includes('/login') ||
-    routeOptions.url.includes('/forgot-password')
+    routeOptions.url.includes('/forgot-password') ||
+    routeOptions.url.includes('/reset-password') ||
+    routeOptions.url.includes('/mfa/verify')
   ) {
     routeOptions.config = {
       ...routeOptions.config,

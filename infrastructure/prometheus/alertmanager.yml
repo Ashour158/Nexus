@@ -32,13 +32,13 @@ receivers:
 
   - name: 'slack'
     slack_configs:
-      - api_url: 'http://localhost/slack-webhook-placeholder'
+      - api_url: '${SLACK_WEBHOOK_URL}'
         send_resolved: true
         title: '{{ .GroupLabels.alertname }}'
         text: 'NEXUS Warning: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
 
   - name: 'pagerduty'
     pagerduty_configs:
-      - service_key: 'change-me-pagerduty-service-key'
+      - service_key: '${PAGERDUTY_SERVICE_KEY}'
         send_resolved: true
         description: '{{ .GroupLabels.alertname }}'

@@ -1,21 +1,30 @@
+function esc(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function renderContractHtml(data: Record<string, unknown>): string {
-  const contractNumber = String(data.contractNumber ?? '—');
-  const title = String(data.title ?? 'Service Agreement');
-  const accountName = String(data.accountName ?? 'Client');
-  const startDate = String(data.startDate ?? '');
-  const endDate = String(data.endDate ?? '');
+  const contractNumber = esc(String(data.contractNumber ?? '—'));
+  const title = esc(String(data.title ?? 'Service Agreement'));
+  const accountName = esc(String(data.accountName ?? 'Client'));
+  const startDate = esc(String(data.startDate ?? ''));
+  const endDate = esc(String(data.endDate ?? ''));
   const value = Number(data.value ?? 0).toFixed(2);
-  const currency = String(data.currency ?? 'USD');
-  const terms = String(data.terms ?? '');
-  const renewalTerms = String(data.renewalTerms ?? '');
-  const terminationClause = String(data.terminationClause ?? '');
+  const currency = esc(String(data.currency ?? 'USD'));
+  const terms = esc(String(data.terms ?? ''));
+  const renewalTerms = esc(String(data.renewalTerms ?? ''));
+  const terminationClause = esc(String(data.terminationClause ?? ''));
   const lineItems = Array.isArray(data.lineItems) ? data.lineItems : [];
 
   const lineItemRows = lineItems
     .map((item: unknown) => {
       const it = item as Record<string, unknown>;
       return `<tr>
-        <td style="padding:8px;border:1px solid #ddd;">${String(it.description ?? '')}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${esc(String(it.description ?? ''))}</td>
         <td style="padding:8px;border:1px solid #ddd;text-align:right;">${Number(it.quantity ?? 1)}</td>
         <td style="padding:8px;border:1px solid #ddd;text-align:right;">${Number(it.unitPrice ?? 0).toFixed(2)} ${currency}</td>
         <td style="padding:8px;border:1px solid #ddd;text-align:right;">${Number(it.total ?? 0).toFixed(2)} ${currency}</td>

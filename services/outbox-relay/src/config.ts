@@ -22,6 +22,20 @@ export const envSchema = z.object({
   REPORTING_DATABASE_URL: z.string().url(),
   TERRITORY_DATABASE_URL: z.string().url(),
   FINANCE_DATABASE_URL: z.string().url(),
+  NOTIFICATION_DATABASE_URL: z.string().url(),
+  WORKFLOW_DATABASE_URL: z.string().url(),
+  COMM_DATABASE_URL: z.string().url(),
+  DOCUMENT_DATABASE_URL: z.string().url(),
+  CADENCE_DATABASE_URL: z.string().url(),
+  PLANNING_DATABASE_URL: z.string().url(),
+  PORTAL_DATABASE_URL: z.string().url(),
+  KNOWLEDGE_DATABASE_URL: z.string().url(),
+  INCENTIVE_DATABASE_URL: z.string().url(),
+  EMAIL_SYNC_DATABASE_URL: z.string().url(),
+  CONTACTS_DATABASE_URL: z.string().url(),
+  DEALS_DATABASE_URL: z.string().url(),
+  LEADS_DATABASE_URL: z.string().url(),
+  ACCOUNTS_DATABASE_URL: z.string().url(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -35,20 +49,34 @@ export interface ServiceConfig {
   dbUrl: string;
 }
 
-const serviceNames = [
-  'auth',
-  'crm',
-  'approval',
-  'analytics',
-  'integration',
-  'reporting',
-  'territory',
-  'finance',
-] as const;
+const serviceDbKeys: Array<{ name: string; envKey: keyof Env }> = [
+  { name: 'auth', envKey: 'AUTH_DATABASE_URL' },
+  { name: 'crm', envKey: 'CRM_DATABASE_URL' },
+  { name: 'approval', envKey: 'APPROVAL_DATABASE_URL' },
+  { name: 'analytics', envKey: 'ANALYTICS_DATABASE_URL' },
+  { name: 'integration', envKey: 'INTEGRATION_DATABASE_URL' },
+  { name: 'reporting', envKey: 'REPORTING_DATABASE_URL' },
+  { name: 'territory', envKey: 'TERRITORY_DATABASE_URL' },
+  { name: 'finance', envKey: 'FINANCE_DATABASE_URL' },
+  { name: 'notification', envKey: 'NOTIFICATION_DATABASE_URL' },
+  { name: 'workflow', envKey: 'WORKFLOW_DATABASE_URL' },
+  { name: 'comm', envKey: 'COMM_DATABASE_URL' },
+  { name: 'document', envKey: 'DOCUMENT_DATABASE_URL' },
+  { name: 'cadence', envKey: 'CADENCE_DATABASE_URL' },
+  { name: 'planning', envKey: 'PLANNING_DATABASE_URL' },
+  { name: 'portal', envKey: 'PORTAL_DATABASE_URL' },
+  { name: 'knowledge', envKey: 'KNOWLEDGE_DATABASE_URL' },
+  { name: 'incentive', envKey: 'INCENTIVE_DATABASE_URL' },
+  { name: 'email-sync', envKey: 'EMAIL_SYNC_DATABASE_URL' },
+  { name: 'contacts', envKey: 'CONTACTS_DATABASE_URL' },
+  { name: 'deals', envKey: 'DEALS_DATABASE_URL' },
+  { name: 'leads', envKey: 'LEADS_DATABASE_URL' },
+  { name: 'accounts', envKey: 'ACCOUNTS_DATABASE_URL' },
+];
 
 export function getServiceConfigs(env: Env): ServiceConfig[] {
-  return serviceNames.map((name) => ({
+  return serviceDbKeys.map(({ name, envKey }) => ({
     name,
-    dbUrl: env[`${name.toUpperCase()}_DATABASE_URL` as keyof Env] as string,
+    dbUrl: env[envKey] as string,
   }));
 }

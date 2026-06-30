@@ -76,7 +76,7 @@ registerHealthRoutes(app, 'integration-service', [() => checkDatabase(rawPrisma)
 app.setErrorHandler(globalErrorHandler);
 
 const webhooks = createWebhooksService({ prisma, raw: rawPrisma, crypto });
-const connections = createConnectionsService(prisma);
+const connections = createConnectionsService(prisma, crypto);
 const sync = createSyncService(prisma, producer);
 const oauth = createOauthService(prisma, crypto);
 const calendar = createGoogleCalendarService(prisma);

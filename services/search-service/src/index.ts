@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { startTracing } from '@nexus/service-utils/tracing';
 import rateLimit from '@fastify/rate-limit';
-import { createService, globalErrorHandler, registerHealthRoutes, startService } from '@nexus/service-utils';
+import { createService, globalErrorHandler, registerHealthRoutes, startService, type HealthCheck } from '@nexus/service-utils';
 import { createMeilisearchClient } from './meilisearch.js';
 import { setupIndexes } from './indexes/setup.js';
 import { startIndexerConsumer } from './consumers/indexer.consumer.js';
@@ -37,9 +37,27 @@ app.setErrorHandler(globalErrorHandler);
 const meili = createMeilisearchClient();
 
 registerHealthRoutes(app, 'search-service', [
-  async () => {
-    const health = await meili.health();
-    if (health.status !== 'available') throw new Error(`Meilisearch status: ${health.status}`);
+  async (): Promise<HealthCheck> => {
+    const start = Date.now();
+    try {
+      const health = await meili.health();
+      if (health.status !== 'available') {
+        return {
+          name: 'meilisearch',
+          ok: false,
+          latencyMs: Date.now() - start,
+          message: `Meilisearch status: ${health.status}`,
+        };
+      }
+      return { name: 'meilisearch', ok: true, latencyMs: Date.now() - start };
+    } catch (err) {
+      return {
+        name: 'meilisearch',
+        ok: false,
+        latencyMs: Date.now() - start,
+        message: err instanceof Error ? err.message : String(err),
+      };
+    }
   },
 ]);
 

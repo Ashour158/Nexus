@@ -173,6 +173,8 @@ services:
       APP_URL: http://localhost:3000
       JWT_SECRET: ${JWT_SECRET}
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_auth
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -191,6 +193,8 @@ services:
       - '3001:3001'
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_crm
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -208,6 +212,8 @@ services:
     environment:
       CHROMIUM_PATH: /usr/bin/chromium
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_finance
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -435,6 +441,8 @@ services:
       - '3003:3003'
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_notification
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -479,6 +487,8 @@ services:
       - '3007:3007'
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_workflow
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -495,6 +505,8 @@ services:
       - '3012:3012'
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_integration
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -511,6 +523,8 @@ services:
       - '3013:3013'
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_blueprint
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -600,6 +614,9 @@ services:
       - '3009:3009'
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_comm
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+      AUTH_SERVICE_URL: http://auth-service:3000
     depends_on:
       postgres:
         condition: service_healthy
@@ -616,6 +633,8 @@ services:
       - '3010:3010'
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_storage
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -631,6 +650,8 @@ services:
     environment:
       PORT: '3014'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_approval
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -648,6 +669,8 @@ services:
     environment:
       PORT: '3015'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_data
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -695,6 +718,8 @@ services:
     environment:
       PORT: '3018'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_cadence
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -729,6 +754,8 @@ services:
     environment:
       PORT: '3020'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_planning
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -746,6 +773,8 @@ services:
     environment:
       PORT: '3021'
       REPORTING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_reporting
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -761,6 +790,8 @@ services:
     environment:
       PORT: '3022'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_portal
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -776,6 +807,8 @@ services:
     environment:
       PORT: '3023'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_knowledge
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -791,6 +824,8 @@ services:
     environment:
       PORT: '3024'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_incentive
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -807,6 +842,8 @@ services:
       - '3026:3026'
     environment:
       EMAIL_SYNC_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_email_sync
+      KAFKA_BROKERS: kafka:29092
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -881,6 +918,20 @@ services:
       REPORTING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_reporting
       TERRITORY_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_territory
       FINANCE_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_finance
+      NOTIFICATION_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_notification
+      WORKFLOW_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_workflow
+      COMM_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_comm
+      DOCUMENT_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_document
+      CADENCE_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_cadence
+      PLANNING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_planning
+      PORTAL_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_portal
+      KNOWLEDGE_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_knowledge
+      INCENTIVE_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_incentive
+      EMAIL_SYNC_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_email_sync
+      CONTACTS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_contacts
+      DEALS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_deals
+      LEADS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_leads
+      ACCOUNTS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_accounts
       OUTBOX_RELAY_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_auth
     depends_on:
       postgres:

@@ -38,6 +38,24 @@ export async function registerAuthRoutes(
         if (result.mfaRequired) {
           return reply.send({ success: true, data: { mfaRequired: true, mfaToken: result.mfaToken } });
         }
+        try {
+          const parts = result.accessToken.split('.');
+          if (parts.length === 3) {
+            const claims = JSON.parse(Buffer.from(parts[1]!, 'base64url').toString('utf-8')) as { sub?: string; tenantId?: string };
+            if (claims.sub && claims.tenantId) {
+              void prisma.auditLog.create({
+                data: {
+                  tenantId: claims.tenantId,
+                  userId: claims.sub,
+                  action: 'auth.login',
+                  resource: 'session',
+                  ipAddress: request.ip,
+                  userAgent: request.headers['user-agent'] ?? null,
+                },
+              });
+            }
+          }
+        } catch { /* non-blocking */ }
         return reply.send({ success: true, data: result });
       });
 
@@ -55,6 +73,17 @@ export async function registerAuthRoutes(
         const user = request.user as JwtPayload | undefined;
         if (user?.sub) {
           await revokeSession(prisma, body.refreshToken, user.sub);
+          if (user.tenantId) {
+            void prisma.auditLog.create({
+              data: {
+                tenantId: user.tenantId,
+                userId: user.sub,
+                action: 'auth.logout',
+                resource: 'session',
+                ipAddress: request.ip,
+              },
+            });
+          }
         }
         return reply.send({ success: true, data: { loggedOut: true } });
       });

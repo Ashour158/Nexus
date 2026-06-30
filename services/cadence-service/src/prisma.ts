@@ -1,5 +1,5 @@
 import { PrismaClient } from '../../../node_modules/.prisma/cadence-client/index.js';
-import { buildDatabaseUrl } from '@nexus/service-utils/db';
+import { attachSlowQueryLog, buildDatabaseUrl } from '@nexus/service-utils/db';
 
 export type CadencePrisma = PrismaClient;
 
@@ -13,8 +13,9 @@ export function getPrisma(): CadencePrisma {
           url: buildDatabaseUrl({ connectionLimit: 5, poolTimeout: 10, databaseUrl: process.env.CADENCE_DATABASE_URL }),
         },
       },
-      log: ['error'],
+      log: ['error', { emit: 'event', level: 'query' }],
     });
+    attachSlowQueryLog(prisma as any, 'cadence-service');
   }
   return prisma;
 }

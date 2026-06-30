@@ -1,5 +1,5 @@
 import { PrismaClient } from '../../../node_modules/.prisma/notification-client/index.js';
-import { buildDatabaseUrl } from '@nexus/service-utils/db';
+import { attachSlowQueryLog, buildDatabaseUrl } from '@nexus/service-utils/db';
 
 /**
  * Notification service Prisma client.
@@ -12,13 +12,16 @@ import { buildDatabaseUrl } from '@nexus/service-utils/db';
  */
 
 export function createNotificationPrisma(): PrismaClient {
-  return new PrismaClient({
+  const prisma = new PrismaClient({
     datasources: {
       db: {
         url: buildDatabaseUrl({ connectionLimit: 5, poolTimeout: 10, databaseUrl: process.env.NOTIFICATION_DATABASE_URL }),
       },
     },
+    log: [{ emit: 'event', level: 'query' }],
   });
+  attachSlowQueryLog(prisma as any, 'notification-service');
+  return prisma;
 }
 
 export type NotificationPrisma = PrismaClient;

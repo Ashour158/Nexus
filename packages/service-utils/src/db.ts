@@ -55,3 +55,33 @@ export function attachGracefulDisconnect(prisma: { $on: (event: string, cb: () =
     await prisma.$disconnect();
   });
 }
+
+export interface SlowQueryEvent {
+  query: string;
+  duration: number;
+}
+
+/**
+ * Attach slow-query logging to a Prisma client.
+ * Queries exceeding `thresholdMs` (default 500 ms) are logged as warnings.
+ * Requires the PrismaClient to be instantiated with `log: [{ emit: 'event', level: 'query' }]`.
+ */
+export function attachSlowQueryLog(
+  prisma: { $on: (event: 'query', cb: (e: SlowQueryEvent) => void) => void },
+  serviceName: string,
+  thresholdMs = 500
+): void {
+  prisma.$on('query', (e) => {
+    if (e.duration >= thresholdMs) {
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          service: serviceName,
+          msg: 'slow_query',
+          durationMs: e.duration,
+          query: e.query.slice(0, 300),
+        })
+      );
+    }
+  });
+}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import Link from 'next/link';
 import type { Stage } from '@nexus/shared-types';
 import { LayoutGrid, List, Trash2 } from 'lucide-react';
@@ -31,6 +32,7 @@ const statusLabelMap: Record<string, string> = {
 };
 
 export default function DealsPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [view, setView] = useState<'pipeline' | 'list'>('pipeline');
   const [stageFilter, setStageFilter] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('');
@@ -313,8 +315,8 @@ export default function DealsPage() {
               <>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm(`Delete ${selectedIds.size} deals?`)) {
+                  onClick={async () => {
+                    if (await confirm(`Delete ${selectedIds.size} deals?`, 'Delete Deals')) {
                       selectedIds.forEach((id) => deleteMutation.mutate(id));
                       setSelectedIds(new Set());
                     }
@@ -383,6 +385,7 @@ export default function DealsPage() {
           )}
         </>
       )}
+      {ConfirmDialog}
     </main>
   );
 }

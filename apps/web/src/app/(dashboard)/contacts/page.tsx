@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState, type FormEvent, type ReactElement, type ReactNode } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import type { Contact } from '@nexus/shared-types';
 import {
   Building2,
@@ -113,6 +114,7 @@ const ownerColors = ['bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700
 
 export default function ContactsPage(): ReactElement {
   const hasPermission = useAuthStore((s) => s.hasPermission);
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const [search, setSearch] = useState('');
   const [ownerId, setOwnerId] = useState('');
@@ -596,8 +598,8 @@ export default function ContactsPage(): ReactElement {
           canDelete={canDelete}
           onClose={() => setActive(null)}
           onEdit={() => openEdit(active)}
-          onDelete={() => {
-            if (!window.confirm(`Delete ${active.firstName} ${active.lastName}?`)) return;
+          onDelete={async () => {
+            if (!await confirm(`Delete ${active.firstName} ${active.lastName}?`, 'Delete Contact')) return;
             deleteContact.mutate(active.id, { onSuccess: () => setActive(null) });
           }}
         />
@@ -619,6 +621,7 @@ export default function ContactsPage(): ReactElement {
       ) : null}
 
       {importOpen ? <CsvImportDialog onClose={() => setImportOpen(false)} /> : null}
+      {ConfirmDialog}
     </CRMModuleShell>
   );
 }

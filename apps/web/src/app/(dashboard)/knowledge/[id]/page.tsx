@@ -3,6 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
 import { Copy, Pencil, Trash2, Archive, CheckCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -24,6 +25,7 @@ export default function KnowledgeArticlePage() {
   const id = params?.id ?? '';
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canRead = hasPermission('documents:read');
+  const { confirm, ConfirmDialog } = useConfirm();
   const articleQuery = useKnowledgeArticle(id);
   const updateArticle = useUpdateKnowledgeArticle();
   const publishArticle = usePublishKnowledgeArticle();
@@ -162,8 +164,8 @@ export default function KnowledgeArticlePage() {
                 <Button
                   type="button"
                   variant="destructive"
-                  onClick={() => {
-                    if (window.confirm('Delete this article?')) {
+                  onClick={async () => {
+                    if (await confirm('Delete this article?', 'Delete Article')) {
                       deleteArticle.mutate(id, {
                         onSuccess: () => {
                           notify.success('Article deleted');
@@ -230,6 +232,7 @@ export default function KnowledgeArticlePage() {
         )}
       </article>
 
+      {ConfirmDialog}
       <aside className="space-y-4 lg:col-span-4">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <h2 className="text-sm font-semibold text-slate-900">Related articles</h2>

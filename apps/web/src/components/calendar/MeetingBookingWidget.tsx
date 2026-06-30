@@ -14,7 +14,7 @@ export function MeetingBookingWidget({ repUsername }: { repUsername: string }) {
       <div className="grid gap-2 md:grid-cols-2">{slots.map((slot) => <button key={slot} onClick={() => setSelected(slot)} className={`rounded border px-3 py-2 text-sm ${selected === slot ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-300'}`}>{slot}</button>)}</div>
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
       <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Your email" className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
-      <button onClick={() => window.alert('Meeting created and invite email sent.')} disabled={!selected || !name || !email} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">Confirm booking</button>
+      <button onClick={() => { console.log('Meeting created and invite email sent.'); }} disabled={!selected || !name || !email} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">Confirm booking</button>
     </section>
   );
 }

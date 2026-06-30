@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
+import { useConfirm } from '@/hooks/use-confirm';
 
 type TenantDetail = {
   id: string;
@@ -17,6 +18,7 @@ type TenantDetail = {
 
 export default function AdminTenantDetailPage({ params }: { params: { id: string } }) {
   const accessToken = useAuthStore((s) => s.accessToken);
+  const { confirm: confirmDialog, ConfirmDialog } = useConfirm();
   const [data, setData] = useState<TenantDetail | null>(null);
   const [maxUsers, setMaxUsers] = useState(250);
   const [maxContacts, setMaxContacts] = useState(50000);
@@ -59,7 +61,7 @@ export default function AdminTenantDetailPage({ params }: { params: { id: string
   }
 
   async function deleteTenant() {
-    if (!window.confirm('Delete all tenant data?')) return;
+    if (!await confirmDialog('Delete all tenant data?', 'Delete Tenant')) return;
     setBanner('');
     try {
       const res = await fetch(`/api/admin/tenants/${params.id}`, {
@@ -111,6 +113,7 @@ export default function AdminTenantDetailPage({ params }: { params: { id: string
           <button onClick={() => void deleteTenant()} disabled={confirm !== (data?.name ?? '')} className="rounded border border-red-700 px-3 py-1.5 text-red-300 disabled:opacity-50">Delete all data</button>
         </div>
       </section>
+      {ConfirmDialog}
       <div className="flex justify-end">
         <button
           onClick={() => void patchTenant({ limits: { maxUsers, maxContacts, maxStorageGb: maxStorage, maxApiCallsPerDay: maxApi } }, 'Tenant limits saved')}

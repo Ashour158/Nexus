@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
+import { useConfirm } from '@/hooks/use-confirm';
 
 const RESOURCES = ['contacts', 'deals', 'reports', 'workflows'] as const;
 
@@ -19,6 +20,7 @@ type UserDetail = {
 
 export default function AdminUserDetailPage({ params }: { params: { id: string } }) {
   const accessToken = useAuthStore((s) => s.accessToken);
+  const { confirm, ConfirmDialog } = useConfirm();
   const [data, setData] = useState<UserDetail | null>(null);
   const [role, setRole] = useState('ae');
   const [tenant, setTenant] = useState('Tenant 1');
@@ -62,7 +64,7 @@ export default function AdminUserDetailPage({ params }: { params: { id: string }
   }
 
   async function deleteCurrent() {
-    if (!window.confirm('Delete this user account?')) return;
+    if (!await confirm('Delete this user account?', 'Delete User')) return;
     setBanner('');
     try {
       const res = await fetch(`/api/admin/users/${params.id}`, {
@@ -130,6 +132,7 @@ export default function AdminUserDetailPage({ params }: { params: { id: string }
           <button onClick={() => void deleteCurrent()} className="rounded border border-red-700 px-3 py-1.5 text-sm text-red-300">Delete account</button>
         </div>
       </section>
+      {ConfirmDialog}
       <div className="flex justify-end">
         <button
           onClick={() => void updateCurrent({ role, tenant, permissions }, 'User permissions saved')}

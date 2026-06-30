@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { useConfirm } from '@/hooks/use-confirm';
 
 const TERRITORY_SERVICE = '/api/territory';
 
@@ -20,6 +21,7 @@ interface Territory {
 }
 
 export default function TerritoriesPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [territories, setTerritories] = useState<Territory[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -54,7 +56,7 @@ export default function TerritoriesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this territory?')) return;
+    if (!await confirm('Delete this territory?', 'Delete Territory')) return;
     await fetch(`${TERRITORY_SERVICE}/territories/${id}`, { method: 'DELETE' });
     void fetchTerritories();
   };
@@ -134,6 +136,7 @@ export default function TerritoriesPage() {
           ))}
         </div>
       )}
+      {ConfirmDialog}
     </div>
   );
 }

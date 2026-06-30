@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useConfirm } from '@/hooks/use-confirm';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { TableSkeleton } from '@/components/ui/skeleton';
@@ -22,6 +23,7 @@ export default function InvoiceDetailPage() {
   const id = params?.id ?? '';
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canRead = hasPermission('invoices:read');
+  const { confirm, ConfirmDialog } = useConfirm();
   const invoiceQuery = useInvoice(id);
   const paymentsQuery = useInvoicePayments(id);
   const recordPayment = useRecordPayment();
@@ -138,8 +140,8 @@ export default function InvoiceDetailPage() {
             <Button
               type="button"
               variant="destructive"
-              onClick={() => {
-                if (window.confirm('Void this invoice?')) voidInvoice.mutate(id);
+              onClick={async () => {
+                if (await confirm('Void this invoice?', 'Void Invoice')) voidInvoice.mutate(id);
               }}
             >
               Void
@@ -327,6 +329,7 @@ export default function InvoiceDetailPage() {
           </div>
         </aside>
       </section>
+      {ConfirmDialog}
     </main>
   );
 }

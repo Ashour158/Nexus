@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/hooks/use-confirm';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import {
@@ -19,6 +20,7 @@ import { useAuthStore } from '@/stores/auth.store';
 export default function JourneysPage() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canRead = hasPermission('workflows:read');
+  const { confirm, ConfirmDialog } = useConfirm();
   const [page, setPage] = useState(1);
   const query = useJourneys({ page, limit: 25 });
   const activate = useActivateJourney();
@@ -157,8 +159,8 @@ export default function JourneysPage() {
                       <Button
                         type="button"
                         variant="destructive"
-                        onClick={() => {
-                          if (window.confirm(`Delete journey "${j.name}"?`)) {
+                        onClick={async () => {
+                          if (await confirm(`Delete journey "${j.name}"?`, 'Delete Journey')) {
                             remove.mutate(j.id, {
                               onSuccess: () => notify.success('Journey deleted'),
                               onError: (err) => notify.error('Delete failed', err.message),
@@ -206,6 +208,7 @@ export default function JourneysPage() {
           </div>
         </footer>
       )}
+      {ConfirmDialog}
     </main>
   );
 }

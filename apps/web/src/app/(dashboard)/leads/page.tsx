@@ -1,5 +1,6 @@
 'use client';
 
+import { useConfirm } from '@/hooks/use-confirm';
 import {
   DndContext,
   DragOverlay,
@@ -183,6 +184,7 @@ export default function LeadsPage(): ReactElement {
   const setViewMode = useUiStore((s) => s.setLeadsViewMode);
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const qc = useQueryClient();
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
@@ -309,7 +311,7 @@ export default function LeadsPage(): ReactElement {
 
   async function runMassDelete() {
     if (selectedIds.length === 0) return;
-    if (!window.confirm(`Delete ${selectedIds.length} leads?`)) return;
+    if (!await confirm(`Delete ${selectedIds.length} leads?`, 'Delete Leads')) return;
     try {
       await api.delete('/leads/mass-delete', { data: { ids: selectedIds } });
       setSelectedIds([]);
@@ -515,6 +517,7 @@ export default function LeadsPage(): ReactElement {
         </div>
       </div>
 
+      {ConfirmDialog}
       {convertTarget ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">

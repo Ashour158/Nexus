@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { usePrompt } from '@/hooks/use-confirm';
 import { Download, Play, Save } from 'lucide-react';
 import { apiClients } from '@/lib/api-client';
 
@@ -10,6 +11,7 @@ type ReportRow = Record<string, unknown>;
 
 export default function ReportBuilderPage() {
   const searchParams = useSearchParams();
+  const { prompt, PromptDialog } = usePrompt();
 
   const [objectType] = useState('deals');
   const [columns] = useState<string[]>(['name', 'amount', 'stageId', 'ownerId']);
@@ -36,11 +38,9 @@ export default function ReportBuilderPage() {
   });
 
   const scheduleMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (email: string) => {
       const id = scheduleReportId;
       if (!id) throw new Error('Missing report id');
-      const email = typeof window !== 'undefined' ? window.prompt('Recipient email:', '') : '';
-      if (!email) throw new Error('Email required');
       return apiClients.reporting.post(`/saved-reports/${id}/schedules`, {
         cronExpr: '0 9 * * 1',
         recipients: [email],
@@ -69,7 +69,10 @@ export default function ReportBuilderPage() {
           {scheduleReportId && (
             <button
               type="button"
-              onClick={() => scheduleMutation.mutate()}
+              onClick={async () => {
+                const email = await prompt('Recipient email:', 'Schedule Report');
+                if (email) scheduleMutation.mutate(email);
+              }}
               disabled={scheduleMutation.isPending}
               className="px-3 py-2 rounded-lg border border-slate-300 text-sm"
             >
@@ -101,6 +104,7 @@ export default function ReportBuilderPage() {
           </button>
         </div>
       </div>
+      {PromptDialog}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { usePrompt } from '@/hooks/use-confirm';
 import {
   AlertCircle,
   CheckCircle2,
@@ -131,6 +132,7 @@ function initials(value: string | undefined): string {
 
 export default function ApprovalsPage() {
   const qc = useQueryClient();
+  const { prompt, PromptDialog } = usePrompt();
   const [filter, setFilter] = useState<'ALL' | ApprovalStatus>('PENDING');
   const [query, setQuery] = useState('');
   const [drqForm, setDrqForm] = useState({
@@ -443,8 +445,8 @@ export default function ApprovalsPage() {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => {
-                                  const note = window.prompt('Reject reason (required)');
+                                onClick={async () => {
+                                  const note = await prompt('Reject reason (required)', 'Reject Approval');
                                   if (!note) return;
                                   reject.mutate({ id: row.id, comment: note });
                                 }}
@@ -631,6 +633,7 @@ export default function ApprovalsPage() {
           </section>
         </aside>
       </section>
+      {PromptDialog}
     </div>
   );
 }

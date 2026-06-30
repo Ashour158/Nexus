@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { usePrompt } from '@/hooks/use-confirm';
 import { Input } from '@/components/ui/input';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import {
@@ -16,6 +17,7 @@ import { formatCurrency, formatDate } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth.store';
 
 export default function QuotesPage(): JSX.Element {
+  const { prompt, PromptDialog } = usePrompt();
   const [status, setStatus] = useState<Quote['status'] | ''>('');
   const [ownerId, setOwnerId] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -175,8 +177,8 @@ export default function QuotesPage(): JSX.Element {
                       <Button
                         type="button"
                         variant="destructive"
-                        onClick={() => {
-                          const reason = window.prompt('Void reason');
+                        onClick={async () => {
+                          const reason = await prompt('Void reason', 'Void Quote');
                           if (reason) voidQuote.mutate({ id: q.id, reason });
                         }}
                       >
@@ -201,6 +203,7 @@ export default function QuotesPage(): JSX.Element {
         )}
       </section>
 
+      {PromptDialog}
       <footer className="flex items-center justify-between text-sm">
         <p className="text-slate-500">
           {rows.length} shown / {total} total

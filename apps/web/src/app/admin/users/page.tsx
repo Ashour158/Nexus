@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
+import { useConfirm } from '@/hooks/use-confirm';
 
 type Status = 'Active' | 'Suspended' | 'Invited';
 type UserRow = { id: string; name: string; email: string; role: string; tenant: string; status: Status; joined: string; lastActive: string };
@@ -10,6 +11,7 @@ type UsersResponse = { data: UserRow[]; page: number; limit: number; total: numb
 
 export default function AdminUsersPage() {
   const accessToken = useAuthStore((s) => s.accessToken);
+  const { confirm, ConfirmDialog } = useConfirm();
   const [qInput, setQInput] = useState('');
   const [q, setQ] = useState('');
   const [tenant, setTenant] = useState('all');
@@ -94,7 +96,7 @@ export default function AdminUsersPage() {
   }
 
   async function deleteUser(id: string) {
-    if (!window.confirm('Delete this user?')) return;
+    if (!await confirm('Delete this user?', 'Delete User')) return;
     setBusyId(id);
     setBanner('');
     try {
@@ -159,6 +161,7 @@ export default function AdminUsersPage() {
         </table>
       </div>
 
+      {ConfirmDialog}
       <div className="flex items-center justify-between text-sm text-gray-400">
         <span>Page {result?.page ?? page} of {result?.totalPages ?? 1}  {result?.total ?? 0} users</span>
         <div className="space-x-2">

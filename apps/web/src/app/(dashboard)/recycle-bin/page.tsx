@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClients } from '@/lib/api-client';
+import { useConfirm } from '@/hooks/use-confirm';
 import { notify } from '@/lib/toast';
 import { formatDateTime } from '@/lib/format';
 import { Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
@@ -20,6 +21,7 @@ interface RecycleItem {
 export default function RecycleBinPage() {
   const [moduleFilter, setModuleFilter] = useState<string>('');
   const queryClient = useQueryClient();
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const { data, isLoading } = useQuery({
     queryKey: ['recycle-bin', moduleFilter],
@@ -122,8 +124,8 @@ export default function RecycleBinPage() {
                         <RefreshCw className="h-3 w-3" /> Restore
                       </button>
                       <button
-                        onClick={() => {
-                          if (window.confirm('Permanently delete this item?')) {
+                        onClick={async () => {
+                          if (await confirm('Permanently delete this item?', 'Delete Permanently')) {
                             purgeMutation.mutate(item.id);
                           }
                         }}
@@ -141,6 +143,7 @@ export default function RecycleBinPage() {
           </table>
         </div>
       )}
+      {ConfirmDialog}
     </main>
   );
 }

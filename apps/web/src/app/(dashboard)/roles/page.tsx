@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/hooks/use-confirm';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -15,6 +16,7 @@ import { useUiStore } from '@/stores/ui.store';
 
 export default function RolesPage(): JSX.Element {
   const toast = useUiStore((s) => s.pushToast);
+  const { confirm, ConfirmDialog } = useConfirm();
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<string | null>(null);
@@ -74,7 +76,7 @@ export default function RolesPage(): JSX.Element {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Delete role "${name}"? This cannot be undone.`)) return;
+    if (!await confirm(`Delete role "${name}"? This cannot be undone.`, 'Delete Role')) return;
     try {
       await deleteRole.mutateAsync(id);
       toast({ variant: 'success', title: 'Role deleted' });
@@ -176,6 +178,7 @@ export default function RolesPage(): JSX.Element {
         )}
       </section>
 
+      {ConfirmDialog}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
           <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg bg-white p-6 shadow-xl">

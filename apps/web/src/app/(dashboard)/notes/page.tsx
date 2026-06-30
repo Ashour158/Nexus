@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import type { Note } from '@nexus/shared-types';
+import { useConfirm } from '@/hooks/use-confirm';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -18,6 +19,7 @@ type NoteTab = 'all' | 'pinned';
 export default function NotesPage() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canRead = hasPermission('notes:read');
+  const { confirm, ConfirmDialog } = useConfirm();
   const [tab, setTab] = useState<NoteTab>('all');
   const [dealId, setDealId] = useState('');
   const [contactId, setContactId] = useState('');
@@ -298,8 +300,8 @@ export default function NotesPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (window.confirm('Delete this note?')) deleteNote.mutate(note.id);
+                    onClick={async () => {
+                      if (await confirm('Delete this note?', 'Delete Note')) deleteNote.mutate(note.id);
                     }}
                     className="rounded-md border border-slate-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
                   >
@@ -312,6 +314,7 @@ export default function NotesPage() {
         </div>
       )}
 
+      {ConfirmDialog}
       {notesQuery.data && (
         <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
           <span>

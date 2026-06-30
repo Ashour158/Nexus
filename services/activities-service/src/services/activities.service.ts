@@ -17,7 +17,7 @@ interface ListPagination {
 }
 
 function buildWhere(tenantId: string, filters: ActivityListFilters): Prisma.ActivityWhereInput {
-  const where: Prisma.ActivityWhereInput = { tenantId };
+  const where: Prisma.ActivityWhereInput = { tenantId, deletedAt: null };
   if (filters.dealId) where.dealId = filters.dealId;
   if (filters.contactId) where.contactId = filters.contactId;
   if (filters.leadId) where.leadId = filters.leadId;
@@ -33,7 +33,7 @@ function buildWhere(tenantId: string, filters: ActivityListFilters): Prisma.Acti
 
 export function createActivitiesService(prisma: ActivitiesPrisma, producer: NexusProducer) {
   async function loadOrThrow(tenantId: string, id: string): Promise<Activity> {
-    const row = await prisma.activity.findFirst({ where: { id, tenantId } });
+    const row = await prisma.activity.findFirst({ where: { id, tenantId, deletedAt: null } });
     if (!row) throw new NotFoundError('Activity', id);
     return row;
   }
@@ -122,7 +122,7 @@ export function createActivitiesService(prisma: ActivitiesPrisma, producer: Nexu
       to.setDate(to.getDate() + daysAhead);
       const limit = Math.min(200, opts.limit ?? 50);
       return prisma.activity.findMany({
-        where: { tenantId, ownerId, dueDate: { gte: from, lte: to }, status: { in: ['PLANNED', 'IN_PROGRESS'] } },
+        where: { tenantId, ownerId, deletedAt: null, dueDate: { gte: from, lte: to }, status: { in: ['PLANNED', 'IN_PROGRESS'] } },
         orderBy: { dueDate: 'asc' },
         take: limit,
       });

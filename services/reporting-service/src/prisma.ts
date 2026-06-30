@@ -1,5 +1,5 @@
 import { PrismaClient } from '../../../node_modules/.prisma/reporting-client/index.js';
-import { buildDatabaseUrl } from '@nexus/service-utils/db';
+import { attachSlowQueryLog, buildDatabaseUrl } from '@nexus/service-utils/db';
 
 export type ReportingPrisma = PrismaClient;
 
@@ -13,8 +13,9 @@ export function getPrisma(): ReportingPrisma {
           url: buildDatabaseUrl({ connectionLimit: 5, poolTimeout: 10, databaseUrl: process.env.REPORTING_DATABASE_URL }),
         },
       },
-      log: ['error'],
+      log: ['error', { emit: 'event', level: 'query' }],
     });
+    attachSlowQueryLog(prisma as any, 'reporting-service');
   }
   return prisma;
 }

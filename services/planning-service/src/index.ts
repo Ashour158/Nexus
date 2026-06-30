@@ -1,5 +1,6 @@
 import { startTracing } from '@nexus/service-utils/tracing';
-import { createService, startService, globalErrorHandler } from '@nexus/service-utils';
+import { createService, startService, globalErrorHandler, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
+import rateLimit from '@fastify/rate-limit';
 import { NexusProducer } from '@nexus/kafka';
 import { getPrisma } from './prisma.js';
 import { createQuotasService } from './services/quotas.service.js';
@@ -26,6 +27,17 @@ const app = await createService({
 const prisma = getPrisma();
 const producer = new NexusProducer('planning-service');
 
+await app.register(rateLimit, {
+  global: true,
+  max: 300,
+  timeWindow: '1 minute',
+  errorResponseBuilder: (_req: any, context: any) => ({
+    success: false,
+    error: 'RATE_LIMIT_EXCEEDED',
+    message: `Too many requests. Retry after ${context.after}.`,
+  }),
+});
+registerHealthRoutes(app, 'planning-service', [() => checkDatabase(prisma as any)]);
 app.setErrorHandler(globalErrorHandler);
 
 await producer.connect().catch(() => undefined);

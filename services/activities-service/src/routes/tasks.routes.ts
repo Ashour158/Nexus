@@ -16,7 +16,7 @@ export async function registerTasksRoutes(
         async (request, reply) => {
           const jwt = request.user as JwtPayload;
           const q = PaginationSchema.parse(request.query);
-          const where = { tenantId: jwt.tenantId, type: 'TASK' as const };
+          const where = { tenantId: jwt.tenantId, type: 'TASK' as const, deletedAt: null as null };
           const [total, rows] = await Promise.all([
             prisma.activity.count({ where }),
             prisma.activity.findMany({ where, skip: (q.page - 1) * q.limit, take: q.limit, orderBy: { dueDate: 'asc' } }),
@@ -31,7 +31,7 @@ export async function registerTasksRoutes(
         async (request, reply) => {
           const jwt = request.user as JwtPayload;
           const q = PaginationSchema.parse(request.query);
-          const where: any = { tenantId: jwt.tenantId, type: 'TASK', dueDate: { lt: new Date() }, status: { in: ['PLANNED', 'IN_PROGRESS'] } };
+          const where: any = { tenantId: jwt.tenantId, type: 'TASK', deletedAt: null, dueDate: { lt: new Date() }, status: { in: ['PLANNED', 'IN_PROGRESS'] } };
           const [total, rows] = await Promise.all([
             prisma.activity.count({ where }),
             prisma.activity.findMany({ where, skip: (q.page - 1) * q.limit, take: q.limit, orderBy: { dueDate: 'asc' } }),
@@ -49,9 +49,9 @@ export async function registerTasksRoutes(
           const start = new Date(); start.setHours(0, 0, 0, 0);
           const end = new Date(); end.setHours(23, 59, 59, 999);
           const [total, rows] = await Promise.all([
-            prisma.activity.count({ where: { tenantId: jwt.tenantId, type: 'TASK', dueDate: { gte: start, lte: end } } }),
+            prisma.activity.count({ where: { tenantId: jwt.tenantId, type: 'TASK', deletedAt: null, dueDate: { gte: start, lte: end } } }),
             prisma.activity.findMany({
-              where: { tenantId: jwt.tenantId, type: 'TASK', dueDate: { gte: start, lte: end } },
+              where: { tenantId: jwt.tenantId, type: 'TASK', deletedAt: null, dueDate: { gte: start, lte: end } },
               orderBy: { dueDate: 'asc' },
               skip: (q.page - 1) * q.limit,
               take: q.limit,

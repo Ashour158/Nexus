@@ -1,5 +1,6 @@
 import { startTracing } from '@nexus/service-utils/tracing';
-import { createService, startService, globalErrorHandler } from '@nexus/service-utils';
+import { createService, startService, globalErrorHandler, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
+import rateLimit from '@fastify/rate-limit';
 import { NexusConsumer, NexusProducer, TOPICS } from '@nexus/kafka';
 import { getPrisma } from './prisma.js';
 import { createCadencesService } from './services/cadences.service.js';
@@ -32,6 +33,17 @@ const enrollments = createEnrollmentsService(prisma, producer);
 const queue = createQueueService(prisma, producer);
 const stopQueueWorker = queue.startQueueWorker();
 
+await app.register(rateLimit, {
+  global: true,
+  max: 300,
+  timeWindow: '1 minute',
+  errorResponseBuilder: (_req: any, context: any) => ({
+    success: false,
+    error: 'RATE_LIMIT_EXCEEDED',
+    message: `Too many requests. Retry after ${context.after}.`,
+  }),
+});
+registerHealthRoutes(app, 'cadence-service', [() => checkDatabase(prisma as any)]);
 app.setErrorHandler(globalErrorHandler);
 
 await producer.connect().catch(() => undefined);

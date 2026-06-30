@@ -1,12 +1,14 @@
 import { PrismaClient } from '../../../node_modules/.prisma/billing-client/index.js';
 import { createTenantPrismaExtension } from '@nexus/service-utils/prisma-tenant';
+import { attachSlowQueryLog } from '@nexus/service-utils/db';
 import { alsStore } from './request-context.js';
 
 export function createBillingPrisma() {
   const base = new PrismaClient({
     datasources: { db: { url: process.env.BILLING_DATABASE_URL } },
-    log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+    log: process.env.NODE_ENV === 'development' ? ['warn', 'error', { emit: 'event', level: 'query' }] : ['error', { emit: 'event', level: 'query' }],
   });
+  attachSlowQueryLog(base as any, 'billing-service');
 
   return base.$extends(
     createTenantPrismaExtension(base, {

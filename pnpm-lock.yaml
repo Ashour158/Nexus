@@ -766,6 +766,9 @@ importers:
       '@prisma/client':
         specifier: ^5.22.0
         version: 5.22.0(prisma@5.22.0)
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
       fastify:
         specifier: ^4.28.1
         version: 4.29.1
@@ -1095,6 +1098,9 @@ importers:
       '@prisma/client':
         specifier: ^5.22.0
         version: 5.22.0(prisma@5.22.0)
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
       fastify:
         specifier: ^4.28.1
         version: 4.29.1
@@ -1165,6 +1171,9 @@ importers:
       dataloader:
         specifier: ^2.2.3
         version: 2.2.3
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
       fastify:
         specifier: ^4.28.1
         version: 4.29.1
@@ -1496,6 +1505,9 @@ importers:
       dataloader:
         specifier: ^2.2.3
         version: 2.2.3
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
       fastify:
         specifier: ^4.28.1
         version: 4.29.1
@@ -1645,6 +1657,9 @@ importers:
       decimal.js:
         specifier: ^10.4.3
         version: 10.6.0
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
       fastify:
         specifier: ^4.28.1
         version: 4.29.1
@@ -1715,6 +1730,9 @@ importers:
       dataloader:
         specifier: ^2.2.3
         version: 2.2.3
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
       fastify:
         specifier: ^4.28.1
         version: 4.29.1
@@ -1885,6 +1903,9 @@ importers:
       decimal.js:
         specifier: ^10.4.3
         version: 10.6.0
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
       fastify:
         specifier: ^4.28.1
         version: 4.29.1
@@ -2028,6 +2049,9 @@ importers:
       dataloader:
         specifier: ^2.2.3
         version: 2.2.3
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
       fastify:
         specifier: ^4.28.1
         version: 4.29.1
@@ -2424,6 +2448,9 @@ importers:
       decimal.js:
         specifier: ^10.4.3
         version: 10.6.0
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
       fastify:
         specifier: ^4.28.1
         version: 4.29.1
@@ -2494,6 +2521,9 @@ importers:
       dataloader:
         specifier: ^2.2.3
         version: 2.2.3
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
       fastify:
         specifier: ^4.28.1
         version: 4.29.1
@@ -2930,6 +2960,9 @@ importers:
       '@prisma/client':
         specifier: ^5.22.0
         version: 5.22.0(prisma@5.22.0)
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
       fastify:
         specifier: ^4.28.1
         version: 4.29.1

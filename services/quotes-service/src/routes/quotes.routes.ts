@@ -11,6 +11,7 @@ import {
   QuoteListQuerySchema,
 } from '@nexus/validation';
 import type { QuotesPrisma } from '../prisma.js';
+import type { Prisma, QuoteStatus } from '../../../node_modules/.prisma/quotes-client/index.js';
 
 function disabledQuoteMutation(requestId: string) {
   return {
@@ -44,11 +45,11 @@ export async function registerQuotesRoutes(
           }
           const jwt = request.user as JwtPayload;
           const q = parsed.data;
-          const where: { tenantId: string; deletedAt: null; dealId?: string; accountId?: string; ownerId?: string; status?: string } = { tenantId: jwt.tenantId, deletedAt: null };
+          const where: Prisma.QuoteWhereInput = { tenantId: jwt.tenantId, deletedAt: null };
           if (q.dealId) where.dealId = q.dealId;
           if (q.accountId) where.accountId = q.accountId;
           if (q.ownerId) where.ownerId = q.ownerId;
-          if (q.status) where.status = q.status;
+          if (q.status) where.status = q.status as QuoteStatus;
 
           const [quotes, total] = await Promise.all([
             prisma.quote.findMany({

@@ -12,13 +12,13 @@ import { PrismaClient } from '../../../node_modules/.prisma/notification-client/
 import { buildDatabaseUrl } from '@nexus/service-utils/db';
 import { createNotificationPrisma } from './prisma.js';
 import { createEmailChannel } from './channels/email.channel.js';
-import { createInAppChannel, type InAppNotificationInput } from './channels/in-app.channel.js';
+import { createInAppChannel } from './channels/in-app.channel.js';
 import { startDealConsumer } from './consumers/deal.consumer.js';
 import { startActivityConsumer } from './consumers/activity.consumer.js';
 import { startQuoteConsumer } from './consumers/quote.consumer.js';
 import { registerNotificationsRoutes } from './routes/notifications.routes.js';
 import { registerGraphQL } from './graphql/index.js';
-import { NexusProducer, TOPICS } from '@nexus/kafka';
+import { NexusProducer } from '@nexus/kafka';
 
 startTracing({ serviceName: 'notification-service' });
 const prismaHealth = new PrismaClient({
@@ -68,7 +68,7 @@ const email = createEmailChannel(app.log);
 // Kafka producer for real-time push via NOTIFICATIONS topic
 let kafkaProducer: NexusProducer | undefined;
 try {
-  kafkaProducer = new NexusProducer({ clientId: 'notification-service' });
+  kafkaProducer = new NexusProducer('notification-service');
   await kafkaProducer.connect();
 } catch (err) {
   app.log.warn({ err }, 'Kafka producer unavailable — real-time push disabled');

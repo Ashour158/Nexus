@@ -12,7 +12,7 @@ import type { Contract } from '../../../../node_modules/.prisma/finance-client/i
 import type { FinancePrisma } from '../prisma.js';
 import { toPaginatedResult } from '@nexus/shared-types';
 
-const producer = new NexusProducer({ clientId: 'finance-service-contracts' });
+const producer = new NexusProducer('finance-service-contracts');
 
 type ContractListFilters = Omit<
   ContractListQuery,

@@ -6,4 +6,4 @@ COPY userlist.txt /etc/pgbouncer/userlist.txt
 USER postgres
 EXPOSE 6432
 
-ENTRYPOINT ["pgbouncer", "/etc/pgbouncer/pgbouncer.ini"]
+ENTRYPOINT ["/opt/pgbouncer/pgbouncer", "/etc/pgbouncer/pgbouncer.ini"]

@@ -86,7 +86,9 @@ function buildWhere(tenantId: string, filters: ContactListFilters): Prisma.Conta
   const where: Prisma.ContactWhereInput = { tenantId };
   if (filters.accountId) where.accountId = filters.accountId;
   if (filters.ownerId) where.ownerId = filters.ownerId;
-  if (filters.isActive !== undefined) where.isActive = filters.isActive;
+  // Default to excluding archived ("deleted") contacts; callers can pass
+  // isActive: false explicitly to see archived records.
+  where.isActive = filters.isActive !== undefined ? filters.isActive : true;
   if (filters.search?.trim()) {
     const q = filters.search.trim();
     where.OR = [
@@ -338,7 +340,12 @@ export function createContactsService(prisma: ContactsPrisma, producer: NexusPro
     },
 
     async getContactById(tenantId: string, id: string): Promise<Contact> {
-      return loadOrThrow(tenantId, id);
+      // loadOrThrow deliberately ignores isActive (archive/restore/merge need to
+      // load inactive records) — the public read path must not expose archived
+      // ("deleted") contacts, so enforce it here.
+      const row = await loadOrThrow(tenantId, id);
+      if (!row.isActive) throw new NotFoundError('Contact', id);
+      return row;
     },
 
     async createContact(tenantId: string, data: CreateContactInput, actorId: string, idempotencyKey?: string): Promise<Contact> {

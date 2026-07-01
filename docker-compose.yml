@@ -875,8 +875,8 @@ services:
 
   router-coprocessor:
     build:
-      context: .
-      dockerfile: ./services/router-coprocessor/Dockerfile
+      context: ./services/router-coprocessor
+      dockerfile: Dockerfile
     container_name: nexus-router-coprocessor
     restart: unless-stopped
     ports:

@@ -1,4 +1,4 @@
-FROM pgbouncer/pgbouncer:1.22.1
+FROM pgbouncer/pgbouncer:1.15.0
 
 COPY pgbouncer.ini /etc/pgbouncer/pgbouncer.ini
 COPY userlist.txt /etc/pgbouncer/userlist.txt

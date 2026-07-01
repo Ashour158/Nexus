@@ -140,11 +140,11 @@ export async function registerDealRoomRoutes(app: FastifyInstance, prisma: CrmPr
             data: {
               dealRoomId: room.id,
               title: body.title,
-              description: body.description,
               owner: body.owner,
-              ownerName: body.ownerName,
-              dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
               position: body.position ?? 0,
+              ...(body.description !== undefined && { description: body.description }),
+              ...(body.ownerName !== undefined && { ownerName: body.ownerName }),
+              ...(body.dueDate ? { dueDate: new Date(body.dueDate) } : {}),
             },
           });
           return reply.code(201).send({ success: true, data: item });
@@ -238,8 +238,8 @@ export async function registerDealRoomRoutes(app: FastifyInstance, prisma: CrmPr
               dealRoomId: room.id,
               name: body.name,
               url: body.url,
-              fileType: body.fileType,
               uploadedBy: body.uploadedBy,
+              ...(body.fileType !== undefined && { fileType: body.fileType }),
             },
           });
           return reply.code(201).send({ success: true, data: doc });

@@ -275,15 +275,16 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           campaignId: data.campaignId ?? null,
           customFields: (data.customFields ?? {}) as Prisma.InputJsonValue,
           tags: data.tags ?? [],
-          contacts:
-            uniqueContactIds.length > 0
-              ? {
+          ...(uniqueContactIds.length > 0
+            ? {
+                contacts: {
                   create: uniqueContactIds.map((contactId, idx) => ({
                     contactId,
                     isPrimary: idx === 0,
                   })),
-                }
-              : undefined,
+                },
+              }
+            : {}),
         },
       });
 

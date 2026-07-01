@@ -37,7 +37,7 @@ export async function registerAccountsRoutes(
           }
           const jwt = request.user as JwtPayload;
           const q = parsed.data;
-          const where: { tenantId: string; deletedAt: null; ownerId?: string; type?: string; tier?: string; status?: string; industry?: string; OR?: unknown } = { tenantId: jwt.tenantId, deletedAt: null };
+          const where: { tenantId: string; deletedAt: null; ownerId?: string; type?: string; tier?: string; status?: string; industry?: string; OR?: Array<{ [k: string]: { contains: string; mode: 'insensitive' } }> } = { tenantId: jwt.tenantId, deletedAt: null };
           if (q.ownerId) where.ownerId = q.ownerId;
           if (q.type) where.type = q.type;
           if (q.tier) where.tier = q.tier;

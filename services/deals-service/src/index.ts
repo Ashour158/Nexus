@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { startTracing } from '@nexus/service-utils/tracing';
-import { createService, startService, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
+import { createService, startService } from '@nexus/service-utils';
 import { NexusProducer } from '@nexus/kafka';
 import { createDealsPrisma } from './prisma.js';
 import { registerDealsHealthRoutes } from './routes/health.routes.js';

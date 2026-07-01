@@ -40,9 +40,11 @@ export class OutboxWriter {
     message: OutboxMessage
   ): Promise<void> {
     validateTopic(message.topic);
+    // "updatedAt" is NOT NULL with no DB default and must be set explicitly on
+    // this raw INSERT (see note in OutboxPublisher.publish).
     await tx.$executeRaw`
       INSERT INTO "OutboxMessage" (
-        id, topic, payload, "aggregateId", "correlationId", headers, status, "createdAt"
+        id, topic, payload, "aggregateId", "correlationId", headers, status, "createdAt", "updatedAt"
       ) VALUES (
         gen_random_uuid(),
         ${message.topic},
@@ -51,6 +53,7 @@ export class OutboxWriter {
         ${message.correlationId ?? null},
         ${JSON.stringify(message.headers ?? {})}::jsonb,
         'PENDING',
+        NOW(),
         NOW()
       )
     `;
@@ -81,9 +84,14 @@ export class OutboxPublisher {
     meta: { eventType: string; tenantId: string; correlationId?: string; aggregateId?: string }
   ): Promise<void> {
     validateTopic(topic);
+    // NOTE: "updatedAt" is NOT NULL with no DB default (Prisma manages @updatedAt
+    // at the ORM layer, which this raw INSERT bypasses) — it must be set here or
+    // every outbox write fails the not-null constraint. "eventType" and "tenantId"
+    // are real columns the relay reads, so populate them too (not just headers).
     const sql = `
       INSERT INTO "OutboxMessage" (
-        id, topic, payload, "aggregateId", "correlationId", headers, status, "createdAt"
+        id, topic, payload, "aggregateId", "correlationId", headers, status,
+        "eventType", "tenantId", "createdAt", "updatedAt"
       ) VALUES (
         gen_random_uuid(),
         $1,
@@ -92,6 +100,9 @@ export class OutboxPublisher {
         $4,
         $5::jsonb,
         'PENDING',
+        $6,
+        $7,
+        NOW(),
         NOW()
       )
     `;
@@ -101,7 +112,9 @@ export class OutboxPublisher {
       JSON.stringify(payload),
       meta.aggregateId ?? null,
       meta.correlationId ?? meta.eventType,
-      JSON.stringify({ eventType: meta.eventType, source: this.serviceName, tenantId: meta.tenantId })
+      JSON.stringify({ eventType: meta.eventType, source: this.serviceName, tenantId: meta.tenantId }),
+      meta.eventType,
+      meta.tenantId
     );
   }
 }

@@ -4,18 +4,18 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/analytics-service/package.json ./services/analytics-service/
 
-RUN pnpm install --frozen-lockfile --filter analytics-service...
+RUN pnpm install --frozen-lockfile --filter @nexus/analytics-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder
 COPY services/analytics-service/ ./services/analytics-service/
 COPY packages/ ./packages/
 
-RUN pnpm --filter analytics-service run build
+RUN pnpm --filter @nexus/analytics-service... run build
 
 # -- Stage 3: Production runner ----------------------------------------------------
 FROM node:20-alpine AS runner

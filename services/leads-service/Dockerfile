@@ -4,18 +4,19 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/leads-service/package.json ./services/leads-service/
 
-RUN pnpm install --frozen-lockfile --filter leads-service...
+RUN pnpm install --frozen-lockfile --filter @nexus/leads-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder
 COPY services/leads-service/ ./services/leads-service/
 COPY packages/ ./packages/
 
-RUN pnpm --filter leads-service run build
+RUN pnpm --filter @nexus/leads-service run db:generate
+RUN pnpm --filter @nexus/leads-service... run build
 
 # -- Stage 3: Production runner ----------------------------------------------------
 FROM node:20-alpine AS runner

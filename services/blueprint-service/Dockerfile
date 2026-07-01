@@ -4,18 +4,19 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/blueprint-service/package.json ./services/blueprint-service/
 
-RUN pnpm install --frozen-lockfile --filter blueprint-service...
+RUN pnpm install --frozen-lockfile --filter @nexus/blueprint-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder
 COPY services/blueprint-service/ ./services/blueprint-service/
 COPY packages/ ./packages/
 
-RUN pnpm --filter blueprint-service run build
+RUN pnpm --filter @nexus/blueprint-service run db:generate
+RUN pnpm --filter @nexus/blueprint-service... run build
 
 # -- Stage 3: Production runner ----------------------------------------------------
 FROM node:20-alpine AS runner

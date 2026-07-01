@@ -4,18 +4,19 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/crm-service/package.json ./services/crm-service/
 
-RUN pnpm install --frozen-lockfile --filter crm-service...
+RUN pnpm install --frozen-lockfile --filter @nexus/crm-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder
 COPY services/crm-service/ ./services/crm-service/
 COPY packages/ ./packages/
 
-RUN pnpm --filter crm-service run build
+RUN pnpm --filter @nexus/crm-service run db:generate
+RUN pnpm --filter @nexus/crm-service... run build
 
 # -- Stage 3: Production runner ----------------------------------------------------
 FROM node:20-alpine AS runner

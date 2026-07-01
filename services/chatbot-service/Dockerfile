@@ -4,18 +4,19 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/chatbot-service/package.json ./services/chatbot-service/
 
-RUN pnpm install --frozen-lockfile --filter chatbot-service...
+RUN pnpm install --frozen-lockfile --filter @nexus/chatbot-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder
 COPY services/chatbot-service/ ./services/chatbot-service/
 COPY packages/ ./packages/
 
-RUN pnpm --filter chatbot-service run build
+RUN pnpm --filter @nexus/chatbot-service run db:generate
+RUN pnpm --filter @nexus/chatbot-service... run build
 
 # -- Stage 3: Production runner ----------------------------------------------------
 FROM node:20-alpine AS runner

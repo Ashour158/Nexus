@@ -4,18 +4,19 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/planning-service/package.json ./services/planning-service/
 
-RUN pnpm install --frozen-lockfile --filter planning-service...
+RUN pnpm install --frozen-lockfile --filter @nexus/planning-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder
 COPY services/planning-service/ ./services/planning-service/
 COPY packages/ ./packages/
 
-RUN pnpm --filter planning-service run build
+RUN pnpm --filter @nexus/planning-service run db:generate
+RUN pnpm --filter @nexus/planning-service... run build
 
 # -- Stage 3: Production runner ----------------------------------------------------
 FROM node:20-alpine AS runner

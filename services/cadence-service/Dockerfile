@@ -4,18 +4,19 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/cadence-service/package.json ./services/cadence-service/
 
-RUN pnpm install --frozen-lockfile --filter cadence-service...
+RUN pnpm install --frozen-lockfile --filter @nexus/cadence-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder
 COPY services/cadence-service/ ./services/cadence-service/
 COPY packages/ ./packages/
 
-RUN pnpm --filter cadence-service run build
+RUN pnpm --filter @nexus/cadence-service run db:generate
+RUN pnpm --filter @nexus/cadence-service... run build
 
 # -- Stage 3: Production runner ----------------------------------------------------
 FROM node:20-alpine AS runner

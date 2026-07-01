@@ -3,7 +3,7 @@ WORKDIR /app
 RUN corepack enable
 
 FROM base AS deps
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/ ./packages/
 RUN pnpm install --frozen-lockfile --filter "./apps/web..."
@@ -12,7 +12,7 @@ FROM deps AS builder
 COPY apps/web/ ./apps/web/
 COPY packages/ ./packages/
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN pnpm --filter "./apps/web" build
+RUN pnpm --filter "./apps/web..." build
 
 FROM node:20-alpine AS runner
 WORKDIR /app

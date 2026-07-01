@@ -4,18 +4,19 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/deals-service/package.json ./services/deals-service/
 
-RUN pnpm install --frozen-lockfile --filter deals-service...
+RUN pnpm install --frozen-lockfile --filter @nexus/deals-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder
 COPY services/deals-service/ ./services/deals-service/
 COPY packages/ ./packages/
 
-RUN pnpm --filter deals-service run build
+RUN pnpm --filter @nexus/deals-service run db:generate
+RUN pnpm --filter @nexus/deals-service... run build
 
 # -- Stage 3: Production runner ----------------------------------------------------
 FROM node:20-alpine AS runner

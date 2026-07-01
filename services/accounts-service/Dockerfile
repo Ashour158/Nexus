@@ -4,18 +4,19 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/accounts-service/package.json ./services/accounts-service/
 
-RUN pnpm install --frozen-lockfile --filter accounts-service...
+RUN pnpm install --frozen-lockfile --filter @nexus/accounts-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder
 COPY services/accounts-service/ ./services/accounts-service/
 COPY packages/ ./packages/
 
-RUN pnpm --filter accounts-service run build
+RUN pnpm --filter @nexus/accounts-service run db:generate
+RUN pnpm --filter @nexus/accounts-service... run build
 
 # -- Stage 3: Production runner ----------------------------------------------------
 FROM node:20-alpine AS runner

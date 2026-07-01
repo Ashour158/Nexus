@@ -4,18 +4,19 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/comm-service/package.json ./services/comm-service/
 
-RUN pnpm install --frozen-lockfile --filter comm-service...
+RUN pnpm install --frozen-lockfile --filter @nexus/comm-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder
 COPY services/comm-service/ ./services/comm-service/
 COPY packages/ ./packages/
 
-RUN pnpm --filter comm-service run build
+RUN pnpm --filter @nexus/comm-service run db:generate
+RUN pnpm --filter @nexus/comm-service... run build
 
 # -- Stage 3: Production runner ----------------------------------------------------
 FROM node:20-alpine AS runner

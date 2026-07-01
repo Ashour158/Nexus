@@ -4,19 +4,19 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/outbox-relay/package.json ./services/outbox-relay/
 
-RUN pnpm install --frozen-lockfile --filter outbox-relay...
+RUN pnpm install --frozen-lockfile --filter @nexus/outbox-relay...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder
 COPY services/outbox-relay/ ./services/outbox-relay/
 COPY packages/ ./packages/
 
-RUN pnpm --filter outbox-relay run db:generate
-RUN pnpm --filter outbox-relay run build
+RUN pnpm --filter @nexus/outbox-relay run db:generate
+RUN pnpm --filter @nexus/outbox-relay... run build
 
 # -- Stage 3: Production runner ----------------------------------------------------
 FROM node:20-alpine AS runner

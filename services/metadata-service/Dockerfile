@@ -4,18 +4,19 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/metadata-service/package.json ./services/metadata-service/
 
-RUN pnpm install --frozen-lockfile --filter metadata-service...
+RUN pnpm install --frozen-lockfile --filter @nexus/metadata-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder
 COPY services/metadata-service/ ./services/metadata-service/
 COPY packages/ ./packages/
 
-RUN pnpm --filter metadata-service run build
+RUN pnpm --filter @nexus/metadata-service run db:generate
+RUN pnpm --filter @nexus/metadata-service... run build
 
 # -- Stage 3: Production runner ----------------------------------------------------
 FROM node:20-alpine AS runner

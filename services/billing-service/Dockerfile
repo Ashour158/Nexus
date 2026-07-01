@@ -4,18 +4,19 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/billing-service/package.json ./services/billing-service/
 
-RUN pnpm install --frozen-lockfile --filter billing-service...
+RUN pnpm install --frozen-lockfile --filter @nexus/billing-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder
 COPY services/billing-service/ ./services/billing-service/
 COPY packages/ ./packages/
 
-RUN pnpm --filter billing-service run build
+RUN pnpm --filter @nexus/billing-service run db:generate
+RUN pnpm --filter @nexus/billing-service... run build
 
 # -- Stage 3: Production runner ----------------------------------------------------
 FROM node:20-alpine AS runner

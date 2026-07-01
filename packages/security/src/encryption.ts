@@ -53,7 +53,13 @@ export interface EncryptedFieldConfig {
 }
 
 export function withFieldEncryption(
-  prisma: { $use: (middleware: (params: Record<string, unknown>, next: (params: Record<string, unknown>) => Promise<unknown>) => Promise<unknown>) => void },
+  // `any` here deliberately: each service generates its own PrismaClient with a
+  // distinct MiddlewareParams union (one member per that service's models), so
+  // there is no single structural type this helper could declare that every
+  // generated client's $use would satisfy. The body only reads .model/.action/
+  // .args off params, which it already casts internally.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  prisma: { $use: (middleware: (params: any, next: (params: any) => Promise<unknown>) => Promise<unknown>) => void },
   masterKey: string,
   configs: EncryptedFieldConfig[]
 ): void {

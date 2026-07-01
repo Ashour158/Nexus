@@ -4,18 +4,18 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/search-service/package.json ./services/search-service/
 
-RUN pnpm install --frozen-lockfile --filter search-service...
+RUN pnpm install --frozen-lockfile --filter @nexus/search-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder
 COPY services/search-service/ ./services/search-service/
 COPY packages/ ./packages/
 
-RUN pnpm --filter search-service run build
+RUN pnpm --filter @nexus/search-service... run build
 
 # -- Stage 3: Production runner ----------------------------------------------------
 FROM node:20-alpine AS runner

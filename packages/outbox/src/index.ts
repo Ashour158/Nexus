@@ -86,12 +86,12 @@ export class OutboxPublisher {
     validateTopic(topic);
     // NOTE: "updatedAt" is NOT NULL with no DB default (Prisma manages @updatedAt
     // at the ORM layer, which this raw INSERT bypasses) — it must be set here or
-    // every outbox write fails the not-null constraint. "eventType" and "tenantId"
-    // are real columns the relay reads, so populate them too (not just headers).
+    // every outbox write fails the not-null constraint. Only columns present in
+    // EVERY service's OutboxMessage table are used here; eventType/tenantId live
+    // in the headers JSON (some services' tables predate those columns).
     const sql = `
       INSERT INTO "OutboxMessage" (
-        id, topic, payload, "aggregateId", "correlationId", headers, status,
-        "eventType", "tenantId", "createdAt", "updatedAt"
+        id, topic, payload, "aggregateId", "correlationId", headers, status, "createdAt", "updatedAt"
       ) VALUES (
         gen_random_uuid(),
         $1,
@@ -100,8 +100,6 @@ export class OutboxPublisher {
         $4,
         $5::jsonb,
         'PENDING',
-        $6,
-        $7,
         NOW(),
         NOW()
       )
@@ -112,9 +110,7 @@ export class OutboxPublisher {
       JSON.stringify(payload),
       meta.aggregateId ?? null,
       meta.correlationId ?? meta.eventType,
-      JSON.stringify({ eventType: meta.eventType, source: this.serviceName, tenantId: meta.tenantId }),
-      meta.eventType,
-      meta.tenantId
+      JSON.stringify({ eventType: meta.eventType, source: this.serviceName, tenantId: meta.tenantId })
     );
   }
 }

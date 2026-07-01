@@ -8,21 +8,21 @@ datasource db {
   url      = env("OUTBOX_RELAY_DATABASE_URL")
 }
 
+// Mirrors the OutboxMessage table written by @nexus/outbox in every service DB
+// (status/sentAt convention). This one model is used to read all service outbox
+// tables, so it must match the shared shape exactly.
 model OutboxMessage {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   topic          String
-  key            String?
   payload        Json
-  headers        Json     @default("{}")
-  tenantId       String
-  aggregateType  String
-  aggregateId    String
-  eventType      String
-  createdAt      DateTime @default(now())
-  processedAt    DateTime?
+  headers        Json      @default("{}")
+  status         String    @default("PENDING")
+  aggregateId    String?
+  correlationId  String?
   error          String?
-  retryCount     Int      @default(0)
+  sentAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  @@index([processedAt, retryCount, createdAt])
-  @@index([aggregateType, aggregateId])
+  @@index([status, createdAt])
 }

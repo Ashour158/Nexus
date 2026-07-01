@@ -8,17 +8,13 @@ import type { Producer } from 'kafkajs';
 export interface OutboxMessage {
   id: string;
   topic: string;
-  key: string | null;
   payload: unknown;
   headers: unknown;
-  tenantId: string;
-  aggregateType: string;
-  aggregateId: string;
-  eventType: string;
+  aggregateId: string | null;
+  status: string;
   createdAt: Date;
-  processedAt: Date | null;
+  sentAt: Date | null;
   error: string | null;
-  retryCount: number;
 }
 
 export interface ServiceConnection {
@@ -104,8 +100,7 @@ export class OutboxRelay {
       try {
         messages = (await svc.prisma.outboxMessage.findMany({
           where: {
-            processedAt: null,
-            retryCount: { lt: 5 },
+            status: 'PENDING',
           },
           orderBy: { createdAt: 'asc' },
           take: this.batchSize,
@@ -164,35 +159,35 @@ export class OutboxRelay {
         updates.push(
           svc.prisma.outboxMessage.update({
             where: { id: message.id },
-            data: { processedAt: new Date() },
+            data: { status: 'SENT', sentAt: new Date() },
           })
         );
       } else {
-        const newRetryCount = message.retryCount + 1;
+        // publishWithRetry already retried the Kafka send this.maxRetries times.
+        // The OutboxMessage schema has no retry counter, so a persistent failure
+        // is marked FAILED (excluded from future polls) and routed to the DLQ.
         updates.push(
           svc.prisma.outboxMessage.update({
             where: { id: message.id },
             data: {
-              retryCount: { increment: 1 },
+              status: 'FAILED',
               error: lastError!.message,
             },
           })
         );
 
-        if (newRetryCount >= 5) {
-          this.log.error(
-            { service: svc.name, messageId: message.id, topic: message.topic },
-            'Message reached max retries'
-          );
-          if (this.dlqEnabled) {
-            try {
-              await this.sendToDLQ(message, lastError!);
-            } catch (dlqErr) {
-              this.log.error(
-                { err: dlqErr, service: svc.name, messageId: message.id },
-                'Failed to send message to DLQ'
-              );
-            }
+        this.log.error(
+          { service: svc.name, messageId: message.id, topic: message.topic },
+          'Message failed to publish; marking FAILED'
+        );
+        if (this.dlqEnabled) {
+          try {
+            await this.sendToDLQ(message, lastError!);
+          } catch (dlqErr) {
+            this.log.error(
+              { err: dlqErr, service: svc.name, messageId: message.id },
+              'Failed to send message to DLQ'
+            );
           }
         }
       }
@@ -245,11 +240,16 @@ export class OutboxRelay {
   }
 
   private buildHeaders(message: OutboxMessage): Record<string, string> {
+    // eventType/tenantId are carried in the headers JSON written by @nexus/outbox
+    // (not as dedicated columns, which some services' tables lack).
+    const h =
+      message.headers && typeof message.headers === 'object' && !Array.isArray(message.headers)
+        ? (message.headers as Record<string, unknown>)
+        : {};
     const base: Record<string, string> = {
-      eventType: message.eventType,
-      tenantId: message.tenantId,
-      aggregateType: message.aggregateType,
-      aggregateId: message.aggregateId,
+      eventType: typeof h.eventType === 'string' ? h.eventType : '',
+      tenantId: typeof h.tenantId === 'string' ? h.tenantId : '',
+      aggregateId: message.aggregateId ?? '',
       source: 'outbox-relay',
     };
 

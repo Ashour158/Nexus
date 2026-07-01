@@ -14,28 +14,28 @@ export const envSchema = z.object({
   DLQ_REPLAY_BATCH_SIZE: z.coerce.number().default(100),
   DLQ_REPLAY_INTERVAL_MS: z.coerce.number().default(60000),
 
-  AUTH_DATABASE_URL: z.string().url(),
-  CRM_DATABASE_URL: z.string().url(),
-  APPROVAL_DATABASE_URL: z.string().url(),
-  ANALYTICS_DATABASE_URL: z.string().url(),
-  INTEGRATION_DATABASE_URL: z.string().url(),
-  REPORTING_DATABASE_URL: z.string().url(),
-  TERRITORY_DATABASE_URL: z.string().url(),
-  FINANCE_DATABASE_URL: z.string().url(),
-  NOTIFICATION_DATABASE_URL: z.string().url(),
-  WORKFLOW_DATABASE_URL: z.string().url(),
-  COMM_DATABASE_URL: z.string().url(),
-  DOCUMENT_DATABASE_URL: z.string().url(),
-  CADENCE_DATABASE_URL: z.string().url(),
-  PLANNING_DATABASE_URL: z.string().url(),
-  PORTAL_DATABASE_URL: z.string().url(),
-  KNOWLEDGE_DATABASE_URL: z.string().url(),
-  INCENTIVE_DATABASE_URL: z.string().url(),
-  EMAIL_SYNC_DATABASE_URL: z.string().url(),
-  CONTACTS_DATABASE_URL: z.string().url(),
-  DEALS_DATABASE_URL: z.string().url(),
-  LEADS_DATABASE_URL: z.string().url(),
-  ACCOUNTS_DATABASE_URL: z.string().url(),
+  AUTH_DATABASE_URL: z.string().url().optional(),
+  CRM_DATABASE_URL: z.string().url().optional(),
+  APPROVAL_DATABASE_URL: z.string().url().optional(),
+  ANALYTICS_DATABASE_URL: z.string().url().optional(),
+  INTEGRATION_DATABASE_URL: z.string().url().optional(),
+  REPORTING_DATABASE_URL: z.string().url().optional(),
+  TERRITORY_DATABASE_URL: z.string().url().optional(),
+  FINANCE_DATABASE_URL: z.string().url().optional(),
+  NOTIFICATION_DATABASE_URL: z.string().url().optional(),
+  WORKFLOW_DATABASE_URL: z.string().url().optional(),
+  COMM_DATABASE_URL: z.string().url().optional(),
+  DOCUMENT_DATABASE_URL: z.string().url().optional(),
+  CADENCE_DATABASE_URL: z.string().url().optional(),
+  PLANNING_DATABASE_URL: z.string().url().optional(),
+  PORTAL_DATABASE_URL: z.string().url().optional(),
+  KNOWLEDGE_DATABASE_URL: z.string().url().optional(),
+  INCENTIVE_DATABASE_URL: z.string().url().optional(),
+  EMAIL_SYNC_DATABASE_URL: z.string().url().optional(),
+  CONTACTS_DATABASE_URL: z.string().url().optional(),
+  DEALS_DATABASE_URL: z.string().url().optional(),
+  LEADS_DATABASE_URL: z.string().url().optional(),
+  ACCOUNTS_DATABASE_URL: z.string().url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -75,8 +75,10 @@ const serviceDbKeys: Array<{ name: string; envKey: keyof Env }> = [
 ];
 
 export function getServiceConfigs(env: Env): ServiceConfig[] {
-  return serviceDbKeys.map(({ name, envKey }) => ({
-    name,
-    dbUrl: env[envKey] as string,
-  }));
+  // Only relay for services whose DATABASE_URL is configured. A relay deployment
+  // need not have connectivity to every service DB to start; unset services are
+  // simply skipped rather than failing startup.
+  return serviceDbKeys
+    .map(({ name, envKey }) => ({ name, dbUrl: env[envKey] as string | undefined }))
+    .filter((s): s is ServiceConfig => typeof s.dbUrl === 'string' && s.dbUrl.length > 0);
 }

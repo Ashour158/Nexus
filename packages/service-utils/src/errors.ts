@@ -14,8 +14,11 @@ export class NexusError extends Error {
 }
 
 export class NotFoundError extends NexusError {
-  constructor(resource: string, id: string) {
-    super('NOT_FOUND', `${resource} '${id}' not found`, 404);
+  constructor(resource: string, id?: string) {
+    // Two call conventions are in use: NotFoundError('Account', id) →
+    // "Account '<id>' not found", and NotFoundError('Subscription not found')
+    // where the caller passes a complete message. Support both.
+    super('NOT_FOUND', id ? `${resource} '${id}' not found` : resource, 404);
   }
 }
 

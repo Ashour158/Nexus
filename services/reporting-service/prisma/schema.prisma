@@ -38,9 +38,12 @@ model DefinitionReportSchedule {
   format     String           @default("xlsx")
   recipients String[]
   lastRunAt  DateTime?
+  nextRunAt  DateTime?
+  isActive   Boolean          @default(true)
   createdAt  DateTime         @default(now())
 
   @@index([tenantId])
+  @@index([isActive, nextRunAt])
   @@unique([id, tenantId])
 }
 

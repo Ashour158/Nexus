@@ -48,7 +48,7 @@ export function startScheduleRunner(prisma: ReportingPrisma): NodeJS.Timeout {
           }),
         });
 
-        const nextRunAt = computeNextRun(schedule.cronExpr, now);
+        const nextRunAt = computeNextRun(schedule.cron, now);
         await prisma.reportSchedule.update({
           where: { id: schedule.id },
           data: { lastRunAt: now, nextRunAt },

@@ -217,8 +217,8 @@ export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: R
       data: {
         tenantId: jwt.tenantId,
         reportId: id,
-        cronExpr: body.cronExpr,
-        recipients: body.recipients as Prisma.InputJsonValue,
+        cron: body.cronExpr,
+        recipients: body.recipients,
         format: body.format ?? 'csv',
         subject: body.subject,
         nextRunAt,

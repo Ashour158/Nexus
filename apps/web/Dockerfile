@@ -12,7 +12,12 @@ FROM deps AS builder
 COPY apps/web/ ./apps/web/
 COPY packages/ ./packages/
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN pnpm --filter "./apps/web..." build
+# Build workspace packages FIRST. apps/web imports @nexus/validation as a value
+# (zod schemas), so its dist/ must exist before `next build` resolves it. The
+# recursive `./apps/web...` selector did not reliably build deps, so build all
+# publishable packages explicitly (packages without a build script are skipped).
+RUN pnpm --filter "./packages/**" run build
+RUN pnpm --filter @nexus/web run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app

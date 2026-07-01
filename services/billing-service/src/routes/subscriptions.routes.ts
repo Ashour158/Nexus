@@ -139,13 +139,10 @@ export async function registerSubscriptionsRoutes(
             },
           });
           try {
-            await producer.send(TOPICS.PAYMENTS, {
-              key: id,
-              value: JSON.stringify({
-                type: 'subscription.cancelled',
-                tenantId: jwt.tenantId,
-                subscriptionId: id,
-              }),
+            await producer.publish(TOPICS.PAYMENTS, {
+              type: 'subscription.cancelled',
+              tenantId: jwt.tenantId,
+              subscriptionId: id,
             });
           } catch (err) {
             app.log.warn({ err }, 'Failed to publish subscription.cancelled event');

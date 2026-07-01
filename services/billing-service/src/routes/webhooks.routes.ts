@@ -58,16 +58,13 @@ export async function registerWebhooksRoutes(
                       data: { status: 'PAID', paidAt: new Date() },
                     });
                     try {
-                      await producer.send(TOPICS.PAYMENTS, {
-                        key: invoice.id,
-                        value: JSON.stringify({
-                          type: 'payment.received',
-                          tenantId: invoice.tenantId,
-                          invoiceId: invoice.id,
-                          amount: stripeInvoice.amount_paid / 100,
-                          currency: (stripeInvoice.currency ?? 'usd').toUpperCase(),
-                          stripeInvoiceId: stripeInvoice.id,
-                        }),
+                      await producer.publish(TOPICS.PAYMENTS, {
+                        type: 'payment.received',
+                        tenantId: invoice.tenantId,
+                        invoiceId: invoice.id,
+                        amount: stripeInvoice.amount_paid / 100,
+                        currency: (stripeInvoice.currency ?? 'usd').toUpperCase(),
+                        stripeInvoiceId: stripeInvoice.id,
                       });
                     } catch (kafkaErr) {
                       app.log.warn({ kafkaErr }, 'Failed to publish payment.received from Stripe webhook');
@@ -108,13 +105,10 @@ export async function registerWebhooksRoutes(
                       },
                     });
                     try {
-                      await producer.send(TOPICS.PAYMENTS, {
-                        key: sub.id,
-                        value: JSON.stringify({
-                          type: 'subscription.cancelled',
-                          tenantId: sub.tenantId,
-                          subscriptionId: sub.id,
-                        }),
+                      await producer.publish(TOPICS.PAYMENTS, {
+                        type: 'subscription.cancelled',
+                        tenantId: sub.tenantId,
+                        subscriptionId: sub.id,
                       });
                     } catch (kafkaErr) {
                       app.log.warn({ kafkaErr }, 'Failed to publish subscription.cancelled from Stripe webhook');

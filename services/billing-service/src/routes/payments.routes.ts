@@ -76,16 +76,13 @@ export async function registerPaymentsRoutes(
               data: { status: 'PAID', paidAt: new Date() },
             });
             try {
-              await producer.send(TOPICS.PAYMENTS, {
-                key: payment.id,
-                value: JSON.stringify({
-                  type: 'payment.received',
-                  tenantId: jwt.tenantId,
-                  invoiceId: parsed.data.invoiceId,
-                  amount: parsed.data.amount,
-                  currency: parsed.data.currency,
-                  paymentId: payment.id,
-                }),
+              await producer.publish(TOPICS.PAYMENTS, {
+                type: 'payment.received',
+                tenantId: jwt.tenantId,
+                invoiceId: parsed.data.invoiceId,
+                amount: parsed.data.amount,
+                currency: parsed.data.currency,
+                paymentId: payment.id,
               });
             } catch (err) {
               app.log.warn({ err }, 'Failed to publish payment.received event');

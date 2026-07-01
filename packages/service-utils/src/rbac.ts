@@ -84,10 +84,10 @@ export const PERMISSIONS = {
     DELETE: 'users:delete',
     MANAGE_ROLES: 'users:manage_roles',
   },
-  SETTINGS: { READ: 'settings:read', UPDATE: 'settings:update' },
+  SETTINGS: { READ: 'settings:read', UPDATE: 'settings:update', WRITE: 'settings:write' },
   INTEGRATIONS: { READ: 'integrations:read', MANAGE: 'integrations:manage' },
   BLUEPRINTS: { READ: 'blueprints:read', MANAGE: 'blueprints:manage' },
-  DOCUMENTS: { READ: 'documents:read' },
+  DOCUMENTS: { READ: 'documents:read', UPDATE: 'documents:update' },
   DATA: {
     READ: 'data:read',
     IMPORT: 'data:import',

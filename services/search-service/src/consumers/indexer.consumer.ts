@@ -7,7 +7,9 @@ import { upsertLeadDoc } from '../indexes/leads.index.js';
 
 export async function startIndexerConsumer(client: MeiliSearch): Promise<NexusConsumer> {
   const consumer = new NexusConsumer('search-service.indexer');
-  const onUnsafe = consumer.on as unknown as (
+  // Bind to the consumer — `on` reads `this.handlers`, so a bare method
+  // reference would call it with `this === undefined` and throw.
+  const onUnsafe = consumer.on.bind(consumer) as unknown as (
     event: string,
     handler: (event: { tenantId: string; payload: Record<string, unknown>; type: string }) => Promise<void>
   ) => void;

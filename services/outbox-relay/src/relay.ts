@@ -212,7 +212,26 @@ export class OutboxRelay {
 
   private async publishWithRetry(message: OutboxMessage): Promise<void> {
     const headers = this.buildHeaders(message);
-    const payload = JSON.stringify(message.payload);
+    // Consumers (NexusConsumer) parse the message VALUE and dispatch on
+    // `event.type`, so publish the NexusKafkaEvent envelope — not the bare
+    // payload. The outbox stores only the payload, so rebuild the envelope from
+    // the payload + the eventType/tenantId carried in the headers JSON.
+    const h = this.parseHeadersJson(message);
+    const eventType = typeof h.eventType === 'string' ? h.eventType : '';
+    const tenantId = typeof h.tenantId === 'string' ? h.tenantId : '';
+    const createdAt =
+      message.createdAt instanceof Date ? message.createdAt.toISOString() : new Date().toISOString();
+    const value = JSON.stringify({
+      type: eventType,
+      tenantId,
+      correlationId: message.id,
+      payload: message.payload,
+      eventId: message.id,
+      timestamp: createdAt,
+      version: 1,
+      source: typeof h.source === 'string' ? h.source : 'outbox-relay',
+    });
+    const key = tenantId || message.id;
 
     let lastErr: Error | undefined;
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
@@ -221,8 +240,8 @@ export class OutboxRelay {
           topic: message.topic,
           messages: [
             {
-              key: message.id,
-              value: payload,
+              key,
+              value,
               headers,
             },
           ],
@@ -239,13 +258,17 @@ export class OutboxRelay {
     throw lastErr;
   }
 
+  /** The headers JSON column written by @nexus/outbox, as a plain object. */
+  private parseHeadersJson(message: OutboxMessage): Record<string, unknown> {
+    return message.headers && typeof message.headers === 'object' && !Array.isArray(message.headers)
+      ? (message.headers as Record<string, unknown>)
+      : {};
+  }
+
   private buildHeaders(message: OutboxMessage): Record<string, string> {
     // eventType/tenantId are carried in the headers JSON written by @nexus/outbox
     // (not as dedicated columns, which some services' tables lack).
-    const h =
-      message.headers && typeof message.headers === 'object' && !Array.isArray(message.headers)
-        ? (message.headers as Record<string, unknown>)
-        : {};
+    const h = this.parseHeadersJson(message);
     const base: Record<string, string> = {
       eventType: typeof h.eventType === 'string' ? h.eventType : '',
       tenantId: typeof h.tenantId === 'string' ? h.tenantId : '',

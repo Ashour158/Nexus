@@ -9,7 +9,62 @@ import { fastifyRequestContext } from '@fastify/request-context';
 import { createRedisClient } from './redis.js';
 import pino from 'pino';
 import * as Sentry from '@sentry/node';
-import type { KeyObject } from 'node:crypto';
+import { createPublicKey, type KeyObject } from 'node:crypto';
+
+
+/**
+ * JWKS resolution with a short TTL cache. Consuming services verify RS256 tokens
+ * issued by auth-service by fetching its public keys from `/.well-known/jwks.json`.
+ * The keyset is cached per URL so we do not fetch on every request; a cache miss
+ * on the requested `kid` (e.g. after a key rotation) forces a single refetch.
+ */
+interface JwksEntry {
+  // Public keys as SPKI PEM strings. fast-jwt (via @fastify/jwt) accepts PEM
+  // strings/buffers for verification but not Node KeyObject handles.
+  keysByKid: Map<string, string>;
+  fetchedAt: number;
+}
+const JWKS_TTL_MS = 5 * 60 * 1000;
+const jwksCache = new Map<string, JwksEntry>();
+
+async function fetchJwks(url: string): Promise<JwksEntry> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`JWKS fetch failed: ${res.status} ${url}`);
+  const body = (await res.json()) as { keys?: Array<{ kid?: string; [k: string]: unknown }> };
+  const keysByKid = new Map<string, string>();
+  for (const jwk of body.keys ?? []) {
+    if (!jwk.kid) continue;
+    const pem = createPublicKey({ key: jwk as Record<string, unknown>, format: 'jwk' })
+      .export({ type: 'spki', format: 'pem' }) as string;
+    keysByKid.set(jwk.kid, pem);
+  }
+  const entry: JwksEntry = { keysByKid, fetchedAt: Date.now() };
+  jwksCache.set(url, entry);
+  return entry;
+}
+
+/** Pull the raw JWT out of the request's Authorization: Bearer header. */
+function rawBearerToken(request: { headers?: Record<string, unknown> }): string {
+  const auth = (request.headers?.authorization as string | undefined) ?? '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : auth;
+  if (!token) throw new Error('Missing bearer token');
+  return token;
+}
+
+async function resolveJwksPublicKey(url: string, token: string): Promise<string> {
+  const header = JSON.parse(Buffer.from(token.split('.')[0]!, 'base64url').toString()) as { kid?: string };
+  const kid = header.kid;
+  if (!kid) throw new Error('Token header is missing a `kid`');
+
+  let entry = jwksCache.get(url);
+  const stale = !entry || Date.now() - entry.fetchedAt > JWKS_TTL_MS;
+  if (!entry || stale || !entry.keysByKid.has(kid)) {
+    entry = await fetchJwks(url);
+  }
+  const key = entry.keysByKid.get(kid);
+  if (!key) throw new Error(`Unknown kid: ${kid}`);
+  return key;
+}
 
 
 if (process.env.SENTRY_DSN) {
@@ -161,24 +216,20 @@ export async function createService(config: ServiceConfig): Promise<FastifyInsta
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-Service-Token', 'Idempotency-Key', 'X-Request-Id'],
   });
 
+  // JWKS URL may be provided explicitly or via AUTH_JWKS_URL env (so services can
+  // opt into verifying auth-service's RS256 tokens without a code change).
+  const jwksUrl = config.jwksUrl ?? process.env.AUTH_JWKS_URL;
   if (config.jwtPrivateKey && config.jwtPublicKey) {
     await app.register(fastifyJwt as any, {
       secret: { private: config.jwtPrivateKey, public: config.jwtPublicKey },
       sign: { algorithm: 'RS256' },
     });
-  } else if (config.jwksUrl) {
+  } else if (jwksUrl) {
     await app.register(fastifyJwt as any, {
-      secret: async (_request: any, token: string) => {
-        if (!config.jwksUrl) throw new Error('JWKS URL not configured');
-        const header = JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString()) as { kid?: string };
-        const kid = header.kid;
-        const jwksRes = await fetch(config.jwksUrl);
-        const jwks = (await jwksRes.json()) as { keys: Array<{ kid: string; [key: string]: unknown }> };
-        const jwk = jwks.keys.find((k) => k.kid === kid);
-        if (!jwk) throw new Error(`Unknown kid: ${kid}`);
-        const { createPublicKey } = await import('node:crypto');
-        return createPublicKey({ key: jwk as unknown as Record<string, unknown>, format: 'jwk' });
-      },
+      // fast-jwt hands the secret callback only the decoded payload (no header),
+      // so read the raw token off the request to recover its `kid`.
+      secret: (request: any) => resolveJwksPublicKey(jwksUrl, rawBearerToken(request)),
+      verify: { algorithms: ['RS256'] },
     });
   } else {
     await app.register(fastifyJwt as any, {

@@ -1,0 +1,794 @@
+# Instincts generated from https://github.com/Ashour158/Nexus
+# Generated: 2026-07-01T15:31:22.895Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: Nexus-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: fix, feat
+
+## Evidence
+
+- 15 commits analyzed
+- Detected conventional commit pattern
+- Examples: fix: P0/P1/P2 security, permissions, and production readiness, feat: complete production readiness audit — all P0/P1/P2 items
+
+---
+id: Nexus-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Commit Length
+
+## Action
+
+Write moderate-length commit messages (~67 characters)
+
+## Evidence
+
+- Average commit message length: 67 chars
+- Based on 15 commits
+
+---
+id: Nexus-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: Nexus-import-alias
+trigger: "when importing modules"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Import Alias
+
+## Action
+
+Use path aliases (@/, ~/) instead of relative imports
+
+## Evidence
+
+- Import analysis shows alias pattern
+- Example: import { x } from '@/lib/x'
+
+---
+id: Nexus-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Export Style
+
+## Action
+
+Prefer default exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: default
+
+---
+id: Nexus-arch-type-based
+trigger: "when adding new code"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Arch Type Based
+
+## Action
+
+Place code in the appropriate type folder (components/, services/, utils/, etc.)
+
+## Evidence
+
+- Type-based module organization detected
+- Folders: 
+
+---
+id: Nexus-test-framework
+trigger: "when writing tests"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Test Framework
+
+## Action
+
+Use playwright as the test framework
+
+## Evidence
+
+- Test framework detected: playwright
+- File pattern: *.test.ts
+
+---
+id: Nexus-test-naming
+trigger: "when creating a test file"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Test Naming
+
+## Action
+
+Name test files using the pattern: *.test.ts
+
+## Evidence
+
+- File pattern: *.test.ts
+- Consistent across test files
+
+---
+id: Nexus-test-mocking
+trigger: "when mocking dependencies in tests"
+confidence: 0.75
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Test Mocking
+
+## Action
+
+Use vi.mock for mocking
+
+## Evidence
+
+- Mocking pattern detected: vi.mock
+- Consistent across test files
+
+---
+id: Nexus-test-types
+trigger: "when planning tests for a feature"
+confidence: 0.7
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Test Types
+
+## Action
+
+Write unit, integration, e2e tests to match project standards
+
+## Evidence
+
+- Test types detected: unit, integration, e2e
+- Coverage config: no
+
+---
+id: Nexus-workflow-database-migration
+trigger: "when modifying the database schema or adding tables"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Workflow Database Migration
+
+## Action
+
+Follow the database-migration workflow:
+1. Create migration file
+2. Update schema definitions
+3. Generate/update types
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~10x per month
+- Files: migrations/*, **/schema.*, **/types.ts
+
+---
+id: Nexus-workflow-feature-development
+trigger: "when implementing a new feature"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Workflow Feature Development
+
+## Action
+
+Follow the feature-development workflow:
+1. Add feature implementation
+2. Add tests for feature
+3. Update documentation
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~26x per month
+- Files: apps/web/src/app/(dashboard)/analytics/competitors/*, apps/web/src/app/(dashboard)/analytics/leaderboard/*, apps/web/src/app/(dashboard)/analytics/*
+
+---
+id: Nexus-workflow-add-or-modify-database-table-or-schema
+trigger: "when doing add or modify database table or schema"
+confidence: 0.65
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Workflow Add Or Modify Database Table Or Schema
+
+## Action
+
+Follow the add-or-modify-database-table-or-schema workflow:
+1. Edit the relevant Prisma schema file (e.g., add model, field, or constraint).
+2. If soft-delete: add deletedAt column to schema.
+3. Update or create migration SQL file if needed.
+4. Update service code to use new/changed fields (e.g., filter deletedAt, enforce tenantId).
+5. Update or create service logic to handle new constraints or fields.
+6. Update .env.example if new env vars are needed for encryption.
+7. Test new/changed model logic.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~3x per month
+- Files: services/*/prisma/schema.prisma, services/*/prisma/migrations/*/migration.sql, services/*/src/services/*.ts
+
+---
+id: Nexus-workflow-add-or-update-api-endpoint
+trigger: "when doing add or update api endpoint"
+confidence: 0.7
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Workflow Add Or Update Api Endpoint
+
+## Action
+
+Follow the add-or-update-api-endpoint workflow:
+1. Create or modify route handler file for the endpoint.
+2. Register new route in the service's router/index or API directory.
+3. If permissions needed: add requirePermission or guards.
+4. If rate limiting needed: add @fastify/rate-limit.
+5. If new business logic: update or create service logic.
+6. If frontend: create or update corresponding API route file.
+7. Add or update tests for the endpoint.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~4x per month
+- Files: services/*/src/routes/*.ts, services/*/src/index.ts, apps/web/src/app/api/**/*.ts
+
+---
+id: Nexus-workflow-add-service-to-docker-compose-and-infrastructure
+trigger: "when doing add service to docker compose and infrastructure"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Workflow Add Service To Docker Compose And Infrastructure
+
+## Action
+
+Follow the add-service-to-docker-compose-and-infrastructure workflow:
+1. Add service entry to docker-compose.yml with ports, dependencies, env vars, and health checks.
+2. Add route to Kong gateway config if service is HTTP accessible.
+3. Add or update Dockerfile for the service if missing.
+4. Update .env.example with required env vars.
+5. Test service boot and health endpoint.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: docker-compose.yml, infrastructure/kong/kong.yml, services/*/Dockerfile
+
+---
+id: Nexus-workflow-enforce-permissions-and-security-guards
+trigger: "when doing enforce permissions and security guards"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Workflow Enforce Permissions And Security Guards
+
+## Action
+
+Follow the enforce-permissions-and-security-guards workflow:
+1. Add requirePermission or equivalent guard to route handlers.
+2. Update or add middleware for IP restriction or rate limiting.
+3. Document or update related env vars.
+4. Test access control for affected endpoints.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: services/*/src/routes/*.ts, services/*/src/index.ts, apps/web/src/app/api/**/*.ts
+
+---
+id: Nexus-workflow-add-or-expand-health-checks-and-monitoring
+trigger: "when doing add or expand health checks and monitoring"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Workflow Add Or Expand Health Checks And Monitoring
+
+## Action
+
+Follow the add-or-expand-health-checks-and-monitoring workflow:
+1. Add or fix /health route registration in service code.
+2. Add health check config to docker-compose.yml for the service.
+3. Update monitoring config files (e.g., alertmanager.yml) as needed.
+4. Test health endpoint and monitoring integration.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: services/*/src/index.ts, docker-compose.yml, infrastructure/prometheus/alertmanager.yml
+
+---
+id: Nexus-workflow-replace-or-standardize-frontend-ui-patterns
+trigger: "when doing replace or standardize frontend ui patterns"
+confidence: 0.55
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Workflow Replace Or Standardize Frontend Ui Patterns
+
+## Action
+
+Follow the replace-or-standardize-frontend-ui-patterns workflow:
+1. Create or update custom React dialog hooks/components.
+2. Replace all window.alert/confirm/prompt calls in pages/components with new dialog usage.
+3. Test all affected flows for correct dialog behavior.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~1x per month
+- Files: apps/web/src/hooks/use-confirm.tsx, apps/web/src/app/**/*.tsx, apps/web/src/components/**/*.tsx
+
+---
+id: Nexus-workflow-add-or-expand-test-coverage-for-services
+trigger: "when doing add or expand test coverage for services"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/Ashour158/Nexus
+---
+
+# Nexus Workflow Add Or Expand Test Coverage For Services
+
+## Action
+
+Follow the add-or-expand-test-coverage-for-services workflow:
+1. Create new test files in the service's tests directory.
+2. Write tests for health, endpoints, or business logic.
+3. Register test files in workspace config if needed.
+4. Run tests and ensure passing.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: services/*/src/tests/*.test.ts, vitest.workspace.ts
+
+---
+id: nexus-camelcase-files
+trigger: "When creating or renaming a file in the codebase"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Camelcase Files
+
+## Action
+
+Use camelCase for file names
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.files
+- apps/web/src/app/(dashboard)/analytics/competitors/page.tsx
+
+---
+id: nexus-camelcase-functions
+trigger: "When defining a function"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Camelcase Functions
+
+## Action
+
+Name the function using camelCase
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.functions
+
+---
+id: nexus-pascalcase-classes
+trigger: "When defining a class"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Pascalcase Classes
+
+## Action
+
+Name the class using PascalCase
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.classes
+
+---
+id: nexus-screaming-snake-constants
+trigger: "When defining a constant"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Screaming Snake Constants
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.constants
+
+---
+id: nexus-alias-imports
+trigger: "When importing modules"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Alias Imports
+
+## Action
+
+Use alias import style
+
+## Evidence
+
+- Pattern in codeStyle.importStyle
+
+---
+id: nexus-default-exports
+trigger: "When exporting from a module"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Default Exports
+
+## Action
+
+Use default export style
+
+## Evidence
+
+- Pattern in codeStyle.exportStyle
+
+---
+id: nexus-playwright-test-pattern
+trigger: "When writing end-to-end or integration tests"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Playwright Test Pattern
+
+## Action
+
+Use Playwright with *.test.ts file pattern
+
+## Evidence
+
+- Pattern in testing.framework
+- Pattern in testing.filePattern
+- apps/web/playwright.config.ts
+
+---
+id: nexus-vi-mock-style
+trigger: "When mocking dependencies in tests"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Vi Mock Style
+
+## Action
+
+Use vi.mock for mocking
+
+## Evidence
+
+- Pattern in testing.mockingStyle
+
+---
+id: nexus-test-types
+trigger: "When writing tests for a service or module"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Test Types
+
+## Action
+
+Include unit, integration, and e2e tests as appropriate
+
+## Evidence
+
+- Pattern in testing.testTypes
+
+---
+id: nexus-commit-conventional
+trigger: "When making a git commit"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Commit Conventional
+
+## Action
+
+Use conventional commit format with 'fix:' or 'feat:' prefix and concise description
+
+## Evidence
+
+- Pattern in commits.prefixes
+- Examples: 'fix: P0/P1/P2 security, permissions, and production readiness'
+
+---
+id: nexus-commit-length
+trigger: "When writing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Commit Length
+
+## Action
+
+Keep commit messages around 67 characters on average
+
+## Evidence
+
+- Pattern in commits.averageLength
+
+---
+id: nexus-add-or-modify-database-table-or-schema
+trigger: "When adding or modifying a database table/model, constraint, or soft-delete"
+confidence: 0.95
+domain: workflow
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Add Or Modify Database Table Or Schema
+
+## Action
+
+Edit Prisma schema, update migration SQL, update service code, update .env.example if needed, and test model logic
+
+## Evidence
+
+- Workflow: add-or-modify-database-table-or-schema
+- services/*/prisma/schema.prisma
+- services/*/prisma/migrations/*/migration.sql
+
+---
+id: nexus-add-or-update-api-endpoint
+trigger: "When exposing new functionality or data via HTTP API"
+confidence: 0.93
+domain: workflow
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Add Or Update Api Endpoint
+
+## Action
+
+Create/modify route handler, register route, add permissions/guards/rate-limits as needed, update service logic, add/update tests
+
+## Evidence
+
+- Workflow: add-or-update-api-endpoint
+- services/*/src/routes/*.ts
+- apps/web/src/app/api/**/*.ts
+
+---
+id: nexus-add-service-to-docker-compose-and-infrastructure
+trigger: "When registering a new microservice for local/dev/prod environments"
+confidence: 0.92
+domain: workflow
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Add Service To Docker Compose And Infrastructure
+
+## Action
+
+Add to docker-compose.yml, update Kong config, add/update Dockerfile, update .env.example, test service boot/health
+
+## Evidence
+
+- Workflow: add-service-to-docker-compose-and-infrastructure
+- docker-compose.yml
+- infrastructure/kong/kong.yml
+
+---
+id: nexus-enforce-permissions-and-security-guards
+trigger: "When enforcing RBAC, restricting access, or closing audit/security gaps"
+confidence: 0.88
+domain: workflow
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Enforce Permissions And Security Guards
+
+## Action
+
+Add requirePermission/guard to route handlers, update middleware for IP/rate limiting, update env vars, test access control
+
+## Evidence
+
+- Workflow: enforce-permissions-and-security-guards
+- services/*/src/routes/*.ts
+- apps/web/src/app/api/**/*.ts
+
+---
+id: nexus-add-or-expand-health-checks-and-monitoring
+trigger: "When ensuring all services expose /health and are monitored"
+confidence: 0.85
+domain: workflow
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Add Or Expand Health Checks And Monitoring
+
+## Action
+
+Add/fix /health route, update docker-compose health check, update monitoring config, test integration
+
+## Evidence
+
+- Workflow: add-or-expand-health-checks-and-monitoring
+- services/*/src/index.ts
+- docker-compose.yml
+
+---
+id: nexus-replace-or-standardize-frontend-ui-patterns
+trigger: "When improving UX consistency or accessibility in the frontend"
+confidence: 0.86
+domain: workflow
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Replace Or Standardize Frontend Ui Patterns
+
+## Action
+
+Replace window.alert/confirm/prompt with custom React dialog components and test flows
+
+## Evidence
+
+- Workflow: replace-or-standardize-frontend-ui-patterns
+- apps/web/src/hooks/use-confirm.tsx
+
+---
+id: nexus-add-or-expand-test-coverage-for-services
+trigger: "When increasing test coverage or adding health-check tests"
+confidence: 0.87
+domain: workflow
+source: repo-analysis
+source_repo: Ashour158/Nexus
+---
+
+# Nexus Add Or Expand Test Coverage For Services
+
+## Action
+
+Create new test files, write tests for health/endpoints/business logic, register in workspace config, run tests
+
+## Evidence
+
+- Workflow: add-or-expand-test-coverage-for-services
+- services/*/src/tests/*.test.ts
+

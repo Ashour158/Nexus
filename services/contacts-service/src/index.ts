@@ -24,8 +24,9 @@ const app = await createService({ name: 'contacts-service', port, jwtSecret, cor
 const prisma = createContactsPrisma();
 const producer = new NexusProducer('contacts-service');
 
+// registerContactsHealthRoutes already registers GET /health (with DB checks)
+// via registerHealthRoutes internally — do not register it again here.
 registerContactsHealthRoutes(app, prisma);
-registerHealthRoutes(app, 'contacts-service', [() => checkDatabase(prisma)]);
 
 try {
   await producer.connect();

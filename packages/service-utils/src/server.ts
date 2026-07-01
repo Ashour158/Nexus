@@ -28,10 +28,10 @@ export interface ServiceConfig {
   enableMultipart?: boolean;
   /** When provided, fastify-jwt is configured to fetch JWKS from this URL instead of a static secret. */
   jwksUrl?: string;
-  /** Optional RS256 private key for JWT signing (overrides static secret). */
-  jwtPrivateKey?: KeyObject;
-  /** Optional RS256 public key for JWT verification (used with jwtPrivateKey). */
-  jwtPublicKey?: KeyObject;
+  /** Optional RS256 private key for JWT signing (overrides static secret). PEM string or KeyObject. */
+  jwtPrivateKey?: KeyObject | string;
+  /** Optional RS256 public key for JWT verification (used with jwtPrivateKey). PEM string or KeyObject. */
+  jwtPublicKey?: KeyObject | string;
   /** Additional URL prefixes that should skip JWT verification. */
   publicPrefixes?: string[];
 }

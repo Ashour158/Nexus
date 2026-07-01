@@ -25,8 +25,9 @@ const app = await createService({ name: 'metadata-service', port, jwtSecret, cor
 const prisma = createMetadataPrisma();
 const producer = new NexusProducer('metadata-service');
 
+// registerMetadataHealthRoutes already registers GET /health (with DB checks)
+// via registerHealthRoutes internally — do not register it again here.
 registerMetadataHealthRoutes(app, prisma);
-registerHealthRoutes(app, 'metadata-service', [() => checkDatabase(prisma)]);
 
 try {
   await producer.connect();

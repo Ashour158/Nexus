@@ -1,4 +1,4 @@
-﻿-- CreateTable
+-- CreateTable
 CREATE TABLE "ReportDefinition" (
     "id" TEXT NOT NULL,
     "tenantId" TEXT,

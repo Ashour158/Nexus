@@ -35,8 +35,9 @@ await app.register(rateLimit, {
   }),
 });
 
+// registerActivitiesHealthRoutes already registers GET /health (with DB checks)
+// via registerHealthRoutes internally — do not register it again here.
 registerActivitiesHealthRoutes(app, prisma);
-registerHealthRoutes(app, 'activities-service', [() => checkDatabase(prisma)]);
 
 try {
   await producer.connect();

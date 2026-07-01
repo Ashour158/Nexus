@@ -14,6 +14,7 @@
         "db:studio": "prisma studio"
     },
     "dependencies": {
+        "@fastify/rate-limit": "^9.1.0",
         "@nexus/kafka": "workspace:*",
         "@nexus/outbox": "workspace:*",
         "@nexus/security": "workspace:*",

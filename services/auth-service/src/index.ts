@@ -40,6 +40,12 @@ const producer = new NexusProducer('auth-service');
 
 const keyStore = new JwksKeyStore({ rotationDays: Number(process.env.JWT_ROTATION_DAYS ?? 90) });
 
+// Active RS256 signing key material as PEM. fast-jwt (via @fastify/jwt) accepts
+// PEM strings / Node KeyObjects but NOT jose's CryptoKey handles, so we always
+// derive the key material as PEM here and convert to Node KeyObjects below.
+let activePrivatePem: string;
+let activePublicPem: string;
+
 const privatePem = await getSigningPrivateKey();
 const publicPem = await getCurrentPublicKey();
 if (privatePem && publicPem) {
@@ -50,6 +56,8 @@ if (privatePem && publicPem) {
     if (kid === currentKid) continue;
     await keyStore.importKeyPair(kid, pem, pem);
   }
+  activePrivatePem = privatePem;
+  activePublicPem = publicPem;
 } else {
   const kid = await keyStore.generateKeyPair();
   const keyRecord = (keyStore as unknown as { keys: Array<{ kid: string; privateKey: import('node:crypto').KeyLike; publicKey: import('node:crypto').KeyLike; createdAt: Date }> }).keys.at(-1)!;
@@ -58,6 +66,8 @@ if (privatePem && publicPem) {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + (Number(process.env.JWT_ROTATION_DAYS ?? 90) * 24 * 60 * 60 * 1000));
   await storeKeyPair(kid, privateKeyPem, publicKeyPem, now.toISOString(), expiresAt.toISOString());
+  activePrivatePem = privateKeyPem;
+  activePublicPem = publicKeyPem;
 }
 
 const env = requireEnv(['DATABASE_URL', 'JWT_SECRET']);
@@ -71,8 +81,8 @@ const app = await createService({
   name: 'auth-service',
   port,
   jwtSecret,
-  jwtPrivateKey: latestKey.privateKey as import('node:crypto').KeyObject,
-  jwtPublicKey: latestKey.publicKey as import('node:crypto').KeyObject,
+  jwtPrivateKey: activePrivatePem,
+  jwtPublicKey: activePublicPem,
   corsOrigins: optionalEnv('CORS_ORIGINS', 'http://localhost:3000').split(',').map((s) => s.trim()),
 });
 

@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../../node_modules/.prisma/accounts-client/index.js';
 import { createPrismaClientWithReplicas } from '@nexus/service-utils/prisma-client';
 import { createTenantPrismaExtension } from '@nexus/service-utils/prisma-tenant';
 import { withFieldEncryption } from '@nexus/security';

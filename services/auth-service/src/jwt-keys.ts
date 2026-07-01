@@ -28,9 +28,13 @@ export async function getAllPublicKeys(): Promise<Record<string, string>> {
   const keys = await redis.keys(`${KEY_PREFIX}:public:*`);
   const result: Record<string, string> = {};
   for (const key of keys) {
+    const keyId = key.replace(`${KEY_PREFIX}:public:`, '');
+    // Skip the `current` alias — it points at the active key's public PEM and is
+    // not a distinct key id. Including it makes callers treat the active key as a
+    // separate (previous) key and re-import its public PEM as a private key.
+    if (keyId === 'current') continue;
     const publicKey = await redis.get(key);
     if (publicKey) {
-      const keyId = key.replace(`${KEY_PREFIX}:public:`, '');
       result[keyId] = publicKey;
     }
   }

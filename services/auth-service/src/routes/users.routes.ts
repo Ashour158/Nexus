@@ -65,16 +65,8 @@ export async function registerUsersRoutes(
         }
       );
 
-      r.get(
-        '/users/:id/permissions',
-        { preHandler: requirePermission(PERMISSIONS.USERS.READ) },
-        async (request, reply) => {
-          const { id } = IdParamSchema.parse(request.params);
-          const jwt = request.user as JwtPayload;
-          const permissions = await users.getUserPermissions(jwt.tenantId, id);
-          return reply.send({ success: true, data: permissions });
-        }
-      );
+      // NOTE: GET /users/:id/permissions is registered in permissions.routes.ts
+      // (with Redis caching). Kept there to avoid a duplicate-route registration.
 
       r.patch(
         '/users/:id/roles',

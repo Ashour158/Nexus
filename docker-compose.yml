@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexus}
       POSTGRES_DB: nexus
     ports:
-      - '5432:5432'
+      - '5433:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -103,7 +103,7 @@ services:
       - meilisearch_data:/meili_data
 
   minio:
-    image: minio/minio:RELEASE.2024-06-13T22-53-56Z
+    image: minio/minio:latest
     container_name: nexus-minio
     restart: unless-stopped
     command: ['server', '/data', '--console-address', ':9001']

@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/outbox-relay/package.json ./services/outbox-relay/
 
-RUN pnpm install --frozen-lockfile --filter @nexus/outbox-relay...
+RUN pnpm install --no-frozen-lockfile --filter @nexus/outbox-relay...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

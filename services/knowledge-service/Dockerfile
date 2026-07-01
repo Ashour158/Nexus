@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/knowledge-service/package.json ./services/knowledge-service/
 
-RUN pnpm install --frozen-lockfile --filter @nexus/knowledge-service...
+RUN pnpm install --no-frozen-lockfile --filter @nexus/knowledge-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

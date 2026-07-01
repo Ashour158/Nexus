@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/workflow-service/package.json ./services/workflow-service/
 
-RUN pnpm install --frozen-lockfile --filter @nexus/workflow-service...
+RUN pnpm install --no-frozen-lockfile --filter @nexus/workflow-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

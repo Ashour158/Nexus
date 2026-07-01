@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/leads-service/package.json ./services/leads-service/
 
-RUN pnpm install --frozen-lockfile --filter @nexus/leads-service...
+RUN pnpm install --no-frozen-lockfile --filter @nexus/leads-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

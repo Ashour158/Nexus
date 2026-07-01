@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/portal-service/package.json ./services/portal-service/
 
-RUN pnpm install --frozen-lockfile --filter @nexus/portal-service...
+RUN pnpm install --no-frozen-lockfile --filter @nexus/portal-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

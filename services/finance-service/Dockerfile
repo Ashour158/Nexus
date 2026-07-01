@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/finance-service/package.json ./services/finance-service/
 
-RUN pnpm install --frozen-lockfile --filter @nexus/finance-service...
+RUN pnpm install --no-frozen-lockfile --filter @nexus/finance-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

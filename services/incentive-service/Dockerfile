@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/incentive-service/package.json ./services/incentive-service/
 
-RUN pnpm install --frozen-lockfile --filter @nexus/incentive-service...
+RUN pnpm install --no-frozen-lockfile --filter @nexus/incentive-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

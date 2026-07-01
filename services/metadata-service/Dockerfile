@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/metadata-service/package.json ./services/metadata-service/
 
-RUN pnpm install --frozen-lockfile --filter @nexus/metadata-service...
+RUN pnpm install --no-frozen-lockfile --filter @nexus/metadata-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

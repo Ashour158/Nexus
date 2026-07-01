@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/email-sync-service/package.json ./services/email-sync-service/
 
-RUN pnpm install --frozen-lockfile --filter @nexus/email-sync-service...
+RUN pnpm install --no-frozen-lockfile --filter @nexus/email-sync-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

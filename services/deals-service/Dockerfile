@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/deals-service/package.json ./services/deals-service/
 
-RUN pnpm install --frozen-lockfile --filter @nexus/deals-service...
+RUN pnpm install --no-frozen-lockfile --filter @nexus/deals-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

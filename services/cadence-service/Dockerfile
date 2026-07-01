@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/cadence-service/package.json ./services/cadence-service/
 
-RUN pnpm install --frozen-lockfile --filter @nexus/cadence-service...
+RUN pnpm install --no-frozen-lockfile --filter @nexus/cadence-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

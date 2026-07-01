@@ -6,7 +6,7 @@ FROM base AS deps
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/ ./packages/
-RUN pnpm install --frozen-lockfile --filter "./apps/web..."
+RUN pnpm install --no-frozen-lockfile --filter "./apps/web..."
 
 FROM deps AS builder
 COPY apps/web/ ./apps/web/

@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/comm-service/package.json ./services/comm-service/
 
-RUN pnpm install --frozen-lockfile --filter @nexus/comm-service...
+RUN pnpm install --no-frozen-lockfile --filter @nexus/comm-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

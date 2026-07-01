@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/data-service/package.json ./services/data-service/
 
-RUN pnpm install --frozen-lockfile --filter @nexus/data-service...
+RUN pnpm install --no-frozen-lockfile --filter @nexus/data-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

@@ -36,10 +36,10 @@ export function createJourneysService(prisma: WorkflowPrisma) {
           name: data.name,
           description: data.description,
           entryTrigger: data.entryTrigger,
-          entryConfig: data.entryConfig ?? {},
+          entryConfig: (data.entryConfig ?? {}) as any,
           nodes: data.nodes as any,
           edges: (data.edges ?? []) as any,
-          settings: data.settings ?? {},
+          settings: (data.settings ?? {}) as any,
         },
       });
     },
@@ -67,7 +67,7 @@ export function createJourneysService(prisma: WorkflowPrisma) {
           edges: data.edges as any,
           entryConfig: data.entryConfig as any,
           settings: data.settings as any,
-        },
+        } as any,
       });
     },
 
@@ -114,13 +114,13 @@ export function createJourneysService(prisma: WorkflowPrisma) {
           journeyId,
           contactId,
           status: 'ACTIVE',
-          metadata: metadata ?? {},
+          metadata: (metadata ?? {}) as any,
         },
         update: {
           status: 'ACTIVE',
           exitedAt: null,
           exitReason: null,
-          metadata: metadata ?? {},
+          metadata: (metadata ?? {}) as any,
         },
       });
     },

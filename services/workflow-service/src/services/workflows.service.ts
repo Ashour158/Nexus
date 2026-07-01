@@ -143,8 +143,8 @@ export function createWorkflowsService(prisma: WorkflowPrisma) {
           tenantId,
           workflowId,
           version: wf.version + 1,
-          nodes: wf.nodes,
-          edges: wf.edges,
+          nodes: wf.nodes as object,
+          edges: wf.edges as object,
           name: wf.name,
           description: wf.description,
           createdBy: 'system-rollback',
@@ -155,8 +155,8 @@ export function createWorkflowsService(prisma: WorkflowPrisma) {
       return prisma.workflowTemplate.update({
         where: { id: workflowId },
         data: {
-          nodes: version.nodes,
-          edges: version.edges,
+          nodes: version.nodes as object,
+          edges: version.edges as object,
           name: version.name,
           description: version.description,
           version: { increment: 1 },

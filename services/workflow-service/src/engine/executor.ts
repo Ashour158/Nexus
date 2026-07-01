@@ -42,7 +42,7 @@ export class WorkflowExecutor {
     const nodes = asNodes(execution.workflow.nodes);
     const edges = asEdges(execution.workflow.edges);
     const nodeById = new Map(nodes.map((n) => [n.id, n]));
-    let currentNodeId = execution.currentNodeId ?? nodes[0]?.id ?? null;
+    let currentNodeId: string | null = execution.currentNodeId ?? nodes[0]?.id ?? null;
 
     const context: ExecutionContext = {
       tenantId: execution.tenantId,
@@ -73,7 +73,7 @@ export class WorkflowExecutor {
             nodeId: node.id,
             nodeType: node.type,
             status: 'RUNNING',
-            input: context.triggerPayload,
+            input: context.triggerPayload as object,
             startedAt: new Date(),
           },
         });

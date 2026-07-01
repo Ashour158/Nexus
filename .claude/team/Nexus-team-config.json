@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "generatedBy": "ecc-tools",
+  "profile": "research",
+  "sharedSkills": [
+    ".claude/skills/Nexus/SKILL.md",
+    ".agents/skills/Nexus/SKILL.md"
+  ],
+  "commandFiles": [
+    ".claude/commands/database-migration.md",
+    ".claude/commands/feature-development.md",
+    ".claude/commands/add-or-modify-database-table-or-schema.md"
+  ],
+  "updatedAt": "2026-07-01T15:30:46.058Z"
+}

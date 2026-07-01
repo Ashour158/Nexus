@@ -10,6 +10,7 @@ export interface EmailJobData {
   metadata?: Record<string, unknown>;
 }
 
-export const emailQueue = new NexusQueue('comm:email', {
+// BullMQ rejects ':' in queue names.
+export const emailQueue = new NexusQueue('comm-email', {
   defaultJobOptions: { attempts: 5, backoff: { type: 'exponential', delay: 3000 } },
 });

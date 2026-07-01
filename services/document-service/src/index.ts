@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { startTracing } from '@nexus/service-utils/tracing';
-import { createService, startService, registerHealthRoutes } from '@nexus/service-utils';
+import { createService, startService, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
 import { registerRoutes } from './routes/index.js';
 import { registerGraphQL } from './graphql/index.js';
 import { PrismaClient } from '../../../node_modules/.prisma/document-client/index.js';
@@ -21,9 +21,7 @@ const app = await createService({
 
 const prisma = new PrismaClient();
 
-registerHealthRoutes(app, 'document-service', [
-  async () => { await prisma.$queryRaw`SELECT 1`; },
-]);
+registerHealthRoutes(app, 'document-service', [() => checkDatabase(prisma)]);
 
 await registerRoutes(app);
 await registerGraphQL(app, prisma);

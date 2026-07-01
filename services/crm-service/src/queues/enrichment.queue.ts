@@ -6,6 +6,7 @@ export interface EnrichmentJobData {
   source?: 'clearbit' | 'zoominfo' | 'manual';
 }
 
-export const enrichmentQueue = new NexusQueue('crm:enrichment', {
+// BullMQ rejects ':' in queue names.
+export const enrichmentQueue = new NexusQueue('crm-enrichment', {
   defaultJobOptions: { attempts: 3, backoff: { type: 'exponential', delay: 10000 } },
 });

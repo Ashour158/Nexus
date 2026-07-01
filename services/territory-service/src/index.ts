@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { startTracing } from '@nexus/service-utils/tracing';
 import { createService, startService, globalErrorHandler, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
 import rateLimit from '@fastify/rate-limit';

@@ -1,5 +1,6 @@
+import 'dotenv/config';
 import { startTracing } from '@nexus/service-utils/tracing';
-import { createService, startService, globalErrorHandler } from '@nexus/service-utils';
+import { createService, startService, globalErrorHandler, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
 import { NexusConsumer, TOPICS } from '@nexus/kafka';
 import { getPrisma } from './prisma.js';
 import { createContestsService } from './services/contests.service.js';
@@ -28,6 +29,7 @@ const badges = createBadgesService(prisma);
 const consumer = new NexusConsumer('incentive-service');
 
 app.setErrorHandler(globalErrorHandler);
+registerHealthRoutes(app, 'incentive-service', [() => checkDatabase(prisma)]);
 
 await badges.seedSystemBadges();
 await consumer.subscribe([TOPICS.DEALS]).catch(() => undefined);

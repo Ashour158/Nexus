@@ -7,6 +7,7 @@ export interface InvoiceJobData {
   payload?: Record<string, unknown>;
 }
 
-export const invoiceQueue = new NexusQueue('finance:invoice', {
+// BullMQ rejects ':' in queue names.
+export const invoiceQueue = new NexusQueue('finance-invoice', {
   defaultJobOptions: { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
 });

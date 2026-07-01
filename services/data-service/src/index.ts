@@ -1,5 +1,6 @@
+import 'dotenv/config';
 import { startTracing } from '@nexus/service-utils/tracing';
-import { createService, startService, globalErrorHandler } from '@nexus/service-utils';
+import { createService, startService, globalErrorHandler, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
 import { NexusProducer } from '@nexus/kafka';
 import { getPrisma } from './prisma.js';
 import { registerImportRoutes } from './routes/import.routes.js';
@@ -29,6 +30,8 @@ const producer = new NexusProducer('data-service');
 
 app.setErrorHandler(globalErrorHandler);
 
+registerHealthRoutes(app, 'data-service', [() => checkDatabase(prisma)]);
+
 await producer.connect().catch(() => undefined);
 app.addHook('onClose', async () => {
   try { await producer.disconnect(); } catch { /* ignore */ }
@@ -37,6 +40,11 @@ app.addHook('onClose', async () => {
 await registerGraphQL(app, prisma);
 
 const retentionJob = startRetentionJob(prisma);
+// Hooks must be registered before startService() calls app.listen() — Fastify
+// throws FST_ERR_INSTANCE_ALREADY_LISTENING on addHook after the server starts.
+app.addHook('onClose', async () => {
+  retentionJob.stop();
+});
 
 await startService(app, port, async () => {
   await registerImportRoutes(app, prisma, producer);
@@ -44,8 +52,4 @@ await startService(app, port, async () => {
   await registerRecycleRoutes(app, prisma);
   await registerAuditRoutes(app, prisma);
   await registerViewsRoutes(app, prisma);
-});
-
-app.addHook('onClose', async () => {
-  retentionJob.stop();
 });

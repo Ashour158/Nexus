@@ -45,8 +45,14 @@ const clickhouse = createClickHouseClient();
 
 registerHealthRoutes(app, 'analytics-service', [
   async () => {
-    const result = await clickhouse.query({ query: 'SELECT 1', format: 'JSONEachRow' });
-    await result.json();
+    const start = Date.now();
+    try {
+      const result = await clickhouse.query({ query: 'SELECT 1', format: 'JSONEachRow' });
+      await result.json();
+      return { name: 'clickhouse', ok: true, latencyMs: Date.now() - start };
+    } catch (err) {
+      return { name: 'clickhouse', ok: false, latencyMs: Date.now() - start, message: (err as Error).message };
+    }
   },
 ]);
 try {

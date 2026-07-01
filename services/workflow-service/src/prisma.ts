@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../../node_modules/.prisma/workflow-client/index.js';
 import { createPrismaClientWithReplicas } from '@nexus/service-utils/prisma-client';
 import { attachSlowQueryLog } from '@nexus/service-utils/db';
 

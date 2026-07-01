@@ -9,6 +9,7 @@ export interface WebhookJobData {
   retryCount?: number;
 }
 
-export const webhookQueue = new NexusQueue('integration:webhook', {
+// BullMQ rejects ':' in queue names.
+export const webhookQueue = new NexusQueue('integration-webhook', {
   defaultJobOptions: { attempts: 5, backoff: { type: 'exponential', delay: 2000 } },
 });

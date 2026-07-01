@@ -1,5 +1,6 @@
+import 'dotenv/config';
 import { startTracing } from '@nexus/service-utils/tracing';
-import { createService, startService } from '@nexus/service-utils';
+import { createService, startService, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
 import { google } from 'googleapis';
 import { registerGraphQL } from './graphql/index.js';
 import { PrismaClient } from '../../../node_modules/.prisma/email-sync-client/index.js';
@@ -32,12 +33,12 @@ const prisma = new PrismaClient({
   },
 });
 
+registerHealthRoutes(app, 'email-sync-service', [() => checkDatabase(prisma)]);
+
 function getTenantId(req: any): string | null {
   const payload = (req as any).user as any;
   return payload?.tenantId ?? req.headers['x-tenant-id'] ?? null;
 }
-
-app.get('/health', async () => ({ status: 'ok', service: 'email-sync-service' }));
 
 /* ── OAuth ─────────────────────────────────────────────────────────────────── */
 

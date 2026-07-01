@@ -13,22 +13,23 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@apollo/subgraph": "^2.13.3",
     "@fastify/jwt": "^8.0.0",
     "@fastify/rate-limit": "^9.1.0",
+    "@fastify/swagger": "^9.0.0",
+    "@fastify/swagger-ui": "^5.0.0",
     "@nexus/kafka": "workspace:*",
     "@nexus/service-utils": "workspace:*",
     "@nexus/shared-types": "workspace:*",
     "@nexus/validation": "workspace:*",
     "@prisma/client": "5.22.0",
+    "dataloader": "^2.2.3",
     "decimal.js": "^10.4.3",
+    "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
-    "zod": "^3.23.8",
-    "@fastify/swagger": "^9.0.0",
-    "@fastify/swagger-ui": "^5.0.0",
     "graphql": "^16.13.2",
     "graphql-yoga": "^5.21.0",
-    "@apollo/subgraph": "^2.13.3",
-    "dataloader": "^2.2.3"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

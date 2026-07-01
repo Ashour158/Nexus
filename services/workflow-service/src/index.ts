@@ -11,7 +11,7 @@ import {
   startService,
 } from '@nexus/service-utils';
 import { NexusProducer } from '@nexus/kafka';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../../node_modules/.prisma/workflow-client/index.js';
 import { buildDatabaseUrl } from '@nexus/service-utils/db';
 import { createWorkflowPrisma } from './prisma.js';
 import { registerRoutes } from './routes/index.js';

@@ -1,5 +1,6 @@
+import 'dotenv/config';
 import { startTracing } from '@nexus/service-utils/tracing';
-import { createService, startService, globalErrorHandler } from '@nexus/service-utils';
+import { createService, startService, globalErrorHandler, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
 import { getPrisma } from './prisma.js';
 import { createPortalService } from './services/portal.service.js';
 import { registerRoutes } from './routes/index.js';
@@ -22,6 +23,7 @@ const app = await createService({
 const prisma = getPrisma();
 
 app.setErrorHandler(globalErrorHandler);
+registerHealthRoutes(app, 'portal-service', [() => checkDatabase(prisma)]);
 
 const portalSvc = createPortalService(prisma);
 

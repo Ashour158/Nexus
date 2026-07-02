@@ -86,11 +86,12 @@ export async function registerDashboardsRoutes(app: FastifyInstance, prisma: Rep
     };
     const widget = await prisma.dashboardWidget.create({
       data: {
+        tenantId: jwt.tenantId,
         dashboardId: id,
-        type: body.type,
+        widgetType: body.type,
         title: body.title,
         config: (body.config ?? {}) as Prisma.InputJsonValue,
-        reportId: body.reportId,
+        ...(body.reportId !== undefined ? { reportId: body.reportId } : {}),
         position: body.position ?? 0,
         width: body.width ?? 6,
         height: body.height ?? 4,

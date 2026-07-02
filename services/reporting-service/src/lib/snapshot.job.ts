@@ -46,17 +46,34 @@ export async function takeSnapshotNow(
     deals: data.deals.slice(0, 100),
   }));
 
-  await prisma.pipelineSnapshot.upsert({
-    where: {
-      tenantId_pipelineId_snapshotDate: {
+  // The schema stores one snapshot row per pipeline stage (composite key
+  // tenantId+pipelineId+snapshotDate+stage), so upsert each stage individually.
+  for (const s of stages) {
+    await prisma.pipelineSnapshot.upsert({
+      where: {
+        tenantId_pipelineId_snapshotDate_stage: {
+          tenantId,
+          pipelineId: pid,
+          snapshotDate: today,
+          stage: s.name,
+        },
+      },
+      create: {
         tenantId,
         pipelineId: pid,
         snapshotDate: today,
+        stage: s.name,
+        dealCount: s.dealCount,
+        totalValue: s.totalValue,
+        dealIds: s.deals.map((d) => d.id),
       },
-    },
-    create: { tenantId, pipelineId: pid, snapshotDate: today, data: { stages } },
-    update: { data: { stages } },
-  });
+      update: {
+        dealCount: s.dealCount,
+        totalValue: s.totalValue,
+        dealIds: s.deals.map((d) => d.id),
+      },
+    });
+  }
 }
 
 export function startSnapshotScheduler(prisma: ReportingPrisma): NodeJS.Timeout {

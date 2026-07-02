@@ -138,6 +138,7 @@ export async function registerDealRoomRoutes(app: FastifyInstance, prisma: CrmPr
 
           const item = await prisma.mutualActionItem.create({
             data: {
+              tenantId: jwt.tenantId,
               dealRoomId: room.id,
               title: body.title,
               owner: body.owner,
@@ -235,6 +236,7 @@ export async function registerDealRoomRoutes(app: FastifyInstance, prisma: CrmPr
 
           const doc = await prisma.dealRoomDocument.create({
             data: {
+              tenantId: jwt.tenantId,
               dealRoomId: room.id,
               name: body.name,
               url: body.url,

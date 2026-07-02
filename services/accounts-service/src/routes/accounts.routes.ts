@@ -13,6 +13,7 @@ import {
   AccountListQuerySchema,
 } from '@nexus/validation';
 import type { AccountsPrisma } from '../prisma.js';
+import type { Prisma, AccountType, AccountTier, AccountStatus } from '../../../../node_modules/.prisma/accounts-client/index.js';
 import { createCodingClient } from '@nexus/service-utils';
 
 const codingClient = createCodingClient({ baseURL: process.env.METADATA_SERVICE_URL ?? 'http://localhost:3004' });
@@ -37,11 +38,11 @@ export async function registerAccountsRoutes(
           }
           const jwt = request.user as JwtPayload;
           const q = parsed.data;
-          const where: { tenantId: string; deletedAt: null; ownerId?: string; type?: string; tier?: string; status?: string; industry?: string; OR?: Array<{ [k: string]: { contains: string; mode: 'insensitive' } }> } = { tenantId: jwt.tenantId, deletedAt: null };
+          const where: Prisma.AccountWhereInput = { tenantId: jwt.tenantId, deletedAt: null };
           if (q.ownerId) where.ownerId = q.ownerId;
-          if (q.type) where.type = q.type;
-          if (q.tier) where.tier = q.tier;
-          if (q.status) where.status = q.status;
+          if (q.type) where.type = q.type as AccountType;
+          if (q.tier) where.tier = q.tier as AccountTier;
+          if (q.status) where.status = q.status as AccountStatus;
           if (q.industry) where.industry = q.industry;
           if (q.search?.trim()) {
             where.OR = [

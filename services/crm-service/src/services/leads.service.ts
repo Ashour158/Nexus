@@ -452,7 +452,7 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
               amount: new Prisma.Decimal(input.dealAmount ?? 0),
               currency: 'USD',
               probability: stage.probability,
-              contacts: { create: [{ contactId: contact.id, isPrimary: true }] },
+              contacts: { create: [{ tenantId, contactId: contact.id, isPrimary: true }] },
             },
           });
         }

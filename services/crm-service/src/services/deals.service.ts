@@ -279,6 +279,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
             ? {
                 contacts: {
                   create: uniqueContactIds.map((contactId, idx) => ({
+                    tenantId,
                     contactId,
                     isPrimary: idx === 0,
                   })),
@@ -819,6 +820,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
             }),
         prisma.dealContact.create({
           data: {
+            tenantId,
             dealId,
             contactId,
             role: role ?? null,

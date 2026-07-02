@@ -5,7 +5,6 @@ import { PERMISSIONS, requirePermission, NotFoundError, ValidationError } from '
 import { NexusProducer, TOPICS } from '@nexus/kafka';
 import type { BillingPrisma } from '../prisma.js';
 
-const IdParamSchema = z.object({ id: z.string().cuid() });
 
 const CreatePaymentSchema = z.object({
   invoiceId: z.string().cuid(),

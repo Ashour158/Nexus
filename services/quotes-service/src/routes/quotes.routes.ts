@@ -11,7 +11,7 @@ import {
   QuoteListQuerySchema,
 } from '@nexus/validation';
 import type { QuotesPrisma } from '../prisma.js';
-import type { Prisma, QuoteStatus } from '../../../node_modules/.prisma/quotes-client/index.js';
+import type { Prisma, QuoteStatus } from '../../../../node_modules/.prisma/quotes-client/index.js';
 
 function disabledQuoteMutation(requestId: string) {
   return {
@@ -47,7 +47,6 @@ export async function registerQuotesRoutes(
           const q = parsed.data;
           const where: Prisma.QuoteWhereInput = { tenantId: jwt.tenantId, deletedAt: null };
           if (q.dealId) where.dealId = q.dealId;
-          if (q.accountId) where.accountId = q.accountId;
           if (q.ownerId) where.ownerId = q.ownerId;
           if (q.status) where.status = q.status as QuoteStatus;
 

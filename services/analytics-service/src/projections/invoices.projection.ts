@@ -8,8 +8,11 @@ export class InvoicesSummaryProjection {
     const payload = event.payload as Record<string, unknown>;
     const tenantId = event.tenantId;
     const accountId = String(payload.accountId ?? '');
-    const total = Number(payload.total ?? 0);
+    const total = Number(payload.total ?? payload.amount ?? 0);
     const status = this.inferStatus(event.type);
+    // base_amount / base_currency are stamped onto the payload by the consumer.
+    const baseTotal = Number(payload.base_amount ?? total);
+    const baseCurrency = String(payload.base_currency ?? payload.currency ?? '');
 
     await this.client.insert({
       table: 'invoices_summary',
@@ -22,6 +25,9 @@ export class InvoicesSummaryProjection {
           invoice_count: 1,
           paid_amount: status === 'PAID' ? total : 0,
           overdue_count: status === 'OVERDUE' ? 1 : 0,
+          base_total_amount: baseTotal,
+          base_paid_amount: status === 'PAID' ? baseTotal : 0,
+          base_currency: baseCurrency,
           updated_at: event.timestamp,
         },
       ],

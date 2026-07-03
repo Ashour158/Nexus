@@ -10,6 +10,9 @@ export class QuotesSummaryProjection {
     const accountId = String(payload.accountId ?? '');
     const dealId = String(payload.dealId ?? '');
     const total = Number(payload.total ?? 0);
+    // base_amount / base_currency are stamped onto the payload by the consumer.
+    const baseTotal = Number(payload.base_amount ?? total);
+    const baseCurrency = String(payload.base_currency ?? payload.currency ?? '');
 
     // Upsert into quotes_summary using a simple INSERT (ReplacingMergeTree handles dedup)
     await this.client.insert({
@@ -22,6 +25,8 @@ export class QuotesSummaryProjection {
           status: this.inferStatus(event.type),
           total,
           quote_count: 1,
+          base_total: baseTotal,
+          base_currency: baseCurrency,
           updated_at: event.timestamp,
         },
       ],

@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS deal_events (
   event_type   String,
   amount       Decimal64(2),
   currency     String,
+  base_amount  Decimal64(2) DEFAULT 0,
+  base_currency String DEFAULT '',
   occurred_at  DateTime64(3)
 ) ENGINE = MergeTree()
 ORDER BY (tenant_id, occurred_at)
@@ -36,6 +38,8 @@ CREATE TABLE IF NOT EXISTS quote_events (
   event_type   String,
   total        Decimal64(2),
   currency     String,
+  base_amount  Decimal64(2) DEFAULT 0,
+  base_currency String DEFAULT '',
   occurred_at  DateTime64(3)
 ) ENGINE = MergeTree()
 ORDER BY (tenant_id, occurred_at)
@@ -53,6 +57,9 @@ CREATE TABLE IF NOT EXISTS deals_summary (
   deal_count       UInt32,
   weighted_amount  Decimal64(2),
   avg_probability  Float64,
+  base_total_amount    Decimal64(2) DEFAULT 0,
+  base_weighted_amount Decimal64(2) DEFAULT 0,
+  base_currency        String DEFAULT '',
   updated_at       DateTime64(3)
 ) ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY (tenant_id, pipeline_id, stage_id, owner_id, territory);
@@ -100,6 +107,8 @@ CREATE TABLE IF NOT EXISTS invoice_events (
   event_type   String,
   total        Decimal64(2),
   currency     String,
+  base_amount  Decimal64(2) DEFAULT 0,
+  base_currency String DEFAULT '',
   status       String,
   occurred_at  DateTime64(3)
 ) ENGINE = MergeTree()
@@ -130,6 +139,9 @@ CREATE TABLE IF NOT EXISTS invoices_summary (
   invoice_count  UInt32,
   paid_amount    Decimal64(2),
   overdue_count  UInt32,
+  base_total_amount Decimal64(2) DEFAULT 0,
+  base_paid_amount  Decimal64(2) DEFAULT 0,
+  base_currency     String DEFAULT '',
   updated_at     DateTime64(3)
 ) ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY (tenant_id, account_id, status);
@@ -151,6 +163,8 @@ CREATE TABLE IF NOT EXISTS quotes_summary (
   status         String,
   total          Decimal64(2),
   quote_count    UInt32,
+  base_total     Decimal64(2) DEFAULT 0,
+  base_currency  String DEFAULT '',
   updated_at     DateTime64(3)
 ) ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY (tenant_id, account_id, deal_id, status);

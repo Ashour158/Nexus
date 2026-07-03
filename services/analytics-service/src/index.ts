@@ -16,6 +16,7 @@ import { registerActivityAnalyticsRoutes } from './routes/activity.routes.js';
 import { registerForecastAnalyticsRoutes } from './routes/forecast.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 import { startAnalyticsConsumer } from './consumers/events.consumer.js';
+import { ensureCurrencyColumns } from './ddl/ensure-currency-columns.js';
 
 startTracing({ serviceName: 'analytics-service' });
 const env = requireEnv(['CLICKHOUSE_URL', 'JWT_SECRET']);
@@ -55,6 +56,12 @@ registerHealthRoutes(app, 'analytics-service', [
     }
   },
 ]);
+try {
+  await ensureCurrencyColumns(clickhouse);
+  app.log.info('Analytics base-currency columns ensured');
+} catch (err) {
+  app.log.warn({ err }, 'ensureCurrencyColumns failed; continuing (projections fall back to 1:1)');
+}
 try {
   await startAnalyticsConsumer(clickhouse);
   app.log.info('Analytics consumer started');

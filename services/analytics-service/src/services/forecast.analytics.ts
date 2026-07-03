@@ -29,7 +29,7 @@ export function createForecastAnalyticsService(client: ClickHouseClient) {
         query: `
           SELECT
             deal_id,
-            argMax(amount, occurred_at) AS amount,
+            argMax(if(base_amount != 0, base_amount, amount), occurred_at) AS amount,
             argMax(owner_id, occurred_at) AS owner_id,
             toStartOfMonth(argMax(occurred_at, occurred_at)) AS close_month
           FROM deal_events

@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/document-service/package.json ./services/document-service/
 
-RUN pnpm install --no-frozen-lockfile --filter @nexus/document-service...
+RUN pnpm install --shamefully-hoist --no-frozen-lockfile --filter @nexus/document-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

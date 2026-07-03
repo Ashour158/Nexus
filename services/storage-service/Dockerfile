@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/storage-service/package.json ./services/storage-service/
 
-RUN pnpm install --no-frozen-lockfile --filter @nexus/storage-service...
+RUN pnpm install --shamefully-hoist --no-frozen-lockfile --filter @nexus/storage-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

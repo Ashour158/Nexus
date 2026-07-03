@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/integration-service/package.json ./services/integration-service/
 
-RUN pnpm install --no-frozen-lockfile --filter @nexus/integration-service...
+RUN pnpm install --shamefully-hoist --no-frozen-lockfile --filter @nexus/integration-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

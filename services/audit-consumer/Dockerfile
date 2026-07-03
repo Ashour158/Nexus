@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/audit-consumer/package.json ./services/audit-consumer/
 
-RUN pnpm install --no-frozen-lockfile --filter @nexus/audit-consumer...
+RUN pnpm install --shamefully-hoist --no-frozen-lockfile --filter @nexus/audit-consumer...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/auth-service/package.json ./services/auth-service/
 
-RUN pnpm install --no-frozen-lockfile --filter @nexus/auth-service...
+RUN pnpm install --shamefully-hoist --no-frozen-lockfile --filter @nexus/auth-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

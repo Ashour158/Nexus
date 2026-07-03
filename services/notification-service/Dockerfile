@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/notification-service/package.json ./services/notification-service/
 
-RUN pnpm install --no-frozen-lockfile --filter @nexus/notification-service...
+RUN pnpm install --shamefully-hoist --no-frozen-lockfile --filter @nexus/notification-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

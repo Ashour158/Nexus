@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/notes-service/package.json ./services/notes-service/
 
-RUN pnpm install --no-frozen-lockfile --filter @nexus/notes-service...
+RUN pnpm install --shamefully-hoist --no-frozen-lockfile --filter @nexus/notes-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

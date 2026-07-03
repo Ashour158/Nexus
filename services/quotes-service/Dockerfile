@@ -8,7 +8,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/quotes-service/package.json ./services/quotes-service/
 
-RUN pnpm install --no-frozen-lockfile --filter @nexus/quotes-service...
+RUN pnpm install --shamefully-hoist --no-frozen-lockfile --filter @nexus/quotes-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder

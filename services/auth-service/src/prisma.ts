@@ -9,7 +9,8 @@ import { alsStore } from './request-context.js';
  * Tenant isolation — Section 35.1 semantics via Prisma 5 `$extends`.
  * Models without `tenantId` and global `Tenant` are excluded.
  */
-const skipTenantModels = new Set(['Tenant', 'Session', 'UserRole']);
+// Models that have no tenantId column — the tenant extension must not inject one.
+const skipTenantModels = new Set(['Tenant', 'Session', 'UserRole', 'MfaConfiguration', 'PasswordReset']);
 
 export function createAuthPrisma() {
   const base = createPrismaClientWithReplicas(

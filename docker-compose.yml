@@ -587,6 +587,7 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: nexus_analytics
     depends_on:
       kafka:
         condition: service_started
@@ -597,11 +598,14 @@ services:
     image: clickhouse/clickhouse-server:24.3
     container_name: nexus-clickhouse
     restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: nexus_analytics
     ports:
       - '8123:8123'
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - ./services/analytics-service/src/ddl/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./clickhouse/users-network.xml:/etc/clickhouse-server/users.d/zz-network.xml:ro
 
   web:
     build:

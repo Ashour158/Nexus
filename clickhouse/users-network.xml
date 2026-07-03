@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!--
+  Widen the ClickHouse `default` user's allowed networks so services on the Docker
+  network (analytics-service etc.) can reach the HTTP interface. The image ships a
+  default-user.xml restricting `default` to ::1/127.0.0.1 (localhost only), which
+  makes every cross-container HTTP query 403 Forbidden. Loaded after that file
+  (zz- prefix) so this <networks> replaces the restrictive one.
+-->
+<clickhouse>
+  <users>
+    <default>
+      <networks>
+        <ip>::/0</ip>
+      </networks>
+    </default>
+  </users>
+</clickhouse>

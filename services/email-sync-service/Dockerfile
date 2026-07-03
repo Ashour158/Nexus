@@ -1,7 +1,7 @@
 ﻿# -- Stage 1: Install dependencies ------------------------------------------------
 FROM node:20-alpine AS deps
 WORKDIR /app
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat openssl
 RUN corepack enable && corepack prepare pnpm@9.1.0 --activate
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./

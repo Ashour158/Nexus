@@ -3,6 +3,7 @@ import type { JwtPayload } from '@nexus/shared-types';
 import { NotFoundError, UnauthorizedError } from '@nexus/service-utils';
 import type { AuthPrisma } from '../prisma.js';
 import { verifyKeycloakAccessToken } from '../lib/keycloak.js';
+import { verifyPassword } from '@nexus/security';
 import { randomToken } from '../lib/crypto-utils.js';
 import { resolveUserPermissions } from '../lib/permissions.js';
 import type { JwksKeyStore } from '../lib/jwt.js';
@@ -85,6 +86,52 @@ export async function loginWithKeycloak(
   });
 
   // Check MFA
+  return finalizeSession(keyStore, prisma, user, meta);
+}
+
+/**
+ * Email/password login against the local user store (passwordHash). This is the
+ * interim credential flow the web login form uses; Keycloak SSO layers on top via
+ * loginWithKeycloak. Returns the same session shape so both paths are interchangeable.
+ */
+export async function loginWithPassword(
+  keyStore: JwksKeyStore,
+  prisma: AuthPrisma,
+  request: FastifyRequest,
+  email: string,
+  password: string,
+  meta: { userAgent?: string; ip?: string }
+): Promise<AuthResult> {
+  const normalizedEmail = email.toLowerCase().trim();
+  const user = await prisma.user.findFirst({
+    where: { email: normalizedEmail, isActive: true },
+  });
+  // Uniform error + a verify against a dummy hash to reduce timing/user-enumeration signal.
+  if (!user || !user.passwordHash) {
+    await verifyPassword(password, '$2b$10$0000000000000000000000000000000000000000000000000000').catch(() => false);
+    throw new UnauthorizedError('Invalid email or password');
+  }
+  const ok = await verifyPassword(password, user.passwordHash);
+  if (!ok) {
+    throw new UnauthorizedError('Invalid email or password');
+  }
+
+  ((request as any).requestContext as { set: (key: string, value: string) => void }).set('tenantId', user.tenantId);
+  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+
+  return finalizeSession(keyStore, prisma, user, meta);
+}
+
+/**
+ * Shared session issuance: MFA gate → resolve roles (default SALES_REP) → persist
+ * refresh session → mint access token. Used by both Keycloak and password login.
+ */
+async function finalizeSession(
+  keyStore: JwksKeyStore,
+  prisma: AuthPrisma,
+  user: { id: string; tenantId: string; email: string },
+  meta: { userAgent?: string; ip?: string }
+): Promise<AuthResult> {
   const mfaRequired = await isMfaEnabled(prisma, user.id);
   if (mfaRequired) {
     const mfaToken = await keyStore.sign(
@@ -103,7 +150,7 @@ export async function loginWithKeycloak(
   let roles = withRoles.userRoles.map((ur: { role: { name: string; permissions: unknown } }) => ur.role);
   if (roles.length === 0) {
     const defaultRole = await prisma.role.findFirst({
-      where: { tenantId: tenant.id, name: 'SALES_REP' },
+      where: { tenantId: user.tenantId, name: 'SALES_REP' },
     });
     if (defaultRole) {
       await prisma.userRole.create({

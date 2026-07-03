@@ -9,10 +9,16 @@ import {
 } from '@nexus/validation';
 import { hashPassword, validatePasswordStrength } from '@nexus/security';
 import type { AuthPrisma } from '../prisma.js';
-import { loginWithKeycloak, refreshTokens, revokeSession } from '../services/session-auth.js';
+import { loginWithKeycloak, loginWithPassword, refreshTokens, revokeSession } from '../services/session-auth.js';
+import { z } from 'zod';
 import type { JwksKeyStore } from '../lib/jwt.js';
 import type { NexusProducer } from '@nexus/kafka';
 import { setKeycloakUserPassword } from '../lib/keycloak-admin.js';
+
+const PasswordLoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
 
 /**
  * Registers `/api/v1/auth/*` routes (Section 34.1).
@@ -27,6 +33,20 @@ export async function registerAuthRoutes(
   await app.register(
     async (r) => {
       r.post('/auth/login', async (request, reply) => {
+        // Polymorphic login: email+password (local credential flow used by the web
+        // form) OR keycloakAccessToken (SSO). Password path is tried first when the
+        // body carries credentials.
+        const pw = PasswordLoginSchema.safeParse(request.body);
+        if (pw.success) {
+          const result = await loginWithPassword(
+            keyStore, prisma, request, pw.data.email, pw.data.password,
+            { userAgent: request.headers['user-agent'], ip: request.ip }
+          );
+          if ('mfaRequired' in result && result.mfaRequired) {
+            return reply.send({ success: true, data: { mfaRequired: true, mfaToken: result.mfaToken } });
+          }
+          return reply.send({ success: true, data: result });
+        }
         const parsed = KeycloakLoginSchema.safeParse(request.body);
         if (!parsed.success) {
           throw new ValidationError('Invalid body', parsed.error.flatten());

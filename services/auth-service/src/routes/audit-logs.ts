@@ -16,7 +16,7 @@ export async function registerAuditLogsRoutes(
     async (r) => {
       r.get(
         '/audit-logs',
-        { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
+        { preHandler: requirePermission(PERMISSIONS.AUDIT.READ) },
         async (request, reply) => {
           const q = PaginationSchema.parse(request.query);
           const jwt = request.user as JwtPayload;
@@ -39,7 +39,7 @@ export async function registerAuditLogsRoutes(
 
       r.get(
         '/audit-logs/:id',
-        { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
+        { preHandler: requirePermission(PERMISSIONS.AUDIT.READ) },
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;

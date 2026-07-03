@@ -14,11 +14,39 @@ import {
   UserRound,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { useActivities, useCompleteActivity, useUpdateActivity } from '@/hooks/use-activities';
+import { useActivities, useCompleteActivity, useCreateActivity, useUpdateActivity } from '@/hooks/use-activities';
 import { useUsers } from '@/hooks/use-users';
+import { useAuthStore } from '@/stores/auth.store';
 import { useUiStore } from '@/stores/ui.store';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+
+const RELATED_TO_FIELDS = [
+  { value: 'dealId', label: 'Deal' },
+  { value: 'contactId', label: 'Contact' },
+  { value: 'leadId', label: 'Lead' },
+  { value: 'accountId', label: 'Account' },
+] as const;
+
+type RelatedToField = (typeof RELATED_TO_FIELDS)[number]['value'];
+
+const EMPTY_CREATE_DRAFT = {
+  subject: '',
+  description: '',
+  dueDate: '',
+  priority: 'NORMAL',
+  status: 'TODO',
+  relatedToField: 'dealId' as RelatedToField,
+  relatedToId: '',
+};
 
 interface TaskItem {
   id: string;
@@ -81,6 +109,8 @@ export default function TasksPage(): ReactElement {
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [dueFilter, setDueFilter] = useState<DueFilter>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createDraft, setCreateDraft] = useState(EMPTY_CREATE_DRAFT);
   const [draft, setDraft] = useState({
     subject: '',
     description: '',
@@ -91,10 +121,12 @@ export default function TasksPage(): ReactElement {
   });
 
   const toast = useUiStore((s) => s.pushToast);
+  const userId = useAuthStore((s) => s.userId);
   const tasksQuery = useActivities({ page: 1, limit: 75, type: 'TASK' });
   const usersQuery = useUsers();
   const completeActivity = useCompleteActivity();
   const updateActivity = useUpdateActivity();
+  const createActivity = useCreateActivity();
 
   const ownerMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -162,6 +194,44 @@ export default function TasksPage(): ReactElement {
     }
   }
 
+  function openCreate(): void {
+    setCreateDraft({ ...EMPTY_CREATE_DRAFT, ownerId: userId ?? '' } as typeof EMPTY_CREATE_DRAFT);
+    setCreateOpen(true);
+  }
+
+  async function handleCreate(event: React.FormEvent): Promise<void> {
+    event.preventDefault();
+    if (!createDraft.subject.trim()) {
+      toast({ variant: 'error', title: 'Title is required' });
+      return;
+    }
+    if (!userId) {
+      toast({ variant: 'error', title: 'You must be signed in to create a task' });
+      return;
+    }
+    if (!createDraft.relatedToId.trim()) {
+      toast({ variant: 'error', title: 'A related record is required' });
+      return;
+    }
+    try {
+      await createActivity.mutateAsync({
+        type: 'TASK',
+        subject: createDraft.subject.trim(),
+        description: createDraft.description.trim() || undefined,
+        priority: createDraft.priority,
+        ownerId: userId,
+        dueDate: createDraft.dueDate ? new Date(createDraft.dueDate).toISOString() : undefined,
+        [createDraft.relatedToField]: createDraft.relatedToId.trim(),
+        customFields: {},
+      } as never);
+      toast({ variant: 'success', title: `"${createDraft.subject.trim()}" created` });
+      setCreateOpen(false);
+      setCreateDraft(EMPTY_CREATE_DRAFT);
+    } catch {
+      toast({ variant: 'error', title: 'Failed to create task' });
+    }
+  }
+
   async function handleSave(): Promise<void> {
     if (!selectedTask) return;
     try {
@@ -193,13 +263,14 @@ export default function TasksPage(): ReactElement {
                 <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">Tasks</h1>
                 <p className="mt-1 text-sm text-slate-500">Manage follow-ups, ownership, priorities, and due dates efficiently.</p>
               </div>
-              <Link
-                href="/activities"
+              <button
+                type="button"
+                onClick={openCreate}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#4A90E2] px-4 text-sm font-bold text-white shadow-sm"
               >
                 <Plus className="h-4 w-4" />
                 Add Task
-              </Link>
+              </button>
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -400,6 +471,85 @@ export default function TasksPage(): ReactElement {
           </div>
         )}
       </aside>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New task</DialogTitle>
+            <DialogDescription>Create a follow-up task with an owner and due date.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreate} className="mt-4 space-y-4">
+            <Field label="Title">
+              <input
+                className="form-input h-11 w-full rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100"
+                value={createDraft.subject}
+                onChange={(event) => setCreateDraft((prev) => ({ ...prev, subject: event.target.value }))}
+                placeholder="Call back the prospect"
+                required
+              />
+            </Field>
+            <Field label="Description">
+              <textarea
+                className="form-textarea min-h-24 w-full resize-none rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100"
+                value={createDraft.description}
+                onChange={(event) => setCreateDraft((prev) => ({ ...prev, description: event.target.value }))}
+              />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Due Date">
+                <input
+                  type="date"
+                  className="form-input h-11 w-full rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100"
+                  value={createDraft.dueDate}
+                  onChange={(event) => setCreateDraft((prev) => ({ ...prev, dueDate: event.target.value }))}
+                />
+              </Field>
+              <Field label="Priority">
+                <select
+                  className="form-select h-11 w-full rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100"
+                  value={createDraft.priority}
+                  onChange={(event) => setCreateDraft((prev) => ({ ...prev, priority: event.target.value }))}
+                >
+                  <option value="LOW">Low</option>
+                  <option value="NORMAL">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="URGENT">Urgent</option>
+                </select>
+              </Field>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Related To">
+                <select
+                  className="form-select h-11 w-full rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100"
+                  value={createDraft.relatedToField}
+                  onChange={(event) => setCreateDraft((prev) => ({ ...prev, relatedToField: event.target.value as RelatedToField }))}
+                >
+                  {RELATED_TO_FIELDS.map((f) => (
+                    <option key={f.value} value={f.value}>{f.label}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Record ID">
+                <input
+                  className="form-input h-11 w-full rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100"
+                  value={createDraft.relatedToId}
+                  onChange={(event) => setCreateDraft((prev) => ({ ...prev, relatedToId: event.target.value }))}
+                  placeholder="Paste the record ID"
+                  required
+                />
+              </Field>
+            </div>
+            <DialogFooter className="mt-2">
+              <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-[#7ED321] text-white hover:bg-[#70bd1d]" isLoading={createActivity.isPending}>
+                Create task
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,13 +1,40 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Calendar, CheckCircle2, FileText, Mail, MessageSquare, Phone, Clock, AlertCircle } from 'lucide-react';
+import { Calendar, CheckCircle2, FileText, Mail, MessageSquare, Phone, Clock, AlertCircle, Plus } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { useAuthStore } from '@/stores/auth.store';
-import { useActivities, useCompleteActivity } from '@/hooks/use-activities';
+import { useActivities, useCompleteActivity, useCreateActivity } from '@/hooks/use-activities';
 import { useUiStore } from '@/stores/ui.store';
 import Link from 'next/link';
+
+const RELATED_TO_FIELDS = [
+  { value: 'dealId', label: 'Deal' },
+  { value: 'contactId', label: 'Contact' },
+  { value: 'leadId', label: 'Lead' },
+  { value: 'accountId', label: 'Account' },
+] as const;
+
+type RelatedToField = (typeof RELATED_TO_FIELDS)[number]['value'];
+
+const EMPTY_DRAFT = {
+  type: 'CALL',
+  subject: '',
+  priority: 'NORMAL',
+  dueDate: '',
+  relatedToField: 'dealId' as RelatedToField,
+  relatedToId: '',
+};
 
 type ActivityTab = 'all' | 'mine' | 'overdue' | 'upcoming';
 
@@ -66,6 +93,8 @@ function isOverdue(activity: ActivityItem): boolean {
 
 export default function ActivitiesPage() {
   const [tab, setTab] = useState<ActivityTab>('all');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [draft, setDraft] = useState(EMPTY_DRAFT);
   const toast = useUiStore((s) => s.pushToast);
   const userId = useAuthStore((s) => s.userId);
 
@@ -83,8 +112,46 @@ export default function ActivitiesPage() {
 
   const activitiesQuery = useActivities(filters);
   const completeActivity = useCompleteActivity();
+  const createActivity = useCreateActivity();
 
   const activities = useMemo(() => (activitiesQuery.data?.data ?? []) as ActivityItem[], [activitiesQuery.data]);
+
+  const openCreate = () => {
+    setDraft(EMPTY_DRAFT);
+    setCreateOpen(true);
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!draft.subject.trim()) {
+      toast({ variant: 'error', title: 'Subject is required' });
+      return;
+    }
+    if (!userId) {
+      toast({ variant: 'error', title: 'You must be signed in to create an activity' });
+      return;
+    }
+    if (!draft.relatedToId.trim()) {
+      toast({ variant: 'error', title: 'A related record is required' });
+      return;
+    }
+    try {
+      await createActivity.mutateAsync({
+        type: draft.type,
+        subject: draft.subject.trim(),
+        priority: draft.priority,
+        ownerId: userId,
+        dueDate: draft.dueDate ? new Date(draft.dueDate).toISOString() : undefined,
+        [draft.relatedToField]: draft.relatedToId.trim(),
+        customFields: {},
+      } as never);
+      toast({ variant: 'success', title: `"${draft.subject.trim()}" created` });
+      setCreateOpen(false);
+      setDraft(EMPTY_DRAFT);
+    } catch (err) {
+      toast({ variant: 'error', title: 'Failed to create activity' });
+    }
+  };
 
   const handleComplete = async (id: string, subject: string) => {
     try {
@@ -106,6 +173,10 @@ export default function ActivitiesPage() {
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Activity Feed</h1>
+        <Button onClick={openCreate}>
+          <Plus className="mr-1.5 h-4 w-4" />
+          New activity
+        </Button>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -202,6 +273,92 @@ export default function ActivitiesPage() {
           )}
         </div>
       )}
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New activity</DialogTitle>
+            <DialogDescription>Log a call, email, meeting, or task.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreate} className="mt-4 space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Type</label>
+              <select
+                value={draft.type}
+                onChange={(e) => setDraft((d) => ({ ...d, type: e.target.value }))}
+                className="flex h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                {Object.entries(TYPE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Subject</label>
+              <Input
+                value={draft.subject}
+                onChange={(e) => setDraft((d) => ({ ...d, subject: e.target.value }))}
+                placeholder="Follow up with client"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Priority</label>
+                <select
+                  value={draft.priority}
+                  onChange={(e) => setDraft((d) => ({ ...d, priority: e.target.value }))}
+                  className="flex h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <option value="LOW">Low</option>
+                  <option value="NORMAL">Normal</option>
+                  <option value="HIGH">High</option>
+                  <option value="URGENT">Urgent</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Due date</label>
+                <Input
+                  type="datetime-local"
+                  value={draft.dueDate}
+                  onChange={(e) => setDraft((d) => ({ ...d, dueDate: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-[120px_1fr] gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Related to</label>
+                <select
+                  value={draft.relatedToField}
+                  onChange={(e) => setDraft((d) => ({ ...d, relatedToField: e.target.value as RelatedToField }))}
+                  className="flex h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {RELATED_TO_FIELDS.map((f) => (
+                    <option key={f.value} value={f.value}>{f.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Record ID</label>
+                <Input
+                  value={draft.relatedToId}
+                  onChange={(e) => setDraft((d) => ({ ...d, relatedToId: e.target.value }))}
+                  placeholder="Paste the record ID"
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter className="mt-2">
+              <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" isLoading={createActivity.isPending}>
+                Create activity
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -61,9 +61,16 @@ export default function ReportsPage(): ReactElement {
   const accessToken = useAuthStore((s) => s.accessToken);
 
   const { data: reportData, isLoading, error } = useQuery({
-    queryKey: ['reports', 'performance'],
+    queryKey: ['reports', 'performance', { template, dateRange, team, user, stage }],
     queryFn: async () => {
-      const res = await fetch('/api/reports/performance', {
+      const params = new URLSearchParams();
+      if (template) params.set('template', template);
+      if (dateRange) params.set('dateFrom', dateRange);
+      if (team !== 'all') params.set('team', team);
+      if (user !== 'all') params.set('user', user);
+      if (stage !== 'all') params.set('stage', stage);
+      const query = params.toString();
+      const res = await fetch(`/api/reports/performance${query ? `?${query}` : ''}`, {
         headers: { Authorization: `Bearer ${accessToken ?? ''}` },
       });
       if (!res.ok) throw new Error('Reports data not yet available');

@@ -34,9 +34,14 @@ export default function PerformanceDashboardPage() {
   const [product, setProduct] = useState('all');
 
   const { data: reportData, isLoading, error } = useQuery({
-    queryKey: ['reports', 'performance'],
+    queryKey: ['reports', 'performance', { team, rep, product }],
     queryFn: async () => {
-      const res = await fetch('/api/reports/performance');
+      const params = new URLSearchParams();
+      if (team !== 'all') params.set('team', team);
+      if (rep !== 'all') params.set('rep', rep);
+      if (product !== 'all') params.set('product', product);
+      const query = params.toString();
+      const res = await fetch(`/api/reports/performance${query ? `?${query}` : ''}`);
       if (!res.ok) throw new Error('Reports data not yet available');
       return res.json();
     },

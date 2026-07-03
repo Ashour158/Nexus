@@ -82,9 +82,14 @@ export default function AnalyticsPage(): ReactElement {
   const { data: usersData } = useUsers();
 
   const { data, isLoading, error, refetch, isFetching } = useQuery<PerformanceReport>({
-    queryKey: ['analytics', 'stitch-performance'],
+    queryKey: ['analytics', 'stitch-performance', { dateRange, team, user }],
     queryFn: async () => {
-      const res = await fetch('/api/reports/performance');
+      const params = new URLSearchParams();
+      if (dateRange) params.set('dateRange', dateRange);
+      if (team !== 'all') params.set('team', team);
+      if (user !== 'all') params.set('user', user);
+      const query = params.toString();
+      const res = await fetch(`/api/reports/performance${query ? `?${query}` : ''}`);
       if (!res.ok) throw new Error('Analytics data is not available');
       return res.json();
     },

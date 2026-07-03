@@ -85,6 +85,7 @@ export const PERMISSIONS = {
     MANAGE_ROLES: 'users:manage_roles',
   },
   SETTINGS: { READ: 'settings:read', UPDATE: 'settings:update', WRITE: 'settings:write' },
+  AUDIT: { READ: 'audit:read' },
   INTEGRATIONS: { READ: 'integrations:read', MANAGE: 'integrations:manage' },
   BLUEPRINTS: { READ: 'blueprints:read', MANAGE: 'blueprints:manage' },
   DOCUMENTS: { READ: 'documents:read', UPDATE: 'documents:update' },
@@ -102,6 +103,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   ADMIN: [
     'users:*',
     'settings:*',
+    'audit:read',
     'integrations:*',
     'roles:*',
     'leads:*',

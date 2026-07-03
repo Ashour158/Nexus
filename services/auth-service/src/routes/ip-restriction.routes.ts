@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { ValidationError, UnauthorizedError } from '@nexus/service-utils';
+import { ValidationError, UnauthorizedError, requirePermission, PERMISSIONS } from '@nexus/service-utils';
 import type { AuthPrisma } from '../prisma.js';
 
 export async function registerIpRestrictionRoutes(
@@ -9,7 +9,7 @@ export async function registerIpRestrictionRoutes(
   await app.register(
     async (r) => {
       // GET /api/v1/auth/ip-restrictions
-      r.get('/auth/ip-restrictions', async (request, reply) => {
+      r.get('/auth/ip-restrictions', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
         const user = request.user as { sub: string; tenantId: string } | undefined;
         if (!user?.tenantId) throw new UnauthorizedError('Authentication required');
 
@@ -21,7 +21,7 @@ export async function registerIpRestrictionRoutes(
       });
 
       // POST /api/v1/auth/ip-restrictions
-      r.post('/auth/ip-restrictions', async (request, reply) => {
+      r.post('/auth/ip-restrictions', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
         const user = request.user as { sub: string; tenantId: string } | undefined;
         if (!user?.tenantId) throw new UnauthorizedError('Authentication required');
 
@@ -45,7 +45,7 @@ export async function registerIpRestrictionRoutes(
       });
 
       // PATCH /api/v1/auth/ip-restrictions/:id
-      r.patch('/auth/ip-restrictions/:id', async (request, reply) => {
+      r.patch('/auth/ip-restrictions/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
         const user = request.user as { sub: string; tenantId: string } | undefined;
         if (!user?.tenantId) throw new UnauthorizedError('Authentication required');
 
@@ -61,7 +61,7 @@ export async function registerIpRestrictionRoutes(
       });
 
       // DELETE /api/v1/auth/ip-restrictions/:id
-      r.delete('/auth/ip-restrictions/:id', async (request, reply) => {
+      r.delete('/auth/ip-restrictions/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
         const user = request.user as { sub: string; tenantId: string } | undefined;
         if (!user?.tenantId) throw new UnauthorizedError('Authentication required');
 

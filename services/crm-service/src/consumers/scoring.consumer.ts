@@ -18,7 +18,7 @@ export async function startScoringConsumer(prisma: CrmPrisma): Promise<NexusCons
   const consumer = new NexusConsumer('crm-scoring-group');
   await consumer.subscribe([TOPICS.ACTIVITIES, TOPICS.LEADS, TOPICS.DEALS]);
 
-  consumer.on('crm.activity.created', async (event) => {
+  consumer.on('activity.created', async (event) => {
     const e = event as unknown as EventWithPayload;
     const tenantId = getTenantId(e);
     const leadId = (e.payload?.leadId as string | undefined) ?? (e.payload?.entityId as string | undefined);
@@ -36,7 +36,7 @@ export async function startScoringConsumer(prisma: CrmPrisma): Promise<NexusCons
     }
   });
 
-  consumer.on('crm.lead.created', async (event) => {
+  consumer.on('lead.created', async (event) => {
     const e = event as unknown as EventWithPayload;
     const tenantId = getTenantId(e);
     const leadId = (e.payload?.leadId as string | undefined) ?? (e.payload?.id as string | undefined);
@@ -47,7 +47,7 @@ export async function startScoringConsumer(prisma: CrmPrisma): Promise<NexusCons
     await scoringEngine.recalculateScoreRealTime(leadId);
   });
 
-  consumer.on('crm.lead.updated', async (event) => {
+  consumer.on('lead.updated', async (event) => {
     const e = event as unknown as EventWithPayload;
     const tenantId = getTenantId(e);
     const leadId = (e.payload?.leadId as string | undefined) ?? (e.payload?.id as string | undefined);
@@ -58,7 +58,7 @@ export async function startScoringConsumer(prisma: CrmPrisma): Promise<NexusCons
     await scoringEngine.recalculateScoreRealTime(leadId);
   });
 
-  consumer.on('crm.deal.updated', async (event) => {
+  consumer.on('deal.updated', async (event) => {
     const e = event as unknown as EventWithPayload;
     const tenantId = getTenantId(e);
     const accountId = e.payload?.accountId as string | undefined;
@@ -67,7 +67,7 @@ export async function startScoringConsumer(prisma: CrmPrisma): Promise<NexusCons
   });
 
   // New event handlers for enhanced scoring triggers
-  consumer.on('crm.email.opened', async (event) => {
+  consumer.on('email.opened', async (event) => {
     const e = event as unknown as EventWithPayload;
     const tenantId = getTenantId(e);
     const leadId = e.payload?.leadId as string;
@@ -77,7 +77,7 @@ export async function startScoringConsumer(prisma: CrmPrisma): Promise<NexusCons
     await scoringEngine.recalculateScoreRealTime(leadId);
   });
 
-  consumer.on('crm.page.viewed', async (event) => {
+  consumer.on('page.viewed', async (event) => {
     const e = event as unknown as EventWithPayload;
     const tenantId = getTenantId(e);
     const leadId = e.payload?.leadId as string;
@@ -87,7 +87,7 @@ export async function startScoringConsumer(prisma: CrmPrisma): Promise<NexusCons
     await scoringEngine.recalculateScoreRealTime(leadId);
   });
 
-  consumer.on('crm.content.downloaded', async (event) => {
+  consumer.on('content.downloaded', async (event) => {
     const e = event as unknown as EventWithPayload;
     const tenantId = getTenantId(e);
     const leadId = e.payload?.leadId as string;

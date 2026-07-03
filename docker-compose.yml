@@ -576,6 +576,12 @@ services:
     restart: unless-stopped
     ports:
       - '3008:3008'
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      CLICKHOUSE_URL: http://clickhouse:8123
     depends_on:
       kafka:
         condition: service_started
@@ -672,6 +678,11 @@ services:
     ports:
       - '3010:3010'
     environment:
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: '9000'
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: nexus-files
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_storage
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
@@ -735,6 +746,10 @@ services:
     ports:
       - '3016:3016'
     environment:
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      KAFKA_BROKERS: kafka:29092
       PORT: '3016'
     depends_on:
       - finance-service
@@ -748,6 +763,10 @@ services:
     ports:
       - '3017:3017'
     environment:
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      KAFKA_BROKERS: kafka:29092
       PORT: '3017'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_chatbot
     depends_on:
@@ -933,6 +952,10 @@ services:
     ports:
       - '3004:3004'
     environment:
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      KAFKA_BROKERS: kafka:29092
       PORT: '3004'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_metadata
     depends_on:

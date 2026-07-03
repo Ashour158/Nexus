@@ -19,6 +19,8 @@ RUN pnpm --filter @nexus/metadata-service run db:generate
 RUN pnpm --filter @nexus/metadata-service... run build
 
 # -- Stage 3: Production runner ----------------------------------------------------
+RUN find /app/services -path "*/src/*" -type f ! -name "*.ts" | while read f; do d="${f%/src/*}/dist/${f#*/src/}"; mkdir -p "$(dirname "$d")"; cp "$f" "$d"; done
+
 FROM node:20-alpine AS runner
 WORKDIR /app
 

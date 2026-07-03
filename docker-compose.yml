@@ -173,6 +173,7 @@ services:
       APP_URL: http://localhost:3000
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_auth
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -195,6 +196,7 @@ services:
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_crm
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -216,6 +218,7 @@ services:
       CHROMIUM_PATH: /usr/bin/chromium
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_finance
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -239,6 +242,7 @@ services:
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       KAFKA_CLIENT_ID: billing-service
@@ -266,6 +270,7 @@ services:
       PORT: '3031'
       ACCOUNTS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_accounts
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -292,6 +297,7 @@ services:
       PORT: '3030'
       LEADS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_leads
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -318,6 +324,7 @@ services:
       PORT: '3041'
       CONTACTS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_contacts
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -344,6 +351,7 @@ services:
       PORT: '3042'
       DEALS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_deals
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -370,6 +378,7 @@ services:
       PORT: '3043'
       ACTIVITIES_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_activities
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -396,6 +405,7 @@ services:
       PORT: '3032'
       NOTES_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_notes
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -422,6 +432,7 @@ services:
       PORT: '3033'
       QUOTES_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_quotes
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -447,6 +458,7 @@ services:
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_notification
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -481,6 +493,7 @@ services:
     environment:
       PORT: '3006'
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       MEILISEARCH_URL: http://meilisearch:7700
@@ -502,6 +515,7 @@ services:
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_workflow
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -522,6 +536,7 @@ services:
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_integration
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -542,6 +557,7 @@ services:
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_blueprint
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -635,6 +651,7 @@ services:
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_comm
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -656,6 +673,7 @@ services:
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_storage
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -675,6 +693,7 @@ services:
       PORT: '3014'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_approval
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -696,6 +715,7 @@ services:
       PORT: '3015'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_data
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -747,6 +767,7 @@ services:
       PORT: '3018'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_cadence
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -785,6 +806,7 @@ services:
       PORT: '3020'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_planning
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -806,6 +828,7 @@ services:
       PORT: '3021'
       REPORTING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_reporting
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -825,6 +848,7 @@ services:
       PORT: '3022'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_portal
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -844,6 +868,7 @@ services:
       PORT: '3023'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_knowledge
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -863,6 +888,7 @@ services:
       PORT: '3024'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_incentive
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -883,6 +909,7 @@ services:
     environment:
       EMAIL_SYNC_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_email_sync
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
@@ -932,6 +959,7 @@ services:
       PORT: '3028'
       AUDIT_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_audit
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       KAFKA_CLIENT_ID: audit-consumer
@@ -952,6 +980,7 @@ services:
     environment:
       PORT: '3027'
       KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       KAFKA_CLIENT_ID: outbox-relay

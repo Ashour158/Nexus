@@ -536,6 +536,7 @@ services:
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_integration
       INTEGRATION_ENCRYPTION_KEY: ${ENCRYPTION_MASTER_KEY}
+      INTEGRATION_SECRET_KEY: nexus_integration_secret_key_32b
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}

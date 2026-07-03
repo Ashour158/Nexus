@@ -31,6 +31,23 @@ const nextConfig = {
     serverComponentsExternalPackages: ['@prisma/client'],
     optimizePackageImports: ['lucide-react', '@nexus/shared-types'],
   },
+  // Same-origin BFF proxy: the browser calls /bff/<domain>/* on the web origin and
+  // Next proxies to the internal service over the Docker network. Avoids CORS and
+  // keeps all backend traffic behind the single public web port.
+  async rewrites() {
+    return [
+      { source: '/bff/auth/:path*', destination: 'http://auth-service:3000/api/v1/:path*' },
+      { source: '/bff/crm/:path*', destination: 'http://crm-service:3001/api/v1/:path*' },
+      { source: '/bff/finance/:path*', destination: 'http://finance-service:3002/api/v1/:path*' },
+      { source: '/bff/workflow/:path*', destination: 'http://workflow-service:3007/api/v1/:path*' },
+      { source: '/bff/comms/:path*', destination: 'http://comm-service:3009/api/v1/:path*' },
+      { source: '/bff/notification/:path*', destination: 'http://notification-service:3003/api/v1/:path*' },
+      { source: '/bff/search/:path*', destination: 'http://search-service:3006/api/v1/search/:path*' },
+      { source: '/bff/storage/:path*', destination: 'http://storage-service:3010/api/v1/storage/:path*' },
+      { source: '/bff/analytics/:path*', destination: 'http://analytics-service:3008/api/v1/analytics/:path*' },
+      { source: '/bff/integration/:path*', destination: 'http://integration-service:3012/api/v1/:path*' },
+    ];
+  },
   async headers() {
     return [
       {

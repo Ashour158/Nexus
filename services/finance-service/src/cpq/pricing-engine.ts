@@ -17,6 +17,37 @@ import type { FinancePrisma } from '../prisma.js';
 export type EnginePrisma = PrismaClient | FinancePrisma;
 
 /**
+ * Locally-extended pricing request. The shared `CpqPricingRequest` type lives
+ * in `@nexus/shared-types` (which this service does not own); the flagship CPQ
+ * features are threaded through as *optional* extras so callers that omit them
+ * behave exactly as before.
+ */
+export type CpqPricingRequestEx = CpqPricingRequest & {
+  /** Price Books — when present, `PriceBookEntry` prices override list price (Rule 1). */
+  priceBookId?: string | null;
+};
+
+/**
+ * Locally-extended pricing result. Adds margin + multi-currency fields that are
+ * only populated when the corresponding inputs/config exist. Consumers read
+ * these off the base result defensively.
+ */
+export type CpqPricingResultEx = CpqPricingResult & {
+  /** Total margin (revenue − cost) in quote currency; undefined when no cost data. */
+  marginTotal?: number;
+  /** Total margin as a percentage of revenue; undefined when no cost data. */
+  marginPercent?: number;
+  /** Tenant base currency, when it differs from the quote currency. */
+  baseCurrency?: string;
+  /** FX rate quoteCurrency → baseCurrency (defaults to 1 when unavailable). */
+  exchangeRate?: number;
+  /** Quote `total` converted into the base currency. */
+  baseTotal?: number;
+  /** Echo of the price book actually used, when resolved. */
+  priceBookId?: string;
+};
+
+/**
  * CPQ Pricing Engine — Section 40.
  *
  * Applies the 10-rule pricing waterfall in strict priority order:
@@ -61,6 +92,13 @@ interface PriceTier {
   unitPrice: Decimal;
 }
 
+/** Engine-internal shape of a `PriceBookEntry` row used for Rule-1 override. */
+interface PriceBookEntryRow {
+  minQty: number;
+  unitPrice: Decimal;
+  discountPct: number;
+}
+
 /** Engine-internal product shape after Prisma → domain conversion. */
 interface ProductWithTiers {
   id: string;
@@ -91,6 +129,16 @@ const TIER_DISCOUNTS: Record<string, number> = {
 /** Rule 9 — flat early-payment discount. */
 const EARLY_PAYMENT_DISCOUNT_PERCENT = 2;
 const DEFAULT_TAX_RATE = 0.1;
+
+/**
+ * Margin-floor guardrail. When the priced quote's total margin % falls below
+ * this threshold, `approvalRequired` is flipped (mirrors the floor-price rule).
+ * Configurable via `MIN_MARGIN_PCT`; defaults to 10%.
+ */
+function getMinMarginPct(): number {
+  const raw = Number(process.env.MIN_MARGIN_PCT);
+  return Number.isFinite(raw) ? raw : 10;
+}
 
 // ─── Type guards ────────────────────────────────────────────────────────────
 
@@ -182,7 +230,7 @@ export class CpqPricingEngine {
    * @throws {NotFoundError} When any requested product does not exist / is inactive
    *                         for the given tenant.
    */
-  async calculate(req: CpqPricingRequest): Promise<CpqPricingResult> {
+  async calculate(req: CpqPricingRequestEx): Promise<CpqPricingResultEx> {
     // ── Load products + tiers in one query ─────────────────────────────────
     const productIds = req.items.map((i) => i.productId);
     const rawProducts = await this.prisma.product.findMany({
@@ -192,6 +240,46 @@ export class CpqPricingEngine {
     const productMap = new Map<string, ProductWithTiers>(
       rawProducts.map((p) => [p.id, toProductWithTiers(p)])
     );
+
+    // ── Price Books (feature 1) ────────────────────────────────────────────
+    // When a price book is supplied, load its entries so Rule-1 list price can
+    // be overridden per (product, qty tier). Absent/unresolved → falls back to
+    // Product.listPrice, i.e. exactly the previous behaviour.
+    const priceBookId = req.priceBookId ?? null;
+    let resolvedPriceBookId: string | undefined;
+    const priceBookEntries = new Map<string, PriceBookEntryRow[]>();
+    if (priceBookId) {
+      const book = await this.prisma.priceBook.findFirst({
+        where: { id: priceBookId, tenantId: req.tenantId, isActive: true },
+        select: { id: true },
+      });
+      if (book) {
+        resolvedPriceBookId = book.id;
+        const entries = await this.prisma.priceBookEntry.findMany({
+          where: {
+            tenantId: req.tenantId,
+            priceBookId: book.id,
+            productId: { in: productIds },
+          },
+        });
+        for (const entry of entries) {
+          const list = priceBookEntries.get(entry.productId) ?? [];
+          list.push({
+            minQty: entry.minQty,
+            unitPrice: new Decimal(entry.unitPrice.toString()),
+            discountPct: entry.discountPct,
+          });
+          priceBookEntries.set(entry.productId, list);
+        }
+      }
+    }
+
+    // ── Cost data for margin (feature 2) ───────────────────────────────────
+    // Preferred cost is the preferred/active VendorProduct.costPrice; otherwise
+    // Product.cost. Missing cost → line contributes no margin (undefined).
+    const costMap = await this.loadCostMap(req.tenantId, productIds, productMap);
+    let marginable = false;
+    let costTotal = new Decimal(0);
 
     // ── Load account pricing context ───────────────────────────────────────
     const account = await this.prisma.account.findFirst({
@@ -217,7 +305,13 @@ export class CpqPricingEngine {
       }
 
       const qty = reqItem.quantity;
-      const listPrice = product.listPrice;
+      // ── Rule 1: List Price baseline ───────────────────────────────────────
+      // Price book entry (when present) overrides the catalog list price.
+      const listPrice = this.resolveListPrice(
+        product,
+        priceBookEntries.get(product.id),
+        qty
+      );
       let discountPercent = new Decimal(0);
 
       // ── Rule 2: Customer Tier Discount ────────────────────────────────────
@@ -341,6 +435,13 @@ export class CpqPricingEngine {
       const discountAmount = listPrice.minus(workingPrice);
       const total = workingPrice.times(qty);
 
+      // ── Margin (feature 2) ────────────────────────────────────────────────
+      const unitCost = costMap.get(product.id);
+      if (unitCost) {
+        marginable = true;
+        costTotal = costTotal.plus(unitCost.times(qty));
+      }
+
       lineItems.push({
         productId: product.id,
         productName: product.name,
@@ -406,16 +507,63 @@ export class CpqPricingEngine {
       });
     }
 
+    const total = subtotal.plus(taxTotal);
+
+    // ── Margin totals + floor guardrail (feature 2) ──────────────────────────
+    // Revenue basis for margin is the pre-tax subtotal (sum of line totals).
+    let marginTotal: number | undefined;
+    let marginPercent: number | undefined;
+    if (marginable) {
+      const marginDec = subtotal.minus(costTotal);
+      marginTotal = marginDec.toNumber();
+      const marginPctDec = subtotal.gt(0)
+        ? marginDec.div(subtotal).times(100)
+        : new Decimal(0);
+      marginPercent = marginPctDec.toNumber();
+
+      const minMarginPct = getMinMarginPct();
+      if (marginPctDec.lt(minMarginPct)) {
+        approvalRequired = true;
+        approvalReasons.push(
+          `Total margin ${marginPctDec.toFixed(2)}% is below the ${minMarginPct}% floor`
+        );
+      }
+    }
+
+    // ── Multi-currency (feature 3) ───────────────────────────────────────────
+    // When the quote currency differs from the tenant base currency, convert
+    // the total using the active ExchangeRate. Missing rate → 1:1 + warning.
+    let baseCurrency: string | undefined;
+    let exchangeRate: number | undefined;
+    let baseTotal: number | undefined;
+    const fx = await this.resolveBaseCurrencyConversion(
+      req.tenantId,
+      req.currency,
+      total
+    );
+    if (fx) {
+      baseCurrency = fx.baseCurrency;
+      exchangeRate = fx.rate.toNumber();
+      baseTotal = fx.baseTotal.toNumber();
+      if (fx.warning) floorWarnings.push(fx.warning);
+    }
+
     return {
       items: lineItems,
       subtotal: subtotal.toNumber(),
       discountTotal: discountTotal.toNumber(),
       taxTotal: taxTotal.toNumber(),
-      total: subtotal.plus(taxTotal).toNumber(),
+      total: total.toNumber(),
       appliedRules: [...new Set(appliedRules)],
       floorPriceWarnings: floorWarnings,
       approvalRequired,
       approvalReasons,
+      marginTotal,
+      marginPercent,
+      baseCurrency,
+      exchangeRate,
+      baseTotal,
+      priceBookId: resolvedPriceBookId,
     };
   }
 
@@ -436,6 +584,120 @@ export class CpqPricingEngine {
   }
 
   // ─── Private rule helpers ─────────────────────────────────────────────────
+
+  /**
+   * Rule 1 (feature 1) — resolves the list-price baseline. When a price book
+   * entry applies to `(product, qty)`, its unit price (net of any `discountPct`)
+   * replaces `Product.listPrice`. Picks the deepest applicable `minQty` tier.
+   * Falls back to the catalog list price when no entry matches.
+   */
+  private resolveListPrice(
+    product: ProductWithTiers,
+    entries: PriceBookEntryRow[] | undefined,
+    qty: number
+  ): Decimal {
+    if (!entries || entries.length === 0) return product.listPrice;
+    const matching = entries
+      .filter((e) => qty >= e.minQty)
+      .sort((a, b) => b.minQty - a.minQty);
+    if (matching.length === 0) return product.listPrice;
+    const entry = matching[0];
+    let price = entry.unitPrice;
+    if (entry.discountPct > 0) {
+      price = price.times(new Decimal(1).minus(new Decimal(entry.discountPct).div(100)));
+    }
+    return price;
+  }
+
+  /**
+   * Margin (feature 2) — resolves the per-unit cost for each product. Prefers
+   * the preferred/active `VendorProduct.costPrice`, then any active vendor cost,
+   * then `Product.cost`. Products with no cost data are omitted from the map so
+   * margin computation stays additive/guarded.
+   */
+  private async loadCostMap(
+    tenantId: string,
+    productIds: string[],
+    productMap: Map<string, ProductWithTiers>
+  ): Promise<Map<string, Decimal>> {
+    const costMap = new Map<string, Decimal>();
+    if (productIds.length === 0) return costMap;
+
+    const vendorProducts = await this.prisma.vendorProduct.findMany({
+      where: { tenantId, productId: { in: productIds }, isActive: true },
+      orderBy: { isPreferred: 'desc' },
+    });
+    for (const vp of vendorProducts) {
+      // First write wins → preferred vendor (orderBy desc) takes precedence.
+      if (!costMap.has(vp.productId)) {
+        costMap.set(vp.productId, new Decimal(vp.costPrice.toString()));
+      }
+    }
+
+    // Fall back to Product.cost where no vendor cost exists.
+    for (const productId of productIds) {
+      if (costMap.has(productId)) continue;
+      const raw = productMap.get(productId);
+      if (!raw) continue;
+      const productCost = await this.prisma.product.findFirst({
+        where: { id: productId, tenantId },
+        select: { cost: true },
+      });
+      if (productCost?.cost !== null && productCost?.cost !== undefined) {
+        costMap.set(productId, new Decimal(productCost.cost.toString()));
+      }
+    }
+    return costMap;
+  }
+
+  /**
+   * Multi-currency (feature 3) — when the quote currency differs from the
+   * tenant base currency, converts `total` using the active `ExchangeRate`
+   * (respecting `effectiveFrom`/`effectiveTo`). Returns `null` when there is no
+   * distinct base currency to convert into. Never throws: a missing rate falls
+   * back to 1:1 with a warning.
+   */
+  private async resolveBaseCurrencyConversion(
+    tenantId: string,
+    quoteCurrency: string,
+    total: Decimal
+  ): Promise<
+    | { baseCurrency: string; rate: Decimal; baseTotal: Decimal; warning?: string }
+    | null
+  > {
+    const baseRow = await this.prisma.currency.findFirst({
+      where: { tenantId, isBase: true, isActive: true },
+      select: { code: true },
+    });
+    const baseCurrency = baseRow?.code;
+    if (!baseCurrency || baseCurrency === quoteCurrency) {
+      return null;
+    }
+
+    const now = new Date();
+    const rateRow = await this.prisma.exchangeRate.findFirst({
+      where: {
+        tenantId,
+        fromCurrency: quoteCurrency,
+        toCurrency: baseCurrency,
+        effectiveFrom: { lte: now },
+        AND: [{ OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }] }],
+      },
+      orderBy: { effectiveFrom: 'desc' },
+    });
+
+    if (!rateRow) {
+      return {
+        baseCurrency,
+        rate: new Decimal(1),
+        baseTotal: total,
+        warning: `No exchange rate ${quoteCurrency}→${baseCurrency}; base total fell back to 1:1`,
+      };
+    }
+
+    const rate = new Decimal(rateRow.rate.toString());
+    return { baseCurrency, rate, baseTotal: total.times(rate) };
+  }
 
   /**
    * Rule 3 — selects the matching `PriceTier` for `qty` (deepest tier first)

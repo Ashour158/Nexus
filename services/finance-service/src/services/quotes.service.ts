@@ -1,4 +1,5 @@
 import type { CpqPricingResult, PaginatedResult } from '@nexus/shared-types';
+import type { CpqPricingResultEx } from '../cpq/pricing-engine.js';
 import {
   BusinessRuleError,
   ConflictError,
@@ -25,7 +26,11 @@ type QuoteListFilters = Omit<
   'page' | 'limit' | 'sortBy' | 'sortDir' | 'cursor'
 > & { contactId?: string };
 
-type ContactLinkedCreateQuoteInput = CreateQuoteInput & { contactId?: string };
+type ContactLinkedCreateQuoteInput = CreateQuoteInput & {
+  contactId?: string;
+  /** Price Books (feature 1) — optional; threaded onto Quote.priceBookId. */
+  priceBookId?: string | null;
+};
 
 interface ListPagination {
   page: number;
@@ -243,7 +248,7 @@ export function createQuotesService(
     async createQuote(
       tenantId: string,
       data: ContactLinkedCreateQuoteInput,
-      pricingResult: CpqPricingResult
+      pricingResult: CpqPricingResultEx
     ): Promise<Quote> {
       if (pricingResult.items.length === 0) {
         throw new BusinessRuleError('Quote must include at least one line item');
@@ -277,6 +282,22 @@ export function createQuotesService(
               approvalStatus: pricingResult.approvalRequired
                 ? 'PENDING'
                 : null,
+              // ── Flagship CPQ columns (features 1–3) ─────────────────────
+              // All optional / null-safe: absent inputs leave columns null.
+              priceBookId: pricingResult.priceBookId ?? data.priceBookId ?? null,
+              marginTotal:
+                pricingResult.marginTotal !== undefined
+                  ? toPrismaDecimal(pricingResult.marginTotal)
+                  : null,
+              baseCurrency: pricingResult.baseCurrency ?? null,
+              exchangeRate:
+                pricingResult.exchangeRate !== undefined
+                  ? toPrismaDecimal(pricingResult.exchangeRate)
+                  : null,
+              baseTotal:
+                pricingResult.baseTotal !== undefined
+                  ? toPrismaDecimal(pricingResult.baseTotal)
+                  : null,
               paymentTerms: data.paymentTerms ?? null,
               terms: data.terms ?? null,
               notes: data.notes ?? null,

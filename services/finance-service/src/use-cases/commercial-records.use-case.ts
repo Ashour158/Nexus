@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import type { CpqPricingRequest, CpqPricingResult } from '@nexus/shared-types';
 import { toPaginatedResult } from '@nexus/shared-types';
 import type { EngineContext } from '@nexus/domain-core';
 import { TOPICS, type NexusProducer } from '@nexus/kafka';
@@ -16,13 +15,17 @@ import {
   type QuoteTemplate,
 } from '../../../../node_modules/.prisma/finance-client/index.js';
 import type { FinancePrisma } from '../prisma.js';
+import type {
+  CpqPricingRequestEx,
+  CpqPricingResultEx,
+} from '../cpq/pricing-engine.js';
 import { buildQuoteDocxBuffer } from '../lib/docx-generator.js';
 import { generatePDF } from '../lib/pdf-generator.js';
 import type { DiscountRequestsService } from '../services/discount-requests.service.js';
 import type { QuotesService } from '../services/quotes.service.js';
 
 type PricingEngine = {
-  calculate(input: CpqPricingRequest): Promise<CpqPricingResult>;
+  calculate(input: CpqPricingRequestEx): Promise<CpqPricingResultEx>;
 };
 
 type DiscountApprovalCheck = (
@@ -32,12 +35,14 @@ type DiscountApprovalCheck = (
   subtotal: number,
   discountAmount: number,
   requestedById: string,
-  reference: string
+  reference: string,
+  reasonCode?: string
 ) => Promise<{
   required: boolean;
   requestId?: string;
   actualDiscountPercent: number;
   thresholdPercent: number;
+  approverTier?: string;
 }>;
 
 export type CommercialRecordsUseCaseDeps = {
@@ -1410,6 +1415,8 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
           throw new BusinessRuleError('Quote commercial anchors must match the source RFQ');
         }
       }
+      // Price Books (feature 1): threaded when supplied on the create payload.
+      const priceBookId = (data as { priceBookId?: string | null }).priceBookId ?? null;
       const pricing = await pricingEngine.calculate({
         tenantId,
         dealId: data.dealId,
@@ -1418,6 +1425,7 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
         paymentTerms: data.paymentTerms,
         appliedPromos: data.appliedPromos,
         items: data.items,
+        priceBookId,
       });
 
       if (pricing.approvalRequired && !data.discountRequest) {
@@ -1431,7 +1439,11 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
         });
       }
 
-      const quote = await quotes.createQuote(tenantId, data, pricing);
+      const quote = await quotes.createQuote(
+        tenantId,
+        { ...data, priceBookId },
+        pricing
+      );
       const discountRequest =
         pricing.approvalRequired && data.discountRequest
           ? await discountRequests.createDiscountRequest(

@@ -29,6 +29,8 @@ function makePricingResult(overrides: Record<string, unknown> = {}) {
       discountPercent: 0,
       discountAmount: 0,
       total: 100,
+      taxPercent: 0,
+      taxAmount: 0,
       billingType: 'ONE_TIME',
     }],
     subtotal: 100,

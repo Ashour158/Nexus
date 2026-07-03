@@ -3,7 +3,7 @@ import { startTracing } from '@nexus/service-utils/tracing';
 import { createService, startService, globalErrorHandler, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
 import rateLimit from '@fastify/rate-limit';
 import { NexusConsumer, NexusProducer, TOPICS } from '@nexus/kafka';
-import { getPrisma } from './prisma.js';
+import { getPrisma, tenantAls } from './prisma.js';
 import { createCadencesService } from './services/cadences.service.js';
 import { createEnrollmentsService } from './services/enrollments.service.js';
 import { createQueueService } from './services/queue.service.js';
@@ -44,6 +44,12 @@ await app.register(rateLimit, {
     message: `Too many requests. Retry after ${context.after}.`,
   }),
 });
+// Bridge Fastify request-context tenantId into Prisma tenant ALS
+app.addHook('preHandler', async (request) => {
+  const tenantId = (request as any).requestContext?.get('tenantId');
+  if (tenantId) tenantAls.enterWith({ tenantId });
+});
+
 registerHealthRoutes(app, 'cadence-service', [() => checkDatabase(prisma as any)]);
 app.setErrorHandler(globalErrorHandler);
 

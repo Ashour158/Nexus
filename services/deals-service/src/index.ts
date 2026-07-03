@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { startTracing } from '@nexus/service-utils/tracing';
 import { createService, startService } from '@nexus/service-utils';
 import { NexusProducer } from '@nexus/kafka';
-import { createDealsPrisma } from './prisma.js';
+import { createDealsPrisma, tenantAls } from './prisma.js';
 import { registerDealsHealthRoutes } from './routes/health.routes.js';
 import { registerDealsRoutes } from './routes/deals.routes.js';
 import { registerPipelinesRoutes } from './routes/pipelines.routes.js';
@@ -25,6 +25,12 @@ const app = await createService({ name: 'deals-service', port, jwtSecret, corsOr
 
 const prisma = createDealsPrisma();
 const producer = new NexusProducer('deals-service');
+
+// Bridge Fastify request-context tenantId into Prisma tenant ALS (defense-in-depth)
+app.addHook('preHandler', async (request) => {
+  const tenantId = (request as any).requestContext?.get('tenantId');
+  if (tenantId) tenantAls.enterWith({ tenantId });
+});
 
 // registerDealsHealthRoutes already registers GET /health (with DB + producer
 // checks) via registerHealthRoutes internally — do not register it again here.

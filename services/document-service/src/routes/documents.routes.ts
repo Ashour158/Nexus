@@ -113,7 +113,7 @@ export async function registerDocumentsRoutes(app: FastifyInstance) {
     return reply.send(pdf);
   });
 
-  app.post('/api/v1/documents/esign/send', { preHandler: requirePermission(PERMISSIONS.DOCUMENTS.UPDATE) }, async (request, reply) => {
+  app.post('/api/v1/documents/esign/send', { preHandler: requirePermission(PERMISSIONS.DOCUMENTS.READ) }, async (request, reply) => {
     const body = EsignSendSchema.parse(request.body);
 
     // Generate PDF preview of the document
@@ -124,11 +124,11 @@ export async function registerDocumentsRoutes(app: FastifyInstance) {
         : renderContractHtml(sanitizedData);
     const pdf = await htmlToPdf(html);
 
-    const docuSignConfigured =
-      process.env.DOCUSIGN_INTEGRATION_KEY &&
-      process.env.DOCUSIGN_ACCOUNT_ID;
+    const accountId = process.env.DOCUSIGN_ACCOUNT_ID;
+    const accessToken = process.env.DOCUSIGN_ACCESS_TOKEN;
+    const baseUrl = process.env.DOCUSIGN_BASE_URL ?? 'https://demo.docusign.net/restapi';
 
-    if (!docuSignConfigured) {
+    if (!accountId || !accessToken) {
       return reply.code(200).send({
         success: true,
         data: {
@@ -136,23 +136,64 @@ export async function registerDocumentsRoutes(app: FastifyInstance) {
           status: 'PENDING_PROVIDER_CONFIGURATION',
           previewUrl: `data:application/pdf;base64,${pdf.toString('base64')}`,
           signers: body.signers,
-          message:
-            'DocuSign is not configured. Document preview generated. Set DOCUSIGN_INTEGRATION_KEY and DOCUSIGN_ACCOUNT_ID to enable sending.',
+          message: 'DocuSign is not configured. Set DOCUSIGN_ACCOUNT_ID and DOCUSIGN_ACCESS_TOKEN to enable sending.',
         },
       });
     }
 
-    // DocuSign SDK integration is pending. Credentials are configured but envelope creation is not yet implemented.
-    return reply.code(503).send({
-      success: false,
-      error: {
-        code: 'NOT_IMPLEMENTED',
-        message: 'DocuSign envelope creation is not yet implemented. Document preview is available.',
+    const envelope = {
+      emailSubject: body.subject ?? `Please sign: ${body.documentType}`,
+      emailBlurb: body.message ?? 'Please review and sign the attached document.',
+      documents: [{
+        documentBase64: pdf.toString('base64'),
+        name: `${body.documentType}.pdf`,
+        fileExtension: 'pdf',
+        documentId: '1',
+      }],
+      recipients: {
+        signers: body.signers.map((s, i) => ({
+          email: s.email,
+          name: s.name,
+          recipientId: String(i + 1),
+          routingOrder: String(i + 1),
+          tabs: {
+            signHereTabs: [{
+              anchorString: `/sn${i + 1}/`,
+              anchorUnits: 'pixels',
+              anchorXOffset: '0',
+              anchorYOffset: '0',
+            }],
+          },
+        })),
       },
+      status: 'sent',
+    };
+
+    const dsRes = await fetch(`${baseUrl}/v2.1/accounts/${accountId}/envelopes`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(envelope),
+    });
+
+    if (!dsRes.ok) {
+      const errText = await dsRes.text().catch(() => 'unknown error');
+      app.log.error({ status: dsRes.status, body: errText }, 'DocuSign envelope creation failed');
+      return reply.code(502).send({
+        success: false,
+        error: { code: 'DOCUSIGN_ERROR', message: `DocuSign returned ${dsRes.status}: ${errText}` },
+      });
+    }
+
+    const dsData = await dsRes.json() as { envelopeId: string; status: string };
+    return reply.send({
+      success: true,
       data: {
-        envelopeId: null,
-        status: 'PENDING_IMPLEMENTATION',
-        previewUrl: `data:application/pdf;base64,${pdf.toString('base64')}`,
+        envelopeId: dsData.envelopeId,
+        status: dsData.status.toUpperCase(),
         signers: body.signers,
       },
     });

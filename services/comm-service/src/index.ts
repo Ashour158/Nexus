@@ -10,7 +10,7 @@ import {
 } from '@nexus/service-utils';
 import { PrismaClient } from '../../../node_modules/.prisma/comm-client/index.js';
 import { buildDatabaseUrl } from '@nexus/service-utils/db';
-import { createCommPrisma } from './prisma.js';
+import { createCommPrisma, tenantAls } from './prisma.js';
 import { createSmtpChannel } from './channels/smtp.channel.js';
 import { createSmsChannel } from './channels/sms.channel.js';
 import { createTemplatesService } from './services/templates.service.js';
@@ -61,6 +61,12 @@ await app.register(rateLimit, {
     error: 'RATE_LIMIT_EXCEEDED',
     message: `Too many requests. Retry after ${context.after}.`,
   }),
+});
+
+// Bridge Fastify request-context tenantId into Prisma tenant ALS
+app.addHook('preHandler', async (request) => {
+  const tenantId = (request as any).requestContext?.get('tenantId');
+  if (tenantId) tenantAls.enterWith({ tenantId });
 });
 
 registerHealthRoutes(app, 'comm-service', [() => checkDatabase(prismaHealth)]);

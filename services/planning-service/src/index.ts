@@ -3,7 +3,7 @@ import { startTracing } from '@nexus/service-utils/tracing';
 import { createService, startService, globalErrorHandler, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
 import rateLimit from '@fastify/rate-limit';
 import { NexusProducer } from '@nexus/kafka';
-import { getPrisma } from './prisma.js';
+import { getPrisma, tenantAls } from './prisma.js';
 import { createQuotasService } from './services/quotas.service.js';
 import { createForecastsService } from './services/forecasts.service.js';
 import { registerQuotasRoutes } from './routes/quotas.routes.js';
@@ -38,6 +38,12 @@ await app.register(rateLimit, {
     message: `Too many requests. Retry after ${context.after}.`,
   }),
 });
+// Bridge Fastify request-context tenantId into Prisma tenant ALS
+app.addHook('preHandler', async (request) => {
+  const tenantId = (request as any).requestContext?.get('tenantId');
+  if (tenantId) tenantAls.enterWith({ tenantId });
+});
+
 registerHealthRoutes(app, 'planning-service', [() => checkDatabase(prisma as any)]);
 app.setErrorHandler(globalErrorHandler);
 

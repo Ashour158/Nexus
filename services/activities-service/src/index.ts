@@ -3,7 +3,7 @@ import { startTracing } from '@nexus/service-utils/tracing';
 import { createService, startService } from '@nexus/service-utils';
 import rateLimit from '@fastify/rate-limit';
 import { NexusProducer } from '@nexus/kafka';
-import { createActivitiesPrisma } from './prisma.js';
+import { createActivitiesPrisma, tenantAls } from './prisma.js';
 import { registerActivitiesHealthRoutes } from './routes/health.routes.js';
 import { registerActivitiesRoutes } from './routes/activities.routes.js';
 import { registerTasksRoutes } from './routes/tasks.routes.js';
@@ -23,6 +23,12 @@ const app = await createService({ name: 'activities-service', port, jwtSecret, c
 
 const prisma = createActivitiesPrisma();
 const producer = new NexusProducer('activities-service');
+
+// Bridge Fastify request-context tenantId into Prisma tenant ALS (defense-in-depth)
+app.addHook('preHandler', async (request) => {
+  const tenantId = (request as any).requestContext?.get('tenantId');
+  if (tenantId) tenantAls.enterWith({ tenantId });
+});
 
 await app.register(rateLimit, {
   global: true,

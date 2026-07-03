@@ -10,7 +10,7 @@ import {
 } from '@nexus/service-utils';
 import { PrismaClient } from '../../../node_modules/.prisma/notification-client/index.js';
 import { buildDatabaseUrl } from '@nexus/service-utils/db';
-import { createNotificationPrisma } from './prisma.js';
+import { createNotificationPrisma, tenantAls } from './prisma.js';
 import { createEmailChannel } from './channels/email.channel.js';
 import { createInAppChannel } from './channels/in-app.channel.js';
 import { startDealConsumer } from './consumers/deal.consumer.js';
@@ -55,6 +55,12 @@ await app.register(rateLimit, {
     error: 'RATE_LIMIT_EXCEEDED',
     message: `Too many requests. Retry after ${context.after}.`,
   }),
+});
+
+// Bridge Fastify request-context tenantId into Prisma tenant ALS
+app.addHook('preHandler', async (request) => {
+  const tenantId = (request as any).requestContext?.get('tenantId');
+  if (tenantId) tenantAls.enterWith({ tenantId });
 });
 
 registerHealthRoutes(app, 'notification-service', [

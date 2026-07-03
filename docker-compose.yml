@@ -587,7 +587,7 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       CLICKHOUSE_URL: http://clickhouse:8123
-      CLICKHOUSE_DB: nexus_analytics
+      CLICKHOUSE_DB: default
     depends_on:
       kafka:
         condition: service_started

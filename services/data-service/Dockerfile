@@ -30,6 +30,7 @@ COPY --from=builder --chown=service:nodejs /app/services/data-service/package.js
 COPY --from=builder --chown=service:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=service:nodejs /app/packages ./packages
 
+RUN apk add --no-cache openssl && ln -sf /app/node_modules /node_modules
 USER service
 EXPOSE 3015
 ENV NODE_ENV=production PORT=3015

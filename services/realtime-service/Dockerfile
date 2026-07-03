@@ -29,6 +29,7 @@ COPY --from=builder --chown=service:nodejs /app/services/realtime-service/packag
 COPY --from=builder --chown=service:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=service:nodejs /app/packages ./packages
 
+RUN apk add --no-cache openssl && ln -sf /app/node_modules /node_modules
 USER service
 EXPOSE 3005
 ENV NODE_ENV=production PORT=3005

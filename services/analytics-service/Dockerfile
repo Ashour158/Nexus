@@ -29,6 +29,7 @@ COPY --from=builder --chown=service:nodejs /app/services/analytics-service/packa
 COPY --from=builder --chown=service:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=service:nodejs /app/packages ./packages
 
+RUN apk add --no-cache openssl && ln -sf /app/node_modules /node_modules
 USER service
 EXPOSE 3008
 ENV NODE_ENV=production PORT=3008

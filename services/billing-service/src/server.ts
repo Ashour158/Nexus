@@ -11,6 +11,7 @@ import { NexusProducer } from '@nexus/kafka';
 import type { FastifyInstance } from 'fastify';
 import { createBillingPrisma } from './prisma.js';
 import { registerAllBillingRoutes } from './routes/index.js';
+import { startFinanceSubscriptionConsumer } from './consumers/finance-subscription.consumer.js';
 
 export async function buildServer(): Promise<{
   app: FastifyInstance;
@@ -44,9 +45,27 @@ export async function buildServer(): Promise<{
     app.log.warn({ err }, 'Kafka producer connect failed; continuing without event publishing');
   }
 
+  // finance-service is the quote-to-cash system-of-record. Mirror its
+  // `subscription.created` events into billing so billing/Stripe reflect the
+  // SoR. Best-effort: if the consumer fails to start, billing keeps serving.
+  let financeSubscriptionConsumer: Awaited<
+    ReturnType<typeof startFinanceSubscriptionConsumer>
+  > | null = null;
+  try {
+    financeSubscriptionConsumer = await startFinanceSubscriptionConsumer(prisma, app.log, producer);
+    app.log.info('Finance subscription consumer started');
+  } catch (err) {
+    app.log.warn({ err }, 'Finance subscription consumer failed to start; continuing without SoR mirroring');
+  }
+
   app.addHook('onClose', async () => {
     try {
       await producer.disconnect();
+    } catch {
+      /* ignore */
+    }
+    try {
+      await financeSubscriptionConsumer?.disconnect();
     } catch {
       /* ignore */
     }

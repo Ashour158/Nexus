@@ -225,6 +225,93 @@ function normalizedCommercialLines(lineItems: unknown) {
     });
 }
 
+// ─── Quote-to-cash: recurring subscription detection ────────────────────────
+// A quote/order line is "recurring" when its underlying Product is billed
+// RECURRING (BillingType.RECURRING) or is of type SUBSCRIPTION. We resolve the
+// signal from the Product catalog; if a line already carries a billingType we
+// honour it as a fallback so we never depend on data we cannot see.
+
+type RecurringSubscriptionLine = {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  billingPeriod: string;
+};
+
+function recurringPeriodOf(value: unknown): string {
+  const raw = String(value ?? '').trim().toUpperCase();
+  if (raw === 'MONTHLY' || raw === 'QUARTERLY' || raw === 'ANNUAL' || raw === 'ANNUALLY' || raw === 'YEARLY' || raw === 'WEEKLY') {
+    return raw === 'ANNUALLY' || raw === 'YEARLY' ? 'ANNUAL' : raw;
+  }
+  return 'MONTHLY';
+}
+
+// Normalizes a billing period into a monthly MRR multiplier.
+function monthlyFactorFor(period: string): number {
+  switch (period) {
+    case 'ANNUAL':
+      return 1 / 12;
+    case 'QUARTERLY':
+      return 1 / 3;
+    case 'WEEKLY':
+      return 52 / 12;
+    default:
+      return 1; // MONTHLY
+  }
+}
+
+function isRecurringProduct(product: { billingType?: unknown; type?: unknown } | null | undefined): boolean {
+  if (!product) return false;
+  return String(product.billingType ?? '').toUpperCase() === 'RECURRING'
+    || String(product.type ?? '').toUpperCase() === 'SUBSCRIPTION';
+}
+
+async function resolveRecurringLines(
+  prisma: FinancePrisma,
+  tenantId: string,
+  lineItems: unknown
+): Promise<RecurringSubscriptionLine[]> {
+  const lines = normalizedCommercialLines(lineItems);
+  if (lines.length === 0) return [];
+
+  const productIds = Array.from(
+    new Set(lines.map((line) => String(line.productId ?? line.sku ?? '')).filter((id) => id.length > 0))
+  );
+  if (productIds.length === 0) return [];
+
+  const products = await prisma.product.findMany({
+    where: { tenantId, id: { in: productIds } },
+  });
+  const byId = new Map(products.map((p) => [p.id, p]));
+
+  const recurring: RecurringSubscriptionLine[] = [];
+  for (const line of lines) {
+    const productId = String(line.productId ?? line.sku ?? '');
+    if (!productId) continue;
+    const product = byId.get(productId) ?? null;
+    // Fall back to a line-level billingType flag if the catalog has no record.
+    const lineIsRecurring = String(line.billingType ?? '').toUpperCase() === 'RECURRING';
+    if (!isRecurringProduct(product) && !lineIsRecurring) continue;
+
+    const quantity = Number(line.quantity ?? 1) || 1;
+    const unitPrice = Number(
+      line.unitPrice ?? line.listPrice ?? (product ? Number(product.listPrice) : 0) ?? 0
+    );
+    const billingPeriod = recurringPeriodOf(
+      line.billingPeriod ?? (product ? product.billingPeriod : undefined)
+    );
+    recurring.push({
+      productId,
+      productName: String(line.productName ?? line.name ?? product?.name ?? productId),
+      quantity,
+      unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
+      billingPeriod,
+    });
+  }
+  return recurring;
+}
+
 function assertRfqCreateAuthority(data: RfqInput) {
   const errors: Record<string, string[]> = {};
   if (!hasText(data.dealId)) errors.dealId = ['RFQ creation requires a dealId.'];
@@ -475,9 +562,11 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
       aggregateType: string;
       aggregateId: string;
       payload: Record<string, unknown>;
+      topic?: string;
     }
   ) {
     const tenantId = actor(ctx).tenantId;
+    const topic = input.topic ?? TOPICS.QUOTES;
     const eventPayload = compactPayload({
       type: input.type,
       tenantId,
@@ -494,7 +583,7 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
 
     await prisma.outboxMessage.create({
       data: {
-        topic: TOPICS.QUOTES,
+        topic,
         key: input.aggregateId,
         payload: jsonSafe(eventPayload),
         tenantId,
@@ -508,11 +597,115 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
       },
     });
 
-    await producer.publish(TOPICS.QUOTES, {
+    await producer.publish(topic, {
       type: input.type,
       tenantId,
       payload: eventPayload,
     }).catch(() => undefined);
+  }
+
+  // ─── Quote-to-cash: create finance Subscription rows from a converted order ──
+  // finance-service is the system-of-record for subscriptions. For every
+  // recurring product on a converted order we create (idempotently) a
+  // Subscription and emit `subscription.created` on TOPICS.CONTRACTS. All data
+  // is guarded so missing/partial inputs never throw.
+  async function createSubscriptionsForOrder(
+    ctx: EngineContext,
+    quote: {
+      id: string;
+      quoteNumber?: string | null;
+      accountId: string;
+      currency?: string | null;
+      lineItems: unknown;
+    },
+    order: { id: string; orderNumber?: string | null; accountId: string; currency?: string | null }
+  ): Promise<void> {
+    const tenantId = actor(ctx).tenantId;
+    const recurringLines = await resolveRecurringLines(prisma, tenantId, quote.lineItems);
+    if (recurringLines.length === 0) return;
+
+    const currency = String(order.currency ?? quote.currency ?? 'USD');
+    // Next billing date defaults to one month out from the order date.
+    const startDate = ctx.now;
+    const nextBillingDate = new Date(startDate);
+    nextBillingDate.setUTCMonth(nextBillingDate.getUTCMonth() + 1);
+
+    for (const line of recurringLines) {
+      const lineTotalPerPeriod = line.unitPrice * line.quantity;
+      const mrr = Number((lineTotalPerPeriod * monthlyFactorFor(line.billingPeriod)).toFixed(2));
+      const arr = Number((mrr * 12).toFixed(2));
+
+      // Idempotency: skip if a subscription for this account+product already
+      // exists (the schema enforces @@unique([tenantId, accountId, productId])).
+      const existing = await prisma.subscription.findFirst({
+        where: { tenantId, accountId: order.accountId, productId: line.productId },
+      });
+      if (existing) {
+        const existingFields = customFieldsOf(existing.customFields);
+        // Already linked to this order → nothing to do (idempotent replay).
+        if (String(existingFields.sourceOrderId ?? '') === order.id) continue;
+        // Belongs to another order → do not clobber; skip to stay additive.
+        continue;
+      }
+
+      let subscription: Awaited<ReturnType<typeof prisma.subscription.create>>;
+      try {
+        subscription = await prisma.subscription.create({
+          data: {
+            tenantId,
+            accountId: order.accountId,
+            productId: line.productId,
+            planName: line.productName,
+            status: 'ACTIVE',
+            quantity: line.quantity,
+            unitPrice: new Prisma.Decimal(line.unitPrice),
+            currency,
+            billingPeriod: line.billingPeriod,
+            billingDay: startDate.getUTCDate(),
+            startDate,
+            mrr: new Prisma.Decimal(mrr),
+            arr: new Prisma.Decimal(arr),
+            nextBillingDate,
+            customFields: {
+              sourceOrderId: order.id,
+              sourceOrderNumber: order.orderNumber ?? null,
+              sourceQuoteId: quote.id,
+              sourceQuoteNumber: quote.quoteNumber ?? null,
+            } as Prisma.InputJsonValue,
+          },
+        });
+      } catch (err) {
+        // Unique-constraint race (concurrent conversion) → treat as created.
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') continue;
+        throw err;
+      }
+
+      await emitCommercialEvent(ctx, {
+        topic: TOPICS.CONTRACTS,
+        type: 'subscription.created',
+        aggregateType: 'subscription',
+        aggregateId: subscription.id,
+        payload: {
+          subscriptionId: subscription.id,
+          accountId: subscription.accountId,
+          productId: subscription.productId,
+          planName: subscription.planName,
+          status: subscription.status,
+          quantity: subscription.quantity,
+          unitPrice: Number(subscription.unitPrice),
+          currency: subscription.currency,
+          billingPeriod: subscription.billingPeriod,
+          mrr: Number(subscription.mrr),
+          arr: Number(subscription.arr),
+          startDate: subscription.startDate.toISOString(),
+          nextBillingDate: subscription.nextBillingDate?.toISOString() ?? null,
+          sourceOrderId: order.id,
+          sourceOrderNumber: order.orderNumber ?? null,
+          sourceQuoteId: quote.id,
+          sourceQuoteNumber: quote.quoteNumber ?? null,
+        },
+      });
+    }
   }
 
   async function persistCpqTransition<T>(
@@ -2246,6 +2439,22 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
           metadata: transitionMetadata(meta, transitionLedgerId),
         },
       });
+
+      // ─── Quote-to-cash handoff (finance = system-of-record) ─────────────
+      // For orders carrying recurring products, materialize finance
+      // Subscription rows and publish `subscription.created` so downstream
+      // satellites (billing/Stripe) can mirror the SoR. Fully guarded: a
+      // failure here must never roll back an otherwise-successful conversion.
+      try {
+        await createSubscriptionsForOrder(ctx, quote, order);
+      } catch (err) {
+        // Best-effort: log-and-continue. The order + quote conversion stand.
+        producer.publish(TOPICS.CONTRACTS, {
+          type: 'subscription.creation_failed',
+          tenantId: actor(ctx).tenantId,
+          payload: { orderId: order.id, quoteId: quote.id, error: err instanceof Error ? err.message : String(err) },
+        }).catch(() => undefined);
+      }
 
       return order;
       });

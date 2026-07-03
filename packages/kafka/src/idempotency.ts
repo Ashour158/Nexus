@@ -7,6 +7,7 @@
  */
 
 import type { Redis } from 'ioredis';
+import { Redis as RedisClient } from 'ioredis';
 
 export interface IdempotencyStore {
   /** Returns true if the event has already been processed. */
@@ -67,10 +68,21 @@ export class MemoryIdempotencyStore implements IdempotencyStore {
 
 export function createIdempotencyStore(redis?: Redis): IdempotencyStore {
   if (redis) return new RedisIdempotencyStore(redis);
+  // Auto-provision from REDIS_URL so every consumer gets a durable, shared store
+  // without each service wiring one explicitly. This is what keeps the whole
+  // event-reaction layer alive in production.
+  if (process.env.REDIS_URL) {
+    const client = new RedisClient(process.env.REDIS_URL, {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+      lazyConnect: false,
+    });
+    return new RedisIdempotencyStore(client);
+  }
   if (process.env.NODE_ENV === 'production') {
     throw new Error(
       'Redis idempotency store is required in production. ' +
-        'Pass a Redis instance to NexusConsumer or set NODE_ENV=development for the in-memory fallback.'
+        'Set REDIS_URL, pass a Redis instance to NexusConsumer, or set NODE_ENV=development for the in-memory fallback.'
     );
   }
   return new MemoryIdempotencyStore();

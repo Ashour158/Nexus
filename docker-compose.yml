@@ -169,6 +169,7 @@ services:
     ports:
       - '3000:3000'
     environment:
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       PORT: '3000'
       APP_URL: http://localhost:3000
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_auth
@@ -194,6 +195,7 @@ services:
     ports:
       - '3001:3001'
     environment:
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_crm
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
@@ -215,6 +217,7 @@ services:
     ports:
       - '3002:3002'
     environment:
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       CHROMIUM_PATH: /usr/bin/chromium
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_finance
       KAFKA_BROKERS: kafka:29092
@@ -721,6 +724,7 @@ services:
     ports:
       - '3014:3014'
     environment:
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       PORT: '3014'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_approval
       KAFKA_BROKERS: kafka:29092
@@ -888,6 +892,7 @@ services:
     ports:
       - '3022:3022'
     environment:
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       PORT: '3022'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_portal
       KAFKA_BROKERS: kafka:29092
@@ -971,6 +976,7 @@ services:
     ports:
       - '3004:3004'
     environment:
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json

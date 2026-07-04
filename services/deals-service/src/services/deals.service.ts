@@ -1,5 +1,5 @@
 import type { PaginatedResult } from '@nexus/shared-types';
-import { BusinessRuleError, NotFoundError, createCodingClient } from '@nexus/service-utils';
+import { BusinessRuleError, NotFoundError, ValidationError, createCodingClient } from '@nexus/service-utils';
 
 const codingClient = createCodingClient({ baseURL: process.env.METADATA_SERVICE_URL ?? 'http://localhost:3004' });
 import type { CreateDealInput, UpdateDealInput, DealListQuery } from '@nexus/validation';
@@ -49,6 +49,102 @@ function resolveSortField(sortBy: ListPagination['sortBy']): keyof Prisma.DealOr
 
 function decimalToNumber(value: Prisma.Decimal): number {
   return Number(value.toFixed(2));
+}
+
+// ─── Stage-gating (fail-open) ────────────────────────────────────────────────
+
+/**
+ * Reads a field off a Deal by name for gating checks. Returns `undefined` for
+ * unknown fields so gating treats them as "not populated" rather than throwing.
+ */
+function readDealField(deal: Deal, field: string): unknown {
+  return (deal as unknown as Record<string, unknown>)[field];
+}
+
+/** A value counts as "present" for a required-field check when it is non-nullish and non-empty. */
+function isPresent(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (value instanceof Prisma.Decimal) return true;
+  return true;
+}
+
+interface StageCriteria {
+  requiredFields: unknown;
+  entryConditions: unknown;
+}
+
+interface EntryCondition {
+  field: string;
+  operator?: string;
+  value?: unknown;
+}
+
+function toEntryConditions(raw: unknown): EntryCondition[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (c): c is EntryCondition =>
+      typeof c === 'object' && c !== null && typeof (c as { field?: unknown }).field === 'string'
+  );
+}
+
+/** Evaluate a single entry condition against a deal. Unknown operators fail-open (pass). */
+function evaluateCondition(deal: Deal, cond: EntryCondition): boolean {
+  const actualRaw = readDealField(deal, cond.field);
+  const actual = actualRaw instanceof Prisma.Decimal ? Number(actualRaw) : actualRaw;
+  const expected = cond.value;
+  switch ((cond.operator ?? 'exists').toLowerCase()) {
+    case 'exists':
+    case 'is_set':
+      return isPresent(actual);
+    case 'eq':
+    case 'equals':
+    case '==':
+      return actual === expected;
+    case 'neq':
+    case '!=':
+      return actual !== expected;
+    case 'gt':
+    case '>':
+      return typeof actual === 'number' && typeof expected === 'number' && actual > expected;
+    case 'gte':
+    case '>=':
+      return typeof actual === 'number' && typeof expected === 'number' && actual >= expected;
+    case 'lt':
+    case '<':
+      return typeof actual === 'number' && typeof expected === 'number' && actual < expected;
+    case 'lte':
+    case '<=':
+      return typeof actual === 'number' && typeof expected === 'number' && actual <= expected;
+    case 'in':
+      return Array.isArray(expected) && expected.includes(actual as never);
+    default:
+      // Unknown operator → fail-open so a misconfigured stage never blocks moves.
+      return true;
+  }
+}
+
+/**
+ * Evaluate a target stage's gating criteria against a deal.
+ *
+ * FAIL-OPEN: a stage with no `requiredFields` and no `entryConditions` always
+ * passes (`{ ok: true }`), so existing moves behave exactly as before. Only a
+ * stage that has been explicitly configured with criteria can block a move.
+ */
+function evaluateStageGating(deal: Deal, stage: StageCriteria): { ok: true } | { ok: false; missing: string[]; unmet: string[] } {
+  const requiredFields = Array.isArray(stage.requiredFields)
+    ? stage.requiredFields.filter((f): f is string => typeof f === 'string' && f.trim().length > 0)
+    : [];
+  const conditions = toEntryConditions(stage.entryConditions);
+
+  const missing = requiredFields.filter((field) => !isPresent(readDealField(deal, field)));
+  const unmet = conditions
+    .filter((cond) => !evaluateCondition(deal, cond))
+    .map((cond) => `${cond.field} ${cond.operator ?? 'exists'}${cond.value !== undefined ? ` ${JSON.stringify(cond.value)}` : ''}`);
+
+  if (missing.length === 0 && unmet.length === 0) return { ok: true };
+  return { ok: false, missing, unmet };
 }
 
 export function createDealsService(prisma: DealsPrisma, producer: NexusProducer) {
@@ -160,6 +256,22 @@ export function createDealsService(prisma: DealsPrisma, producer: NexusProducer)
       if (!stage) throw new NotFoundError('Stage', stageId);
       if (stage.pipelineId !== existing.pipelineId) throw new BusinessRuleError('Target stage does not belong to the deal pipeline');
       if (existing.stageId === stageId) return existing;
+
+      // Stage-gating enforcement (fail-open). A stage with no requiredFields /
+      // entryConditions always passes, so moves behave exactly as before.
+      const gate = evaluateStageGating(existing, {
+        requiredFields: stage.requiredFields,
+        entryConditions: stage.entryConditions,
+      });
+      if (!gate.ok) {
+        throw new ValidationError('Deal does not meet the target stage entry criteria', {
+          stageId: stage.id,
+          stageName: stage.name,
+          missingRequiredFields: gate.missing,
+          unmetEntryConditions: gate.unmet,
+        });
+      }
+
       const updated = await prisma.deal.update({ where: { id }, data: { stageId, probability: stage.probability, version: { increment: 1 } } });
       await producer.publish(TOPICS.DEALS, {
         type: 'deal.stage_changed',
@@ -175,6 +287,98 @@ export function createDealsService(prisma: DealsPrisma, producer: NexusProducer)
         },
       }).catch(() => undefined);
       return updated;
+    },
+
+    /**
+     * Forecast roll-up for open deals, grouped by `forecastCategory`.
+     * Returns, per category: total `amount` and weighted amount
+     * (`amount * probability / 100`), plus a grand total weighted pipeline.
+     * Tenant-scoped; only OPEN deals (not deleted) are counted.
+     */
+    async getForecast(tenantId: string): Promise<{
+      categories: Array<{ forecastCategory: string; dealCount: number; amount: number; weightedAmount: number }>;
+      totalAmount: number;
+      totalWeightedPipeline: number;
+    }> {
+      const rows = await prisma.deal.findMany({
+        where: { tenantId, deletedAt: null, status: 'OPEN' },
+        select: { forecastCategory: true, amount: true, probability: true },
+      });
+
+      const byCategory = new Map<string, { dealCount: number; amount: number; weightedAmount: number }>();
+      let totalAmount = 0;
+      let totalWeightedPipeline = 0;
+
+      for (const row of rows) {
+        const amount = decimalToNumber(row.amount);
+        const weighted = Number(((amount * (row.probability ?? 0)) / 100).toFixed(2));
+        const key = String(row.forecastCategory);
+        const acc = byCategory.get(key) ?? { dealCount: 0, amount: 0, weightedAmount: 0 };
+        acc.dealCount += 1;
+        acc.amount = Number((acc.amount + amount).toFixed(2));
+        acc.weightedAmount = Number((acc.weightedAmount + weighted).toFixed(2));
+        byCategory.set(key, acc);
+        totalAmount = Number((totalAmount + amount).toFixed(2));
+        totalWeightedPipeline = Number((totalWeightedPipeline + weighted).toFixed(2));
+      }
+
+      const categories = Array.from(byCategory.entries())
+        .map(([forecastCategory, v]) => ({ forecastCategory, ...v }))
+        .sort((a, b) => b.weightedAmount - a.weightedAmount);
+
+      return { categories, totalAmount, totalWeightedPipeline };
+    },
+
+    /**
+     * One pass of the rotten-deal scan. Finds OPEN deals across all tenants
+     * whose time in the current stage exceeds that stage's `rottenDays`, and
+     * emits a `deal.rotten` event per deal. Idempotency/dedup is deferred to
+     * consumers. Never hard-fails: individual publish errors are swallowed and
+     * the whole pass is safe to call repeatedly.
+     */
+    async scanRottenDeals(now: Date = new Date()): Promise<{ scanned: number; rotten: number }> {
+      // Consider deals not touched since the max possible rotten window. We
+      // then confirm per-deal against its own stage's rottenDays below.
+      const candidates = await prisma.deal.findMany({
+        where: { deletedAt: null, status: 'OPEN' },
+        select: {
+          id: true,
+          tenantId: true,
+          ownerId: true,
+          amount: true,
+          stageId: true,
+          updatedAt: true,
+          stage: { select: { rottenDays: true, name: true } },
+        },
+        take: 5000,
+      });
+
+      let rotten = 0;
+      for (const deal of candidates) {
+        const rottenDays = deal.stage?.rottenDays ?? 0;
+        if (!rottenDays || rottenDays <= 0) continue;
+        const idleMs = now.getTime() - new Date(deal.updatedAt).getTime();
+        const idleDays = idleMs / 86_400_000;
+        if (idleDays < rottenDays) continue;
+        rotten += 1;
+        await producer
+          .publish(TOPICS.DEALS, {
+            type: 'deal.rotten',
+            tenantId: deal.tenantId,
+            payload: {
+              dealId: deal.id,
+              ownerId: deal.ownerId,
+              stageId: deal.stageId,
+              stageName: deal.stage?.name ?? null,
+              amount: decimalToNumber(deal.amount),
+              rottenDays,
+              idleDays: Math.floor(idleDays),
+              detectedAt: now.toISOString(),
+            },
+          })
+          .catch(() => undefined);
+      }
+      return { scanned: candidates.length, rotten };
     },
   };
 }

@@ -4,6 +4,27 @@ import { Prisma } from '../../../../node_modules/.prisma/deals-client/index.js';
 import type { Pipeline, Stage } from '../../../../node_modules/.prisma/deals-client/index.js';
 import type { DealsPrisma } from '../prisma.js';
 
+/**
+ * Normalize a stage's `requiredFields` into a clean `string[]` for persistence.
+ * Fail-open: anything that isn't a usable list of field names becomes `[]`,
+ * which the mover treats as "no gating".
+ */
+function normalizeRequiredFields(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  return input.filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+}
+
+/**
+ * Normalize `entryConditions` into a `Prisma.InputJsonValue` array. The
+ * validation schema does not (yet) surface entryConditions on the stage body,
+ * so this only takes effect when a caller passes them through programmatically
+ * or via seed data. Fail-open: non-arrays persist as `[]` (no gating).
+ */
+function normalizeEntryConditions(input: unknown): Prisma.InputJsonValue {
+  if (!Array.isArray(input)) return [];
+  return input as Prisma.InputJsonValue;
+}
+
 export function createPipelinesService(prisma: DealsPrisma) {
   async function loadPipelineOrThrow(tenantId: string, id: string): Promise<Pipeline> {
     const row = await prisma.pipeline.findFirst({ where: { id, tenantId } });
@@ -40,8 +61,8 @@ export function createPipelinesService(prisma: DealsPrisma) {
             color: s.color ?? '#6B7280',
             isWon: s.isWon ?? false,
             isLost: s.isLost ?? false,
-            requiredFields: [],
-            entryConditions: [],
+            requiredFields: normalizeRequiredFields(s.requiredFields),
+            entryConditions: normalizeEntryConditions((s as { entryConditions?: unknown }).entryConditions),
           }))
         : [];
       return prisma.pipeline.create({
@@ -98,8 +119,8 @@ export function createPipelinesService(prisma: DealsPrisma) {
           color: data.color ?? '#6B7280',
           isWon: data.isWon ?? false,
           isLost: data.isLost ?? false,
-          requiredFields: [],
-          entryConditions: [],
+          requiredFields: normalizeRequiredFields(data.requiredFields),
+          entryConditions: normalizeEntryConditions((data as { entryConditions?: unknown }).entryConditions),
         },
       });
     },
@@ -114,6 +135,9 @@ export function createPipelinesService(prisma: DealsPrisma) {
       if (data.color !== undefined) update.color = data.color;
       if (data.isWon !== undefined) update.isWon = data.isWon;
       if (data.isLost !== undefined) update.isLost = data.isLost;
+      if (data.requiredFields !== undefined) update.requiredFields = normalizeRequiredFields(data.requiredFields);
+      const entryConditions = (data as { entryConditions?: unknown }).entryConditions;
+      if (entryConditions !== undefined) update.entryConditions = normalizeEntryConditions(entryConditions);
       return prisma.stage.update({ where: { id: stageId }, data: update });
     },
 

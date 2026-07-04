@@ -5,7 +5,7 @@ export type CustomerEntityType = 'contact' | 'account';
 type CustomerModuleService = {
   create: (tenantId: string, data: Record<string, unknown>, userId?: string, userName?: string) => Promise<unknown>;
   get: (tenantId: string, id: string) => Promise<Record<string, unknown>>;
-  update: (tenantId: string, id: string, updates: Record<string, unknown>, userId?: string, userName?: string) => Promise<unknown>;
+  update: (tenantId: string, id: string, updates: Record<string, unknown>, userId?: string, userName?: string, roles?: string[]) => Promise<unknown>;
   archive: (tenantId: string, id: string) => Promise<unknown>;
   restore: (tenantId: string, id: string) => Promise<unknown>;
 };
@@ -88,7 +88,7 @@ export function createCustomerRecordsUseCase(deps: CustomerRecordsUseCaseDeps) {
   }
 
   async function update(ctx: EngineContext, input: { entityType: CustomerEntityType; id: string; data: Record<string, unknown> }): Promise<unknown> {
-    return deps.services[input.entityType].update(actor(ctx).tenantId, input.id, input.data, actor(ctx).userId, actor(ctx).email);
+    return deps.services[input.entityType].update(actor(ctx).tenantId, input.id, input.data, actor(ctx).userId, actor(ctx).email, actor(ctx).roles ?? []);
   }
 
   async function get(ctx: EngineContext, input: { entityType: CustomerEntityType; id: string }): Promise<Record<string, unknown>> {
@@ -123,7 +123,7 @@ export function createCustomerRecordsUseCase(deps: CustomerRecordsUseCaseDeps) {
 
     let count = 0;
     for (const id of input.ids) {
-      await deps.services[input.entityType].update(actor(ctx).tenantId, id, safeData, actor(ctx).userId, actor(ctx).email);
+      await deps.services[input.entityType].update(actor(ctx).tenantId, id, safeData, actor(ctx).userId, actor(ctx).email, actor(ctx).roles ?? []);
       count += 1;
     }
     return { count };

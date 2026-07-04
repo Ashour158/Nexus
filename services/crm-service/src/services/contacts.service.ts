@@ -12,6 +12,11 @@ import type { CrmPrisma } from '../prisma.js';
 import { toPaginatedResult } from '@nexus/shared-types';
 import { recordFieldChanges } from '../lib/field-history.js';
 import { updateContactDataQuality } from '../lib/data-quality.js';
+import {
+  enforceValidationRules,
+  applyFieldPermissions,
+  mergeForValidation,
+} from '../lib/write-guards.js';
 
 type ContactListFilters = Omit<
   ContactListQuery,
@@ -106,6 +111,9 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
         if (existing) throw new ConflictError('Contact', 'email');
       }
 
+      // Enforce active validation rules (fail-open: no rules / eval error => allow).
+      await enforceValidationRules(prisma, tenantId, 'contact', data as Record<string, unknown>);
+
       const emails = data.emails && data.emails.length > 0 ? data.emails : (data.email ? [{ email: data.email, label: 'work', isPrimary: true }] : []);
       const hasPrimary = emails.some((e) => e.isPrimary);
       if (emails.length > 0 && !hasPrimary) emails[0].isPrimary = true;
@@ -162,7 +170,8 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
       id: string,
       data: UpdateContactInput,
       changedBy?: string,
-      changedByName?: string
+      changedByName?: string,
+      roles?: string[]
     ): Promise<Contact> {
       const existing = await loadOrThrow(tenantId, id);
 
@@ -226,7 +235,25 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
       }
       if (data.tags !== undefined) { update.tags = data.tags; oldValues.tags = existing.tags; }
 
-      const updated = await prisma.contact.update({ where: { id }, data: update });
+      // FieldPermission: strip fields the caller may not write (fail-open).
+      const permResult = await applyFieldPermissions(
+        prisma,
+        tenantId,
+        'contact',
+        update as Record<string, unknown>,
+        roles
+      );
+      const safeUpdate = permResult.update as Prisma.ContactUpdateInput;
+
+      // Validation rules run against the post-write record (existing + patch).
+      await enforceValidationRules(
+        prisma,
+        tenantId,
+        'contact',
+        mergeForValidation(existing as Record<string, unknown>, safeUpdate as Record<string, unknown>)
+      );
+
+      const updated = await prisma.contact.update({ where: { id }, data: safeUpdate });
       if (changedBy) {
         await recordFieldChanges(prisma, tenantId, 'contact', id, oldValues, data as Record<string, unknown>, changedBy, changedByName);
       }

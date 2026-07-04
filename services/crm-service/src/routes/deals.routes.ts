@@ -93,7 +93,7 @@ export async function registerDealsRoutes(
     deals: {
       create: (tenantId, data) => deals.createDeal(tenantId, data as never),
       get: (tenantId, id) => deals.getDealById(tenantId, id) as Promise<Record<string, unknown>>,
-      update: (tenantId, id, data, actor) => deals.updateDeal(tenantId, id, data as never, actor),
+      update: (tenantId, id, data, actor, roles) => deals.updateDeal(tenantId, id, data as never, actor, roles),
       archive: (tenantId, id) => deals.deleteDeal(tenantId, id),
       restore: (tenantId, id) => deals.restoreDeal(tenantId, id),
       moveStage: (tenantId, id, stageId) => deals.moveDealToStage(tenantId, id, stageId),

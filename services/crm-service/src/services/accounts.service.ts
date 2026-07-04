@@ -20,6 +20,11 @@ import type { CrmPrisma } from '../prisma.js';
 import { toPaginatedResult } from '@nexus/shared-types';
 import { updateAccountDataQuality } from '../lib/data-quality.js';
 import { recordFieldChanges } from '../lib/field-history.js';
+import {
+  enforceValidationRules,
+  applyFieldPermissions,
+  mergeForValidation,
+} from '../lib/write-guards.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -165,6 +170,8 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
         });
         if (!parent) throw new NotFoundError('Account', data.parentAccountId);
       }
+      // Enforce active validation rules (fail-open: no rules / eval error => allow).
+      await enforceValidationRules(prisma, tenantId, 'account', data as Record<string, unknown>);
       const created = await prisma.account.create({
         data: {
           tenantId,
@@ -253,7 +260,8 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
       id: string,
       data: UpdateAccountInput,
       changedBy?: string,
-      changedByName?: string
+      changedByName?: string,
+      roles?: string[]
     ): Promise<Account> {
       const existing = await loadOrThrow(tenantId, id);
       const oldValues: Record<string, unknown> = {};
@@ -328,7 +336,25 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
       }
       if (data.tags !== undefined) { update.tags = data.tags; oldValues.tags = existing.tags; }
 
-      const updated = await prisma.account.update({ where: { id }, data: update });
+      // FieldPermission: strip fields the caller may not write (fail-open).
+      const permResult = await applyFieldPermissions(
+        prisma,
+        tenantId,
+        'account',
+        update as Record<string, unknown>,
+        roles
+      );
+      const safeUpdate = permResult.update as Prisma.AccountUpdateInput;
+
+      // Validation rules run against the post-write record (existing + patch).
+      await enforceValidationRules(
+        prisma,
+        tenantId,
+        'account',
+        mergeForValidation(existing as Record<string, unknown>, safeUpdate as Record<string, unknown>)
+      );
+
+      const updated = await prisma.account.update({ where: { id }, data: safeUpdate });
       if (changedBy) {
         await recordFieldChanges(prisma, tenantId, 'account', id, oldValues, data as Record<string, unknown>, changedBy, changedByName);
       }

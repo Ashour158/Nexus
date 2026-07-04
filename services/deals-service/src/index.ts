@@ -5,6 +5,7 @@ import { NexusProducer } from '@nexus/kafka';
 import { createDealsPrisma, tenantAls } from './prisma.js';
 import { registerDealsHealthRoutes } from './routes/health.routes.js';
 import { registerDealsRoutes } from './routes/deals.routes.js';
+import { createDealsService } from './services/deals.service.js';
 import { registerPipelinesRoutes } from './routes/pipelines.routes.js';
 import { registerQuotesRoutes } from './routes/quotes.routes.js';
 import { registerQuoteProjectionRoutes } from './routes/quote-projections.routes.js';
@@ -58,6 +59,29 @@ try {
   app.log.info('Quote projection consumer started');
 } catch (err) {
   app.log.warn({ err }, 'Quote projection consumer failed to start; continuing without projection updates');
+}
+
+// ─── Rotten-deal poller ──────────────────────────────────────────────────────
+// Guarded, unref'd setInterval that finds OPEN deals idle past their stage's
+// rottenDays and emits `deal.rotten`. Disabled by default via env; each pass is
+// wrapped in try/catch so a transient DB/Kafka outage never crashes the service.
+const rottenScanEnabled = process.env.DEALS_ROTTEN_SCAN_ENABLED !== 'false';
+const rottenScanIntervalMs = Math.max(60_000, Number(process.env.DEALS_ROTTEN_SCAN_INTERVAL_MS ?? 3_600_000));
+if (rottenScanEnabled) {
+  const rottenScanService = createDealsService(prisma, producer);
+  const rottenTimer = setInterval(() => {
+    void (async () => {
+      try {
+        const result = await rottenScanService.scanRottenDeals();
+        if (result.rotten > 0) app.log.info(result, 'Rotten-deal scan emitted deal.rotten events');
+      } catch (err) {
+        app.log.warn({ err }, 'Rotten-deal scan failed; will retry next interval');
+      }
+    })();
+  }, rottenScanIntervalMs);
+  if (typeof rottenTimer.unref === 'function') rottenTimer.unref();
+  app.addHook('onClose', async () => { clearInterval(rottenTimer); });
+  app.log.info({ intervalMs: rottenScanIntervalMs }, 'Rotten-deal poller started');
 }
 
 await startService(app, port, async () => {

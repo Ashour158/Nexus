@@ -20,6 +20,11 @@ import { recordFieldChanges } from '../lib/field-history.js';
 import { toPaginatedResult } from '@nexus/shared-types';
 import { updateDealDataQuality } from '../lib/data-quality.js';
 import { assertValidStageTransition } from '../lib/blueprint-client.js';
+import {
+  enforceValidationRules,
+  applyFieldPermissions,
+  mergeForValidation,
+} from '../lib/write-guards.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -257,6 +262,9 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
 
       const probability = data.probability ?? stage.probability;
 
+      // Enforce active validation rules (fail-open: no rules / eval error => allow).
+      await enforceValidationRules(prisma, tenantId, 'deal', data as Record<string, unknown>);
+
       const created = await prisma.deal.create({
         data: {
           tenantId,
@@ -319,7 +327,8 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
       tenantId: string,
       id: string,
       data: UpdateDealInput,
-      actor?: { userId: string; userEmail?: string }
+      actor?: { userId: string; userEmail?: string },
+      roles?: string[]
     ): Promise<Deal> {
       const existing = await loadDealOrThrow(tenantId, id);
 
@@ -403,9 +412,33 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         updateData.stage = { connect: { id: data.stageId } };
       }
 
+      // FieldPermission: strip scalar fields the caller may not write (fail-open).
+      // Relation-connect keys (account/pipeline/stage) and `version` never match
+      // a FieldPermission row, so they are left untouched.
+      const permResult = await applyFieldPermissions(
+        prisma,
+        tenantId,
+        'deal',
+        updateData as Record<string, unknown>,
+        roles
+      );
+      const safeUpdateData = permResult.update as Prisma.DealUpdateInput;
+
+      // Validation rules run against the post-write record. Build the candidate
+      // from the raw scalar patch merged onto the existing row, dropping any
+      // fields the FieldPermission guard stripped.
+      const patchForValidation: Record<string, unknown> = { ...(data as Record<string, unknown>) };
+      for (const stripped of permResult.stripped) delete patchForValidation[stripped];
+      await enforceValidationRules(
+        prisma,
+        tenantId,
+        'deal',
+        mergeForValidation(existing as Record<string, unknown>, patchForValidation)
+      );
+
       const updated = await prisma.deal.update({
         where: { id },
-        data: updateData,
+        data: safeUpdateData,
       });
 
       if (actor) {

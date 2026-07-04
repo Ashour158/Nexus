@@ -145,6 +145,8 @@ export async function executeReport(
   return { rows, total };
 }
 
+const ANALYTICS_TIMEOUT_MS = 4000;
+
 async function executeAnalyticsReport(
   tenantId: string,
   query: ReportQuery,
@@ -155,24 +157,33 @@ async function executeAnalyticsReport(
   const endpoint = query.objectType === 'pipeline_analytics' ? '/pipeline/summary' : '/revenue/summary';
   const token = process.env.INTERNAL_SERVICE_TOKEN ?? '';
 
-  const res = await fetch(`${analyticsUrl}${endpoint}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'x-tenant-id': tenantId,
-    },
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Analytics query failed: ${res.status} ${err}`);
+  // Guarded: analytics is a live read model. On timeout/unreachable/non-2xx we
+  // degrade to an empty result instead of throwing, so report/dashboard runs
+  // keep working when analytics-service is down.
+  let raw: Record<string, unknown> | Record<string, unknown>[] = {};
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ANALYTICS_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${analyticsUrl}${endpoint}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'x-tenant-id': tenantId,
+      },
+      signal: controller.signal,
+    });
+    if (res.ok) {
+      const body = (await res.json()) as {
+        success?: boolean;
+        data?: Record<string, unknown> | Record<string, unknown>[];
+      };
+      raw = body.data ?? {};
+    }
+  } catch {
+    // Timeout / connection error / malformed body → fall through to empty result.
+  } finally {
+    clearTimeout(timer);
   }
 
-  const body = (await res.json()) as {
-    success?: boolean;
-    data?: Record<string, unknown> | Record<string, unknown>[];
-  };
-
-  const raw = body.data ?? {};
   const rows = Array.isArray(raw) ? raw : [raw];
   const filtered = applyFiltersInMemory(rows, query.filters, query.objectType);
   const total = filtered.length;

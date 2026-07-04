@@ -24,6 +24,11 @@ import {
   updateContactDataQuality,
   updateDealDataQuality,
 } from '../lib/data-quality.js';
+import {
+  enforceValidationRules,
+  applyFieldPermissions,
+  mergeForValidation,
+} from '../lib/write-guards.js';
 
 type LeadListFilters = Omit<
   LeadListQuery,
@@ -173,6 +178,9 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
           throw e;
         }
       }
+      // Enforce active validation rules (fail-open: no rules / eval error => allow).
+      await enforceValidationRules(prisma, tenantId, 'lead', data as Record<string, unknown>);
+
       const score = scoreLead(data as Partial<Lead>);
       const created = await prisma.lead.create({
         data: {
@@ -247,7 +255,8 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
       id: string,
       data: UpdateLeadInput,
       changedBy?: string,
-      changedByName?: string
+      changedByName?: string,
+      roles?: string[]
     ): Promise<Lead> {
       const existing = await loadOrThrow(tenantId, id);
       const oldValues: Record<string, unknown> = {};
@@ -299,7 +308,26 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
       }
       if (data.tags !== undefined) { update.tags = data.tags; oldValues.tags = existing.tags; }
 
-      const updated = await prisma.lead.update({ where: { id }, data: update });
+      // FieldPermission: strip fields the caller may not write (fail-open when
+      // no roles supplied / no permission rows / any error).
+      const permResult = await applyFieldPermissions(
+        prisma,
+        tenantId,
+        'lead',
+        update as Record<string, unknown>,
+        roles
+      );
+      const safeUpdate = permResult.update as Prisma.LeadUpdateInput;
+
+      // Validation rules run against the post-write record (existing + patch).
+      await enforceValidationRules(
+        prisma,
+        tenantId,
+        'lead',
+        mergeForValidation(existing as Record<string, unknown>, safeUpdate as Record<string, unknown>)
+      );
+
+      const updated = await prisma.lead.update({ where: { id }, data: safeUpdate });
       if (changedBy) {
         await recordFieldChanges(prisma, tenantId, 'lead', id, oldValues, data as Record<string, unknown>, changedBy, changedByName);
       }

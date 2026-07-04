@@ -71,7 +71,7 @@ export async function registerContactsRoutes(
       contact: {
         create: (tenantId, data) => contacts.createContact(tenantId, data as never),
         get: (tenantId, id) => contacts.getContactById(tenantId, id) as Promise<Record<string, unknown>>,
-        update: (tenantId, id, updates, userId, userName) => contacts.updateContact(tenantId, id, updates as never, userId, userName),
+        update: (tenantId, id, updates, userId, userName, roles) => contacts.updateContact(tenantId, id, updates as never, userId, userName, roles),
         archive: (tenantId, id) => contacts.deleteContact(tenantId, id),
         restore: (tenantId, id) => contacts.restoreContact(tenantId, id),
       },

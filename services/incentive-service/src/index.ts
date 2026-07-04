@@ -1,10 +1,12 @@
 import 'dotenv/config';
 import { startTracing } from '@nexus/service-utils/tracing';
 import { createService, startService, globalErrorHandler, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
-import { NexusConsumer, TOPICS } from '@nexus/kafka';
+import { NexusConsumer } from '@nexus/kafka';
 import { getPrisma } from './prisma.js';
 import { createContestsService } from './services/contests.service.js';
 import { createBadgesService } from './services/badges.service.js';
+import { createMetricsService } from './services/metrics.service.js';
+import { registerIncentiveConsumers, INCENTIVE_TOPICS } from './consumers.js';
 import { registerContestsRoutes } from './routes/contests.routes.js';
 import { registerBadgesRoutes } from './routes/badges.routes.js';
 import { registerGraphQL } from './graphql/index.js';
@@ -26,26 +28,38 @@ const app = await createService({
 const prisma = getPrisma();
 const contests = createContestsService(prisma);
 const badges = createBadgesService(prisma);
+const metrics = createMetricsService(prisma);
 const consumer = new NexusConsumer('incentive-service');
 
 app.setErrorHandler(globalErrorHandler);
 registerHealthRoutes(app, 'incentive-service', [() => checkDatabase(prisma)]);
 
-await badges.seedSystemBadges();
-await consumer.subscribe([TOPICS.DEALS]).catch(() => undefined);
-consumer.on('deal.won', async (event) => {
-  const payload = event.payload as { ownerId?: string; amount?: number | string };
-  if (!payload.ownerId) return;
-  await badges.checkAndAward(event.tenantId, payload.ownerId, 'DEALS_WON_COUNT', 1);
-  await badges.checkAndAward(
-    event.tenantId,
-    payload.ownerId,
-    'DEAL_VALUE', Number(payload.amount ?? 0));
+await badges.seedSystemBadges().catch((err) => {
+  app.log.warn({ err }, 'seedSystemBadges failed; continuing');
 });
 
-await consumer.start().catch(() => undefined);
+// Event-driven contest metrics + badge counters. Guarded so unavailable
+// Kafka/DB cannot crash boot: subscribe/start are best-effort, and each
+// handler isolates its own failures (see consumers.ts).
+registerIncentiveConsumers(consumer, { contests, badges, metrics });
+await consumer.subscribe([...INCENTIVE_TOPICS]).catch((err) => {
+  app.log.warn({ err }, 'Kafka subscribe failed; contest metrics will rely on the periodic fallback');
+});
+await consumer.start().catch((err) => {
+  app.log.warn({ err }, 'Kafka consumer start failed; contest metrics will rely on the periodic fallback');
+});
+
+// Fallback: periodic leaderboard rank refresh in case events were missed
+// (Kafka downtime, replayed offsets, etc.). Event-driven updates remain primary.
+let stopContestWorker: (() => void) | undefined;
+try {
+  stopContestWorker = contests.startContestWorker();
+} catch (err) {
+  app.log.warn({ err }, 'periodic contest worker failed to start');
+}
 
 app.addHook('onClose', async () => {
+  try { stopContestWorker?.(); } catch { /* ignore */ }
   try { await consumer.disconnect(); } catch { /* ignore */ }
 });
 

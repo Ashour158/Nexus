@@ -5,7 +5,7 @@ export type SalesEntityType = 'lead' | 'deal';
 type LeadServiceAdapter = {
   create: (tenantId: string, data: Record<string, unknown>, force?: boolean) => Promise<unknown>;
   get: (tenantId: string, id: string) => Promise<Record<string, unknown>>;
-  update: (tenantId: string, id: string, data: Record<string, unknown>, userId?: string, userName?: string) => Promise<unknown>;
+  update: (tenantId: string, id: string, data: Record<string, unknown>, userId?: string, userName?: string, roles?: string[]) => Promise<unknown>;
   archive: (tenantId: string, id: string) => Promise<unknown>;
   restore: (tenantId: string, id: string) => Promise<unknown>;
   convert: (tenantId: string, id: string, data: Record<string, unknown>) => Promise<unknown>;
@@ -18,7 +18,7 @@ type LeadServiceAdapter = {
 type DealServiceAdapter = {
   create: (tenantId: string, data: Record<string, unknown>) => Promise<unknown>;
   get: (tenantId: string, id: string) => Promise<Record<string, unknown>>;
-  update: (tenantId: string, id: string, data: Record<string, unknown>, actor?: { userId: string; userEmail?: string }) => Promise<unknown>;
+  update: (tenantId: string, id: string, data: Record<string, unknown>, actor?: { userId: string; userEmail?: string }, roles?: string[]) => Promise<unknown>;
   archive: (tenantId: string, id: string) => Promise<unknown>;
   restore: (tenantId: string, id: string) => Promise<unknown>;
   moveStage: (tenantId: string, id: string, stageId: string) => Promise<unknown>;
@@ -78,10 +78,11 @@ export function createSalesRecordsUseCase(deps: SalesRecordsUseCaseDeps) {
   }
 
   async function update(ctx: EngineContext, input: { entityType: SalesEntityType; id: string; data: Record<string, unknown> }): Promise<unknown> {
+    const callerRoles = actor(ctx).roles ?? [];
     if (input.entityType === 'lead') {
-      return deps.leads.update(actor(ctx).tenantId, input.id, input.data, actor(ctx).userId, actor(ctx).email);
+      return deps.leads.update(actor(ctx).tenantId, input.id, input.data, actor(ctx).userId, actor(ctx).email, callerRoles);
     }
-    return deps.deals.update(actor(ctx).tenantId, input.id, input.data, { userId: actor(ctx).userId, userEmail: actor(ctx).email });
+    return deps.deals.update(actor(ctx).tenantId, input.id, input.data, { userId: actor(ctx).userId, userEmail: actor(ctx).email }, callerRoles);
   }
 
   async function archive(ctx: EngineContext, input: { entityType: SalesEntityType; id: string }): Promise<{ id: string; deleted: true }> {

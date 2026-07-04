@@ -47,6 +47,16 @@ export async function registerDealsRoutes(
       );
 
       r.get(
+        '/forecast',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.READ) },
+        async (request, reply) => {
+          const jwt = request.user as JwtPayload;
+          const forecast = await deals.getForecast(jwt.tenantId);
+          return reply.send({ success: true, data: forecast });
+        }
+      );
+
+      r.get(
         '/deals/:id',
         { preHandler: requirePermission(PERMISSIONS.DEALS.READ) },
         async (request, reply) => {

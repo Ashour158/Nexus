@@ -64,7 +64,7 @@ export async function registerLeadsRoutes(
     leads: {
       create: (tenantId, data, force) => leads.createLead(tenantId, data as never, force),
       get: (tenantId, id) => leads.getLeadById(tenantId, id) as Promise<Record<string, unknown>>,
-      update: (tenantId, id, data, userId, userName) => leads.updateLead(tenantId, id, data as never, userId, userName),
+      update: (tenantId, id, data, userId, userName, roles) => leads.updateLead(tenantId, id, data as never, userId, userName, roles),
       archive: (tenantId, id) => leads.deleteLead(tenantId, id),
       restore: (tenantId, id) => leads.restoreLead(tenantId, id),
       convert: (tenantId, id, data) => leads.convertLead(tenantId, id, data as never),

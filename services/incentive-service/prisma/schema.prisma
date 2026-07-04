@@ -76,6 +76,25 @@ enum ContestMetric {
   NEW_LOGOS
 }
 
+/// Per-tenant/owner cumulative counters that drive event-based badge metrics
+/// (e.g. LEADS_CREATED, ACTIVITY_STREAK) which have no other source of truth.
+/// Additive: existing deal.won badge path does not depend on this table.
+model MetricCounter {
+  id                String   @id @default(cuid())
+  tenantId          String
+  ownerId           String
+  metric            String
+  value             Decimal  @default(0) @db.Decimal(18, 2)
+  /// Streak bookkeeping (used by ACTIVITY_STREAK). Nullable for non-streak metrics.
+  lastEventDate     String?
+  streakValue       Int      @default(0)
+  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now())
+
+  @@unique([tenantId, ownerId, metric])
+  @@index([tenantId, ownerId])
+}
+
 model OutboxMessage {
   id             String   @id @default(cuid())
   topic          String

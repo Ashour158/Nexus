@@ -9,6 +9,7 @@ import { startScoringConsumer } from './consumers/scoring.consumer.js';
 import { startGdprConsumer } from './consumers/gdpr.consumer.js';
 import { startFinanceTimelineConsumer } from './consumers/finance-timeline.consumer.js';
 import { NexusProducer } from '@nexus/kafka';
+import { startRottenDealsPoller } from './lib/rotten-deals.poller.js';
 import type { FastifyInstance } from 'fastify';
 
 export async function buildServer(): Promise<{ app: FastifyInstance; prismaHealth: PrismaClient }> {
@@ -62,11 +63,26 @@ export async function buildServer(): Promise<{ app: FastifyInstance; prismaHealt
     return null;
   });
 
+  // Stage-gating rotten-deal detector. Guarded so a start failure can never
+  // break the service; the interval is unref'd inside the poller.
+  let rottenDealsPoller: ReturnType<typeof startRottenDealsPoller> | null = null;
+  try {
+    const intervalRaw = optionalEnv('ROTTEN_DEALS_INTERVAL_MS', '');
+    const intervalMs = intervalRaw ? Number(intervalRaw) : undefined;
+    rottenDealsPoller = startRottenDealsPoller(prisma, producer, {
+      intervalMs: intervalMs && Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs : undefined,
+    });
+    app.log.info('Rotten-deals poller started');
+  } catch (err) {
+    app.log.warn({ err }, 'Rotten-deals poller failed to start; continuing without stage-gating');
+  }
+
   app.addHook('onClose', async () => {
     try { await producer.disconnect(); } catch { /* ignore */ }
     try { await scoringConsumer?.disconnect(); } catch { /* ignore */ }
     try { await gdprConsumer?.disconnect(); } catch { /* ignore */ }
     try { await financeTimelineConsumer?.disconnect(); } catch { /* ignore */ }
+    try { rottenDealsPoller?.stop(); } catch { /* ignore */ }
   });
 
   await registerAllRoutes(app, prisma, producer);

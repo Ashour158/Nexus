@@ -30,6 +30,36 @@ export function createContestsService(prisma: IncentivePrisma) {
         orderBy: [{ rank: 'asc' }, { currentValue: 'desc' }],
       });
     },
+    /**
+     * Event-driven update: for every active, in-window contest in this tenant
+     * whose `metric` matches, upsert the owner's entry and add `delta` to its
+     * currentValue, then recompute ranks within each affected contest.
+     *
+     * Tenant-scoped and idempotent-friendly at the row level (increment is
+     * atomic). Returns the number of contest entries touched.
+     */
+    async applyEvent(
+      tenantId: string,
+      metric: 'DEALS_WON_COUNT' | 'DEALS_WON_REVENUE' | 'ACTIVITIES_COMPLETED' | 'LEADS_CONVERTED' | 'NEW_LOGOS',
+      ownerId: string,
+      delta: number,
+    ): Promise<number> {
+      if (!ownerId || !(delta > 0)) return 0;
+      const now = new Date();
+      const contests = await prisma.contest.findMany({
+        take: 500,
+        where: { tenantId, metric, isActive: true, startDate: { lte: now }, endDate: { gte: now } },
+      });
+      for (const contest of contests) {
+        await prisma.contestEntry.upsert({
+          where: { contestId_ownerId: { contestId: contest.id, ownerId } },
+          update: { currentValue: { increment: new Decimal(delta).toFixed(2) } },
+          create: { contestId: contest.id, tenantId, ownerId, currentValue: new Decimal(delta).toFixed(2) },
+        });
+        await this.updateLeaderboard(tenantId, contest.id);
+      }
+      return contests.length;
+    },
     async updateLeaderboard(tenantId: string, contestId: string) {
       const contest = await prisma.contest.findFirst({ where: { tenantId, id: contestId } });
       if (!contest) return null;

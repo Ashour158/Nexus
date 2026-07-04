@@ -36,6 +36,9 @@ model KbArticle {
   authorId   String
   version    Int           @default(1)
   viewCount  Int           @default(0)
+  helpfulCount    Int       @default(0)
+  notHelpfulCount Int       @default(0)
+  publishedAt     DateTime?
   dealStages String[]
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt

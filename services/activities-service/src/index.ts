@@ -8,6 +8,7 @@ import { registerActivitiesHealthRoutes } from './routes/health.routes.js';
 import { registerActivitiesRoutes } from './routes/activities.routes.js';
 import { registerTasksRoutes } from './routes/tasks.routes.js';
 import { registerMeetingsRoutes } from './routes/meetings.routes.js';
+import { startRemindersPoller } from './lib/reminders.poller.js';
 // REMOVED: Self-consuming sync consumer (anti-pattern). A service must not consume
 // its own events to update its own database — the write path already does that.
 // If read-models are needed, use a dedicated consumer service (e.g. search-service).
@@ -52,7 +53,18 @@ try {
   app.log.warn({ err }, 'Kafka producer connect failed; continuing without event publishing');
 }
 
+// Due-date reminder + overdue/SLA poller. Additive and fail-open: a failed start
+// or any tick never breaks request handling.
+let remindersPoller: { stop(): void } | undefined;
+try {
+  remindersPoller = startRemindersPoller(prisma, producer);
+  app.log.info('Reminders/overdue poller started');
+} catch (err) {
+  app.log.warn({ err }, 'Reminders/overdue poller failed to start; continuing');
+}
+
 app.addHook('onClose', async () => {
+  try { remindersPoller?.stop(); } catch (err) { app.log.warn({ err }, 'Reminders poller stop failed'); }
   try { await producer.disconnect(); } catch (err) { app.log.warn({ err }, 'Producer disconnect failed'); }
 });
 

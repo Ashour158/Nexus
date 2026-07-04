@@ -12,6 +12,7 @@ const TerritoryBody = z.object({
   ownerIds: z.array(z.string().cuid()).default([]),
   teamId: z.string().optional(),
   priority: z.number().int().default(0),
+  isDefault: z.boolean().default(false),
   rules: z.array(z.object({ field: z.string(), operator: z.string(), value: z.string() })).default([]),
 });
 const Paging = z.object({

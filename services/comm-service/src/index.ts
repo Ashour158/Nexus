@@ -26,6 +26,7 @@ import { registerWhatsAppOutboundRoutes } from './routes/whatsapp-outbound.route
 import { registerGraphQL } from './graphql/index.js';
 import { startTriggerConsumer } from './consumers/trigger.consumer.js';
 import { startGdprConsumer } from './consumers/gdpr.consumer.js';
+import { startSequencePoller } from './lib/sequence.poller.js';
 import './workers/email.worker.js';
 
 startTracing({ serviceName: 'comm-service' });
@@ -81,7 +82,7 @@ const sequences = createSequencesService(prisma, smtp, templates);
 
 let triggerConsumer: Awaited<ReturnType<typeof startTriggerConsumer>> | null = null;
 try {
-  triggerConsumer = await startTriggerConsumer({ prisma, outbox, templates, log: app.log });
+  triggerConsumer = await startTriggerConsumer({ prisma, outbox, templates, smtp, log: app.log });
 } catch (err) {
   app.log.warn({ err }, 'Kafka consumer start failed; HTTP-only mode');
 }
@@ -91,7 +92,20 @@ const gdprConsumer = await startGdprConsumer(prisma).catch((err) => {
   return null;
 });
 
+// Sequence-step poller: advances enrolled contacts through due steps on schedule.
+// Fail-open — a start failure must never break the service.
+let sequencePoller: ReturnType<typeof startSequencePoller> | null = null;
+try {
+  sequencePoller = startSequencePoller(prisma, sequences, app.log);
+  app.log.info('comm-service sequence poller running');
+} catch (err) {
+  app.log.warn({ err }, 'Sequence poller start failed; continuing');
+}
+
 app.addHook('onClose', async () => {
+  try {
+    sequencePoller?.stop();
+  } catch { /* ignore */ }
   try {
     await triggerConsumer?.disconnect();
   } catch { /* ignore */ }

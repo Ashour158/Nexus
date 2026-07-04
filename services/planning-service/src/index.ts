@@ -9,6 +9,9 @@ import { createForecastsService } from './services/forecasts.service.js';
 import { registerQuotasRoutes } from './routes/quotas.routes.js';
 import { registerForecastsRoutes } from './routes/forecasts.routes.js';
 import { registerForecastOverrideRoutes } from './routes/forecast-override.routes.js';
+import { registerForecastRollupRoutes } from './routes/forecast-rollup.routes.js';
+import { createForecastRollupService } from './services/forecast-rollup.service.js';
+import { startDealForecastConsumer } from './consumers/deal-forecast.consumer.js';
 import { registerGraphQL } from './graphql/index.js';
 
 startTracing({ serviceName: 'planning-service' });
@@ -55,8 +58,23 @@ app.addHook('onClose', async () => {
 
 await registerGraphQL(app, prisma);
 
+// ─── Deal-event forecast roll-up consumer (best-effort) ────────────────────
+// Maintains ForecastAggregate per owner/period from deal.* events. Guarded so a
+// missing/broken Kafka never prevents the service from booting or serving HTTP.
+let dealForecastConsumer: Awaited<ReturnType<typeof startDealForecastConsumer>> | null = null;
+try {
+  dealForecastConsumer = await startDealForecastConsumer(prisma, app.log as any);
+} catch (err) {
+  app.log.error({ err }, 'planning-service: failed to start deal-forecast consumer (continuing without it)');
+}
+
+app.addHook('onClose', async () => {
+  try { if (dealForecastConsumer) await dealForecastConsumer.disconnect(); } catch { /* ignore */ }
+});
+
 await startService(app, port, async () => {
   await registerQuotasRoutes(app, createQuotasService(prisma));
   await registerForecastsRoutes(app, createForecastsService(prisma, producer));
   await registerForecastOverrideRoutes(app, prisma);
+  await registerForecastRollupRoutes(app, createForecastRollupService(prisma));
 });

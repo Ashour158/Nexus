@@ -1,5 +1,16 @@
 import { createRequire } from 'node:module';
 
+interface MailAttachment {
+  filename: string;
+  content: string;
+  contentType?: string;
+  method?: string;
+}
+
+interface MailHeaders {
+  [key: string]: string;
+}
+
 interface MailTransporter {
   sendMail(options: {
     from: string;
@@ -7,6 +18,12 @@ interface MailTransporter {
     subject: string;
     html: string;
     text?: string;
+    icalEvent?: { method?: string; content: string };
+    attachments?: MailAttachment[];
+    headers?: MailHeaders;
+    messageId?: string;
+    inReplyTo?: string;
+    references?: string;
   }): Promise<unknown>;
 }
 
@@ -25,6 +42,18 @@ export interface EmailEnvelope {
   html: string;
   text?: string;
   from?: string;
+  /**
+   * Optional RFC-5545 iCalendar body. When present it is sent both as a
+   * `text/calendar` alternative (so calendar clients surface an RSVP) and as a
+   * downloadable `invite.ics` attachment.
+   */
+  ics?: { content: string; method?: string };
+  /** Stable Message-ID for outbound thread correlation (e.g. `<uid@host>`). */
+  messageId?: string;
+  /** In-Reply-To header value for reply correlation. */
+  inReplyTo?: string;
+  /** References header value (space-separated Message-IDs) for threading. */
+  references?: string;
 }
 
 export interface EmailChannel {
@@ -46,7 +75,10 @@ export function createSmtpChannel(log: {
     log.warn('SMTP_HOST not configured — outbound email is skipped (dev mode).');
     return {
       async send(envelope) {
-        log.info({ to: envelope.to, subject: envelope.subject }, '[smtp] skipped (no SMTP)');
+        log.info(
+          { to: envelope.to, subject: envelope.subject, hasIcs: Boolean(envelope.ics) },
+          '[smtp] skipped (no SMTP)'
+        );
       },
     };
   }
@@ -68,6 +100,22 @@ export function createSmtpChannel(log: {
         subject: envelope.subject,
         html: envelope.html,
         text: envelope.text,
+        ...(envelope.ics
+          ? {
+              icalEvent: { method: envelope.ics.method ?? 'REQUEST', content: envelope.ics.content },
+              attachments: [
+                {
+                  filename: 'invite.ics',
+                  content: envelope.ics.content,
+                  contentType: 'text/calendar; charset=utf-8; method=' +
+                    (envelope.ics.method ?? 'REQUEST'),
+                },
+              ],
+            }
+          : {}),
+        ...(envelope.messageId ? { messageId: envelope.messageId } : {}),
+        ...(envelope.inReplyTo ? { inReplyTo: envelope.inReplyTo } : {}),
+        ...(envelope.references ? { references: envelope.references } : {}),
       });
     },
   };

@@ -18,6 +18,7 @@ model Territory {
   teamId      String?
   priority    Int              @default(0)
   isActive    Boolean          @default(true)
+  isDefault   Boolean          @default(false)
   currency    String?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
@@ -42,12 +43,16 @@ model LeadRoutingLog {
   id                 String     @id @default(cuid())
   tenantId           String
   leadId             String
+  recordType         String     @default("LEAD")
   matchedTerritoryId String?
   territory          Territory? @relation(fields: [matchedTerritoryId], references: [id])
+  matchedRuleIds     String[]
+  viaDefault         Boolean    @default(false)
   assignedOwnerId    String?
   routedAt           DateTime   @default(now())
 
   @@index([tenantId, leadId])
+  @@index([tenantId, recordType])
   @@unique([id, tenantId])
 }
 

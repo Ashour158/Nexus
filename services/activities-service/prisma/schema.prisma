@@ -27,6 +27,12 @@ model Activity {
   accountId    String?
   dealId       String?
   customFields Json           @default("{}")
+  // Set once a due-date reminder notification has been emitted for this activity,
+  // so restarts / overlapping poller ticks never re-send it (idempotency flag).
+  reminderSentAt   DateTime?
+  // Set once an overdue notification/escalation event has been emitted, so an
+  // activity is only flagged overdue a single time (idempotency flag).
+  overdueNotifiedAt DateTime?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   deletedAt    DateTime?
@@ -41,6 +47,9 @@ model Activity {
   @@index([tenantId, dueDate])
   @@index([tenantId, ownerId, dueDate, status])
   @@index([tenantId, createdAt])
+  // Poller scan indexes: find not-yet-notified activities by due date.
+  @@index([status, dueDate, reminderSentAt])
+  @@index([status, dueDate, overdueNotifiedAt])
   @@unique([id, tenantId])
 }
 

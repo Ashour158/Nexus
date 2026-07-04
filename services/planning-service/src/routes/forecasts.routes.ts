@@ -47,4 +47,41 @@ export async function registerForecastsRoutes(
     if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Submission not found', requestId: request.id } });
     return reply.send({ success: true, data });
   });
+
+  // ─── ForecastReview lifecycle (SUBMITTED → APPROVED | ADJUSTED) ────────────
+
+  // Open a review in SUBMITTED state for a submission.
+  app.post('/api/v1/forecasts/:id/reviews', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+    const user = (request as unknown as { user: { tenantId: string; sub: string } }).user;
+    const { id } = z.object({ id: z.string().cuid() }).parse(request.params);
+    const data = await forecasts.openReview(user.tenantId, id, user.sub);
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Submission not found', requestId: request.id } });
+    return reply.code(201).send({ success: true, data });
+  });
+
+  // Approve an open review.
+  app.post('/api/v1/forecasts/reviews/:reviewId/approve', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+    const user = (request as unknown as { user: { tenantId: string; sub: string } }).user;
+    const { reviewId } = z.object({ reviewId: z.string().cuid() }).parse(request.params);
+    const body = z.object({ note: z.string().optional() }).parse(request.body ?? {});
+    const result = await forecasts.transitionReview(user.tenantId, reviewId, user.sub, 'APPROVED', body);
+    if (!result.ok) {
+      const code = result.reason === 'NOT_FOUND' ? 404 : 409;
+      return reply.code(code).send({ success: false, error: { code: result.reason, message: `Review ${result.reason === 'NOT_FOUND' ? 'not found' : 'cannot be approved from its current state'}`, requestId: request.id } });
+    }
+    return reply.send({ success: true, data: result.review });
+  });
+
+  // Adjust an open review (requires at least one adjusted amount).
+  app.post('/api/v1/forecasts/reviews/:reviewId/adjust', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+    const user = (request as unknown as { user: { tenantId: string; sub: string } }).user;
+    const { reviewId } = z.object({ reviewId: z.string().cuid() }).parse(request.params);
+    const body = ReviewBody.parse(request.body);
+    const result = await forecasts.transitionReview(user.tenantId, reviewId, user.sub, 'ADJUSTED', body);
+    if (!result.ok) {
+      const code = result.reason === 'NOT_FOUND' ? 404 : 409;
+      return reply.code(code).send({ success: false, error: { code: result.reason, message: `Review ${result.reason === 'NOT_FOUND' ? 'not found' : 'cannot be adjusted (already decided or missing adjusted amounts)'}`, requestId: request.id } });
+    }
+    return reply.send({ success: true, data: result.review });
+  });
 }

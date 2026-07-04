@@ -2,8 +2,10 @@ import { NexusConsumer, TOPICS } from '@nexus/kafka';
 import type { ActivityCreatedEvent, DealWonEvent, QuoteSentEvent } from '@nexus/shared-types';
 import { fetchContactEmail, fetchDealPrimaryContactEmail } from '../lib/crm-client.js';
 import { fetchUserEmail } from '../lib/auth-client.js';
+import { buildIcs } from '../lib/ics.js';
 import type { createOutboxService } from '../services/outbox.service.js';
 import type { createTemplatesService } from '../services/templates.service.js';
+import type { EmailChannel } from '../channels/smtp.channel.js';
 import type { CommPrisma } from '../prisma.js';
 import type { EmailTemplate } from '../../../../node_modules/.prisma/comm-client/index.js';
 
@@ -11,7 +13,14 @@ export interface TriggerConsumerDeps {
   prisma: CommPrisma;
   outbox: ReturnType<typeof createOutboxService>;
   templates: ReturnType<typeof createTemplatesService>;
+  /** Optional direct SMTP channel — required to attach calendar invites. */
+  smtp?: EmailChannel;
   log: { info: (...a: unknown[]) => void; warn: (...a: unknown[]) => void };
+}
+
+/** Stable, host-qualified Message-ID for outbound thread correlation. */
+function meetingMessageId(activityId: string): string {
+  return `<meeting-${activityId}@nexuscrm>`;
 }
 
 function renderSafe(
@@ -103,10 +112,54 @@ export async function startTriggerConsumer(deps: TriggerConsumerDeps): Promise<N
       email = c?.email ?? undefined;
     }
     if (!email) return;
+
+    const startsAt = payload.dueDate ? new Date(payload.dueDate) : null;
+    const subject = 'Meeting invitation';
+    const html =
+      `<p>A meeting has been scheduled${startsAt ? ` for ${startsAt.toUTCString()}` : ''}.</p>` +
+      `<p>Please find the calendar invitation attached.</p>`;
+
+    // Build a valid RFC-5545 invite. Fail-open: if anything goes wrong we still
+    // fall back to a plain queued email so the notification is never lost.
+    let ics: string | null = null;
+    if (startsAt && !Number.isNaN(startsAt.getTime())) {
+      try {
+        const organizerEmail = await fetchUserEmail(tenantId, payload.ownerId).catch(() => undefined);
+        ics = buildIcs({
+          uid: `meeting-${payload.activityId}@nexuscrm`,
+          start: startsAt,
+          summary: subject,
+          description: `Meeting created in Nexus CRM (activity ${payload.activityId}).`,
+          organizerEmail: organizerEmail ?? undefined,
+          attendeeEmails: [email],
+        });
+      } catch (err) {
+        deps.log.warn({ err, activityId: payload.activityId }, 'meeting: ICS build failed; sending without invite');
+      }
+    }
+
+    // With an ICS we must send directly (the outbox has no attachment column);
+    // otherwise use the normal queued path.
+    if (ics && deps.smtp) {
+      try {
+        await deps.smtp.send({
+          to: email,
+          subject,
+          html,
+          text: html.replace(/<[^>]+>/g, ' '),
+          ics: { content: ics, method: 'REQUEST' },
+          messageId: meetingMessageId(payload.activityId),
+        });
+        return;
+      } catch (err) {
+        deps.log.warn({ err, activityId: payload.activityId }, 'meeting: ICS send failed; falling back to queued email');
+      }
+    }
+
     await deps.outbox.queueEmail(tenantId, {
       to: email,
-      subject: 'Meeting scheduled (calendar placeholder)',
-      htmlBody: `<p>A meeting activity was created (${payload.activityId}). Calendar invite attachment is not generated in this build.</p>`,
+      subject,
+      htmlBody: html,
       entityType: 'DEAL',
       entityId: payload.dealId ?? undefined,
     });

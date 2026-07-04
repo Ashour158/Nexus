@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { startTracing } from '@nexus/service-utils/tracing';
 import { createService, startService, globalErrorHandler, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
+import { NexusProducer } from '@nexus/kafka';
 import { getPrisma } from './prisma.js';
 import { createKnowledgeService } from './services/knowledge.service.js';
 import { registerRoutes } from './routes/index.js';
@@ -25,7 +26,20 @@ const prisma = getPrisma();
 app.setErrorHandler(globalErrorHandler);
 registerHealthRoutes(app, 'knowledge-service', [() => checkDatabase(prisma)]);
 
-const knowledgeSvc = createKnowledgeService(prisma);
+// Kafka producer for search-index events. Fail-open: if the broker is down we
+// continue serving requests; article events are fire-and-forget best-effort.
+const producer = new NexusProducer('knowledge-service');
+try {
+  await producer.connect();
+  app.log.info('Kafka producer connected');
+} catch (err) {
+  app.log.warn({ err }, 'Kafka producer connect failed; continuing without event publishing');
+}
+app.addHook('onClose', async () => {
+  try { await producer.disconnect(); } catch (err) { app.log.warn({ err }, 'Producer disconnect failed'); }
+});
+
+const knowledgeSvc = createKnowledgeService(prisma, producer);
 
 await registerGraphQL(app, prisma);
 

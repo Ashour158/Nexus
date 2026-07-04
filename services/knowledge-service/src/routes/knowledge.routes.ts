@@ -75,4 +75,19 @@ export async function registerKnowledgeRoutes(
     const body = z.object({ dealStage: z.string().optional() }).parse(request.body ?? {});
     return reply.send({ success: true, data: await knowledge.recordView(id, user.sub, body.dealStage) });
   });
+  app.post('/api/v1/knowledge/articles/:id/helpful', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
+    const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+    const { id } = z.object({ id: z.string().cuid() }).parse(request.params);
+    const body = z.object({ helpful: z.boolean() }).parse(request.body ?? {});
+    const data = await knowledge.recordHelpful(tenantId, id, body.helpful);
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Article not found', requestId: request.id } });
+    return reply.send({ success: true, data });
+  });
+  app.delete('/api/v1/knowledge/articles/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+    const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+    const { id } = z.object({ id: z.string().cuid() }).parse(request.params);
+    const data = await knowledge.deleteArticle(tenantId, id);
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Article not found', requestId: request.id } });
+    return reply.send({ success: true, data });
+  });
 }

@@ -63,10 +63,13 @@ export function createForecastsService(prisma: PlanningPrisma, producer: NexusPr
         where: { tenantId, id: submissionId },
       });
       if (!submission) return null;
+      const isAdjustment =
+        input.adjustedCommit !== undefined || input.adjustedBest !== undefined;
       const review = await prisma.forecastReview.create({
         data: {
           submissionId,
           reviewerId,
+          status: isAdjustment ? 'ADJUSTED' : 'APPROVED',
           adjustedCommit:
             input.adjustedCommit === undefined
               ? null
@@ -79,9 +82,75 @@ export function createForecastsService(prisma: PlanningPrisma, producer: NexusPr
       await producer.publish(TOPICS.ANALYTICS, {
         type: 'forecast.reviewed',
         tenantId,
-        payload: { submissionId, reviewId: review.id, reviewerId },
+        payload: { submissionId, reviewId: review.id, reviewerId, status: review.status },
       });
       return review;
+    },
+
+    /**
+     * ForecastReview lifecycle. A review is opened in `SUBMITTED` state, then
+     * transitioned to `APPROVED` or `ADJUSTED` by a reviewer. Transitions are
+     * guarded: only a `SUBMITTED` review may be approved/adjusted, so an
+     * already-decided review cannot be silently re-decided. Note: ForecastReview
+     * is an RLS skip-model, so tenant ownership is enforced via the parent
+     * submission (which is tenant-scoped) rather than the review row itself.
+     */
+    async openReview(tenantId: string, submissionId: string, reviewerId: string) {
+      const submission = await prisma.forecastSubmission.findFirst({
+        where: { tenantId, id: submissionId },
+      });
+      if (!submission) return null;
+      const review = await prisma.forecastReview.create({
+        data: { submissionId, reviewerId, status: 'SUBMITTED' },
+      });
+      return review;
+    },
+
+    async transitionReview(
+      tenantId: string,
+      reviewId: string,
+      reviewerId: string,
+      target: 'APPROVED' | 'ADJUSTED',
+      input: ReviewInput = {}
+    ): Promise<
+      | { ok: true; review: Awaited<ReturnType<typeof prisma.forecastReview.update>> }
+      | { ok: false; reason: 'NOT_FOUND' | 'INVALID_TRANSITION' }
+    > {
+      const review = await prisma.forecastReview.findUnique({ where: { id: reviewId } });
+      if (!review) return { ok: false, reason: 'NOT_FOUND' };
+      // Ownership guard: the review's submission must belong to this tenant.
+      const submission = await prisma.forecastSubmission.findFirst({
+        where: { tenantId, id: review.submissionId },
+      });
+      if (!submission) return { ok: false, reason: 'NOT_FOUND' };
+      // Guard: only an open (SUBMITTED) review may be decided.
+      if (review.status !== 'SUBMITTED') return { ok: false, reason: 'INVALID_TRANSITION' };
+      if (target === 'ADJUSTED' && input.adjustedCommit === undefined && input.adjustedBest === undefined) {
+        return { ok: false, reason: 'INVALID_TRANSITION' };
+      }
+      const updated = await prisma.forecastReview.update({
+        where: { id: reviewId },
+        data: {
+          status: target,
+          reviewerId,
+          adjustedCommit:
+            input.adjustedCommit === undefined
+              ? review.adjustedCommit
+              : new Decimal(input.adjustedCommit).toFixed(2),
+          adjustedBest:
+            input.adjustedBest === undefined
+              ? review.adjustedBest
+              : new Decimal(input.adjustedBest).toFixed(2),
+          note: input.note ?? review.note,
+          reviewedAt: new Date(),
+        },
+      });
+      await producer.publish(TOPICS.ANALYTICS, {
+        type: 'forecast.reviewed',
+        tenantId,
+        payload: { submissionId: review.submissionId, reviewId, reviewerId, status: target },
+      }).catch(() => undefined);
+      return { ok: true, review: updated };
     },
 
     async getRollup(tenantId: string, period: string) {

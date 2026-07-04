@@ -25,7 +25,7 @@ const app = await createService({
 
 const prisma = getPrisma();
 const producer = new NexusProducer('territory-service');
-const consumer = new NexusConsumer('territory-service-leads');
+const consumer = new NexusConsumer('territory-service-routing');
 const territories = createTerritoriesService(prisma, producer);
 
 // Bridge Fastify request-context tenantId into Prisma tenant ALS (defense-in-depth)
@@ -50,13 +50,19 @@ app.setErrorHandler(globalErrorHandler);
 await registerTerritoriesRoutes(app, territories);
 await registerTerritoryInternalRoutes(app, territories);
 await producer.connect().catch(() => undefined);
-await consumer.subscribe([TOPICS.LEADS]).catch(() => undefined);
+await consumer.subscribe([TOPICS.LEADS, TOPICS.ACCOUNTS]).catch(() => undefined);
+
+// lead.created → evaluate territory rules, assign owner, call CRM back.
+// Fail-open: any error is logged, never rethrown, so the consumer loop survives.
 consumer.on('lead.created', async (event) => {
-  const lead = event.payload as Record<string, unknown>;
-  const assigned = await territories.assignLead(event.tenantId, lead);
-  if (assigned?.assignedOwnerId) {
-    try {
-      const res = await fetch(`${process.env.CRM_SERVICE_URL}/api/v1/internal/leads/${String(lead.id)}/owner`, {
+  try {
+    const lead = event.payload as Record<string, unknown>;
+    // leads-service emits `leadId`; internal route passes `id`. Support both.
+    const leadId = String(lead.leadId ?? lead.id ?? '');
+    if (!leadId) return;
+    const assigned = await territories.assignRecord(event.tenantId, 'LEAD', leadId, { ...lead, id: leadId });
+    if (assigned?.assignedOwnerId) {
+      const res = await fetch(`${process.env.CRM_SERVICE_URL}/api/v1/internal/leads/${leadId}/owner`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -66,11 +72,26 @@ consumer.on('lead.created', async (event) => {
         body: JSON.stringify({ ownerId: assigned.assignedOwnerId, territoryId: assigned.territory?.id }),
       });
       if (!res.ok) {
-        console.error(`[TerritoryConsumer] Failed to update lead owner: ${res.status} ${await res.text().catch(() => '')}`);
+        console.warn(`[TerritoryConsumer] lead owner callback failed: ${res.status} ${await res.text().catch(() => '')}`);
       }
-    } catch (err: any) {
-      console.error('[TerritoryConsumer] Error updating lead owner:', err.message);
     }
+  } catch (err: any) {
+    console.warn('[TerritoryConsumer] lead.created handler error:', err?.message);
+  }
+});
+
+// account.created → evaluate territory rules and record the assignment.
+// crm-service has no internal account-owner endpoint yet, so we publish an
+// `account.routed` event (see assignRecord) for it to consume; this handler
+// stays additive and fail-open.
+consumer.on('account.created', async (event) => {
+  try {
+    const account = event.payload as Record<string, unknown>;
+    const accountId = String(account.accountId ?? account.id ?? '');
+    if (!accountId) return;
+    await territories.assignRecord(event.tenantId, 'ACCOUNT', accountId, { ...account, id: accountId });
+  } catch (err: any) {
+    console.warn('[TerritoryConsumer] account.created handler error:', err?.message);
   }
 });
 

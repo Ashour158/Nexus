@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { startTracing } from '@nexus/service-utils/tracing';
 import { createService, startService, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
+import { NexusProducer } from '@nexus/kafka';
 import { getPrisma } from './prisma.js';
 import { registerWhatsAppRoutes } from './routes/whatsapp.routes.js';
 import { registerTelegramRoutes } from './routes/telegram.routes.js';
@@ -32,12 +33,27 @@ app.addHook('preParsing', async (request, _reply, payload) => {
 
 const prisma = getPrisma();
 
+// Kafka producer for human-handoff events (TOPICS.NOTIFICATIONS). Additive and
+// fail-open: if the broker is unavailable the bot keeps serving; handoff events
+// are simply best-effort.
+const producer = new NexusProducer('chatbot-service');
+try {
+  await producer.connect();
+  app.log.info('Kafka producer connected');
+} catch (err) {
+  app.log.warn({ err }, 'Kafka producer connect failed; continuing without handoff events');
+}
+
 registerHealthRoutes(app, 'chatbot-service', [() => checkDatabase(prisma)]);
 
-await registerWhatsAppRoutes(app, prisma);
-await registerTelegramRoutes(app, prisma);
+await registerWhatsAppRoutes(app, prisma, producer);
+await registerTelegramRoutes(app, prisma, producer);
 
 await registerGraphQL(app, prisma);
+
+app.addHook('onClose', async () => {
+  try { await producer.disconnect(); } catch (err) { app.log.warn({ err }, 'Producer disconnect failed'); }
+});
 
 await startService(app, port, async () => {
   await prisma.$disconnect();

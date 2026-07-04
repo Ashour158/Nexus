@@ -10,12 +10,17 @@ import { registerAccountSocketHandlers } from './socket/handlers/account.handler
 import { registerDealSocketHandlers } from './socket/handlers/deal.handler.js';
 import { registerContactSocketHandlers } from './socket/handlers/contact.handler.js';
 import { registerNotificationSocketHandlers } from './socket/handlers/notification.handler.js';
+import { registerPresenceSocketHandlers } from './socket/handlers/presence.handler.js';
 import { tenantRoom, userRoom } from './socket/rooms.js';
+import { addPresence, removePresence } from './socket/presence.js';
 import { startDealConsumer } from './consumers/deal.consumer.js';
 import { startNotificationConsumer } from './consumers/notification.consumer.js';
 import { startActivityConsumer } from './consumers/activity.consumer.js';
 import { startQuoteConsumer } from './consumers/quote.consumer.js';
+import { startLeadConsumer } from './consumers/lead.consumer.js';
+import { startCrmEntityConsumer } from './consumers/crm-entity.consumer.js';
 import { registerRealtimeHealthRoutes } from './routes/health.routes.js';
+import { registerPresenceRoutes } from './routes/presence.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 import type { AuthedSocket } from './socket/auth.middleware.js';
 
@@ -64,6 +69,7 @@ const subClient = pubClient.duplicate();
 io.adapter(createAdapter(pubClient, subClient));
 app.log.info('Socket.IO Redis adapter enabled');
 registerRealtimeHealthRoutes(app, pubClient);
+registerPresenceRoutes(app);
 
 await registerGraphQL(app);
 
@@ -78,6 +84,25 @@ io.on('connection', (socket) => {
   registerDealSocketHandlers(socket);
   registerContactSocketHandlers(socket);
   registerNotificationSocketHandlers(socket);
+  registerPresenceSocketHandlers(socket);
+
+  // Presence tracking (fail-open): track this socket and broadcast join to the
+  // tenant only when the user transitions offline→online (first socket).
+  try {
+    const cameOnline = addPresence(tenantId, userId);
+    if (cameOnline) {
+      socket.to(tenantRoom(tenantId)).emit('presence:join', { userId });
+    }
+  } catch { /* never block a connection on presence */ }
+
+  socket.on('disconnect', () => {
+    try {
+      const wentOffline = removePresence(tenantId, userId);
+      if (wentOffline) {
+        socket.to(tenantRoom(tenantId)).emit('presence:leave', { userId });
+      }
+    } catch { /* never crash on disconnect */ }
+  });
 });
 
 try {
@@ -85,6 +110,8 @@ try {
   await startNotificationConsumer(io);
   await startActivityConsumer(io);
   await startQuoteConsumer(io);
+  await startLeadConsumer(io);
+  await startCrmEntityConsumer(io);
   app.log.info('Realtime Kafka consumers started');
 } catch (err) {
   app.log.warn({ err }, 'Kafka consumers failed; WebSocket-only mode');

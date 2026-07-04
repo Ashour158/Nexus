@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
-import type { createPortalService } from '../services/portal.service.js';
+import { createPortalService, IllegalPortalTransitionError } from '../services/portal.service.js';
 
 export async function registerPortalRoutes(
   app: FastifyInstance,
@@ -16,7 +16,15 @@ export async function registerPortalRoutes(
 
   app.post('/portal/:token/accept', async (request, reply) => {
     const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
-    const data = await portal.accept(token);
+    let data;
+    try {
+      data = await portal.accept(token);
+    } catch (err) {
+      if (err instanceof IllegalPortalTransitionError) {
+        return reply.code(409).send({ success: false, error: { code: 'ILLEGAL_TRANSITION', message: err.message, requestId: request.id } });
+      }
+      throw err;
+    }
     if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Portal link expired or invalid', requestId: request.id } });
     return reply.send({ success: true, data });
   });
@@ -24,7 +32,15 @@ export async function registerPortalRoutes(
   app.post('/portal/:token/reject', async (request, reply) => {
     const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
     const body = z.object({ reason: z.string().optional() }).parse(request.body ?? {});
-    const data = await portal.reject(token, body.reason);
+    let data;
+    try {
+      data = await portal.reject(token, body.reason);
+    } catch (err) {
+      if (err instanceof IllegalPortalTransitionError) {
+        return reply.code(409).send({ success: false, error: { code: 'ILLEGAL_TRANSITION', message: err.message, requestId: request.id } });
+      }
+      throw err;
+    }
     if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Portal link expired or invalid', requestId: request.id } });
     return reply.send({ success: true, data });
   });

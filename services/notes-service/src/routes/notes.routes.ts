@@ -14,14 +14,21 @@ import {
   NoteListQuerySchema,
   PaginationSchema,
 } from '@nexus/validation';
+import type { NexusProducer } from '@nexus/kafka';
 import type { NotesPrisma } from '../prisma.js';
+import { notifyMentions } from '../services/mentions.service.js';
 
 /**
  * Registers the `/api/v1/notes/*` route family.
+ *
+ * `producer` is optional: when Kafka is available it is used to fan out
+ * `@mention` notifications on note create/update. When absent, mention
+ * notification is silently skipped and the note write path is unaffected.
  */
 export async function registerNotesRoutes(
   app: FastifyInstance,
-  prisma: NotesPrisma
+  prisma: NotesPrisma,
+  producer?: NexusProducer
 ): Promise<void> {
   await app.register(
     async (r) => {
@@ -68,10 +75,28 @@ export async function registerNotesRoutes(
             throw new ValidationError('Invalid body', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
+
+          // Entity reference integrity: a note must attach to exactly the record(s)
+          // the caller specified. CreateNoteSchema already refines that at least one
+          // of deal/contact/lead/account is present; re-assert defensively so a note
+          // can never be persisted orphaned regardless of schema drift.
+          if (
+            !parsed.data.dealId &&
+            !parsed.data.contactId &&
+            !parsed.data.leadId &&
+            !parsed.data.accountId
+          ) {
+            throw new ValidationError('Note must reference at least one entity', {
+              formErrors: ['Note must reference at least one of deal/contact/lead/account'],
+              fieldErrors: {},
+            });
+          }
+
           const note = await prisma.note.create({
             data: {
               content: parsed.data.content,
               isPinned: parsed.data.isPinned,
+              mentions: parsed.data.mentions ?? [],
               dealId: parsed.data.dealId,
               contactId: parsed.data.contactId,
               leadId: parsed.data.leadId,
@@ -80,6 +105,10 @@ export async function registerNotesRoutes(
               authorId: jwt.sub,
             },
           });
+
+          // Fire-and-forget @mention fan-out. Never blocks or fails the note write.
+          void notifyMentions(prisma, producer, note as any);
+
           return reply.code(201).send({ success: true, data: note });
         }
       );
@@ -115,13 +144,18 @@ export async function registerNotesRoutes(
             throw new ValidationError('Invalid body', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
+          const data: { content?: string; isPinned?: boolean; mentions?: string[] } = {};
+          if (parsed.data.content !== undefined) data.content = parsed.data.content;
+          if (parsed.data.isPinned !== undefined) data.isPinned = parsed.data.isPinned;
+          if (parsed.data.mentions !== undefined) data.mentions = parsed.data.mentions;
           const note = await prisma.note.update({
             where: { id_tenantId: { id, tenantId: jwt.tenantId } },
-            data: {
-              content: parsed.data.content,
-              isPinned: parsed.data.isPinned,
-            },
+            data,
           });
+
+          // Notify only mentions not previously notified (idempotent per version).
+          void notifyMentions(prisma, producer, note as any);
+
           return reply.send({ success: true, data: note });
         }
       );

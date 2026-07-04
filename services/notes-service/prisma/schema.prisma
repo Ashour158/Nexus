@@ -14,6 +14,8 @@ model Note {
   authorId   String
   content    String
   isPinned   Boolean  @default(false)
+  mentions   String[] @default([])
+  mentionsNotified String[] @default([])
   leadId     String?
   contactId  String?
   accountId  String?

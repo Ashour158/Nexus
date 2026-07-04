@@ -25,6 +25,13 @@ model FileAttachment {
   @@unique([id, tenantId])
 }
 
+model StorageUsage {
+  tenantId   String   @id
+  bytesUsed  BigInt   @default(0)
+  fileCount  Int      @default(0)
+  updatedAt  DateTime @updatedAt
+}
+
 model OutboxMessage {
   id             String   @id @default(cuid())
   topic          String

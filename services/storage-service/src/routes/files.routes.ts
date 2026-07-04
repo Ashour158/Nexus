@@ -61,6 +61,16 @@ export async function registerFilesRoutes(
       );
 
       r.get(
+        '/files/usage',
+        { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
+        async (request, reply) => {
+          const jwt = request.user as JwtPayload;
+          const data = await files.getUsage(jwt.tenantId);
+          return reply.send({ success: true, data });
+        }
+      );
+
+      r.get(
         '/files',
         { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
         async (request, reply) => {

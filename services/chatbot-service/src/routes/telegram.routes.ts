@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { timingSafeEqual } from 'crypto';
+import type { NexusProducer } from '@nexus/kafka';
 import type { Prisma } from '../../../../node_modules/.prisma/chatbot-client/index.js';
 import type { ChatbotPrisma } from '../prisma.js';
 import { processMessage } from '../services/conversation.service.js';
@@ -12,7 +13,11 @@ interface TelegramWebhookBody {
   };
 }
 
-export async function registerTelegramRoutes(app: FastifyInstance, prisma: ChatbotPrisma) {
+export async function registerTelegramRoutes(
+  app: FastifyInstance,
+  prisma: ChatbotPrisma,
+  producer?: NexusProducer | null
+) {
   app.post('/api/v1/webhooks/telegram', async (request, reply) => {
     // 1. Verify secret token
     const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
@@ -66,7 +71,7 @@ export async function registerTelegramRoutes(app: FastifyInstance, prisma: Chatb
     await prisma.conversationMessage.create({
       data: { conversationId: conv.id, direction: 'INBOUND', body: text },
     });
-    const result = await processMessage(conv, text, prisma);
+    const result = await processMessage(conv, text, prisma, producer);
     await prisma.conversation.update({
       where: { id: conv.id },
       data: {

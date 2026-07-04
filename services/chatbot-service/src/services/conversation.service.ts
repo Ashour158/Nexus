@@ -1,11 +1,16 @@
 import type { ConversationState } from '../../../../node_modules/.prisma/chatbot-client/index.js';
 import type { Conversation } from '../../../../node_modules/.prisma/chatbot-client/index.js';
+import type { NexusProducer } from '@nexus/kafka';
 import type { ChatbotPrisma } from '../prisma.js';
+import { matchIntent } from './intents.js';
+import { emitHandoff } from './handoff.service.js';
 
 export type FsmResult = {
   reply: string;
   newState: ConversationState;
   updatedContext?: Record<string, unknown>;
+  /** Set when the message was escalated to a human this turn. */
+  handoff?: boolean;
 };
 
 function internalHeaders(): Record<string, string> {
@@ -14,7 +19,123 @@ function internalHeaders(): Record<string, string> {
   };
 }
 
+/**
+ * Session state machine + rules-only intent routing orchestrator.
+ *
+ * Session lifecycle (per Conversation.state):
+ *   IDLE ──greeting──▶ GREETING ─▶ COLLECTING_INFO ─▶ PRODUCT_SEARCH
+ *        ─▶ QUOTE_BUILDING ─▶ QUOTE_REVIEW ─▶ QUOTE_SENT ─▶ COMPLETE
+ *   Any state ──"agent" / no-match──▶ HANDED_OFF   (escalated to a human)
+ *   HANDED_OFF / CLOSED ──"restart"/"start"──▶ IDLE (customer re-engages)
+ *
+ * Ordering per turn:
+ *   1. If the session is already HANDED_OFF/CLOSED, only a restart re-opens it;
+ *      otherwise we stay parked so a human owns the thread.
+ *   2. Rules-only intent match (keyword/regex, deterministic — NO AI):
+ *        - AGENT      → emit handoff event, mark HANDED_OFF
+ *        - HELP/GREETING/GOODBYE → canned reply, state unchanged
+ *        - RESTART    → reset to IDLE
+ *        - QUOTE      → fall through to the quote FSM
+ *   3. No intent + mid-quote-flow → continue the quote FSM.
+ *   4. No intent + not in a flow (IDLE) → fail-safe handoff so nothing is dropped.
+ *
+ * Additive + fail-open: if intent matching or the quote FSM throws, we fall back
+ * to a human handoff rather than crashing the webhook.
+ */
 export async function processMessage(
+  conversation: Conversation,
+  message: string,
+  prisma: ChatbotPrisma,
+  producer?: NexusProducer | null
+): Promise<FsmResult> {
+  try {
+    // 1. Parked with a human — only an explicit restart re-opens the bot.
+    if (conversation.state === 'HANDED_OFF' || conversation.state === 'CLOSED') {
+      const parkedIntent = safeMatchIntent(message);
+      if (parkedIntent?.action.kind === 'restart') {
+        return {
+          reply: `Okay, starting over. Reply with a product name or "quote" to begin.`,
+          newState: 'IDLE',
+          updatedContext: {},
+        };
+      }
+      return {
+        reply: `You're connected to our team — someone will follow up shortly. Reply RESTART to talk to the bot again.`,
+        newState: conversation.state,
+      };
+    }
+
+    // 2. Rules-only intent routing.
+    const intent = safeMatchIntent(message);
+    if (intent) {
+      switch (intent.action.kind) {
+        case 'handoff':
+          return await handoffResult(conversation, message, intent.action.reason, producer);
+        case 'reply':
+          return { reply: intent.action.reply, newState: conversation.state };
+        case 'restart':
+          return {
+            reply: `No problem — let's start fresh. What product or service are you looking for?`,
+            newState: 'IDLE',
+            updatedContext: {},
+          };
+        case 'quote':
+          // Fall through to the quote FSM below (kick off from IDLE if needed).
+          break;
+      }
+    }
+
+    // 3./4. No short-circuiting intent — run the quote FSM. When the session is
+    // IDLE and nothing matched (and it wasn't an explicit quote intent), there is
+    // no flow to advance, so escalate rather than silently drop the message.
+    if (!intent && conversation.state === 'IDLE') {
+      return await handoffResult(conversation, message, 'no_intent_match', producer);
+    }
+
+    return await runQuoteFsm(conversation, message, prisma);
+  } catch (err) {
+    // Fail-open: never throw out of the message handler. Escalate to a human.
+    console.warn('processMessage: unexpected error, falling back to handoff:', err);
+    return await handoffResult(conversation, message, 'processing_error', producer);
+  }
+}
+
+/** Intent matching that never throws — errors degrade to "no match". */
+function safeMatchIntent(message: string): ReturnType<typeof matchIntent> {
+  try {
+    return matchIntent(message);
+  } catch (err) {
+    console.warn('safeMatchIntent: intent matching failed, treating as no match:', err);
+    return null;
+  }
+}
+
+/** Emit the handoff event (fail-open) and return the HANDED_OFF transition. */
+async function handoffResult(
+  conversation: Conversation,
+  message: string,
+  reason: string,
+  producer?: NexusProducer | null
+): Promise<FsmResult> {
+  await emitHandoff(producer, {
+    conversation: {
+      id: conversation.id,
+      tenantId: conversation.tenantId,
+      channel: conversation.channel,
+      externalId: conversation.externalId,
+    },
+    message,
+    reason,
+  });
+  return {
+    reply: `Let me connect you with a member of our team — they'll follow up shortly. Reply RESTART to keep using the bot.`,
+    newState: 'HANDED_OFF',
+    handoff: true,
+  };
+}
+
+/** The original deterministic quote-building flow, unchanged. */
+async function runQuoteFsm(
   conversation: Conversation,
   message: string,
   _prisma: ChatbotPrisma

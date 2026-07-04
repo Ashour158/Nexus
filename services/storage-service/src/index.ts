@@ -15,6 +15,8 @@ import { createMinioClient, ensureBucket } from './minio.js';
 import { createFilesService } from './services/files.service.js';
 import { registerFilesRoutes } from './routes/files.routes.js';
 import { registerGraphQL } from './graphql/index.js';
+import { disconnectStorageProducer } from './services/storage-events.js';
+import { startOrphanCleanupPoller } from './lib/orphan-cleanup.poller.js';
 
 startTracing({ serviceName: 'storage-service' });
 const prismaHealth = new PrismaClient({
@@ -59,11 +61,23 @@ await app.register(rateLimit, {
 registerHealthRoutes(app, 'storage-service', [() => checkDatabase(prismaHealth)]);
 app.setErrorHandler(globalErrorHandler);
 
+const files = createFilesService(prisma, minio, bucket);
+
+// Orphan object reconciliation poller (additive, fail-open, disabled by default
+// via STORAGE_ORPHAN_CLEANUP_ENABLED). A failed start never breaks the service.
+let orphanPoller: { stop(): void } | undefined;
+try {
+  orphanPoller = startOrphanCleanupPoller(prisma, minio, bucket);
+  app.log.info('Orphan cleanup poller initialized');
+} catch (err) {
+  app.log.warn({ err }, 'Orphan cleanup poller failed to start; continuing');
+}
+
 app.addHook('onClose', async () => {
+  try { orphanPoller?.stop(); } catch (err) { app.log.warn({ err }, 'Orphan poller stop failed'); }
+  try { await disconnectStorageProducer(); } catch (err) { app.log.warn({ err }, 'Producer disconnect failed'); }
   await prismaHealth.$disconnect();
 });
-
-const files = createFilesService(prisma, minio, bucket);
 
 await registerGraphQL(app, prisma);
 

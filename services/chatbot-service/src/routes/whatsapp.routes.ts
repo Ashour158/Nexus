@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { createHmac, timingSafeEqual } from 'crypto';
+import type { NexusProducer } from '@nexus/kafka';
 import type { Prisma } from '../../../../node_modules/.prisma/chatbot-client/index.js';
 import type { ChatbotPrisma } from '../prisma.js';
 import { processMessage } from '../services/conversation.service.js';
@@ -30,7 +31,11 @@ function verifyWhatsAppSignature(
   return timingSafeEqual(Buffer.from(expected), Buffer.from(received));
 }
 
-export async function registerWhatsAppRoutes(app: FastifyInstance, prisma: ChatbotPrisma) {
+export async function registerWhatsAppRoutes(
+  app: FastifyInstance,
+  prisma: ChatbotPrisma,
+  producer?: NexusProducer | null
+) {
   app.get('/api/v1/webhooks/whatsapp', async (request, reply) => {
     const q = request.query as Record<string, string>;
     if (q['hub.verify_token'] === process.env.WHATSAPP_VERIFY_TOKEN) {
@@ -95,7 +100,7 @@ export async function registerWhatsAppRoutes(app: FastifyInstance, prisma: Chatb
         data: { conversationId: conv.id, direction: 'INBOUND', body: text },
       });
 
-      const result = await processMessage(conv, text, prisma);
+      const result = await processMessage(conv, text, prisma, producer);
 
       await prisma.conversation.update({
         where: { id: conv.id },

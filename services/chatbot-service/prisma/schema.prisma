@@ -58,6 +58,8 @@ enum ConversationState {
   QUOTE_REVIEW
   QUOTE_SENT
   COMPLETE
+  HANDED_OFF
+  CLOSED
 }
 
 model OutboxMessage {

@@ -179,6 +179,76 @@ enum EnrollmentStatus {
   EXITED
 }
 
+// ─── CommandCenter — Customer Journey Orchestration ─────────────────────────
+//
+// Higher-level than WorkflowTemplate (one-off automations): a CommandJourney is
+// a long-running, per-record, step-based orchestration. Records (lead / contact
+// / account / deal) are enrolled and progress through ordered steps over time
+// and events. Named `Command*` to stay additive alongside the existing
+// marketing-flavoured Journey model (contact-only, nodes/edges) which is left
+// untouched.
+
+model CommandJourney {
+  id           String                     @id @default(cuid())
+  tenantId     String
+  name         String
+  description  String?
+  entityType   String                     // lead | contact | account | deal
+  status       CommandJourneyStatus       @default(DRAFT)
+  // { event?: string, conditions?: [{ field, operator, value }], match?: 'all'|'any' }
+  entryTrigger Json                       @default("{}")
+  // Ordered steps: [{ id, type, config, nextStepId?, branches?: [{condition,nextStepId}] }]
+  steps        Json                       @default("[]")
+  // Optional early-exit rule: { conditions?: [...], match?: 'all'|'any' }
+  exitCriteria Json?
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+  enrollments  CommandJourneyEnrollment[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  // entryTrigger event matching: scan ACTIVE journeys for a tenant
+  @@index([tenantId, entityType, status])
+  @@unique([id, tenantId])
+}
+
+model CommandJourneyEnrollment {
+  id            String                       @id @default(cuid())
+  tenantId      String
+  journeyId     String
+  journey       CommandJourney               @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  entityType    String
+  entityId      String
+  currentStepId String?
+  status        CommandEnrollmentStatus      @default(ACTIVE)
+  context       Json                         @default("{}")
+  enteredAt     DateTime                     @default(now())
+  resumeAt      DateTime?
+  lastStepAt    DateTime?
+  error         String?
+  updatedAt     DateTime                     @updatedAt
+
+  // A record is never double-enrolled in the same journey.
+  @@unique([tenantId, journeyId, entityId])
+  // Scheduler: pick up ACTIVE enrollments whose resumeAt is due.
+  @@index([status, resumeAt])
+  @@index([tenantId, journeyId])
+  @@index([tenantId, entityType, entityId])
+}
+
+enum CommandJourneyStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum CommandEnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  EXITED
+  FAILED
+}
+
 model OutboxMessage {
   id             String   @id @default(cuid())
   topic          String

@@ -4,6 +4,7 @@ import type { WorkflowPrisma } from '../prisma.js';
 import { registerWorkflowsRoutes } from './workflows.routes.js';
 import { registerExecutionsRoutes } from './executions.routes.js';
 import { registerJourneysRoutes } from './journeys.routes.js';
+import { registerCommandJourneysRoutes } from './command-journeys.routes.js';
 import { registerSlaRoutes } from './sla.routes.js';
 
 export async function registerRoutes(
@@ -14,5 +15,6 @@ export async function registerRoutes(
   await registerWorkflowsRoutes(app, prisma, producer);
   await registerExecutionsRoutes(app, prisma, producer);
   await registerJourneysRoutes(app, prisma);
+  await registerCommandJourneysRoutes(app, prisma, producer);
   await registerSlaRoutes(app, prisma);
 }

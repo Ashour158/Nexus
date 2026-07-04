@@ -21,6 +21,8 @@ import { startApprovalConsumer } from './consumers/approval.consumer.js';
 import { startGdprConsumer } from './consumers/gdpr.consumer.js';
 import { startSlaScanner } from './services/sla-scanner.js';
 import { startScheduleTrigger } from './services/schedule-trigger.js';
+import { startJourneyEnrollmentConsumer } from './consumers/journey-enrollment.consumer.js';
+import { startJourneyScheduler } from './services/journey-engine.js';
 import { createExecutionsService } from './services/executions.service.js';
 import { registerGraphQL } from './graphql/index.js';
 
@@ -64,13 +66,20 @@ app.setErrorHandler(globalErrorHandler);
 let branchConsumer: Awaited<ReturnType<typeof startBranchConsumer>> | null = null;
 let approvalConsumer: Awaited<ReturnType<typeof startApprovalConsumer>> | null = null;
 let gdprConsumer: Awaited<ReturnType<typeof startGdprConsumer>> | null = null;
+let journeyEnrollmentConsumer: Awaited<ReturnType<typeof startJourneyEnrollmentConsumer>> | null = null;
 try {
   await producer.connect();
   await startTriggerConsumer(prisma, producer);
   branchConsumer = await startBranchConsumer(prisma, producer);
   approvalConsumer = await startApprovalConsumer(prisma, producer, app.log);
   gdprConsumer = await startGdprConsumer(prisma);
-  app.log.info('Workflow trigger + branch + approval consumers started');
+  // CommandCenter auto-enrollment — fail-open, never blocks the other consumers.
+  try {
+    journeyEnrollmentConsumer = await startJourneyEnrollmentConsumer(prisma, producer, app.log);
+  } catch (err) {
+    app.log.warn({ err }, 'Journey enrollment consumer failed to start');
+  }
+  app.log.info('Workflow trigger + branch + approval + journey consumers started');
 } catch (err) {
   app.log.warn({ err }, 'Workflow Kafka consumers failed to start');
 }
@@ -79,6 +88,7 @@ app.addHook('onClose', async () => {
   try { await branchConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Branch consumer disconnect failed'); }
   try { await approvalConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Approval consumer disconnect failed'); }
   try { await gdprConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'GDPR consumer disconnect failed'); }
+  try { await journeyEnrollmentConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Journey enrollment consumer disconnect failed'); }
   try { await producer.disconnect(); } catch (err) { app.log.warn({ err }, 'Producer disconnect failed'); }
 });
 
@@ -112,6 +122,10 @@ startSlaScanner(prisma, app.log, 60_000);
 // Fire schedule-triggered workflows (trigger === 'schedule') on a timer.
 // Tick interval configurable via WORKFLOW_SCHEDULE_TICK_MS (default 60 s).
 startScheduleTrigger(prisma, producer, app.log);
+
+// CommandCenter — advance due journey enrollments (resumeAt <= now) on a timer.
+// Tick interval configurable via JOURNEY_SCHEDULE_TICK_MS (default 30 s).
+startJourneyScheduler(prisma, producer, app.log);
 
 await registerGraphQL(app, prisma);
 

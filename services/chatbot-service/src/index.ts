@@ -5,6 +5,7 @@ import { NexusProducer } from '@nexus/kafka';
 import { getPrisma } from './prisma.js';
 import { registerWhatsAppRoutes } from './routes/whatsapp.routes.js';
 import { registerTelegramRoutes } from './routes/telegram.routes.js';
+import { registerChatRoutes } from './routes/chat.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 
 startTracing({ serviceName: 'chatbot-service' });
@@ -48,6 +49,7 @@ registerHealthRoutes(app, 'chatbot-service', [() => checkDatabase(prisma)]);
 
 await registerWhatsAppRoutes(app, prisma, producer);
 await registerTelegramRoutes(app, prisma, producer);
+await registerChatRoutes(app, prisma, producer);
 
 await registerGraphQL(app, prisma);
 

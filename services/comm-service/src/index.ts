@@ -23,6 +23,9 @@ import { registerWebhookRoutes } from './routes/webhook.routes.js';
 import { registerInternalOutboxRoutes } from './routes/internal-outbox.routes.js';
 import { createWhatsAppChannel } from './channels/whatsapp.channel.js';
 import { registerWhatsAppOutboundRoutes } from './routes/whatsapp-outbound.routes.js';
+import { createTelephonyChannel } from './channels/telephony.channel.js';
+import { registerTelephonyRoutes } from './routes/telephony.routes.js';
+import { NexusProducer } from '@nexus/kafka';
 import { registerGraphQL } from './graphql/index.js';
 import { startTriggerConsumer } from './consumers/trigger.consumer.js';
 import { startGdprConsumer } from './consumers/gdpr.consumer.js';
@@ -76,6 +79,18 @@ app.setErrorHandler(globalErrorHandler);
 const smtp = createSmtpChannel(app.log);
 const sms = createSmsChannel(app.log);
 const whatsapp = createWhatsAppChannel(app.log);
+const telephony = createTelephonyChannel(app.log);
+
+// CTI telephony event producer. Fail-open: if Kafka is unavailable the webhook
+// still updates the call record; only downstream timeline projection is skipped.
+let telephonyProducer: NexusProducer | null = new NexusProducer('comm-service');
+try {
+  await telephonyProducer.connect();
+  app.log.info('comm-service telephony event producer connected');
+} catch (err) {
+  app.log.warn({ err }, 'Telephony event producer connect failed; call.logged events disabled');
+  telephonyProducer = null;
+}
 const templates = createTemplatesService(prisma);
 const outbox = createOutboxService(prisma, smtp, sms);
 const sequences = createSequencesService(prisma, smtp, templates);
@@ -113,6 +128,9 @@ app.addHook('onClose', async () => {
     await gdprConsumer?.disconnect();
   } catch { /* ignore */ }
   try {
+    await telephonyProducer?.disconnect();
+  } catch { /* ignore */ }
+  try {
     await prismaHealth.$disconnect();
   } catch { /* ignore */ }
 });
@@ -126,4 +144,5 @@ await startService(app, port, async (a) => {
   await registerWebhookRoutes(a, outbox);
   await registerInternalOutboxRoutes(a, outbox);
   await registerWhatsAppOutboundRoutes(a, prisma, whatsapp);
+  await registerTelephonyRoutes(a, prisma, telephony, telephonyProducer);
 });

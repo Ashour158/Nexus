@@ -15,11 +15,13 @@ import { createEmailChannel } from './channels/email.channel.js';
 import { createInAppChannel } from './channels/in-app.channel.js';
 import { createSmsChannel } from './channels/sms.channel.js';
 import { createPushChannel } from './channels/push.channel.js';
+import { createWhatsAppChannel } from './channels/whatsapp.channel.js';
 import { startDealConsumer } from './consumers/deal.consumer.js';
 import { startActivityConsumer } from './consumers/activity.consumer.js';
 import { startQuoteConsumer } from './consumers/quote.consumer.js';
 import { startLeadConsumer } from './consumers/lead.consumer.js';
 import { registerNotificationsRoutes } from './routes/notifications.routes.js';
+import { registerWhatsAppWebhookRoutes } from './routes/whatsapp-webhook.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 import { NexusProducer } from '@nexus/kafka';
 
@@ -60,6 +62,19 @@ await app.register(rateLimit, {
   }),
 });
 
+// Capture raw request body for inbound WhatsApp webhook HMAC verification.
+// Scoped to /api/v1/webhooks/* so normal JSON routes are unaffected.
+app.addHook('preParsing', async (request, _reply, payload) => {
+  if (!request.url.startsWith('/api/v1/webhooks/')) return payload;
+  const chunks: Buffer[] = [];
+  for await (const chunk of payload) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  (request as unknown as { rawBody?: Buffer }).rawBody = Buffer.concat(chunks);
+  const { Readable } = await import('node:stream');
+  return Readable.from(Buffer.concat(chunks));
+});
+
 // Bridge Fastify request-context tenantId into Prisma tenant ALS
 app.addHook('preHandler', async (request) => {
   const tenantId = (request as any).requestContext?.get('tenantId');
@@ -78,6 +93,9 @@ const email = createEmailChannel(app.log);
 // existing email + in-app behaviour is unchanged.
 const sms = createSmsChannel(app.log);
 const push = createPushChannel(app.log);
+// WhatsApp channel — env-gated (Twilio WhatsApp or WhatsApp Cloud API). A
+// guarded no-op when unconfigured; never throws.
+const whatsapp = createWhatsAppChannel(app.log);
 
 // Kafka producer for real-time push via NOTIFICATIONS topic
 let kafkaProducer: NexusProducer | undefined;
@@ -139,10 +157,10 @@ async function lookupOwner(
 // the HTTP surface still works for reading / marking-read.
 let leadConsumer: Awaited<ReturnType<typeof startLeadConsumer>> | undefined;
 try {
-  await startDealConsumer({ inApp, email, sms, push, lookupOwner, log: app.log });
+  await startDealConsumer({ inApp, email, sms, push, whatsapp, lookupOwner, log: app.log });
   await startActivityConsumer({ inApp, log: app.log });
-  await startQuoteConsumer({ inApp, email, sms, push, log: app.log });
-  leadConsumer = await startLeadConsumer({ inApp, email, sms, push, lookupOwner, log: app.log });
+  await startQuoteConsumer({ inApp, email, sms, push, whatsapp, log: app.log });
+  leadConsumer = await startLeadConsumer({ inApp, email, sms, push, whatsapp, lookupOwner, log: app.log });
 } catch (err) {
   app.log.warn({ err }, 'Kafka consumers failed to start; HTTP-only mode');
 }
@@ -161,4 +179,8 @@ await registerGraphQL(app, prisma);
 
 await startService(app, port, async (a) => {
   await registerNotificationsRoutes(a, prisma);
+  // Inbound WhatsApp webhook (public per createService's /api/v1/webhooks/*
+  // JWT exemption; POST is HMAC-verified). Emits `whatsapp.received` on the
+  // comms topic for downstream timeline correlation. Guarded + fail-open.
+  await registerWhatsAppWebhookRoutes(a, kafkaProducer);
 });

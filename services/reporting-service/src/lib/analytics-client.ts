@@ -56,6 +56,68 @@ async function analyticsGet<T>(
   }
 }
 
+/**
+ * Guarded POST against analytics-service. Returns the `data` field of the
+ * standard `{ success, data }` envelope, or `null` on any failure.
+ */
+async function analyticsPost<T>(
+  tenantId: string,
+  path: string,
+  payload: unknown,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  authHeader?: string
+): Promise<T | null> {
+  // The analytics query endpoint is JWT-guarded (requirePermission + tenant from
+  // the token), so forward the caller's bearer when we have it; fall back to the
+  // internal service token for endpoints that accept it.
+  const authorization =
+    authHeader && authHeader.trim().length > 0
+      ? authHeader
+      : `Bearer ${process.env.INTERNAL_SERVICE_TOKEN ?? ''}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${analyticsBaseUrl()}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: authorization,
+        'x-tenant-id': tenantId,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { success?: boolean; data?: T };
+    return body?.data ?? null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export interface QueryResult {
+  rows: Record<string, unknown>[];
+  [key: string]: unknown;
+}
+
+/**
+ * Execute a ReportSpec against analytics-service's `POST /query` endpoint.
+ * Fail-open: returns `null` if analytics is unavailable or the endpoint is not
+ * yet deployed, so a report "run" degrades gracefully instead of throwing.
+ */
+export function runReportSpec(
+  tenantId: string,
+  spec: unknown,
+  authHeader?: string
+): Promise<QueryResult | null> {
+  // analytics-service's POST /query expects the bare ReportSpec as the body and
+  // authenticates the caller's JWT (deriving tenant from it), so forward the
+  // incoming Authorization header rather than the internal service token.
+  return analyticsPost<QueryResult>(tenantId, '/query', spec, DEFAULT_TIMEOUT_MS, authHeader);
+}
+
 export interface PipelineSummary {
   totalDeals: number;
   totalValue: number;

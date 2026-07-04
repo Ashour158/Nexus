@@ -24,8 +24,12 @@ import type { CrmPrisma } from '../prisma.js';
 
 const EMAIL_TIMELINE_EVENTS = ['email.sent', 'email.received', 'email.replied'] as const;
 const PORTAL_TIMELINE_EVENTS = ['portal.engagement'] as const;
+// Telephony calls (comm-service CTI). `call.logged` is a distinct event only the
+// telephony channel emits, so projecting it never double-counts internal
+// activity.created rows.
+const CALL_TIMELINE_EVENTS = ['call.logged'] as const;
 
-type TimelineSource = 'email' | 'portal';
+type TimelineSource = 'email' | 'portal' | 'call';
 
 type EngagementEvent = {
   id?: string;
@@ -71,6 +75,7 @@ function isUniqueConstraintError(error: unknown): boolean {
 function timelineSourceFor(type: string): TimelineSource | null {
   if ((EMAIL_TIMELINE_EVENTS as readonly string[]).includes(type)) return 'email';
   if ((PORTAL_TIMELINE_EVENTS as readonly string[]).includes(type)) return 'portal';
+  if ((CALL_TIMELINE_EVENTS as readonly string[]).includes(type)) return 'call';
   return null;
 }
 
@@ -82,10 +87,17 @@ function timelineSourceFor(type: string): TimelineSource | null {
 function sourceEventId(event: EngagementEvent, type: string, payload: Record<string, unknown>, metadata: Record<string, unknown>): string | undefined {
   const explicit =
     stringField(metadata, 'sourceEventId') ??
+    stringField(payload, 'sourceEventId') ??
     event.id ??
     stringField(payload, 'eventId') ??
     stringField(payload, 'messageId');
   if (explicit) return explicit;
+
+  // Telephony calls key on the provider call SID.
+  if (type === 'call.logged') {
+    const sid = stringField(payload, 'providerCallSid') ?? stringField(payload, 'callSid');
+    if (sid) return `call:${sid}`;
+  }
 
   // Portal engagement has no natural event id — build one from its natural key.
   if (type === 'portal.engagement') {
@@ -109,6 +121,12 @@ function titleForEvent(type: string, payload: Record<string, unknown>): string {
       return 'Email replied';
     case 'portal.engagement':
       return stringField(payload, 'subject') ?? 'Portal engagement';
+    case 'call.logged': {
+      const direction = stringField(payload, 'direction');
+      const outcome = stringField(payload, 'outcome');
+      const dir = direction === 'inbound' ? 'Inbound call' : 'Outbound call';
+      return outcome ? `${dir} — ${outcome}` : dir;
+    }
     default:
       return type.replaceAll('.', ' ');
   }
@@ -135,6 +153,21 @@ function descriptionForEvent(type: string, payload: Record<string, unknown>): st
       action ? `Action: ${action}` : undefined,
       entityType ? `Entity: ${entityType}` : undefined,
       reason ? `Reason: ${reason}` : undefined,
+    ]
+      .filter(Boolean)
+      .join(' | ') || null;
+  }
+  if (type === 'call.logged') {
+    const direction = stringField(payload, 'direction');
+    const durationRaw = payload.durationSec;
+    const duration = typeof durationRaw === 'number' ? `${durationRaw}s` : undefined;
+    const to = stringField(payload, 'toNumber');
+    const from = stringField(payload, 'fromNumber');
+    return [
+      direction ? `Direction: ${direction}` : undefined,
+      duration ? `Duration: ${duration}` : undefined,
+      from ? `From: ${from}` : undefined,
+      to ? `To: ${to}` : undefined,
     ]
       .filter(Boolean)
       .join(' | ') || null;
@@ -187,9 +220,15 @@ export async function projectEngagementTimelineEvent(
   if (existing) return { status: 'duplicate', sourceEventId: sourceId };
 
   const actorId =
-    stringField(payload, 'actorId') ?? stringField(metadata, 'actorId') ?? stringField(payload, 'source') ?? 'system';
-  const occurredAt = stringField(payload, 'occurredAt') ?? event.occurredAt ?? new Date().toISOString();
-  const activityType = timelineSource === 'email' ? 'EMAIL' : 'NOTE';
+    stringField(payload, 'actorId') ??
+    stringField(metadata, 'actorId') ??
+    stringField(payload, 'agentUserId') ??
+    stringField(payload, 'source') ??
+    'system';
+  const occurredAt =
+    stringField(payload, 'occurredAt') ?? stringField(payload, 'endedAt') ?? event.occurredAt ?? new Date().toISOString();
+  const activityType =
+    timelineSource === 'email' ? 'EMAIL' : timelineSource === 'call' ? 'CALL' : 'NOTE';
 
   try {
     const activity = (await prisma.activity.create({
@@ -242,7 +281,7 @@ export async function projectEngagementTimelineEvent(
  */
 export async function startEngagementTimelineConsumer(prisma: CrmPrisma): Promise<NexusConsumer> {
   const consumer = new NexusConsumer('crm-service.engagement-timeline');
-  await consumer.subscribe([TOPICS.EMAILS, TOPICS.ACTIVITIES]);
+  await consumer.subscribe([TOPICS.EMAILS, TOPICS.ACTIVITIES, TOPICS.CALLS]);
 
   const handle = async (event: unknown): Promise<void> => {
     try {
@@ -253,7 +292,7 @@ export async function startEngagementTimelineConsumer(prisma: CrmPrisma): Promis
     }
   };
 
-  for (const eventType of [...EMAIL_TIMELINE_EVENTS, ...PORTAL_TIMELINE_EVENTS]) {
+  for (const eventType of [...EMAIL_TIMELINE_EVENTS, ...PORTAL_TIMELINE_EVENTS, ...CALL_TIMELINE_EVENTS]) {
     consumer.on(eventType, handle);
   }
 

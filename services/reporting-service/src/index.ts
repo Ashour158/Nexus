@@ -8,6 +8,7 @@ import { registerReportsRoutes } from './routes/reports.routes.js';
 import { registerSavedReportsRoutes } from './routes/saved-reports.routes.js';
 import { registerDashboardsRoutes } from './routes/dashboards.routes.js';
 import { registerFunnelRoutes } from './routes/funnel.routes.js';
+import { registerBiRoutes } from './routes/bi.routes.js';
 import { registerExportRoutes } from './routes/export.routes.js';
 import { startSnapshotScheduler } from './lib/snapshot.job.js';
 import { startScheduleRunner } from './lib/schedule-runner.js';
@@ -56,6 +57,7 @@ await startService(app, port, async (a) => {
   await registerSavedReportsRoutes(a, prisma);
   await registerDashboardsRoutes(a, prisma);
   await registerFunnelRoutes(a, prisma);
+  await registerBiRoutes(a, prisma);
   await registerExportRoutes(a, reports);
 
   // Start background jobs (non-blocking)

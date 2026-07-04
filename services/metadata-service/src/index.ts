@@ -8,6 +8,7 @@ import { registerCustomFieldsRoutes } from './routes/custom-fields.routes.js';
 import { registerTagsRoutes } from './routes/tags.routes.js';
 import { registerValidationRulesRoutes } from './routes/validation-rules.routes.js';
 import { registerCodingRoutes } from './routes/coding.routes.js';
+import { registerCustomModulesRoutes } from './routes/custom-modules.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 // REMOVED: Self-consuming sync consumer (anti-pattern). A service must not consume
 // its own events to update its own database — the write path already does that.
@@ -53,4 +54,5 @@ await startService(app, port, async () => {
   await registerTagsRoutes(app, prisma);
   await registerValidationRulesRoutes(app, prisma);
   await registerCodingRoutes(app, prisma);
+  await registerCustomModulesRoutes(app, prisma);
 });

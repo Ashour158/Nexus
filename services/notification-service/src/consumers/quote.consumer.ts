@@ -3,6 +3,7 @@ import type { InAppChannel } from '../channels/in-app.channel.js';
 import type { EmailChannel } from '../channels/email.channel.js';
 import type { SmsChannel } from '../channels/sms.channel.js';
 import type { PushChannel } from '../channels/push.channel.js';
+import type { WhatsAppChannel } from '../channels/whatsapp.channel.js';
 import { renderActionEmail } from '../channels/email.channel.js';
 
 interface QuoteConsumerDeps {
@@ -10,6 +11,7 @@ interface QuoteConsumerDeps {
   email: EmailChannel;
   sms: SmsChannel;
   push: PushChannel;
+  whatsapp: WhatsAppChannel;
   log: {
     info: (...args: unknown[]) => void;
     warn: (...args: unknown[]) => void;
@@ -18,12 +20,13 @@ interface QuoteConsumerDeps {
 }
 
 /**
- * Best-effort SMS + push fan-out. Channels are already guarded no-ops when
- * unconfigured; this isolates any failure so one channel can never block the
- * other or the consumer.
+ * Best-effort SMS + push + WhatsApp fan-out. Channels are already guarded no-ops
+ * when unconfigured; this isolates any failure so one channel can never block the
+ * other or the consumer. WhatsApp reuses the recipient's phone number and is only
+ * attempted when the channel is configured.
  */
 async function fanOutSmsPush(
-  deps: Pick<QuoteConsumerDeps, 'sms' | 'push' | 'log'>,
+  deps: Pick<QuoteConsumerDeps, 'sms' | 'push' | 'whatsapp' | 'log'>,
   target: { phone?: string; deviceToken?: string },
   msg: { title: string; body: string; actionUrl?: string }
 ): Promise<void> {
@@ -42,6 +45,11 @@ async function fanOutSmsPush(
             actionUrl: msg.actionUrl,
           })
           .catch((err) => deps.log.error({ err }, 'push fan-out failed'))
+      : Promise.resolve(),
+    target.phone && deps.whatsapp.isConfigured()
+      ? deps.whatsapp
+          .send({ to: target.phone, body: `${msg.title}: ${msg.body}` })
+          .catch((err) => deps.log.error({ err }, 'whatsapp fan-out failed'))
       : Promise.resolve(),
   ]);
 }

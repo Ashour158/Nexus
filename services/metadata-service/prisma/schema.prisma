@@ -195,6 +195,80 @@ model CodingSequence {
   @@index([tenantId, entityType])
 }
 
+// ─── Low-code platform layer (custom modules + Canvas layouts + records) ─────
+// Additive, tenant-scoped. Admins define custom objects with fields and page
+// layouts and store records for them, with FORMULA fields computed by the safe
+// (no-IO, no-eval) formula engine in src/services/formula-engine.ts.
+
+model CustomModule {
+  id          String   @id @default(cuid())
+  tenantId    String
+  apiName     String
+  label       String
+  pluralLabel String
+  description String?
+  icon        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, apiName])
+  @@index([tenantId])
+  @@unique([id, tenantId])
+}
+
+model CustomModuleField {
+  id           String   @id @default(cuid())
+  tenantId     String
+  moduleId     String
+  apiName      String
+  label        String
+  // TEXT|NUMBER|BOOLEAN|DATE|DATETIME|PICKLIST|MULTISELECT|EMAIL|PHONE|CURRENCY|FORMULA|LOOKUP
+  type         String
+  required     Boolean  @default(false)
+  unique       Boolean  @default(false)
+  options      Json?    // picklist / multiselect options
+  formula      String?  // for FORMULA type
+  lookupModule String?  // apiName of the referenced module (for LOOKUP)
+  defaultValue Json?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([tenantId, moduleId, apiName])
+  @@index([tenantId, moduleId])
+  @@unique([id, tenantId])
+}
+
+model CustomModuleLayout {
+  id        String   @id @default(cuid())
+  tenantId  String
+  moduleId  String
+  name      String
+  // Canvas sections: [{ title, columns, fields: [fieldApiName] }]
+  sections  Json     @default("[]")
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, moduleId])
+  @@unique([id, tenantId])
+}
+
+model CustomRecord {
+  id        String   @id @default(cuid())
+  tenantId  String
+  moduleId  String
+  // fieldApiName -> value
+  data      Json     @default("{}")
+  ownerId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, moduleId])
+  @@unique([id, tenantId])
+}
+
 model CodingAllocationLog {
   id               String   @id @default(cuid())
   tenantId         String

@@ -15,7 +15,12 @@ model Conversation {
   externalId    String
   state         ConversationState   @default(IDLE)
   contactId     String?
+  leadId        String?
   draftQuoteId  String?
+  // Web live-chat visitor identity (channel WEB). Null for messaging channels.
+  visitorName   String?
+  visitorEmail  String?
+  sessionToken  String?             @unique
   context       Json                @default("{}")
   lastMessageAt DateTime            @default(now())
   createdAt     DateTime            @default(now())
@@ -42,6 +47,7 @@ model ConversationMessage {
 enum Channel {
   WHATSAPP
   TELEGRAM
+  WEB
 }
 
 enum Direction {

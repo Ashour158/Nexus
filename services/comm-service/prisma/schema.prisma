@@ -124,6 +124,35 @@ model OutboxMessage {
   @@index([tenantId])
 }
 
+/// CTI telephony call log (click-to-call + automatic call logging).
+/// One row per placed/received call; updated by the provider status webhook.
+model CallLog {
+  id              String    @id @default(cuid())
+  tenantId        String
+  provider        String    @default("twilio")
+  providerCallSid String?
+  direction       String    @default("OUTBOUND")
+  fromNumber      String
+  toNumber        String
+  agentUserId     String
+  contactId       String?
+  dealId          String?
+  accountId       String?
+  status          String    @default("INITIATED")
+  outcome         String?
+  durationSec     Int?
+  recordingUrl    String?
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, contactId])
+  @@index([providerCallSid])
+  @@unique([id, tenantId])
+}
+
 /// WhatsApp Business API outbound/inbound thread (Prompt 32).
 model WhatsAppMessage {
   id          String   @id @default(cuid())

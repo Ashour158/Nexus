@@ -3,6 +3,7 @@ import type { JwtPayload } from '@nexus/shared-types';
 import { PERMISSIONS, requirePermission, ValidationError } from '@nexus/service-utils';
 import { CreateApiKeySchema, IdParamSchema, PaginationSchema } from '@nexus/validation';
 import type { AuthPrisma } from '../prisma.js';
+import type { UnifiedAuditLogger } from '../lib/unified-audit.js';
 import { toPaginatedResult } from '@nexus/shared-types';
 import { randomToken, sha256Hex } from '../lib/crypto-utils.js';
 
@@ -11,7 +12,8 @@ import { randomToken, sha256Hex } from '../lib/crypto-utils.js';
  */
 export async function registerApiKeysRoutes(
   app: FastifyInstance,
-  prisma: AuthPrisma
+  prisma: AuthPrisma,
+  unifiedAudit: UnifiedAuditLogger
 ): Promise<void> {
   await app.register(
     async (r) => {
@@ -72,6 +74,16 @@ export async function registerApiKeysRoutes(
               userAgent: request.headers['user-agent'],
             },
           });
+          void unifiedAudit.log({
+            tenantId: jwt.tenantId,
+            actorId: jwt.sub,
+            action: 'CREATE',
+            resource: 'ApiKey',
+            resourceId: row.id,
+            metadata: { newValue: { name: row.name, keyPrefix } },
+            ipAddress: request.ip,
+            userAgent: request.headers['user-agent'],
+          });
           return reply.code(201).send({
             success: true,
             data: { ...row, key: raw },
@@ -96,6 +108,15 @@ export async function registerApiKeysRoutes(
               ipAddress: request.ip,
               userAgent: request.headers['user-agent'],
             },
+          });
+          void unifiedAudit.log({
+            tenantId: jwt.tenantId,
+            actorId: jwt.sub,
+            action: 'DELETE',
+            resource: 'ApiKey',
+            resourceId: id,
+            ipAddress: request.ip,
+            userAgent: request.headers['user-agent'],
           });
           return reply.send({ success: true, data: { id } });
         }

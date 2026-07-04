@@ -1,10 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { ValidationError, UnauthorizedError, requirePermission, PERMISSIONS } from '@nexus/service-utils';
 import type { AuthPrisma } from '../prisma.js';
+import type { UnifiedAuditLogger } from '../lib/unified-audit.js';
 
 export async function registerIpRestrictionRoutes(
   app: FastifyInstance,
-  prisma: AuthPrisma
+  prisma: AuthPrisma,
+  unifiedAudit: UnifiedAuditLogger
 ): Promise<void> {
   await app.register(
     async (r) => {
@@ -41,6 +43,16 @@ export async function registerIpRestrictionRoutes(
             description: body.description,
           },
         });
+        void unifiedAudit.log({
+          tenantId: user.tenantId,
+          actorId: user.sub,
+          action: 'CREATE',
+          resource: 'IpRestriction',
+          resourceId: item.id,
+          metadata: { newValue: { type: body.type, cidr: body.cidr, description: body.description } },
+          ipAddress: request.ip,
+          userAgent: request.headers['user-agent'],
+        });
         return reply.status(201).send({ success: true, data: item });
       });
 
@@ -57,6 +69,16 @@ export async function registerIpRestrictionRoutes(
           data: body,
         });
         if (item.count === 0) throw new ValidationError('IP restriction not found');
+        void unifiedAudit.log({
+          tenantId: user.tenantId,
+          actorId: user.sub,
+          action: 'UPDATE',
+          resource: 'IpRestriction',
+          resourceId: id,
+          metadata: { newValue: body },
+          ipAddress: request.ip,
+          userAgent: request.headers['user-agent'],
+        });
         return reply.send({ success: true, data: { updated: true } });
       });
 
@@ -67,6 +89,15 @@ export async function registerIpRestrictionRoutes(
 
         const { id } = request.params as { id: string };
         await prisma.ipRestriction.deleteMany({ where: { id, tenantId: user.tenantId } });
+        void unifiedAudit.log({
+          tenantId: user.tenantId,
+          actorId: user.sub,
+          action: 'DELETE',
+          resource: 'IpRestriction',
+          resourceId: id,
+          ipAddress: request.ip,
+          userAgent: request.headers['user-agent'],
+        });
         return reply.send({ success: true, data: { deleted: true } });
       });
     },

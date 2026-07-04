@@ -10,6 +10,7 @@ import {
   UserListQuerySchema,
 } from '@nexus/validation';
 import type { AuthPrisma } from '../prisma.js';
+import type { UnifiedAuditLogger } from '../lib/unified-audit.js';
 import { createUsersService } from '../services/users.service.js';
 
 /**
@@ -17,7 +18,8 @@ import { createUsersService } from '../services/users.service.js';
  */
 export async function registerUsersRoutes(
   app: FastifyInstance,
-  prisma: AuthPrisma
+  prisma: AuthPrisma,
+  unifiedAudit: UnifiedAuditLogger
 ): Promise<void> {
   const users = createUsersService(prisma);
 
@@ -91,6 +93,16 @@ export async function registerUsersRoutes(
               ipAddress: request.ip,
               userAgent: request.headers['user-agent'],
             },
+          });
+          void unifiedAudit.log({
+            tenantId: jwt.tenantId,
+            actorId: jwt.sub,
+            action: 'UPDATE',
+            resource: 'UserRoles',
+            resourceId: id,
+            metadata: { newValue: { roleIds: parsed.data.roleIds } },
+            ipAddress: request.ip,
+            userAgent: request.headers['user-agent'],
           });
           return reply.send({ success: true, data: row });
         }

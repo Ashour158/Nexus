@@ -13,6 +13,7 @@ import { loginWithKeycloak, loginWithPassword, refreshTokens, revokeSession } fr
 import { z } from 'zod';
 import type { JwksKeyStore } from '../lib/jwt.js';
 import type { NexusProducer } from '@nexus/kafka';
+import type { UnifiedAuditLogger } from '../lib/unified-audit.js';
 import { setKeycloakUserPassword } from '../lib/keycloak-admin.js';
 
 const PasswordLoginSchema = z.object({
@@ -27,7 +28,8 @@ export async function registerAuthRoutes(
   app: FastifyInstance,
   prisma: AuthPrisma,
   keyStore: JwksKeyStore,
-  producer: NexusProducer
+  producer: NexusProducer,
+  unifiedAudit: UnifiedAuditLogger
 ): Promise<void> {
   void producer;
   await app.register(
@@ -72,6 +74,14 @@ export async function registerAuthRoutes(
                   ipAddress: request.ip,
                   userAgent: request.headers['user-agent'] ?? null,
                 },
+              });
+              void unifiedAudit.log({
+                tenantId: claims.tenantId,
+                actorId: claims.sub,
+                action: 'auth.login',
+                resource: 'session',
+                ipAddress: request.ip,
+                userAgent: request.headers['user-agent'],
               });
             }
           }

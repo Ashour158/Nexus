@@ -32,7 +32,7 @@ function createMockPrisma() {
 
 function createTestApp(prisma: ReturnType<typeof createMockPrisma>, keyStore: JwksKeyStore) {
   const app = Fastify();
-  registerAuthRoutes(app, prisma as any, keyStore, null as any);
+  registerAuthRoutes(app, prisma as any, keyStore, null as any, { log: async () => {} } as any);
   return app;
 }
 

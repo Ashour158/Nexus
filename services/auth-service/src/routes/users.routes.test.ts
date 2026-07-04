@@ -33,7 +33,7 @@ function createTestApp(prisma: ReturnType<typeof createMockPrisma>) {
   app.addHook('preHandler', async (request) => {
     (request as any).user = { tenantId: 'ten_test', sub: 'usr_test', email: 'test@example.com', roles: ['ADMIN'], permissions: ['*'] };
   });
-  registerUsersRoutes(app, prisma as any);
+  registerUsersRoutes(app, prisma as any, { log: async () => {} } as any);
   return app;
 }
 

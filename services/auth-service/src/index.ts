@@ -13,6 +13,7 @@ import {
 import rateLimit from '@fastify/rate-limit';
 import type { RouteOptions } from 'fastify';
 import { NexusProducer } from '@nexus/kafka';
+import { UnifiedAuditLogger } from './lib/unified-audit.js';
 import { PrismaClient } from '../../../node_modules/.prisma/auth-client/index.js';
 import { buildDatabaseUrl } from '@nexus/service-utils/db';
 import { createAuthPrisma } from './prisma.js';
@@ -37,6 +38,10 @@ const prismaHealth = new PrismaClient({
 });
 const prisma = createAuthPrisma();
 const producer = new NexusProducer('auth-service');
+// Shared best-effort logger to the unified audit stream (TOPICS.AUDIT). Reuses
+// the connected `producer` above, so it shares the producer's connect/disconnect
+// lifecycle (guarded below) — no separate Kafka connection is opened.
+const unifiedAudit = new UnifiedAuditLogger(producer);
 
 const keyStore = new JwksKeyStore({ rotationDays: Number(process.env.JWT_ROTATION_DAYS ?? 90) });
 
@@ -151,7 +156,7 @@ app.addHook('preHandler', async (request, reply) => {
   }
 });
 
-await registerAllRoutes(app, prisma, producer, keyStore);
+await registerAllRoutes(app, prisma, producer, keyStore, unifiedAudit);
 await registerGraphQL(app, prisma, keyStore);
 
 await startService(app, port, async () => {

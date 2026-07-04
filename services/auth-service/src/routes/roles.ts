@@ -10,6 +10,7 @@ import {
 } from '@nexus/service-utils';
 import { CreateRoleSchema, IdParamSchema, PaginationSchema, UpdateRoleSchema } from '@nexus/validation';
 import type { AuthPrisma } from '../prisma.js';
+import type { UnifiedAuditLogger } from '../lib/unified-audit.js';
 import { toPaginatedResult } from '@nexus/shared-types';
 
 function allStaticPermissions(): string[] {
@@ -29,7 +30,8 @@ function allStaticPermissions(): string[] {
  */
 export async function registerRolesRoutes(
   app: FastifyInstance,
-  prisma: AuthPrisma
+  prisma: AuthPrisma,
+  unifiedAudit: UnifiedAuditLogger
 ): Promise<void> {
   await app.register(
     async (r) => {
@@ -92,6 +94,16 @@ export async function registerRolesRoutes(
             userAgent: request.headers['user-agent'],
           },
         });
+        void unifiedAudit.log({
+          tenantId: jwt.tenantId,
+          actorId: jwt.sub,
+          action: 'CREATE',
+          resource: 'Role',
+          resourceId: role.id,
+          metadata: { newValue: parsed.data },
+          ipAddress: request.ip,
+          userAgent: request.headers['user-agent'],
+        });
         return reply.code(201).send({ success: true, data: role });
       });
 
@@ -131,6 +143,16 @@ export async function registerRolesRoutes(
             userAgent: request.headers['user-agent'],
           },
         });
+        void unifiedAudit.log({
+          tenantId: jwt.tenantId,
+          actorId: jwt.sub,
+          action: 'UPDATE',
+          resource: 'Role',
+          resourceId: id,
+          metadata: { newValue: parsed.data },
+          ipAddress: request.ip,
+          userAgent: request.headers['user-agent'],
+        });
         return reply.send({ success: true, data: role });
       });
 
@@ -153,6 +175,15 @@ export async function registerRolesRoutes(
             ipAddress: request.ip,
             userAgent: request.headers['user-agent'],
           },
+        });
+        void unifiedAudit.log({
+          tenantId: jwt.tenantId,
+          actorId: jwt.sub,
+          action: 'DELETE',
+          resource: 'Role',
+          resourceId: id,
+          ipAddress: request.ip,
+          userAgent: request.headers['user-agent'],
         });
         return reply.send({ success: true, data: { id } });
       });

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { NexusProducer } from '@nexus/kafka';
 import type { AuthPrisma } from '../prisma.js';
 import type { JwksKeyStore } from '../lib/jwt.js';
+import type { UnifiedAuditLogger } from '../lib/unified-audit.js';
 import { registerApiKeysRoutes } from './api-keys.js';
 import { registerAuditLogsRoutes } from './audit-logs.js';
 import { registerAuthRoutes } from './auth.js';
@@ -23,13 +24,14 @@ export async function registerAllRoutes(
   app: FastifyInstance,
   prisma: AuthPrisma,
   producer: NexusProducer,
-  keyStore: JwksKeyStore
+  keyStore: JwksKeyStore,
+  unifiedAudit: UnifiedAuditLogger
 ): Promise<void> {
-  await registerAuthRoutes(app, prisma, keyStore, producer);
+  await registerAuthRoutes(app, prisma, keyStore, producer, unifiedAudit);
   await registerMfaRoutes(app, prisma, keyStore);
-  await registerUsersRoutes(app, prisma);
-  await registerRolesRoutes(app, prisma);
-  await registerApiKeysRoutes(app, prisma);
+  await registerUsersRoutes(app, prisma, unifiedAudit);
+  await registerRolesRoutes(app, prisma, unifiedAudit);
+  await registerApiKeysRoutes(app, prisma, unifiedAudit);
   await registerAuditLogsRoutes(app, prisma);
   await registerTenantsRoutes(app, prisma);
   await registerSsoRoutes(app, prisma);
@@ -37,5 +39,5 @@ export async function registerAllRoutes(
   await registerDataOwnershipRoutes(app, prisma, producer);
   await registerProfileRoutes(app, prisma);
   await registerPermissionsRoutes(app, prisma);
-  await registerIpRestrictionRoutes(app, prisma);
+  await registerIpRestrictionRoutes(app, prisma, unifiedAudit);
 }

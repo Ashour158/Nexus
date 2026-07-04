@@ -64,6 +64,14 @@ const BASE_URLS: Record<string, string> = {
     process.env.NEXT_PUBLIC_PLANNING_URL ?? 'http://localhost:3020/api/v1',
   reporting:
     process.env.NEXT_PUBLIC_REPORTING_URL ?? 'http://localhost:3021/api/v1',
+  // Saved BI definitions (dashboards + reports). In dev the browser cannot
+  // reach reporting-service (:3021) directly, so route through the Next BFF
+  // proxy at /api/bi (see app/api/bi/[[...path]]). In prod use the service or
+  // an explicit env URL.
+  bi:
+    (DEV_BFF_URL ? `${DEV_BFF_URL}/bi` : undefined) ??
+    process.env.NEXT_PUBLIC_BI_URL ??
+    'http://localhost:3021/api/v1/bi',
   portal:
     process.env.NEXT_PUBLIC_PORTAL_URL ?? 'http://localhost:3022',
   knowledge:
@@ -234,6 +242,7 @@ export const apiClients = {
   territory: makeTypedClient(createApiClient(BASE_URLS.territory)),
   planning: makeTypedClient(createApiClient(BASE_URLS.planning)),
   reporting: makeTypedClient(createApiClient(BASE_URLS.reporting)),
+  bi: makeTypedClient(createApiClient(BASE_URLS.bi)),
   portal: makeTypedClient(createApiClient(BASE_URLS.portal)),
   knowledge: makeTypedClient(createApiClient(BASE_URLS.knowledge)),
   incentive: makeTypedClient(createApiClient(BASE_URLS.incentive)),

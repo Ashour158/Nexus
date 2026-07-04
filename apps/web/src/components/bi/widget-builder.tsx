@@ -1,0 +1,466 @@
+'use client';
+
+import { type ReactElement, useEffect, useMemo, useState } from 'react';
+import { Plus, Trash2, X } from 'lucide-react';
+import { cn } from '@/lib/cn';
+import {
+  AGG_FNS,
+  CHART_TYPES,
+  DATASETS,
+  FILTER_OPS,
+  TIME_GRAINS,
+  type AggFn,
+  type ChartType,
+  type Dataset,
+  type FilterOp,
+  type ReportSpec,
+  type ReportSpecFilter,
+  type TimeGrain,
+} from '@/lib/bi-types';
+import { useFieldCatalog, useQueryPreview } from '@/hooks/use-bi';
+import { WidgetChart } from './widget-chart';
+
+export interface WidgetDraft {
+  title: string;
+  chartType: ChartType;
+  spec: ReportSpec;
+}
+
+interface MeasureRow {
+  field: string;
+  agg: AggFn;
+}
+interface DimensionRow {
+  field: string;
+  timeGrain?: TimeGrain;
+}
+interface FilterRow {
+  field: string;
+  op: FilterOp;
+  value: string;
+}
+
+const selectCls =
+  'rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500';
+const inputCls =
+  'rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500';
+
+export function WidgetBuilder({
+  initial,
+  onCancel,
+  onSave,
+  saving,
+}: {
+  initial?: WidgetDraft;
+  onCancel: () => void;
+  onSave: (draft: WidgetDraft) => void;
+  saving?: boolean;
+}): ReactElement {
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [dataset, setDataset] = useState<Dataset>(initial?.spec.dataset ?? 'deals');
+  const [chartType, setChartType] = useState<ChartType>(initial?.chartType ?? 'bar');
+  const [measures, setMeasures] = useState<MeasureRow[]>(
+    initial?.spec.measures.map((m) => ({ field: m.field, agg: m.agg })) ?? []
+  );
+  const [dimensions, setDimensions] = useState<DimensionRow[]>(
+    initial?.spec.dimensions.map((d) => ({ field: d.field, timeGrain: d.timeGrain })) ?? []
+  );
+  const [filters, setFilters] = useState<FilterRow[]>(
+    initial?.spec.filters?.map((f) => ({ field: f.field, op: f.op, value: String(f.value ?? '') })) ?? []
+  );
+  const [limit, setLimit] = useState<string>(
+    initial?.spec.limit ? String(initial.spec.limit) : ''
+  );
+
+  const { data: catalog, isLoading: catalogLoading } = useFieldCatalog(dataset);
+
+  // Reset field selections when dataset changes (unless restoring initial for same dataset).
+  useEffect(() => {
+    if (initial && initial.spec.dataset === dataset) return;
+    setMeasures([]);
+    setDimensions([]);
+    setFilters([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataset]);
+
+  const spec: ReportSpec | null = useMemo(() => {
+    const validMeasures = measures.filter((m) => m.field);
+    if (validMeasures.length === 0) return null;
+    const built: ReportSpec = {
+      dataset,
+      measures: validMeasures.map((m) => ({
+        field: m.field,
+        agg: m.agg,
+        alias: `${m.agg}_${m.field}`,
+      })),
+      dimensions: dimensions
+        .filter((d) => d.field)
+        .map((d) => ({ field: d.field, ...(d.timeGrain ? { timeGrain: d.timeGrain } : {}) })),
+      filters: filters
+        .filter((f) => f.field && f.value !== '')
+        .map<ReportSpecFilter>((f) => ({ field: f.field, op: f.op, value: f.value })),
+    };
+    if (limit && Number(limit) > 0) built.limit = Number(limit);
+    return built;
+  }, [dataset, measures, dimensions, filters, limit]);
+
+  const preview = useQueryPreview(spec, Boolean(spec));
+
+  const canSave = Boolean(spec) && title.trim().length > 0;
+
+  const measureOpts = catalog?.measures ?? [];
+  const dimensionOpts = catalog?.dimensions ?? [];
+  const filterOpts = catalog?.filters ?? [];
+
+  function dimIsDate(field: string) {
+    return dimensionOpts.find((d) => d.key === field)?.type === 'date';
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+        <header className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <h2 className="text-lg font-bold text-slate-900">
+            {initial ? 'Edit widget' : 'Add widget'}
+          </h2>
+          <button onClick={onCancel} className="text-slate-400 hover:text-slate-700" title="Close">
+            <X className="h-5 w-5" />
+          </button>
+        </header>
+
+        <div className="grid flex-1 grid-cols-1 gap-0 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          {/* Config panel */}
+          <div className="space-y-5 border-r border-slate-100 p-6">
+            <Field label="Title">
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Deals by stage"
+                className={cn(inputCls, 'w-full')}
+              />
+            </Field>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Dataset">
+                <select
+                  value={dataset}
+                  onChange={(e) => setDataset(e.target.value as Dataset)}
+                  className={cn(selectCls, 'w-full')}
+                >
+                  {DATASETS.map((d) => (
+                    <option key={d.value} value={d.value}>
+                      {d.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Chart type">
+                <select
+                  value={chartType}
+                  onChange={(e) => setChartType(e.target.value as ChartType)}
+                  className={cn(selectCls, 'w-full')}
+                >
+                  {CHART_TYPES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+
+            {catalogLoading ? (
+              <p className="text-sm text-slate-400">Loading fields…</p>
+            ) : (
+              <>
+                {/* Measures */}
+                <Section
+                  title="Measures"
+                  onAdd={() =>
+                    setMeasures((prev) => [
+                      ...prev,
+                      { field: measureOpts[0]?.key ?? '', agg: 'sum' },
+                    ])
+                  }
+                >
+                  {measures.length === 0 && (
+                    <p className="text-xs text-slate-400">Add at least one measure.</p>
+                  )}
+                  {measures.map((m, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <select
+                        value={m.agg}
+                        onChange={(e) =>
+                          setMeasures((prev) =>
+                            prev.map((row, i) =>
+                              i === index ? { ...row, agg: e.target.value as AggFn } : row
+                            )
+                          )
+                        }
+                        className={selectCls}
+                      >
+                        {AGG_FNS.map((a) => (
+                          <option key={a.value} value={a.value}>
+                            {a.label}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={m.field}
+                        onChange={(e) =>
+                          setMeasures((prev) =>
+                            prev.map((row, i) =>
+                              i === index ? { ...row, field: e.target.value } : row
+                            )
+                          )
+                        }
+                        className={cn(selectCls, 'flex-1')}
+                      >
+                        {measureOpts.map((f) => (
+                          <option key={f.key} value={f.key}>
+                            {f.label}
+                          </option>
+                        ))}
+                      </select>
+                      <RemoveBtn onClick={() => setMeasures((p) => p.filter((_, i) => i !== index))} />
+                    </div>
+                  ))}
+                </Section>
+
+                {/* Dimensions */}
+                <Section
+                  title="Dimensions (group by)"
+                  onAdd={() =>
+                    setDimensions((prev) => [...prev, { field: dimensionOpts[0]?.key ?? '' }])
+                  }
+                >
+                  {dimensions.length === 0 && (
+                    <p className="text-xs text-slate-400">
+                      Optional. No dimension = single aggregate value.
+                    </p>
+                  )}
+                  {dimensions.map((d, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <select
+                        value={d.field}
+                        onChange={(e) =>
+                          setDimensions((prev) =>
+                            prev.map((row, i) =>
+                              i === index ? { ...row, field: e.target.value } : row
+                            )
+                          )
+                        }
+                        className={cn(selectCls, 'flex-1')}
+                      >
+                        {dimensionOpts.map((f) => (
+                          <option key={f.key} value={f.key}>
+                            {f.label}
+                          </option>
+                        ))}
+                      </select>
+                      {dimIsDate(d.field) && (
+                        <select
+                          value={d.timeGrain ?? ''}
+                          onChange={(e) =>
+                            setDimensions((prev) =>
+                              prev.map((row, i) =>
+                                i === index
+                                  ? {
+                                      ...row,
+                                      timeGrain: (e.target.value || undefined) as
+                                        | TimeGrain
+                                        | undefined,
+                                    }
+                                  : row
+                              )
+                            )
+                          }
+                          className={selectCls}
+                        >
+                          <option value="">(raw)</option>
+                          {TIME_GRAINS.map((g) => (
+                            <option key={g.value} value={g.value}>
+                              {g.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      <RemoveBtn
+                        onClick={() => setDimensions((p) => p.filter((_, i) => i !== index))}
+                      />
+                    </div>
+                  ))}
+                </Section>
+
+                {/* Filters */}
+                <Section
+                  title="Filters"
+                  onAdd={() =>
+                    setFilters((prev) => [
+                      ...prev,
+                      { field: filterOpts[0]?.key ?? '', op: 'eq', value: '' },
+                    ])
+                  }
+                >
+                  {filters.length === 0 && (
+                    <p className="text-xs text-slate-400">Optional.</p>
+                  )}
+                  {filters.map((f, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <select
+                        value={f.field}
+                        onChange={(e) =>
+                          setFilters((prev) =>
+                            prev.map((row, i) =>
+                              i === index ? { ...row, field: e.target.value } : row
+                            )
+                          )
+                        }
+                        className={cn(selectCls, 'flex-1')}
+                      >
+                        {filterOpts.map((fo) => (
+                          <option key={fo.key} value={fo.key}>
+                            {fo.label}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={f.op}
+                        onChange={(e) =>
+                          setFilters((prev) =>
+                            prev.map((row, i) =>
+                              i === index ? { ...row, op: e.target.value as FilterOp } : row
+                            )
+                          )
+                        }
+                        className={selectCls}
+                      >
+                        {FILTER_OPS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        value={f.value}
+                        onChange={(e) =>
+                          setFilters((prev) =>
+                            prev.map((row, i) =>
+                              i === index ? { ...row, value: e.target.value } : row
+                            )
+                          )
+                        }
+                        placeholder="value"
+                        className={cn(inputCls, 'w-24')}
+                      />
+                      <RemoveBtn onClick={() => setFilters((p) => p.filter((_, i) => i !== index))} />
+                    </div>
+                  ))}
+                </Section>
+
+                <Field label="Row limit (optional)">
+                  <input
+                    value={limit}
+                    onChange={(e) => setLimit(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="e.g. 10"
+                    className={cn(inputCls, 'w-28')}
+                  />
+                </Field>
+              </>
+            )}
+          </div>
+
+          {/* Preview panel */}
+          <div className="space-y-3 p-6">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Live preview
+            </h3>
+            <div className="min-h-[280px] rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+              {!spec ? (
+                <div className="flex h-[260px] items-center justify-center text-sm text-slate-400">
+                  Add a measure to preview
+                </div>
+              ) : preview.isLoading ? (
+                <div className="flex h-[260px] items-center justify-center text-sm text-slate-400">
+                  Running query…
+                </div>
+              ) : preview.error ? (
+                <div className="flex h-[260px] items-center justify-center text-center text-sm text-rose-600">
+                  {(preview.error as Error).message || 'Query failed'}
+                </div>
+              ) : preview.data ? (
+                <WidgetChart chartType={chartType} result={preview.data} height={240} />
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <footer className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
+          <button
+            onClick={onCancel}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            disabled={!canSave || saving}
+            onClick={() => spec && onSave({ title: title.trim(), chartType, spec })}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : initial ? 'Save changes' : 'Add widget'}
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }): ReactElement {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function Section({
+  title,
+  onAdd,
+  children,
+}: {
+  title: string;
+  onAdd: () => void;
+  children: React.ReactNode;
+}): ReactElement {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          {title}
+        </span>
+        <button
+          onClick={onAdd}
+          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50"
+        >
+          <Plus className="h-3.5 w-3.5" /> Add
+        </button>
+      </div>
+      <div className="space-y-2">{children}</div>
+    </div>
+  );
+}
+
+function RemoveBtn({ onClick }: { onClick: () => void }): ReactElement {
+  return (
+    <button
+      onClick={onClick}
+      className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+      title="Remove"
+    >
+      <Trash2 className="h-4 w-4" />
+    </button>
+  );
+}

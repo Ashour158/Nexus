@@ -109,6 +109,8 @@ const LEGACY_NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/reports', label: 'Reports', icon: FileText },
       { href: '/analytics', label: 'Analytics', icon: BarChart2 },
+      { href: '/analytics/dashboards', label: 'Dashboards', icon: LayoutDashboard },
+      { href: '/analytics/reports/builder', label: 'Report Builder', icon: BarChart2 },
       { href: '/analytics/win-loss', label: 'Win / Loss', icon: CheckSquare },
       { href: '/analytics/competitors', label: 'Competitors', icon: ShieldCheck },
     ],

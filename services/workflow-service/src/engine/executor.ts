@@ -307,9 +307,9 @@ export class WorkflowExecutor {
       case 'APPROVAL_REQUEST':
         return handleApprovalRequestNode(node, context);
       case 'VALIDATION_RULE':
-        return handleValidationRuleNode(node, context);
+        return handleValidationRuleNode(node, context, edges);
       case 'SLA_CHECK':
-        return handleSlaCheckNode(node, context);
+        return handleSlaCheckNode(node, context, edges);
       default:
         throw new Error(`Unsupported workflow node type: ${String(node.type)}`);
     }

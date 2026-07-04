@@ -1,4 +1,4 @@
-import type { ExecutionContext, NodeResult, WorkflowNode } from '../types.js';
+import type { ExecutionContext, NodeResult, WorkflowEdge, WorkflowNode } from '../types.js';
 
 /**
  * VALIDATION_RULE node — calls blueprint-service to validate a stage transition
@@ -9,10 +9,39 @@ import type { ExecutionContext, NodeResult, WorkflowNode } from '../types.js';
  *   - fromStageId: string
  *   - toStageId: string
  *   - dealId: string
+ *
+ * Branching:
+ *   After computing `valid`, the node routes down an outgoing edge whose
+ *   `condition` label matches the result:
+ *     - valid   → edge labelled 'valid' | 'true' | 'pass' | 'yes'
+ *     - invalid → edge labelled 'invalid' | 'false' | 'fail' | 'no'
+ *   When the workflow does not model branches (no matching labelled edge),
+ *   `nextNodeId` is left `undefined` so the executor follows the default
+ *   unconditional edge — preserving the previous linear behaviour.
+ *   Fail-open: on service/network errors we treat the transition as valid and
+ *   select the safe edge.
  */
+function selectValidationEdge(
+  nodeId: string,
+  edges: WorkflowEdge[],
+  valid: boolean
+): string | undefined {
+  const outgoing = edges.filter((e) => e.from === nodeId);
+  if (outgoing.length === 0) return undefined;
+  const wantLabels = valid
+    ? ['valid', 'true', 'pass', 'yes', 'ok']
+    : ['invalid', 'false', 'fail', 'no'];
+  const labelled = outgoing.find(
+    (e) => typeof e.condition === 'string' && wantLabels.includes(e.condition.trim().toLowerCase())
+  );
+  // Only override the default flow when the workflow actually models this branch.
+  return labelled?.to ?? undefined;
+}
+
 export async function handleValidationRuleNode(
   node: WorkflowNode,
-  context: ExecutionContext
+  context: ExecutionContext,
+  edges: WorkflowEdge[] = []
 ): Promise<NodeResult> {
   const cfg = (node.config ?? {}) as {
     pipelineId?: string;
@@ -47,15 +76,16 @@ export async function handleValidationRuleNode(
       // Fail-open: if blueprint service is unavailable, allow the transition
       if (res.status >= 500) {
         return {
-          nextNodeId: undefined,
+          nextNodeId: selectValidationEdge(node.id, edges, true),
           output: {
             valid: true,
             warning: `Blueprint service unavailable (${res.status}); allowing transition`,
           },
         };
       }
+      // A 4xx means the transition is genuinely invalid → take the invalid edge.
       return {
-        nextNodeId: undefined,
+        nextNodeId: selectValidationEdge(node.id, edges, false),
         output: {
           valid: false,
           error: text,
@@ -64,17 +94,19 @@ export async function handleValidationRuleNode(
     }
 
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    // Respect an explicit `valid: false` from the service; default to valid.
+    const valid = data.valid !== false;
     return {
-      nextNodeId: undefined,
+      nextNodeId: selectValidationEdge(node.id, edges, valid),
       output: {
-        valid: true,
+        valid,
         data,
       },
     };
   } catch (err) {
     // Fail-open on network errors
     return {
-      nextNodeId: undefined,
+      nextNodeId: selectValidationEdge(node.id, edges, true),
       output: {
         valid: true,
         warning: err instanceof Error ? err.message : 'Blueprint validation failed; allowing transition',

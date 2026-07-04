@@ -56,6 +56,11 @@ model ApprovalStep {
   comment    String?
   actionedAt DateTime?
   createdAt  DateTime        @default(now())
+  // Quorum config for the level this step belongs to (all steps sharing the
+  // same `order` form one parallel level and carry the same values). Defaults
+  // preserve legacy behavior: ALL with one step per level == all-must-approve.
+  quorumMode QuorumMode      @default(ALL)
+  quorumSize Int?
 
   @@index([requestId])
   @@index([approverId, status])
@@ -75,6 +80,12 @@ enum StepStatus {
   REJECTED
   SKIPPED
   DELEGATED
+}
+
+enum QuorumMode {
+  ALL
+  ANY
+  N_OF_M
 }
 
 model OutboxMessage {

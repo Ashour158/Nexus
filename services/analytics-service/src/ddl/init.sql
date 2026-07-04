@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS deal_events (
   currency     String,
   base_amount  Decimal64(2) DEFAULT 0,
   base_currency String DEFAULT '',
+  probability  Float64 DEFAULT 0,
   occurred_at  DateTime64(3)
 ) ENGINE = MergeTree()
 ORDER BY (tenant_id, occurred_at)

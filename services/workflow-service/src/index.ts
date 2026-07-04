@@ -20,6 +20,7 @@ import { startBranchConsumer } from './consumers/branch.consumer.js';
 import { startApprovalConsumer } from './consumers/approval.consumer.js';
 import { startGdprConsumer } from './consumers/gdpr.consumer.js';
 import { startSlaScanner } from './services/sla-scanner.js';
+import { startScheduleTrigger } from './services/schedule-trigger.js';
 import { createExecutionsService } from './services/executions.service.js';
 import { registerGraphQL } from './graphql/index.js';
 
@@ -107,6 +108,10 @@ setInterval(async () => {
 
 // Scan active SLA definitions for breaches (poll every 60 s)
 startSlaScanner(prisma, app.log, 60_000);
+
+// Fire schedule-triggered workflows (trigger === 'schedule') on a timer.
+// Tick interval configurable via WORKFLOW_SCHEDULE_TICK_MS (default 60 s).
+startScheduleTrigger(prisma, producer, app.log);
 
 await registerGraphQL(app, prisma);
 

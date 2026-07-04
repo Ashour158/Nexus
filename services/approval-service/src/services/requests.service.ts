@@ -3,12 +3,74 @@ import type { ApprovalPrisma } from '../prisma.js';
 import type { Prisma } from '../../../../node_modules/.prisma/approval-client/index.js';
 import { resolveManager, resolveRoleApprover } from './approver-resolver.js';
 
+type QuorumMode = 'ALL' | 'ANY' | 'N_OF_M';
+
 interface PolicyStep {
   order: number;
   approverType: 'USER' | 'ROLE' | 'MANAGER';
   approverId?: string;
   role?: string;
   canDelegate?: boolean;
+  // Quorum config for the level (all PolicySteps sharing the same `order`).
+  // Optional: when unset the level behaves as ALL (legacy all-must-approve).
+  quorumMode?: QuorumMode;
+  quorumSize?: number;
+}
+
+// A materialized step carries the level's quorum config. Only the fields the
+// level logic needs are typed here so it works against Prisma rows.
+interface LevelStep {
+  order: number;
+  status: string;
+  quorumMode?: string | null;
+  quorumSize?: number | null;
+}
+
+type LevelOutcome = 'PENDING' | 'SATISFIED' | 'FAILED';
+
+/**
+ * Normalize a level's quorum config from its steps. All steps at an order share
+ * the same config; we read it from the first step and coerce to safe values.
+ * ALL   => every step must be APPROVED.
+ * ANY   => at least one APPROVED (quorumSize forced to 1).
+ * N_OF_M => at least `quorumSize` APPROVED (clamped to [1, level size]).
+ */
+function levelQuorum(steps: LevelStep[]): { mode: QuorumMode; size: number } {
+  const total = steps.length;
+  const rawMode = (steps[0]?.quorumMode ?? 'ALL') as QuorumMode;
+  const mode: QuorumMode =
+    rawMode === 'ANY' || rawMode === 'N_OF_M' || rawMode === 'ALL' ? rawMode : 'ALL';
+  if (mode === 'ALL') return { mode, size: total };
+  if (mode === 'ANY') return { mode, size: 1 };
+  // N_OF_M: clamp requested size into [1, total]; default to total when missing.
+  const requested = steps[0]?.quorumSize ?? total;
+  const size = Math.max(1, Math.min(total, requested));
+  return { mode, size };
+}
+
+/**
+ * Evaluate a single level (all steps sharing one `order`).
+ *   SATISFIED — approvals already meet quorum.
+ *   FAILED    — enough rejects/skips that the remaining pending + approved can
+ *               no longer reach quorum (early-reject rule).
+ *   PENDING   — still resolvable, not yet satisfied.
+ * DELEGATED steps are re-pointed (a fresh PENDING step exists at the same
+ * order) so they count as neither approved nor a live vote here.
+ */
+function evaluateLevel(steps: LevelStep[]): LevelOutcome {
+  if (steps.length === 0) return 'SATISFIED';
+  const { size } = levelQuorum(steps);
+  const approved = steps.filter((s) => s.status === 'APPROVED').length;
+  const pending = steps.filter((s) => s.status === 'PENDING').length;
+  if (approved >= size) return 'SATISFIED';
+  // Best achievable = current approvals + everything still pending.
+  if (approved + pending < size) return 'FAILED';
+  return 'PENDING';
+}
+
+/** Distinct level orders present in a set of steps, ascending. */
+function levelOrders(steps: LevelStep[]): number[] {
+  return [...new Set(steps.map((s) => s.order))].sort((a, b) => a - b);
 }
 
 /**
@@ -78,13 +140,35 @@ export function createRequestsService(prisma: ApprovalPrisma, producer: NexusPro
           },
         });
         if (steps.length > 0) {
+          // A "level" = all steps sharing the same `order`. Quorum config is a
+          // per-level property; if multiple PolicySteps at the same order set
+          // it, the first one wins (they are expected to agree). Legacy policies
+          // omit these fields entirely -> schema defaults (ALL / null) apply,
+          // reproducing all-must-approve behavior.
+          const orderKey = (step: PolicyStep, i: number) => step.order ?? i;
+          const quorumByOrder = new Map<number, { mode: QuorumMode; size: number | null }>();
+          steps.forEach((step, i) => {
+            const ord = orderKey(step, i);
+            if (!quorumByOrder.has(ord) && step.quorumMode) {
+              quorumByOrder.set(ord, {
+                mode: step.quorumMode,
+                size: step.quorumSize ?? null,
+              });
+            }
+          });
           await tx.approvalStep.createMany({
-            data: steps.map((step, i) => ({
-              requestId: req.id,
-              order: step.order ?? i,
-              approverId: resolvedApprovers[i] ?? step.approverId ?? requestedBy,
-              status: 'PENDING',
-            })),
+            data: steps.map((step, i) => {
+              const ord = orderKey(step, i);
+              const q = quorumByOrder.get(ord);
+              return {
+                requestId: req.id,
+                order: ord,
+                approverId: resolvedApprovers[i] ?? step.approverId ?? requestedBy,
+                status: 'PENDING' as const,
+                quorumMode: (q?.mode ?? 'ALL') as QuorumMode,
+                quorumSize: q?.mode === 'N_OF_M' ? q.size : null,
+              };
+            }),
           });
         }
         return req;
@@ -180,8 +264,37 @@ export function createRequestsService(prisma: ApprovalPrisma, producer: NexusPro
         orderBy: { order: 'asc' },
         take: 100,
       });
-      const allApproved = allSteps.every((s) => s.status === 'APPROVED');
-      if (allApproved) {
+      // Group steps into levels (by `order`) and evaluate the just-actioned
+      // level's quorum. Legacy single-approver ALL levels reduce to the old
+      // "every step APPROVED" behavior exactly.
+      const stepsByOrder = (ord: number) => allSteps.filter((s) => s.order === ord);
+      const currentLevel = evaluateLevel(stepsByOrder(pendingStep.order));
+      if (currentLevel === 'FAILED') {
+        // Level can no longer reach quorum -> reject the whole request.
+        await prisma.approvalRequest.update({
+          where: { id: requestId },
+          data: { status: 'REJECTED', comment: comment ?? null },
+        });
+        await producer.publish(TOPICS.WORKFLOWS, {
+          type: 'approval.request.rejected',
+          tenantId,
+          payload: {
+            requestId,
+            module: req.module,
+            recordId: req.recordId,
+            entityType: (req.data as Record<string, unknown>)?.entityType,
+            entityId: (req.data as Record<string, unknown>)?.entityId,
+            data: req.data,
+            comment,
+          },
+        });
+        return this.getRequest(tenantId, requestId);
+      }
+      const orders = levelOrders(allSteps);
+      const allLevelsSatisfied = orders.every(
+        (ord) => evaluateLevel(stepsByOrder(ord)) === 'SATISFIED'
+      );
+      if (allLevelsSatisfied) {
         await prisma.approvalRequest.update({
           where: { id: requestId },
           data: { status: 'APPROVED' },
@@ -199,12 +312,13 @@ export function createRequestsService(prisma: ApprovalPrisma, producer: NexusPro
           },
         });
       } else {
-        // Advance currentStep in order: point it at the lowest-ordered step
-        // that is still PENDING. Falls back to the incremented value if none.
-        const nextPending = allSteps
-          .filter((s) => s.status === 'PENDING')
-          .sort((a, b) => a.order - b.order)[0];
-        const nextStep = nextPending ? nextPending.order : req.currentStep + 1;
+        // Advance currentStep to the lowest level order that is not yet
+        // SATISFIED (i.e. the level still awaiting quorum). Falls back to the
+        // incremented value when none remain unresolved.
+        const nextLevel = orders.find(
+          (ord) => evaluateLevel(stepsByOrder(ord)) !== 'SATISFIED'
+        );
+        const nextStep = nextLevel ?? req.currentStep + 1;
         await prisma.approvalRequest.update({
           where: { id: requestId },
           data: { currentStep: nextStep },
@@ -226,23 +340,49 @@ export function createRequestsService(prisma: ApprovalPrisma, producer: NexusPro
     ) {
       const req = await prisma.approvalRequest.findFirst({
         where: { tenantId, id: requestId },
-        include: { steps: true },
+        include: { steps: { orderBy: { order: 'asc' } } },
       });
       if (!req || req.status !== 'PENDING') return null;
       const pendingStep = req.steps.find(
         (s) => s.status === 'PENDING' && s.approverId === approverId
       );
       if (!pendingStep) return null;
-      await prisma.$transaction([
-        prisma.approvalStep.update({
-          where: { id: pendingStep.id },
-          data: { status: 'REJECTED', comment, actionedAt: new Date() },
-        }),
-        prisma.approvalRequest.update({
-          where: { id: requestId },
-          data: { status: 'REJECTED', comment },
-        }),
-      ]);
+      // Record this reject, then re-evaluate the level's quorum. Under a quorum
+      // level (ANY / N_OF_M) a single reject does NOT necessarily kill the
+      // request — it only fails once the remaining approvals can no longer meet
+      // quorum. Legacy single-approver ALL levels fail immediately, as before.
+      await prisma.approvalStep.update({
+        where: { id: pendingStep.id },
+        data: { status: 'REJECTED', comment, actionedAt: new Date() },
+      });
+      const allSteps = await prisma.approvalStep.findMany({
+        where: { requestId },
+        orderBy: { order: 'asc' },
+        take: 100,
+      });
+      const stepsByOrder = (ord: number) => allSteps.filter((s) => s.order === ord);
+      const levelOutcome = evaluateLevel(stepsByOrder(pendingStep.order));
+      if (levelOutcome !== 'FAILED') {
+        // Quorum still reachable — keep the request PENDING and advance
+        // currentStep to the earliest unsatisfied level (unchanged if this one
+        // is still open). Idempotent: does not re-touch resolved levels.
+        const orders = levelOrders(allSteps);
+        const nextLevel = orders.find(
+          (ord) => evaluateLevel(stepsByOrder(ord)) !== 'SATISFIED'
+        );
+        if (nextLevel !== undefined && nextLevel !== req.currentStep) {
+          await prisma.approvalRequest.update({
+            where: { id: requestId },
+            data: { currentStep: nextLevel },
+          });
+        }
+        return this.getRequest(tenantId, requestId);
+      }
+      // Level can no longer reach quorum -> request REJECTED.
+      await prisma.approvalRequest.update({
+        where: { id: requestId },
+        data: { status: 'REJECTED', comment },
+      });
       await producer.publish(TOPICS.WORKFLOWS, {
         type: 'approval.request.rejected',
         tenantId,
@@ -295,13 +435,16 @@ export function createRequestsService(prisma: ApprovalPrisma, producer: NexusPro
         data: { status: 'DELEGATED', approverId: delegateTo, comment: comment ?? null },
       });
       // Create a fresh PENDING step for the delegate at the same order so the
-      // request can still be actioned by the delegate.
+      // request can still be actioned by the delegate. Carry the level's quorum
+      // config forward so the level model still evaluates correctly.
       await prisma.approvalStep.create({
         data: {
           requestId,
           order: pendingStep.order,
           approverId: delegateTo,
           status: 'PENDING',
+          quorumMode: pendingStep.quorumMode,
+          quorumSize: pendingStep.quorumSize,
         },
       });
       await producer.publish(TOPICS.WORKFLOWS, {

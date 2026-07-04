@@ -52,6 +52,14 @@ export async function ensureCurrencyColumns(client: ClickHouseClient): Promise<v
       `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS base_currency String DEFAULT ''`
     );
   }
+  // deal_events gains a per-deal `probability` column (0-100 win probability)
+  // so the weighted-pipeline forecast can use the real per-stage probability
+  // instead of a flat default. Additive + idempotent; existing rows default to 0
+  // and the forecast query falls back to its sane default for those.
+  statements.push(
+    `ALTER TABLE deal_events ADD COLUMN IF NOT EXISTS probability Float64 DEFAULT 0`
+  );
+
   statements.push(...SUMMARY_ALTERS);
 
   for (const query of statements) {

@@ -12,7 +12,8 @@ import { useUiStore } from '@/stores/ui.store';
 type NodeType =
   | 'TRIGGER' | 'CONDITION' | 'WAIT' | 'ACTION' | 'EMAIL'
   | 'WEBHOOK' | 'SET_FIELD' | 'CREATE_ACTIVITY' | 'CREATE_TASK'
-  | 'ASSIGN' | 'NOTIFY' | 'FORK' | 'JOIN' | 'END';
+  | 'ASSIGN' | 'NOTIFY' | 'FORK' | 'JOIN' | 'END'
+  | 'APPROVAL_REQUEST' | 'VALIDATION_RULE' | 'SLA_CHECK';
 
 interface WorkflowNode {
   id: string;
@@ -51,10 +52,33 @@ const NODE_COLORS: Record<NodeType, string> = {
   FORK: 'bg-lime-100 text-lime-700 border-lime-300',
   JOIN: 'bg-violet-100 text-violet-700 border-violet-300',
   END: 'bg-red-100 text-red-700 border-red-300',
+  APPROVAL_REQUEST: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+  VALIDATION_RULE: 'bg-sky-100 text-sky-700 border-sky-300',
+  SLA_CHECK: 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300',
+};
+
+// Branch-capable node types produce two labelled outgoing edges so the engine
+// can route on the edge `condition` label (matching the backend node handlers).
+const NODE_BRANCHES: Partial<Record<NodeType, [string, string]>> = {
+  APPROVAL_REQUEST: ['approved', 'rejected'],
+  VALIDATION_RULE: ['valid', 'invalid'],
+  SLA_CHECK: ['breached', 'within'],
 };
 
 function generateId() {
   return Math.random().toString(36).slice(2, 10);
+}
+
+// Positive-branch labels render green, negative-branch labels render red.
+const POSITIVE_EDGE_LABELS = new Set(['true', 'approved', 'valid', 'within']);
+const NEGATIVE_EDGE_LABELS = new Set(['false', 'rejected', 'invalid', 'breached']);
+
+function edgeColor(condition?: string): string {
+  if (!condition) return '#94a3b8';
+  const c = condition.trim().toLowerCase();
+  if (POSITIVE_EDGE_LABELS.has(c)) return '#10b981';
+  if (NEGATIVE_EDGE_LABELS.has(c)) return '#ef4444';
+  return '#64748b';
 }
 
 export default function WorkflowCanvasPage(): JSX.Element {
@@ -137,6 +161,20 @@ export default function WorkflowCanvasPage(): JSX.Element {
     ]);
   };
 
+  // Adds two labelled branch edges for branch-capable nodes (APPROVAL_REQUEST,
+  // VALIDATION_RULE, SLA_CHECK). The labels become the edge `condition` the
+  // engine routes on (e.g. approved/rejected).
+  const addLabelledBranches = (nodeId: string, labels: [string, string]) => {
+    const nodeA: WorkflowNode = { id: generateId(), type: 'ACTION', config: {} };
+    const nodeB: WorkflowNode = { id: generateId(), type: 'ACTION', config: {} };
+    setNodes((prev) => [...prev, nodeA, nodeB]);
+    setEdges((prev) => [
+      ...prev,
+      { from: nodeId, to: nodeA.id, condition: labels[0] },
+      { from: nodeId, to: nodeB.id, condition: labels[1] },
+    ]);
+  };
+
   const removeNode = (id: string) => {
     setNodes((prev) => prev.filter((n) => n.id !== id));
     setEdges((prev) => prev.filter((e) => e.from !== id && e.to !== id));
@@ -194,7 +232,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
         <aside className="w-48 overflow-y-auto border-r border-slate-200 bg-white p-3">
           <p className="mb-2 text-xs font-semibold uppercase text-slate-500">Nodes</p>
           <div className="space-y-1">
-            {(['CONDITION', 'WAIT', 'ACTION', 'EMAIL', 'WEBHOOK', 'SET_FIELD', 'CREATE_ACTIVITY', 'CREATE_TASK', 'ASSIGN', 'NOTIFY', 'FORK', 'JOIN', 'END'] as NodeType[]).map((type) => (
+            {(['CONDITION', 'WAIT', 'ACTION', 'EMAIL', 'WEBHOOK', 'SET_FIELD', 'CREATE_ACTIVITY', 'CREATE_TASK', 'ASSIGN', 'NOTIFY', 'APPROVAL_REQUEST', 'VALIDATION_RULE', 'SLA_CHECK', 'FORK', 'JOIN', 'END'] as NodeType[]).map((type) => (
               <button
                 key={type}
                 onClick={() => addNode(type)}
@@ -226,7 +264,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
                       y1={from.y + 30}
                       x2={to.x + 80}
                       y2={to.y}
-                      stroke={edge.condition === 'true' ? '#10b981' : edge.condition === 'false' ? '#ef4444' : '#94a3b8'}
+                      stroke={edgeColor(edge.condition)}
                       strokeWidth={2}
                       strokeDasharray={edge.condition ? undefined : '4 4'}
                     />
@@ -234,7 +272,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
                       <text
                         x={(from.x + to.x) / 2 + 80}
                         y={(from.y + to.y) / 2 + 15}
-                        fill={edge.condition === 'true' ? '#10b981' : '#ef4444'}
+                        fill={edgeColor(edge.condition)}
                         fontSize={10}
                         fontWeight={600}
                       >
@@ -283,6 +321,17 @@ export default function WorkflowCanvasPage(): JSX.Element {
                     className="mt-1 text-[10px] underline"
                   >
                     + Add branches
+                  </button>
+                )}
+                {NODE_BRANCHES[node.type] && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      addLabelledBranches(node.id, NODE_BRANCHES[node.type]!);
+                    }}
+                    className="mt-1 text-[10px] underline"
+                  >
+                    + {NODE_BRANCHES[node.type]![0]}/{NODE_BRANCHES[node.type]![1]} branches
                   </button>
                 )}
               </div>
@@ -407,6 +456,134 @@ export default function WorkflowCanvasPage(): JSX.Element {
                       className="mt-1 h-8 text-xs"
                     />
                   </div>
+                </>
+              )}
+              {selectedNode.type === 'APPROVAL_REQUEST' && (
+                <>
+                  <div>
+                    <label className="text-xs text-slate-600">Policy ID</label>
+                    <Input
+                      value={String(selectedNode.config?.policyId ?? '')}
+                      onChange={(e) => updateNodeConfig(selectedNode.id, 'policyId', e.target.value)}
+                      className="mt-1 h-8 text-xs"
+                      placeholder="optional — else matched by entity type"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600">Entity type</label>
+                    <Input
+                      value={String(selectedNode.config?.entityType ?? '')}
+                      onChange={(e) => updateNodeConfig(selectedNode.id, 'entityType', e.target.value)}
+                      className="mt-1 h-8 text-xs"
+                      placeholder="e.g. quote, deal, contract"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600">Entity ID</label>
+                    <Input
+                      value={String(selectedNode.config?.entityId ?? '')}
+                      onChange={(e) => updateNodeConfig(selectedNode.id, 'entityId', e.target.value)}
+                      className="mt-1 h-8 text-xs"
+                      placeholder="record to request approval for"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600">Requester ID</label>
+                    <Input
+                      value={String(selectedNode.config?.requesterId ?? '')}
+                      onChange={(e) => updateNodeConfig(selectedNode.id, 'requesterId', e.target.value)}
+                      className="mt-1 h-8 text-xs"
+                      placeholder="who is requesting"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600">Notes</label>
+                    <textarea
+                      value={String(selectedNode.config?.notes ?? '')}
+                      onChange={(e) => updateNodeConfig(selectedNode.id, 'notes', e.target.value)}
+                      className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-xs"
+                      rows={2}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Routes on <span className="font-medium text-emerald-600">approved</span> /{' '}
+                    <span className="font-medium text-red-600">rejected</span> branch edges.
+                  </p>
+                </>
+              )}
+              {selectedNode.type === 'VALIDATION_RULE' && (
+                <>
+                  <div>
+                    <label className="text-xs text-slate-600">Pipeline ID</label>
+                    <Input
+                      value={String(selectedNode.config?.pipelineId ?? '')}
+                      onChange={(e) => updateNodeConfig(selectedNode.id, 'pipelineId', e.target.value)}
+                      className="mt-1 h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600">From stage ID</label>
+                    <Input
+                      value={String(selectedNode.config?.fromStageId ?? '')}
+                      onChange={(e) => updateNodeConfig(selectedNode.id, 'fromStageId', e.target.value)}
+                      className="mt-1 h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600">To stage ID</label>
+                    <Input
+                      value={String(selectedNode.config?.toStageId ?? '')}
+                      onChange={(e) => updateNodeConfig(selectedNode.id, 'toStageId', e.target.value)}
+                      className="mt-1 h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600">Deal ID</label>
+                    <Input
+                      value={String(selectedNode.config?.dealId ?? '')}
+                      onChange={(e) => updateNodeConfig(selectedNode.id, 'dealId', e.target.value)}
+                      className="mt-1 h-8 text-xs"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Routes on <span className="font-medium text-emerald-600">valid</span> /{' '}
+                    <span className="font-medium text-red-600">invalid</span> branch edges.
+                  </p>
+                </>
+              )}
+              {selectedNode.type === 'SLA_CHECK' && (
+                <>
+                  <div>
+                    <label className="text-xs text-slate-600">Entity type</label>
+                    <Input
+                      value={String(selectedNode.config?.entityType ?? '')}
+                      onChange={(e) => updateNodeConfig(selectedNode.id, 'entityType', e.target.value)}
+                      className="mt-1 h-8 text-xs"
+                      placeholder="e.g. deal, lead"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600">Entity ID</label>
+                    <Input
+                      value={String(selectedNode.config?.entityId ?? '')}
+                      onChange={(e) => updateNodeConfig(selectedNode.id, 'entityId', e.target.value)}
+                      className="mt-1 h-8 text-xs"
+                      placeholder="record to check"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600">SLA ID</label>
+                    <Input
+                      value={String(selectedNode.config?.slaId ?? '')}
+                      onChange={(e) => updateNodeConfig(selectedNode.id, 'slaId', e.target.value)}
+                      className="mt-1 h-8 text-xs"
+                      placeholder="optional — specific SLA definition"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Routes on <span className="font-medium text-red-600">breached</span> /{' '}
+                    <span className="font-medium text-emerald-600">within</span> branch edges.
+                  </p>
                 </>
               )}
             </div>

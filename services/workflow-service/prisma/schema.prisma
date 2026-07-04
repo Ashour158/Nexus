@@ -19,6 +19,10 @@ model WorkflowTemplate {
   edges             Json
   isActive          Boolean             @default(false)
   version           Int                 @default(1)
+  // Schedule bookkeeping (used only when trigger === 'schedule'). Tracked so a
+  // service restart cannot double-fire a due schedule.
+  lastRunAt         DateTime?
+  nextRunAt         DateTime?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   executions        WorkflowExecution[]
@@ -26,6 +30,7 @@ model WorkflowTemplate {
 
   @@index([tenantId])
   @@index([tenantId, trigger, isActive])
+  @@index([trigger, isActive, nextRunAt])
   @@unique([id, tenantId])
 }
 

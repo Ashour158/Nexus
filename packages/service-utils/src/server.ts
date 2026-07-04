@@ -52,6 +52,31 @@ function pathOnly(url: string): string {
   return i === -1 ? url : url.slice(0, i);
 }
 
+/**
+ * Internal service-to-service routes self-authenticate via `x-service-token`
+ * (INTERNAL_SERVICE_TOKEN) inside the route handler, so they must bypass the
+ * global end-user JWT preHandler. This bypass is DELIBERATELY narrow:
+ *
+ *  - Only paths under `/api/v1/internal/` or `/internal/` qualify, AND
+ *  - the request MUST carry an `x-service-token` header that matches the
+ *    configured `INTERNAL_SERVICE_TOKEN`.
+ *
+ * A request to an internal route WITHOUT a matching service token is NOT
+ * bypassed here — it falls through to normal JWT verification (and is rejected
+ * with 401 if it also lacks a valid user JWT). We never open internal routes to
+ * the unauthenticated public: if `INTERNAL_SERVICE_TOKEN` is unset, this always
+ * returns false. Token comparison mirrors finance-service `verifyServiceToken`.
+ */
+function isInternalServiceRoute(url: string, headers: Record<string, unknown> | undefined): boolean {
+  const path = pathOnly(url);
+  if (!(path.startsWith('/api/v1/internal/') || path.startsWith('/internal/'))) {
+    return false;
+  }
+  const token = headers?.['x-service-token'];
+  const expected = process.env.INTERNAL_SERVICE_TOKEN;
+  return Boolean(expected && typeof token === 'string' && token === expected);
+}
+
 /** Routes that skip JWT verification (Section 35 + public auth flows). */
 function isPublicRoute(url: string, method: string): boolean {
   const path = pathOnly(url);
@@ -266,6 +291,10 @@ export async function createService(config: ServiceConfig): Promise<FastifyInsta
   app.addHook('preHandler', async (request, reply) => {
     const path = pathOnly(request.url);
     if (isPublicRoute(path, request.method)) return;
+    // Internal service-to-service routes self-verify `x-service-token` in-route;
+    // bypass the end-user JWT preHandler ONLY when a matching token is present.
+    // Without the token this falls through to JWT verification below.
+    if (isInternalServiceRoute(path, request.headers as Record<string, unknown>)) return;
     if (config.publicPrefixes?.some((prefix) => path.startsWith(prefix))) return;
 
     try {

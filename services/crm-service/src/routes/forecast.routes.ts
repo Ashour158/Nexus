@@ -1,5 +1,25 @@
 import type { FastifyInstance } from 'fastify';
 import type { CrmPrisma } from '../prisma.js';
+import { ratesService } from '../lib/currency.js';
+
+/**
+ * Convert a raw deal amount into the tenant base currency. Fully guarded and
+ * fail-open: on any rates failure `ratesService.convertToBase` returns the
+ * native amount, so a rates hiccup never breaks a forecast endpoint.
+ */
+async function toBaseAmount(
+  tenantId: string,
+  amount: unknown,
+  currency: unknown
+): Promise<number> {
+  const amt = Number(amount ?? 0);
+  const { baseAmount } = await ratesService.convertToBase(
+    tenantId,
+    Number.isFinite(amt) ? amt : 0,
+    String(currency ?? 'USD')
+  );
+  return baseAmount;
+}
 
 function getPeriodDates(period: string): { start: Date; end: Date } {
   const now = new Date();
@@ -65,6 +85,15 @@ export async function registerForecastRoutes(app: FastifyInstance, prisma: CrmPr
         include: { stage: true },
       });
 
+      // Convert each deal amount into the tenant base currency before summing so
+      // mixed-currency pipelines total correctly. Fail-open (native on error).
+      const baseAmountByDeal = new Map<string, number>();
+      await Promise.all(
+        deals.map(async (d) => {
+          baseAmountByDeal.set(d.id, await toBaseAmount(tenantId, d.amount, d.currency));
+        })
+      );
+
       const byOwner = new Map<string, typeof deals>();
       for (const deal of deals) {
         const list = byOwner.get(deal.ownerId) ?? [];
@@ -87,7 +116,7 @@ export async function registerForecastRoutes(app: FastifyInstance, prisma: CrmPr
         let weightedValue = 0;
         for (const deal of list) {
           const prob = deal.stage?.probability ?? deal.probability ?? 0;
-          const amt = Number(deal.amount);
+          const amt = baseAmountByDeal.get(deal.id) ?? Number(deal.amount);
           totalValue += amt;
           weightedValue += (amt * prob) / 100;
         }
@@ -125,6 +154,15 @@ export async function registerForecastRoutes(app: FastifyInstance, prisma: CrmPr
         include: { stage: true },
       });
 
+      // Convert each deal amount into the tenant base currency before summing so
+      // mixed-currency pipelines total correctly. Fail-open (native on error).
+      const baseAmountByDeal = new Map<string, number>();
+      await Promise.all(
+        deals.map(async (d) => {
+          baseAmountByDeal.set(d.id, await toBaseAmount(tenantId, d.amount, d.currency));
+        })
+      );
+
       const stageMap = new Map<string, { stageName: string; probability: number; deals: typeof deals }>();
       for (const deal of deals) {
         const stageId = deal.stageId || 'unknown';
@@ -138,7 +176,10 @@ export async function registerForecastRoutes(app: FastifyInstance, prisma: CrmPr
 
       const stages = Array.from(stageMap.entries())
         .map(([stageId, { stageName, probability, deals: stageDeals }]) => {
-          const totalAmount = stageDeals.reduce((s, d) => s + Number(d.amount || 0), 0);
+          const totalAmount = stageDeals.reduce(
+            (s, d) => s + (baseAmountByDeal.get(d.id) ?? Number(d.amount || 0)),
+            0
+          );
           const weightedAmount = Math.round(totalAmount * (probability / 100));
           return {
             stageId,
@@ -153,15 +194,18 @@ export async function registerForecastRoutes(app: FastifyInstance, prisma: CrmPr
 
       const closedDeals = await prisma.deal.findMany({
         where: { tenantId, status: 'WON', actualCloseDate: { gte: start, lte: end } },
-        select: { amount: true },
+        select: { amount: true, currency: true },
       });
+      const closedBaseAmounts = await Promise.all(
+        closedDeals.map((d) => toBaseAmount(tenantId, d.amount, d.currency))
+      );
 
       const pipeline = stages.reduce((s, st) => s + st.totalAmount, 0);
       const weighted = stages.reduce((s, st) => s + st.weightedAmount, 0);
       const committed = stages
         .filter((st) => st.probability >= 80)
         .reduce((s, st) => s + st.totalAmount, 0);
-      const closed = closedDeals.reduce((s, d) => s + Number(d.amount || 0), 0);
+      const closed = closedBaseAmounts.reduce((s, a) => s + a, 0);
 
       return reply.send({ success: true, data: { pipeline, weighted, committed, closed, stages } });
     });

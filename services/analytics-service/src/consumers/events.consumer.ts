@@ -66,6 +66,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         currency: String(p.currency ?? 'USD'),
         base_amount: baseAmount,
         base_currency: baseCurrency,
+        probability: Number(p.probability ?? 0),
         occurred_at: event.timestamp,
       }],
       format: 'JSONEachRow',

@@ -1,5 +1,6 @@
 import { Decimal } from 'decimal.js';
 import type { PlanningPrisma } from '../prisma.js';
+import { ratesService } from '../lib/currency.js';
 
 /**
  * Event-driven forecast roll-up.
@@ -23,7 +24,10 @@ interface NormalizedDealEvent {
   dealId: string;
   ownerId: string;
   period: string;
+  /** Native deal amount, in `currency`. Converted to base at aggregate time. */
   amount: Decimal;
+  /** Raw per-deal currency code, e.g. "EUR". Defaults to "USD" when absent. */
+  currency: string;
   category: ForecastCategory;
 }
 
@@ -96,6 +100,7 @@ export function normalizeDealEvent(
     ownerId,
     period: periodForEvent(payload, eventTimestamp),
     amount: toDecimal(payload.amount),
+    currency: String(payload.currency ?? 'USD'),
     category: categoryForEvent(type, payload),
   };
 }
@@ -187,12 +192,26 @@ export function createForecastRollupService(prisma: PlanningPrisma) {
         where: { tenantId: evt.tenantId, dealId: evt.dealId },
       });
 
+      // Convert the native amount into the tenant base currency BEFORE storing,
+      // so DealForecastState (and every aggregate summed from it) is expressed
+      // in a single consistent currency. Fully guarded/fail-open: on any rates
+      // failure convertToBase returns the native amount, so a rates hiccup never
+      // breaks the consumer.
+      const { baseAmount } = await ratesService.convertToBase(
+        evt.tenantId,
+        evt.amount.toNumber(),
+        evt.currency
+      );
+      const baseAmountStr = new Decimal(
+        Number.isFinite(baseAmount) ? baseAmount : evt.amount.toNumber()
+      ).toFixed(2);
+
       await prisma.dealForecastState.upsert({
         where: { tenantId_dealId: { tenantId: evt.tenantId, dealId: evt.dealId } },
         update: {
           ownerId: evt.ownerId,
           period: evt.period,
-          amount: evt.amount.toFixed(2),
+          amount: baseAmountStr,
           category: evt.category,
         },
         create: {
@@ -200,7 +219,7 @@ export function createForecastRollupService(prisma: PlanningPrisma) {
           dealId: evt.dealId,
           ownerId: evt.ownerId,
           period: evt.period,
-          amount: evt.amount.toFixed(2),
+          amount: baseAmountStr,
           category: evt.category,
         },
       });

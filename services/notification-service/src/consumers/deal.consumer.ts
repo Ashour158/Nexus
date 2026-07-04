@@ -80,9 +80,36 @@ interface DealRottenPayload {
 }
 
 /**
+ * Payload shape of the `deal.at_risk` event as emitted by crm-service's AI
+ * at-risk detector (see services/crm-service/src/lib/ai/scoring.service.ts,
+ * `detectAtRiskDeal`). Like `deal.rotten`, this event is not part of the shared
+ * `NexusKafkaEvent` union, so we describe its payload locally and read it
+ * defensively.
+ */
+interface DealAtRiskAnomaly {
+  signal?: string;
+  value?: number;
+  z?: number;
+  explanation?: string;
+}
+
+interface DealAtRiskPayload {
+  dealId?: string;
+  ownerId?: string;
+  accountId?: string;
+  stageId?: string;
+  reasons?: string[];
+  anomalies?: DealAtRiskAnomaly[];
+  idleDays?: number;
+  daysSinceLastActivity?: number;
+  detectedAt?: string;
+}
+
+/**
  * Deal events → notifications. Handles deal.won / deal.lost /
- * deal.stage_changed (with rotten-deal detection against the CRM service) and
- * deal.rotten (emitted asynchronously by the crm-service rotten-deals poller).
+ * deal.stage_changed (with rotten-deal detection against the CRM service),
+ * deal.rotten (emitted asynchronously by the crm-service rotten-deals poller)
+ * and deal.at_risk (emitted by the crm-service AI at-risk detector).
  */
 export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusConsumer> {
   const consumer = new NexusConsumer('notification-service.deals');
@@ -228,6 +255,69 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
       metadata: {
         idleDays,
         rottenDays,
+        stageId: payload.stageId,
+        accountId: payload.accountId,
+        detectedAt: payload.detectedAt,
+      },
+    });
+    const owner = await deps.lookupOwner(evt.tenantId, payload.ownerId);
+    if (owner.email) {
+      await deps.email.send({
+        to: owner.email,
+        subject: title,
+        html: renderActionEmail({
+          heading: title,
+          body,
+          actionLabel: 'View deal',
+          actionUrl: `/deals/${payload.dealId}`,
+        }),
+      });
+    }
+    await fanOutSmsPush(deps, owner, {
+      title,
+      body,
+      actionUrl: `/deals/${payload.dealId}`,
+    });
+  });
+
+  // `deal.at_risk` is published by the crm-service AI at-risk detector
+  // (scoring.service.ts `detectAtRiskDeal`) whenever a deal trips a threshold
+  // rule or a cohort anomaly. Without this handler the whole AI at-risk feature
+  // is a silent no-op. The NexusConsumer dedupes by eventId, and we guard on
+  // required fields so a malformed event can never throw and stall the loop.
+  consumer.on('deal.at_risk', async (event) => {
+    // `deal.at_risk` is not in the shared NexusKafkaEvent union, so we read the
+    // event shape generically. The handler is only dispatched for this type.
+    const evt = event as { tenantId: string; payload?: unknown };
+    const payload = (evt.payload ?? {}) as DealAtRiskPayload;
+    if (!payload.dealId || !payload.ownerId) return;
+    const reasons = Array.isArray(payload.reasons) ? payload.reasons : [];
+    const anomalies = Array.isArray(payload.anomalies) ? payload.anomalies : [];
+    // Prefer the human-readable threshold reasons; fall back to anomaly
+    // explanations; finally a generic phrase so the body is never empty.
+    const why =
+      reasons.length > 0
+        ? reasons.join(' ')
+        : anomalies
+            .map((a) => a.explanation)
+            .filter((e): e is string => typeof e === 'string' && e.length > 0)
+            .join(' ') || 'It is showing warning signs and needs attention.';
+    const title = '⚠️ Deal at risk';
+    const body = `Deal ${payload.dealId} is at risk. ${why}`;
+    await deps.inApp.send({
+      tenantId: evt.tenantId,
+      userId: payload.ownerId,
+      type: 'DEAL_AT_RISK',
+      title,
+      body,
+      entityType: 'deal',
+      entityId: payload.dealId,
+      actionUrl: `/deals/${payload.dealId}`,
+      metadata: {
+        reasons,
+        anomalies,
+        idleDays: payload.idleDays,
+        daysSinceLastActivity: payload.daysSinceLastActivity,
         stageId: payload.stageId,
         accountId: payload.accountId,
         detectedAt: payload.detectedAt,

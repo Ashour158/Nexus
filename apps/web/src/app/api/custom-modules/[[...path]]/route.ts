@@ -99,10 +99,24 @@ async function handleMock(
       }
     }
     // /custom-modules/:id/fields/reorder
+    // Real backend expects `{ order: [{ id, sortOrder }] }`. Normalize to an
+    // ordered id array (sorted by sortOrder) for the in-memory store, while
+    // tolerating legacy shapes.
     if (rest.length === 2 && rest[1] === 'reorder' && method === 'PATCH') {
       const payload = await body(req);
-      const order = (payload.order ?? payload.fieldIds ?? payload.ids) as string[] | undefined;
-      const result = reorderFields(moduleId, order ?? []);
+      const raw = (payload.order ?? payload.fieldIds ?? payload.ids) as unknown;
+      let orderedIds: string[] = [];
+      if (Array.isArray(raw)) {
+        if (raw.every((e) => typeof e === 'string')) {
+          orderedIds = raw as string[];
+        } else {
+          orderedIds = (raw as { id: string; sortOrder?: number }[])
+            .slice()
+            .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+            .map((e) => e.id);
+        }
+      }
+      const result = reorderFields(moduleId, orderedIds);
       return result ? ok(result) : notFound('Module not found');
     }
     // /custom-modules/:id/fields/:fieldId

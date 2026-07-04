@@ -170,16 +170,28 @@ export async function registerTelephonyRoutes(
     const fullUrl =
       process.env.TELEPHONY_STATUS_CALLBACK_URL?.trim() || `${proto}://${host}${req.url}`;
 
-    // Signature verification when an auth token is present. Fail-open only when
-    // no token is configured (dev), matching the service's env-gated posture.
-    if (process.env.TWILIO_AUTH_TOKEN) {
-      const valid = telephony.verifyWebhookSignature(fullUrl, params, signature);
-      if (!valid) {
-        return reply.code(401).send({
-          success: false,
-          error: { code: 'UNAUTHORIZED', message: 'Invalid webhook signature', requestId: req.id },
-        });
-      }
+    // Signature verification is MANDATORY. This webhook mutates state (writes
+    // CallLog rows + emits events), so an unsigned/unverifiable request must
+    // never be accepted. Fail CLOSED: if no auth token is configured we cannot
+    // verify Twilio's signature, so reject rather than trust the caller.
+    if (!process.env.TWILIO_AUTH_TOKEN?.trim()) {
+      return reply.code(503).send({
+        success: false,
+        error: {
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'telephony webhook not configured',
+          requestId: req.id,
+        },
+        hint: 'Set TWILIO_AUTH_TOKEN in comm-service environment to enable signature-verified telephony webhooks',
+      });
+    }
+
+    const valid = telephony.verifyWebhookSignature(fullUrl, params, signature);
+    if (!valid) {
+      return reply.code(401).send({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Invalid webhook signature', requestId: req.id },
+      });
     }
 
     const callSid = params.CallSid;

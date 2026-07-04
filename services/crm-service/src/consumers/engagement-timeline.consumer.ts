@@ -8,8 +8,10 @@ import type { CrmPrisma } from '../prisma.js';
  * shared {@link CrmPrisma.activity} store. This consumer complements it by
  * projecting the *other* external engagement sources so the account / contact
  * journey is complete:
- *   - email events   (TOPICS.EMAILS: email.sent / email.received / email.replied)
- *   - portal events  (TOPICS.ACTIVITIES: portal.engagement)
+ *   - email events    (TOPICS.EMAILS: email.sent / email.received / email.replied)
+ *   - portal events   (TOPICS.ACTIVITIES: portal.engagement)
+ *   - call events     (TOPICS.CALLS: call.logged)
+ *   - whatsapp events (TOPICS.CALLS: whatsapp.sent / whatsapp.received)
  *
  * Internal `activity.created` / `activity.completed` events are intentionally
  * NOT projected — those describe rows that already live in the Activity table
@@ -28,8 +30,14 @@ const PORTAL_TIMELINE_EVENTS = ['portal.engagement'] as const;
 // telephony channel emits, so projecting it never double-counts internal
 // activity.created rows.
 const CALL_TIMELINE_EVENTS = ['call.logged'] as const;
+// WhatsApp messaging. `whatsapp.sent` (comm-service, outbound, carries crm ids)
+// and `whatsapp.received` (notification-service, inbound, phone-only) both flow
+// on TOPICS.CALLS. Distinct event types, so projecting them never double-counts
+// internal activity.created rows. crm has no WHATSAPP ActivityType, so these
+// project as NOTE (see activityTypeFor).
+const WHATSAPP_TIMELINE_EVENTS = ['whatsapp.sent', 'whatsapp.received'] as const;
 
-type TimelineSource = 'email' | 'portal' | 'call';
+type TimelineSource = 'email' | 'portal' | 'call' | 'whatsapp';
 
 type EngagementEvent = {
   id?: string;
@@ -76,6 +84,7 @@ function timelineSourceFor(type: string): TimelineSource | null {
   if ((EMAIL_TIMELINE_EVENTS as readonly string[]).includes(type)) return 'email';
   if ((PORTAL_TIMELINE_EVENTS as readonly string[]).includes(type)) return 'portal';
   if ((CALL_TIMELINE_EVENTS as readonly string[]).includes(type)) return 'call';
+  if ((WHATSAPP_TIMELINE_EVENTS as readonly string[]).includes(type)) return 'whatsapp';
   return null;
 }
 
@@ -127,6 +136,13 @@ function titleForEvent(type: string, payload: Record<string, unknown>): string {
       const dir = direction === 'inbound' ? 'Inbound call' : 'Outbound call';
       return outcome ? `${dir} — ${outcome}` : dir;
     }
+    case 'whatsapp.sent':
+    case 'whatsapp.received': {
+      const verb = type === 'whatsapp.sent' ? 'WhatsApp sent' : 'WhatsApp received';
+      const body = stringField(payload, 'body');
+      const snippet = body ? (body.length > 80 ? `${body.slice(0, 80)}…` : body) : undefined;
+      return snippet ? `${verb}: ${snippet}` : verb;
+    }
     default:
       return type.replaceAll('.', ' ');
   }
@@ -172,6 +188,21 @@ function descriptionForEvent(type: string, payload: Record<string, unknown>): st
       .filter(Boolean)
       .join(' | ') || null;
   }
+  if (type.startsWith('whatsapp.')) {
+    const direction =
+      stringField(payload, 'direction') ?? (type === 'whatsapp.sent' ? 'outbound' : 'inbound');
+    const to = stringField(payload, 'toNumber');
+    const from = stringField(payload, 'from') ?? stringField(payload, 'fromNumber');
+    const body = stringField(payload, 'body');
+    return [
+      direction ? `Direction: ${direction}` : undefined,
+      from ? `From: ${from}` : undefined,
+      to ? `To: ${to}` : undefined,
+      body ? `Message: ${body}` : undefined,
+    ]
+      .filter(Boolean)
+      .join(' | ') || null;
+  }
   return null;
 }
 
@@ -180,8 +211,33 @@ function descriptionForEvent(type: string, payload: Record<string, unknown>): st
  * Idempotent (de-dupes on customFields.sourceEventId) and fail-open at the
  * caller. Ignored when it cannot be anchored to a CRM record.
  */
+/**
+ * Best-effort inbound-WhatsApp contact resolution. `whatsapp.received` carries a
+ * phone number only (no CRM ids), so we look the sender up against crm's own
+ * Contact table (tenant-scoped, on phone/mobile). Fail-open: any error yields
+ * `undefined` and the event is simply skipped upstream.
+ */
+async function resolveContactIdByPhone(
+  prisma: Pick<CrmPrisma, 'contact'>,
+  tenantId: string,
+  phone: string
+): Promise<string | undefined> {
+  try {
+    const contact = (await prisma.contact.findFirst({
+      where: {
+        tenantId,
+        OR: [{ phone }, { mobile: phone }],
+      },
+      select: { id: true },
+    } as never)) as { id: string } | null;
+    return contact?.id;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function projectEngagementTimelineEvent(
-  prisma: Pick<CrmPrisma, 'activity'>,
+  prisma: Pick<CrmPrisma, 'activity' | 'contact'>,
   event: EngagementEvent
 ): Promise<ProjectionResult> {
   const type = event.type;
@@ -198,8 +254,19 @@ export async function projectEngagementTimelineEvent(
   // accountId directly; other portal links carry relatedEntityId only, which we
   // cannot anchor, so they are ignored (fail-open, no noise).
   const accountId = stringField(payload, 'accountId');
-  const contactId = stringField(payload, 'contactId');
+  let contactId = stringField(payload, 'contactId');
   const dealId = stringField(payload, 'dealId') ?? stringField(payload, 'opportunityId');
+
+  // Inbound WhatsApp is phone-only (no CRM ids). Best-effort resolve the sender
+  // to a Contact by phone/mobile; if unresolved, skip rather than create an
+  // unanchored timeline row.
+  if (timelineSource === 'whatsapp' && !accountId && !contactId && !dealId) {
+    const phone = stringField(payload, 'from') ?? stringField(payload, 'fromNumber');
+    if (phone) {
+      contactId = await resolveContactIdByPhone(prisma, tenantId, phone);
+    }
+  }
+
   if (!accountId && !contactId && !dealId) {
     return { status: 'ignored', reason: 'missing_crm_anchor' };
   }
@@ -227,6 +294,8 @@ export async function projectEngagementTimelineEvent(
     'system';
   const occurredAt =
     stringField(payload, 'occurredAt') ?? stringField(payload, 'endedAt') ?? event.occurredAt ?? new Date().toISOString();
+  // crm's ActivityType enum has no WHATSAPP member, so WhatsApp projects as NOTE
+  // (the timelineSource customField distinguishes it downstream).
   const activityType =
     timelineSource === 'email' ? 'EMAIL' : timelineSource === 'call' ? 'CALL' : 'NOTE';
 
@@ -255,7 +324,19 @@ export async function projectEngagementTimelineEvent(
           // Email-specific
           messageId: stringField(payload, 'messageId'),
           threadId: stringField(payload, 'threadId'),
-          direction: stringField(payload, 'direction'),
+          direction:
+            stringField(payload, 'direction') ??
+            (timelineSource === 'whatsapp'
+              ? type === 'whatsapp.sent'
+                ? 'outbound'
+                : 'inbound'
+              : undefined),
+          // WhatsApp-specific
+          whatsappFrom:
+            timelineSource === 'whatsapp'
+              ? stringField(payload, 'from') ?? stringField(payload, 'fromNumber')
+              : undefined,
+          whatsappTo: timelineSource === 'whatsapp' ? stringField(payload, 'toNumber') : undefined,
           // Portal-specific
           portalAction: stringField(payload, 'action'),
           portalEntityType: stringField(payload, 'entityType'),
@@ -292,7 +373,12 @@ export async function startEngagementTimelineConsumer(prisma: CrmPrisma): Promis
     }
   };
 
-  for (const eventType of [...EMAIL_TIMELINE_EVENTS, ...PORTAL_TIMELINE_EVENTS, ...CALL_TIMELINE_EVENTS]) {
+  for (const eventType of [
+    ...EMAIL_TIMELINE_EVENTS,
+    ...PORTAL_TIMELINE_EVENTS,
+    ...CALL_TIMELINE_EVENTS,
+    ...WHATSAPP_TIMELINE_EVENTS,
+  ]) {
     consumer.on(eventType, handle);
   }
 

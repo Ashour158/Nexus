@@ -17,14 +17,16 @@ export async function POST(req: NextRequest) {
   }
 
   if (DEV_PREVIEW_ENABLED) {
+    // Match the real backend's fail-open `{ ok, value, error? }` shape so dev
+    // and prod behave identically (the engine returns null on failure).
     const result = evaluateFormula(payload.formula ?? '', payload.record ?? {});
     if (result === null) {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORMULA_ERROR', message: 'Formula could not be evaluated' } },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        success: true,
+        data: { ok: false, value: null, error: 'Formula could not be evaluated' },
+      });
     }
-    return NextResponse.json({ success: true, data: { result } });
+    return NextResponse.json({ success: true, data: { ok: true, value: result } });
   }
 
   try {

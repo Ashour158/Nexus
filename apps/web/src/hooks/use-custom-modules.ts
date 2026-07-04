@@ -212,8 +212,12 @@ export function useDeleteField(moduleId: string) {
 export function useReorderFields(moduleId: string) {
   const qc = useQueryClient();
   return useMutation({
+    // Backend expects `{ order: [{ id, sortOrder }] }`; map the ordered id array
+    // to positional sortOrder entries before POSTing.
     mutationFn: (order: string[]) =>
-      api.patch<CustomField[]>(`/custom-modules/${moduleId}/fields/reorder`, { order }),
+      api.patch<CustomField[]>(`/custom-modules/${moduleId}/fields/reorder`, {
+        order: order.map((id, index) => ({ id, sortOrder: index })),
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: moduleKeys.fields(moduleId) }),
   });
 }
@@ -341,6 +345,15 @@ export function useDeleteRecord(moduleId: string) {
 // Formula preview
 // ---------------------------------------------------------------------------
 
+/** Result of a formula preview evaluation (mirrors the metadata-service engine). */
+export interface FormulaEvalResult {
+  ok: boolean;
+  value: number | string | boolean | null;
+  error?: string;
+}
+
 export function evaluateFormula(formula: string, record: Record<string, unknown>) {
-  return api.post<{ result: number | string }>('/formula/evaluate', { formula, record });
+  // Backend returns `{ success, data: { ok, value, error? } }`; the api client
+  // unwraps `data`, so this resolves to `{ ok, value, error? }`.
+  return api.post<FormulaEvalResult>('/formula/evaluate', { formula, record });
 }

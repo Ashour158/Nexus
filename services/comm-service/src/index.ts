@@ -143,6 +143,6 @@ await startService(app, port, async (a) => {
   await registerOutboxRoutes(a, outbox);
   await registerWebhookRoutes(a, outbox);
   await registerInternalOutboxRoutes(a, outbox);
-  await registerWhatsAppOutboundRoutes(a, prisma, whatsapp);
+  await registerWhatsAppOutboundRoutes(a, prisma, whatsapp, telephonyProducer);
   await registerTelephonyRoutes(a, prisma, telephony, telephonyProducer);
 });

@@ -235,7 +235,11 @@ function FieldManager({ moduleId, fields, loading }: { moduleId: string; fields:
     }
     try {
       const res = await evaluateFormula(form.formula, record);
-      setFormulaPreview(String(res.result));
+      if (!res.ok) {
+        setFormulaPreview(res.error ? `Error: ${res.error}` : 'Formula error');
+        return;
+      }
+      setFormulaPreview(String(res.value));
     } catch (err) {
       setFormulaPreview(err instanceof Error ? err.message : 'Formula error');
     }

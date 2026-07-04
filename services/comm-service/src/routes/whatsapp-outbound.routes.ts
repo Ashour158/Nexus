@@ -1,13 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import type { JwtPayload } from '@nexus/shared-types';
 import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
+import { TOPICS, type NexusProducer } from '@nexus/kafka';
 import type { CommPrisma } from '../prisma.js';
 import type { WhatsAppChannel } from '../channels/whatsapp.channel.js';
 
 export async function registerWhatsAppOutboundRoutes(
   app: FastifyInstance,
   prisma: CommPrisma,
-  whatsapp: WhatsAppChannel
+  whatsapp: WhatsAppChannel,
+  producer: NexusProducer | null
 ): Promise<void> {
   app.post(
     '/api/v1/whatsapp/send',
@@ -29,6 +31,7 @@ export async function registerWhatsAppOutboundRoutes(
         caption?: string;
         contactId?: string;
         dealId?: string;
+        accountId?: string;
       };
 
       if (!whatsapp.isConfigured()) {
@@ -53,7 +56,11 @@ export async function registerWhatsAppOutboundRoutes(
         caption: body.caption,
       });
 
-      await prisma.whatsAppMessage.create({
+      const messageBody =
+        body.text ??
+        `[${body.type}: ${body.templateName ?? body.documentName ?? 'media'}]`;
+
+      const saved = await prisma.whatsAppMessage.create({
         data: {
           tenantId,
           contactId: body.contactId,
@@ -61,14 +68,42 @@ export async function registerWhatsAppOutboundRoutes(
           direction: 'OUTBOUND',
           from: process.env.WHATSAPP_PHONE_NUMBER_ID ?? 'system',
           to: body.to,
-          body:
-            body.text ??
-            `[${body.type}: ${body.templateName ?? body.documentName ?? 'media'}]`,
+          body: messageBody,
           status: 'SENT',
           externalId: result.messageId,
           sentBy: userId,
         },
       });
+
+      // Emit whatsapp.sent so the CRM engagement-timeline consumer projects the
+      // outbound message onto the contact's journey (keyed on contactId +
+      // sourceEventId). Fire-and-forget + guarded: a publish failure must never
+      // fail the send. Only emit when there is a CRM anchor (contact/deal/account).
+      if (producer && (body.contactId || body.dealId || body.accountId)) {
+        const messageId = result.messageId ?? saved.id;
+        const sourceEventId = `wa:${messageId}`;
+        try {
+          await producer
+            .publish(TOPICS.CALLS, {
+              type: 'whatsapp.sent',
+              tenantId,
+              payload: {
+                contactId: body.contactId,
+                dealId: body.dealId,
+                accountId: body.accountId,
+                toNumber: body.to,
+                body: messageBody,
+                messageId,
+                direction: 'outbound',
+                sourceEventId,
+                occurredAt: saved.createdAt.toISOString(),
+              },
+            })
+            .catch((err) => app.log.warn({ err }, 'whatsapp.sent publish failed (ignored)'));
+        } catch (err) {
+          app.log.warn({ err }, 'whatsapp.sent publish failed (ignored)');
+        }
+      }
 
       return reply.send({ success: true, data: { messageId: result.messageId } });
     }

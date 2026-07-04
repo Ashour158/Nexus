@@ -58,7 +58,7 @@ export function DynamicRecordForm({
       if (field.type === 'FORMULA' && field.formula) {
         try {
           const res = await evaluateFormula(field.formula, nextValues);
-          results[field.apiName] = String(res.result);
+          results[field.apiName] = res.ok ? String(res.value) : '—';
         } catch {
           results[field.apiName] = '—';
         }

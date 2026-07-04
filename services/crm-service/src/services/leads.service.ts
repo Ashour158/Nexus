@@ -388,7 +388,8 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
      * Kanban status transition (Section 34.2 → `PATCH /leads/:id/status`).
      * Delegates the field write + `lead.updated` emission to `updateLead`, then
      * — when the target status is `QUALIFIED` or `UNQUALIFIED` — additionally
-     * publishes a `lead.qualified` event (realtime-service subscribes to it).
+     * publishes a `lead.qualified` (QUALIFIED) or `lead.unqualified`
+     * (UNQUALIFIED) event (realtime-service subscribes to both fan-outs).
      *
      * Guards against illegal transitions out of a `CONVERTED` lead. Publishing
      * the qualification event is fire-and-forget so it can never break the write.
@@ -416,7 +417,10 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
       if (status === 'QUALIFIED' || status === 'UNQUALIFIED') {
         await producer
           .publish(TOPICS.LEADS, {
-            type: 'lead.qualified',
+            // Emit a distinct type per transition so a downstream consumer keying
+            // on the event type never mistakes a disqualification for a
+            // qualification. The `qualified` boolean in the payload is preserved.
+            type: status === 'QUALIFIED' ? 'lead.qualified' : 'lead.unqualified',
             tenantId,
             payload: {
               leadId: updated.id,

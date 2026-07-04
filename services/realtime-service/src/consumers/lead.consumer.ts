@@ -39,7 +39,17 @@ export async function startLeadConsumer(io: Server): Promise<NexusConsumer> {
   consumer.on('lead.updated', fanOut('lead:updated'));
   consumer.on('lead.assigned', fanOut('lead:updated'));
   consumer.on('lead.qualified', fanOut('lead:updated'));
+  // crm-service now emits `lead.unqualified` alongside `lead.qualified` for a
+  // disqualification transition; fan it out the same way so the UI reflects the
+  // status change either direction.
+  consumer.on('lead.unqualified', fanOut('lead:updated'));
   consumer.on('lead.converted', fanOut('lead:converted'));
+  // crm-service switched leads to soft-delete: it emits `lead.archived` /
+  // `lead.restored` (never `lead.deleted`). Handle the live events so archive
+  // and restore propagate to connected clients.
+  consumer.on('lead.archived', fanOut('lead:archived'));
+  consumer.on('lead.restored', fanOut('lead:restored'));
+  // Retained for backward compatibility; no live service emits `lead.deleted`.
   consumer.on('lead.deleted', fanOut('lead:deleted'));
 
   await consumer.subscribe([TOPICS.LEADS]);

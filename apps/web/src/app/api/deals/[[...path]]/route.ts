@@ -10,7 +10,6 @@ import {
 } from '@/lib/server/dev-preview-data';
 
 const CRM_URL = process.env.CRM_SERVICE_URL || 'http://localhost:3001';
-const DEALS_SERVICE_URL = process.env.DEALS_SERVICE_URL || 'http://localhost:3042';
 type PreviewRecord = Record<string, unknown> & {
   customFields?: Record<string, unknown>;
   updatedAt?: string;
@@ -474,22 +473,10 @@ async function proxy(
     }
   }
 
-  const segments = params.path ?? [];
-  if (method === 'GET' && segments.length === 2 && segments[1] === 'quotes') {
-    const dealId = segments[0];
-    const res = await fetch(
-      `${DEALS_SERVICE_URL}/api/v1/data/quote-projections/deal/${encodeURIComponent(dealId)}${search ? `?${search}` : ''}`,
-      {
-        headers: {
-          Authorization: auth ?? '',
-          'x-tenant-id': req.headers.get('x-tenant-id') ?? 'default',
-        },
-        cache: 'no-store',
-      }
-    );
-    const data = await res.json().catch(() => ({}));
-    return NextResponse.json(data, { status: res.status });
-  }
+  // Note: `GET /api/deals/:id/quotes` (the deal-detail Quotes tab) is no longer
+  // special-cased to deals-service. The quote-projection read-model now lives in
+  // crm-service, so this request falls through to the CRM proxy below and hits
+  // `${CRM_URL}/api/v1/deals/:id/quotes`.
 
   try {
     const res = await fetch(

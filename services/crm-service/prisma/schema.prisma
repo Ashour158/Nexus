@@ -719,6 +719,66 @@ model Quote {
   @@index([tenantId, dealId])
 }
 
+// Read-model of finance quote lifecycle events, projected from TOPICS.QUOTES.
+// Migrated from deals-service (consumer group crm-service.quote-projections).
+// Powers the deal-detail Quotes tab. Kept tenant-scoped to match CRM RLS.
+model QuoteProjection {
+  id                   String    @id @default(cuid())
+  tenantId             String
+  quoteId              String
+  accountId            String?
+  contactId            String?
+  dealId               String?
+  rfqId                String?
+  quoteNumber          String?
+  status               String
+  totalAmount          Decimal   @default(0) @db.Decimal(18, 2)
+  currency             String    @default("USD")
+  currentRevisionId    String?
+  validUntil           DateTime?
+  lastFinanceEventType String
+  sourceEventId        String
+  sourceEventVersion   Int       @default(1)
+  sourceAggregateId    String?
+  sourceAggregateType  String?
+  correlationId        String?
+  transitionLedgerId   String?
+  projectionVersion    Int       @default(1)
+  projectedAt          DateTime
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([tenantId, quoteId])
+  @@unique([tenantId, sourceEventId])
+  @@index([tenantId, accountId])
+  @@index([tenantId, contactId])
+  @@index([tenantId, dealId])
+  @@index([tenantId, status])
+  @@unique([id, tenantId])
+}
+
+// Append-only ledger of projected quote source events, used for idempotent
+// dedupe (unique on tenantId+sourceEventId) and as a future replay source.
+model QuoteProjectionEvent {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  quoteId             String
+  sourceEventId       String
+  sourceEventVersion  Int      @default(1)
+  financeEventType    String
+  sourceAggregateId   String?
+  sourceAggregateType String?
+  correlationId       String?
+  transitionLedgerId  String?
+  projectionVersion   Int      @default(1)
+  projectedAt         DateTime @default(now())
+
+  @@unique([tenantId, sourceEventId])
+  @@index([tenantId, quoteId])
+  @@index([tenantId, financeEventType])
+  @@unique([id, tenantId])
+}
+
 model Attachment {
   id         String    @id @default(cuid())
   tenantId   String

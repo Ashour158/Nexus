@@ -8,6 +8,7 @@ import { registerGraphQL } from './graphql/index.js';
 import { startScoringConsumer } from './consumers/scoring.consumer.js';
 import { startGdprConsumer } from './consumers/gdpr.consumer.js';
 import { startFinanceTimelineConsumer } from './consumers/finance-timeline.consumer.js';
+import { startQuoteProjectionConsumer } from './consumers/quote-projection.consumer.js';
 import { startEngagementTimelineConsumer } from './consumers/engagement-timeline.consumer.js';
 import { NexusProducer } from '@nexus/kafka';
 import { startRottenDealsPoller } from './lib/rotten-deals.poller.js';
@@ -67,6 +68,10 @@ export async function buildServer(): Promise<{ app: FastifyInstance; prismaHealt
     app.log.warn({ err }, 'Engagement timeline consumer failed to start; continuing without email/portal timeline projection');
     return null;
   });
+  const quoteProjectionConsumer = await startQuoteProjectionConsumer(prisma).catch((err) => {
+    app.log.warn({ err }, 'Quote projection consumer failed to start; continuing without quote read-model');
+    return null;
+  });
 
   // Stage-gating rotten-deal detector. Guarded so a start failure can never
   // break the service; the interval is unref'd inside the poller.
@@ -88,6 +93,7 @@ export async function buildServer(): Promise<{ app: FastifyInstance; prismaHealt
     try { await gdprConsumer?.disconnect(); } catch { /* ignore */ }
     try { await financeTimelineConsumer?.disconnect(); } catch { /* ignore */ }
     try { await engagementTimelineConsumer?.disconnect(); } catch { /* ignore */ }
+    try { await quoteProjectionConsumer?.disconnect(); } catch { /* ignore */ }
     try { rottenDealsPoller?.stop(); } catch { /* ignore */ }
   });
 

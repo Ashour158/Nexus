@@ -22,6 +22,7 @@ import {
 import type { CrmPrisma } from '../prisma.js';
 import { createDealsService } from '../services/deals.service.js';
 import { createAttachmentsService } from '../services/attachments.service.js';
+import { createQuoteProjectionsService } from '../services/quote-projections.service.js';
 import { getFieldHistory } from '../lib/field-history.js';
 import { uploadToStorage } from '../lib/storage.js';
 import { createSalesRecordsUseCase } from '../use-cases/sales-records.use-case.js';
@@ -70,9 +71,6 @@ const AttachmentIdParamSchema = z.object({
 const dataServiceProxyClient = createHttpClient({
   baseURL: process.env.DATA_SERVICE_URL ?? 'http://localhost:3015',
 });
-const quoteProjectionClient = createHttpClient({
-  baseURL: process.env.DEALS_SERVICE_URL ?? 'http://localhost:3042',
-});
 
 export async function registerDealsRoutes(
   app: FastifyInstance,
@@ -81,6 +79,7 @@ export async function registerDealsRoutes(
 ): Promise<void> {
   const deals = createDealsService(prisma, producer);
   const attachments = createAttachmentsService(prisma);
+  const quoteProjections = createQuoteProjectionsService(prisma);
   const salesRecords = createSalesRecordsUseCase({
     leads: {
       create: async () => undefined,
@@ -441,25 +440,27 @@ export async function registerDealsRoutes(
         }
       );
 
-      // ─── QUOTES ─────────────────────────────────────────────────────────
-      r.get(
-        '/deals/:id/quotes',
-        { preHandler: requirePermission(PERMISSIONS.DEALS.READ) },
-        async (request, reply) => {
-          const { id } = IdParamSchema.parse(request.params);
-          const q = PaginationSchema.parse(request.query);
-          const jwt = request.user as JwtPayload;
-          const authorization = request.headers.authorization;
-          const result = await quoteProjectionClient.get(
-            `/api/v1/data/quote-projections/deal/${encodeURIComponent(id)}?page=${q.page}&limit=${q.limit}`,
-            {
-              ...(authorization ? { Authorization: authorization } : {}),
-              'x-tenant-id': jwt.tenantId,
-            }
-          );
-          return reply.send(result);
-        }
-      );
+      // ─── QUOTES (finance quote-projection read-model) ───────────────────
+      // Reads the local crm-service QuoteProjection read-model (migrated from
+      // deals-service). No HTTP hop — direct Prisma via the projections service.
+      // Both paths share the same handler: `/deals/:id/quotes` (existing web
+      // contract) and `/deals/:id/quote-projections` (canonical shape).
+      for (const quotesPath of ['/deals/:id/quotes', '/deals/:id/quote-projections'] as const) {
+        r.get(
+          quotesPath,
+          { preHandler: requirePermission(PERMISSIONS.DEALS.READ) },
+          async (request, reply) => {
+            const { id } = IdParamSchema.parse(request.params);
+            const q = PaginationSchema.parse(request.query);
+            const jwt = request.user as JwtPayload;
+            const data = await quoteProjections.listByDeal(jwt.tenantId, id, {
+              page: q.page,
+              limit: q.limit,
+            });
+            return reply.send({ success: true, data });
+          }
+        );
+      }
 
       // ─── SCORING INSIGHTS (deterministic signals — no AI) ───────────────
       r.get(

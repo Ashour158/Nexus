@@ -409,6 +409,77 @@ function leadDuplicates(id: string) {
   return NextResponse.json(apiSuccess(rows));
 }
 
+/**
+ * Dev-preview mock of `GET /leads/:id/ai-prediction` — the explainable AI lead
+ * prediction. Mirrors the crm-service shape so the UI panel renders identically
+ * against mock and live data.
+ */
+function leadAiPrediction(id: string) {
+  const { state, index } = findLead(id);
+  if (index < 0) return notFound();
+  const lead = state.leads[index];
+
+  const baseScore = typeof lead.score === 'number' ? lead.score : 50;
+  const highIntent = ['REFERRAL', 'INBOUND', 'DEMO_REQUEST', 'WEBSITE'].includes(
+    String(lead.source ?? '').toUpperCase()
+  );
+  let probability = Math.max(0.05, Math.min(0.95, baseScore / 100));
+  if (highIntent) probability = Math.min(0.95, probability + 0.1);
+  const hasFirmographics = Boolean(lead.company && lead.jobTitle);
+  const lowData = !hasFirmographics || baseScore < 30;
+
+  const factors = [
+    {
+      label: highIntent ? 'High-intent source' : 'Lead source',
+      direction: (highIntent ? 'up' : 'down') as 'up' | 'down',
+      impact: highIntent ? 13 : 7,
+      explanation: highIntent
+        ? 'High-intent source raises the estimate (+13%)'
+        : 'A lower-intent source tempers the estimate.',
+    },
+    {
+      label: 'Firmographic fit',
+      direction: (hasFirmographics ? 'up' : 'down') as 'up' | 'down',
+      impact: hasFirmographics ? 9 : 8,
+      explanation: hasFirmographics
+        ? 'Company and job title are known — good routing signal.'
+        : 'Missing company/title reduces fit confidence.',
+    },
+    {
+      label: 'Engagement score',
+      direction: (baseScore >= 50 ? 'up' : 'down') as 'up' | 'down',
+      impact: Math.max(5, Math.round(Math.abs(baseScore - 50) / 5)),
+      explanation:
+        baseScore >= 50
+          ? 'Above-average score reflects stronger engagement.'
+          : 'Below-average score signals weaker engagement.',
+    },
+  ].sort((a, b) => b.impact - a.impact);
+
+  return NextResponse.json(
+    apiSuccess({
+      probability,
+      aiScore: Math.round(probability * 100),
+      insights: {
+        probability,
+        confidence: lowData ? 0.35 : 0.68,
+        lowData,
+        modelVersion: 'preview-v0',
+        sampleSize: lowData ? 12 : 180,
+        topFactors: factors,
+        nextBestActions: [
+          hasFirmographics
+            ? 'Route to the owning rep for a qualification call.'
+            : 'Enrich the lead — capture company and job title first.',
+          highIntent
+            ? 'Follow up within 24h to capitalise on intent.'
+            : 'Add to a nurture sequence to build intent.',
+        ],
+      },
+    })
+  );
+}
+
 async function handleDev(req: NextRequest, ctx: RouteContext, method: string) {
   const path = normalizePath(ctx.params);
   const [id, action] = path;
@@ -438,6 +509,7 @@ async function handleDev(req: NextRequest, ctx: RouteContext, method: string) {
     return NextResponse.json(apiSuccess(recordList(state.leads[index], 'outboxEvents')));
   }
   if (method === 'GET' && id && action === 'duplicates') return leadDuplicates(id);
+  if (method === 'GET' && id && action === 'ai-prediction') return leadAiPrediction(id);
   if (method === 'PATCH' && id && action === 'status') {
     const body = (await req.json().catch(() => ({}))) as { status?: string };
     return updateLead(req, id, { status: body.status });

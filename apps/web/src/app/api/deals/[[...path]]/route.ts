@@ -271,10 +271,75 @@ async function proxy(
         recommendations.push('MEDDIC coverage is thin — identify the economic buyer and decision criteria.');
       }
 
+      // Explainable AI win prediction (dev-preview mock). Mirrors the shape the
+      // crm-service `ai` block returns so the UI panel renders identically
+      // against mock and live data.
+      const meddicForAi = meddicScore ?? 40;
+      const probabilityFromDeal =
+        typeof deal.probability === 'number' ? deal.probability / 100 : 0.4;
+      let winProbability = probabilityFromDeal;
+      if (isWon) winProbability = 0.95;
+      else if (isLost) winProbability = 0.05;
+      winProbability = Math.max(0.02, Math.min(0.98, winProbability));
+      const lowData = meddicScore == null || (dataQualityScore != null && dataQualityScore < 40);
+      const aiFactors = [
+        {
+          label: 'Stage probability',
+          direction: (probabilityFromDeal >= 0.4 ? 'up' : 'down') as 'up' | 'down',
+          impact: Math.round(Math.abs(probabilityFromDeal - 0.4) * 40) + 6,
+          explanation: `Current stage probability of ${Math.round(probabilityFromDeal * 100)}% ${probabilityFromDeal >= 0.4 ? 'lifts' : 'lowers'} the estimate.`,
+        },
+        {
+          label: 'MEDDIC coverage',
+          direction: (meddicForAi >= 50 ? 'up' : 'down') as 'up' | 'down',
+          impact: Math.round(Math.abs(meddicForAi - 50) / 5) + 5,
+          explanation:
+            meddicForAi >= 50
+              ? 'Strong qualification coverage supports the forecast.'
+              : 'Thin MEDDIC coverage adds risk to the forecast.',
+        },
+        {
+          label: 'Recent engagement',
+          direction: (daysSinceLastActivity != null && daysSinceLastActivity <= 14 ? 'up' : 'down') as 'up' | 'down',
+          impact:
+            daysSinceLastActivity != null && daysSinceLastActivity <= 14
+              ? 9
+              : Math.min(20, 6 + Math.round((daysSinceLastActivity ?? 30) / 10)),
+          explanation:
+            daysSinceLastActivity != null && daysSinceLastActivity <= 14
+              ? 'Fresh activity signals an engaged buyer.'
+              : 'A gap since the last touchpoint weakens momentum.',
+        },
+      ].sort((a, b) => b.impact - a.impact);
+
+      const aiBlock = {
+        winProbability,
+        score: Math.round(winProbability * 100),
+        insights: {
+          probability: winProbability,
+          confidence: lowData ? 0.35 : 0.72,
+          lowData,
+          modelVersion: 'preview-v0',
+          sampleSize: lowData ? 8 : 240,
+          topFactors: aiFactors,
+          nextBestActions: isOpen
+            ? [
+                daysSinceLastActivity != null && daysSinceLastActivity > 14
+                  ? 'Schedule a check-in to re-engage the buyer.'
+                  : 'Confirm the next milestone with the champion.',
+                meddicForAi < 50
+                  ? 'Close MEDDIC gaps — nail down the economic buyer.'
+                  : 'Validate the decision timeline and paper process.',
+              ]
+            : [],
+        },
+      };
+
       return NextResponse.json(
         apiSuccess({
           dealId: id,
           health,
+          ai: aiBlock,
           signals: {
             status,
             isOpen,

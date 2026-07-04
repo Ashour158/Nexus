@@ -10,8 +10,9 @@ import type {
   PaginatedResult,
 } from '@nexus/shared-types';
 import type { CreateLeadInput, UpdateLeadInput } from '@nexus/validation';
-import { apiClients } from '@/lib/api-client';
+import { api, apiClients } from '@/lib/api-client';
 import { notify } from '@/lib/toast';
+import type { AiPredictionInsights } from '@/hooks/use-deals';
 
 /**
  * React Query hooks for the Leads domain — Section 39.1.
@@ -40,9 +41,34 @@ export const leadKeys = {
   list: (f: Record<string, unknown>) => [...leadKeys.lists(), f] as const,
   details: () => [...leadKeys.all, 'detail'] as const,
   detail: (id: string) => [...leadKeys.details(), id] as const,
+  aiPrediction: (id: string) => [...leadKeys.detail(id), 'ai-prediction'] as const,
 };
 
 type LeadListResponse = PaginatedResult<Lead>;
+
+/**
+ * Explainable AI lead prediction returned by `GET /leads/:id/ai-prediction`.
+ * `aiScore` is the 0-100 projection of `probability`; `insights` carries the
+ * confidence, low-data honesty flag and the "why" factor list.
+ */
+export interface LeadAiPrediction {
+  probability: number;
+  aiScore: number;
+  insights: AiPredictionInsights;
+}
+
+/**
+ * Fetches the explainable AI prediction for a lead. The endpoint returns the
+ * standard `{ success, data }` envelope; the typed client unwraps `data`.
+ */
+export function useLeadAiPrediction(id: string, enabled = true) {
+  return useQuery<LeadAiPrediction>({
+    queryKey: leadKeys.aiPrediction(id),
+    queryFn: () => api.get<LeadAiPrediction>(`/leads/${id}/ai-prediction`),
+    enabled: Boolean(id) && enabled,
+    staleTime: 5 * 60_000,
+  });
+}
 
 export function useLeads(filters: LeadListFilters = {}) {
   const normalized = {

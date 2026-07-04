@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { CallButton } from '@/components/crm/call-button';
+import { AiPredictionPanel } from '@/components/crm/AiPredictionPanel';
 import { timelineMeta } from '@/lib/timeline-icons';
 import { useDeal, useDealTimeline, useDealScoringInsights } from '@/hooks/use-deals';
 import type { DealHealth, DealScoringInsights } from '@/hooks/use-deals';
@@ -355,6 +356,15 @@ function HealthTab({ data, isLoading, isError }: { data: DealScoringInsights | u
 
   return (
     <div className="space-y-4">
+      {data.ai ? (
+        <AiPredictionPanel
+          probability={data.ai.winProbability}
+          score={data.ai.score}
+          insights={data.ai.insights}
+          kind="win prediction"
+        />
+      ) : null}
+
       <div className="rounded-xl border border-slate-200 bg-white p-5">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Deal Health</h3>

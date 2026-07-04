@@ -7,7 +7,8 @@ import type { Activity, Note, PaginatedResult } from '@nexus/shared-types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { useLead } from '@/hooks/use-leads';
+import { useLead, useLeadAiPrediction } from '@/hooks/use-leads';
+import { AiPredictionPanel } from '@/components/crm/AiPredictionPanel';
 import { useLeadNotes } from '@/hooks/use-notes';
 import { useActivities } from '@/hooks/use-activities';
 import { api } from '@/lib/api-client';
@@ -15,7 +16,7 @@ import { formatDate } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/auth.store';
 
-type LeadTab = 'activities' | 'notes' | 'score' | 'documents' | 'duplicates' | 'governance' | 'conversion';
+type LeadTab = 'activities' | 'notes' | 'ai' | 'score' | 'documents' | 'duplicates' | 'governance' | 'conversion';
 type AnyRecord = Record<string, unknown>;
 
 interface ScoreBreakdown {
@@ -46,6 +47,8 @@ export default function LeadDetailPage() {
   const leadQuery = useLead(leadId);
   const notesQuery = useLeadNotes(leadId);
   const activitiesQuery = useActivities({ leadId, limit: 50 });
+
+  const aiPredictionQuery = useLeadAiPrediction(leadId, tab === 'ai');
 
   const scoreQuery = useQuery<ScoreBreakdown>({
     queryKey: ['lead-scores', leadId],
@@ -131,6 +134,7 @@ export default function LeadDetailPage() {
   const tabs: { id: LeadTab; label: string }[] = [
     { id: 'activities', label: 'Activities' },
     { id: 'notes', label: 'Notes' },
+    { id: 'ai', label: 'AI Prediction' },
     { id: 'score', label: 'Score' },
     { id: 'documents', label: 'Documents' },
     { id: 'duplicates', label: 'Duplicates' },
@@ -213,6 +217,16 @@ export default function LeadDetailPage() {
 
           {tab === 'activities' && <ActivitiesTab data={activitiesQuery.data} isLoading={activitiesQuery.isLoading} />}
           {tab === 'notes' && <NotesTab data={notesQuery.data} isLoading={notesQuery.isLoading} />}
+          {tab === 'ai' && (
+            <AiPredictionPanel
+              probability={aiPredictionQuery.data?.probability}
+              score={aiPredictionQuery.data?.aiScore}
+              insights={aiPredictionQuery.data?.insights}
+              isLoading={aiPredictionQuery.isLoading}
+              isError={aiPredictionQuery.isError}
+              kind="conversion prediction"
+            />
+          )}
           {tab === 'score' && <ScoreTab data={scoreQuery.data} isLoading={scoreQuery.isLoading} />}
           {tab === 'documents' && (
             <DocumentsTab

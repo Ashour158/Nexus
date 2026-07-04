@@ -58,10 +58,46 @@ export interface DealScoringSignals {
 }
 
 /**
+ * A single explainable factor behind an AI prediction. `impact` is the signed
+ * contribution to the estimate expressed in percentage points; `direction`
+ * mirrors its sign for quick styling.
+ */
+export interface AiPredictionFactor {
+  label: string;
+  direction: 'up' | 'down';
+  impact: number;
+  explanation: string;
+}
+
+/**
+ * Explainable AI prediction payload — shared by deals (`scoring-insights.ai`)
+ * and leads (`ai-prediction.insights`). `lowData` is surfaced honestly in the
+ * UI: when true the model is falling back to priors and confidence is low.
+ */
+export interface AiPredictionInsights {
+  probability: number;
+  confidence: number;
+  lowData: boolean;
+  modelVersion: string;
+  sampleSize: number;
+  topFactors: AiPredictionFactor[];
+  nextBestActions?: string[];
+}
+
+/** The `ai` block attached to `GET /deals/:id/scoring-insights`. */
+export interface DealAiPrediction {
+  winProbability: number;
+  score: number;
+  insights: AiPredictionInsights;
+}
+
+/**
  * Deterministic (NOT AI) deal-health insights returned by
  * `GET /deals/:id/scoring-insights`. `healthScore` is optional because the
  * service derives a categorical `health` label; the UI computes a numeric
- * score from the label when the backend omits it.
+ * score from the label when the backend omits it. The optional `ai` block
+ * carries the explainable AI win prediction (rendered above the deterministic
+ * health section).
  */
 export interface DealScoringInsights {
   dealId: string;
@@ -69,6 +105,7 @@ export interface DealScoringInsights {
   health: DealHealth;
   signals: DealScoringSignals;
   recommendations: string[];
+  ai?: DealAiPrediction | null;
 }
 
 type DealListResponse = PaginatedResult<Deal>;

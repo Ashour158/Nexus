@@ -28,6 +28,62 @@ export function createExecutionsService(prisma: WorkflowPrisma, producer: NexusP
       await executor.run(executionId);
     },
 
+    /**
+     * Resume a PAUSED execution that is waiting on an APPROVAL_REQUEST node,
+     * following the approved/rejected branch. Delegates idempotency + branch
+     * selection to the executor. Returns true when a resume was performed.
+     */
+    async resumeFromApproval(executionId: string, outcome: 'approved' | 'rejected') {
+      return executor.resumeFromApproval(executionId, outcome);
+    },
+
+    /**
+     * Correlate an approval event back to the PAUSED workflow execution that
+     * created it. We only ever edit workflow-service, so we cannot guarantee
+     * the approval-service echoes our `workflowExecutionId` back in the event.
+     * Two strategies, most reliable first:
+     *   1. An explicit workflowExecutionId carried in the event payload (or its
+     *      nested `data` / `metadata`). Verified to be a PAUSED execution.
+     *   2. The approval `requestId`: the APPROVAL_REQUEST node stored the
+     *      approval-service request id on its WorkflowStep output as
+     *      `approvalRequestId`. Find that step, then its PAUSED execution.
+     */
+    async findPausedExecutionForApproval(
+      tenantId: string,
+      payload: Record<string, unknown>
+    ): Promise<string | null> {
+      const nested = (payload.data ?? payload.metadata) as Record<string, unknown> | undefined;
+      const explicit =
+        (payload.workflowExecutionId as string | undefined) ??
+        (nested?.workflowExecutionId as string | undefined);
+
+      if (typeof explicit === 'string' && explicit.length > 0) {
+        const exec = await prisma.workflowExecution.findFirst({
+          where: { id: explicit, tenantId, status: 'PAUSED' },
+          select: { id: true },
+        });
+        if (exec) return exec.id;
+      }
+
+      const requestId =
+        (payload.requestId as string | undefined) ??
+        (payload.approvalRequestId as string | undefined) ??
+        (nested?.requestId as string | undefined);
+      if (typeof requestId !== 'string' || requestId.length === 0) return null;
+
+      // The approval node persisted `approvalRequestId` on its step output.
+      const step = await prisma.workflowStep.findFirst({
+        where: {
+          nodeType: 'APPROVAL_REQUEST',
+          execution: { tenantId, status: 'PAUSED' },
+          output: { path: ['approvalRequestId'], equals: requestId },
+        },
+        orderBy: { startedAt: 'desc' },
+        select: { executionId: true },
+      });
+      return step?.executionId ?? null;
+    },
+
     async listExecutions(tenantId: string, page: number, limit: number) {
       const p = Math.max(1, page);
       const l = Math.min(100, Math.max(1, limit));

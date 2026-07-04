@@ -116,6 +116,18 @@ export function createCadencesService(prisma: CadencePrisma) {
           (e) => e.status === 'EXITED' && e.currentStep === s.position
         ).length;
         const sent = s.type === 'EMAIL' ? stepExec.filter((e) => e.status === 'EXECUTED').length : 0;
+        // Per-variant outcome counts so an A/B step can be analyzed. Derived
+        // from the StepExecution.variant column already recorded by the worker.
+        const variantStats = (variant: 'A' | 'B') => {
+          const rows = stepExec.filter((e) => e.variant === variant);
+          return {
+            reached: rows.length,
+            executed: rows.filter((e) => e.status === 'EXECUTED').length,
+            skipped: rows.filter((e) => e.status === 'SKIPPED').length,
+            failed: rows.filter((e) => e.status === 'FAILED').length,
+          };
+        };
+        const hasVariantB = s.variantB !== null && s.variantB !== undefined;
         return {
           position: s.position,
           type: s.type,
@@ -123,6 +135,9 @@ export function createCadencesService(prisma: CadencePrisma) {
           completionRate: totalEnrollments ? reached / totalEnrollments : 0,
           exitRate: totalEnrollments ? exited / totalEnrollments : 0,
           emailExecutions: sent,
+          abTest: hasVariantB
+            ? { enabled: true, variantA: variantStats('A'), variantB: variantStats('B') }
+            : { enabled: false },
         };
       });
       return { totalEnrollments, perStep };

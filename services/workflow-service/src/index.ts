@@ -17,7 +17,9 @@ import { createWorkflowPrisma } from './prisma.js';
 import { registerRoutes } from './routes/index.js';
 import { startTriggerConsumer } from './consumers/trigger.consumer.js';
 import { startBranchConsumer } from './consumers/branch.consumer.js';
+import { startApprovalConsumer } from './consumers/approval.consumer.js';
 import { startGdprConsumer } from './consumers/gdpr.consumer.js';
+import { startSlaScanner } from './services/sla-scanner.js';
 import { createExecutionsService } from './services/executions.service.js';
 import { registerGraphQL } from './graphql/index.js';
 
@@ -59,19 +61,22 @@ registerHealthRoutes(app, 'workflow-service', [() => checkDatabase(prismaHealth)
 app.setErrorHandler(globalErrorHandler);
 
 let branchConsumer: Awaited<ReturnType<typeof startBranchConsumer>> | null = null;
+let approvalConsumer: Awaited<ReturnType<typeof startApprovalConsumer>> | null = null;
 let gdprConsumer: Awaited<ReturnType<typeof startGdprConsumer>> | null = null;
 try {
   await producer.connect();
   await startTriggerConsumer(prisma, producer);
   branchConsumer = await startBranchConsumer(prisma, producer);
+  approvalConsumer = await startApprovalConsumer(prisma, producer, app.log);
   gdprConsumer = await startGdprConsumer(prisma);
-  app.log.info('Workflow trigger + branch consumers started');
+  app.log.info('Workflow trigger + branch + approval consumers started');
 } catch (err) {
   app.log.warn({ err }, 'Workflow Kafka consumers failed to start');
 }
 
 app.addHook('onClose', async () => {
   try { await branchConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Branch consumer disconnect failed'); }
+  try { await approvalConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Approval consumer disconnect failed'); }
   try { await gdprConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'GDPR consumer disconnect failed'); }
   try { await producer.disconnect(); } catch (err) { app.log.warn({ err }, 'Producer disconnect failed'); }
 });
@@ -99,6 +104,9 @@ setInterval(async () => {
     app.log.warn({ err }, 'Paused execution poll failed');
   }
 }, 30_000);
+
+// Scan active SLA definitions for breaches (poll every 60 s)
+startSlaScanner(prisma, app.log, 60_000);
 
 await registerGraphQL(app, prisma);
 

@@ -23,6 +23,10 @@ const CreateSchema = z.object({
 });
 const CommentSchema = z.object({ comment: z.string().optional() });
 const RejectSchema = z.object({ comment: z.string().min(1) });
+const DelegateSchema = z.object({
+  delegateTo: z.string().min(1),
+  comment: z.string().optional(),
+});
 
 export async function registerRequestsRoutes(
   app: FastifyInstance,
@@ -126,6 +130,37 @@ export async function registerRequestsRoutes(
       const data = await requests.reject(user.tenantId, id, user.sub, body.comment);
       if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found or not approver', requestId: request.id } });
       return reply.send({ success: true, data });
+    }
+  );
+
+  app.post(
+    '/api/v1/approval/requests/:id/delegate',
+    { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) },
+    async (request, reply) => {
+      const { id } = IdSchema.parse(request.params);
+      const body = DelegateSchema.parse(request.body);
+      const user = (request as any).user as { tenantId: string; sub: string };
+      const result = await requests.delegate(
+        user.tenantId,
+        id,
+        user.sub,
+        body.delegateTo,
+        body.comment
+      );
+      if ('error' in result && result.error) {
+        const code = result.error;
+        const status = code === 'NOT_DELEGABLE' || code === 'INVALID_TARGET' ? 400 : 404;
+        const message =
+          code === 'NOT_DELEGABLE'
+            ? 'Step is not delegable'
+            : code === 'INVALID_TARGET'
+              ? 'Invalid delegate target'
+              : code === 'NOT_APPROVER'
+                ? 'Not the current approver'
+                : 'Not found';
+        return reply.code(status).send({ success: false, error: { code, message, requestId: request.id } });
+      }
+      return reply.send({ success: true, data: result.request });
     }
   );
 

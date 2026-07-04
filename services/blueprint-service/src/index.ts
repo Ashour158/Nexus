@@ -20,6 +20,7 @@ import { registerPlaybooksRoutes } from './routes/playbooks.routes.js';
 import { registerTemplatesRoutes } from './routes/templates.routes.js';
 import { registerValidationRoutes } from './routes/validation.routes.js';
 import { registerGraphQL } from './graphql/index.js';
+import { startDealStageConsumer } from './consumers/deal-stage.consumer.js';
 
 startTracing({ serviceName: 'blueprint-service' });
 const rawPrisma = new PrismaClient({
@@ -66,9 +67,25 @@ try {
   app.log.warn({ err }, 'Kafka producer connect failed');
 }
 
+// Deal stage-change consumer: executes playbook stage entryActions on
+// `deal.stage_changed`. Guarded so a Kafka/DB outage never stops the service
+// from booting or serving HTTP.
+let dealStageConsumer: Awaited<ReturnType<typeof startDealStageConsumer>> | null = null;
+try {
+  dealStageConsumer = await startDealStageConsumer(prisma, producer, app.log);
+  app.log.info('Deal stage consumer started (playbook entry actions)');
+} catch (err) {
+  app.log.warn({ err }, 'Deal stage consumer failed to start; continuing without stage-entry actions');
+}
+
 app.addHook('onClose', async () => {
   try {
     await producer.disconnect();
+  } catch {
+    /* ignore */
+  }
+  try {
+    await dealStageConsumer?.disconnect();
   } catch {
     /* ignore */
   }

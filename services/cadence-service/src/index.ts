@@ -9,6 +9,7 @@ import { createEnrollmentsService } from './services/enrollments.service.js';
 import { createQueueService } from './services/queue.service.js';
 import { registerCadencesRoutes } from './routes/cadences.routes.js';
 import { registerEnrollmentsRoutes } from './routes/enrollments.routes.js';
+import { registerInternalRoutes } from './routes/internal.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 
 startTracing({ serviceName: 'cadence-service' });
@@ -54,7 +55,7 @@ registerHealthRoutes(app, 'cadence-service', [() => checkDatabase(prisma as any)
 app.setErrorHandler(globalErrorHandler);
 
 await producer.connect().catch(() => undefined);
-await consumer.subscribe([TOPICS.ACTIVITIES]).catch(() => undefined);
+await consumer.subscribe([TOPICS.ACTIVITIES, TOPICS.EMAILS]).catch(() => undefined);
 consumer.on('activity.completed', async (event) => {
   const payload = event.payload as { type?: string; contactId?: string };
   if (payload.type !== 'MEETING' || !payload.contactId) return;
@@ -65,6 +66,28 @@ consumer.on('activity.completed', async (event) => {
     rows.map((r) => enrollments.exitEnrollment(event.tenantId, r.id, 'meeting_booked'))
   );
 });
+
+// exitOnReply: when a prospect replies to an email, exit their active
+// enrollments whose cadence template has exitOnReply=true. This mirrors the
+// exitOnMeeting consumer above but gates on the template flag. comm-service /
+// email-sync can drive this either by emitting a reply event on the EMAILS
+// topic, or by calling the internal /internal/cadence/reply-signal endpoint.
+// Both paths are fully guarded so a Kafka/DB hiccup can never crash the service.
+const handleReplySignal = async (event: {
+  tenantId: string;
+  payload: unknown;
+}): Promise<void> => {
+  try {
+    const payload = (event.payload ?? {}) as { contactId?: string; leadId?: string; objectId?: string };
+    const objectId = payload.contactId ?? payload.leadId ?? payload.objectId;
+    if (!event.tenantId || !objectId) return;
+    await enrollments.exitEnrollmentsForObject(event.tenantId, objectId, 'exitOnReply', 'replied');
+  } catch {
+    /* never let a reply signal crash the consumer */
+  }
+};
+consumer.on('email.replied', handleReplySignal);
+consumer.on('email.received', handleReplySignal);
 await consumer.start().catch(() => undefined);
 
 app.addHook('onClose', async () => {
@@ -78,4 +101,5 @@ await registerGraphQL(app, prisma);
 await startService(app, port, async () => {
   await registerCadencesRoutes(app, cadences);
   await registerEnrollmentsRoutes(app, enrollments);
+  await registerInternalRoutes(app, enrollments);
 });

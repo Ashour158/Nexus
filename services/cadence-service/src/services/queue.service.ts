@@ -1,5 +1,21 @@
+import { createHash } from 'node:crypto';
 import { TOPICS, type NexusProducer } from '@nexus/kafka';
 import type { CadencePrisma } from '../prisma.js';
+
+/**
+ * Deterministically pick the A/B bucket for an enrollment.
+ *
+ * The previous implementation used `enrollment.id.length % 2`, but cuid ids are
+ * effectively fixed-length so that expression almost always resolved to the same
+ * value — the split was heavily skewed and not random. Instead we hash the
+ * enrollment id and use the low bit of the digest, which is uniformly distributed
+ * (~50/50) while remaining stable for a given enrollment (so re-processing a step
+ * never flips the variant).
+ */
+function pickVariant(enrollmentId: string): 'A' | 'B' {
+  const digest = createHash('sha256').update(enrollmentId).digest();
+  return (digest[0] & 1) === 1 ? 'B' : 'A';
+}
 
 export function createQueueService(prisma: CadencePrisma, producer: NexusProducer) {
   async function resolveEmail(enrollment: {
@@ -59,8 +75,11 @@ export function createQueueService(prisma: CadencePrisma, producer: NexusProduce
       let result = 'ok';
       try {
         if (step.type === 'EMAIL') {
-          const useB = enrollment.id.length % 2 === 1 && step.variantB !== null;
-          const variant = useB ? 'B' : 'A';
+          // Only run the A/B split when a B variant is actually configured for
+          // this step; otherwise always use A.
+          const hasVariantB = step.variantB !== null && step.variantB !== undefined;
+          const variant = hasVariantB ? pickVariant(enrollment.id) : 'A';
+          const useB = variant === 'B';
           const payload = useB
             ? (step.variantB as { subject?: string; body?: string })
             : { subject: step.subject, body: step.body };

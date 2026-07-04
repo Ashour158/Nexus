@@ -8,6 +8,7 @@ import { registerPoliciesRoutes } from './routes/policies.routes.js';
 import { registerRequestsRoutes } from './routes/requests.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 import { startGdprConsumer } from './consumers/gdpr.consumer.js';
+import { startEscalationWorker } from './services/escalation.worker.js';
 
 startTracing({ serviceName: 'approval-service' });
 const port = parseInt(process.env.PORT ?? '3014', 10);
@@ -45,7 +46,16 @@ const gdprConsumer = await startGdprConsumer(prisma).catch((err) => {
 });
 
 await producer.connect().catch(() => undefined);
+
+let escalationWorker: { stop: () => void } | null = null;
+try {
+  escalationWorker = startEscalationWorker(prisma, producer);
+} catch (err) {
+  console.warn('Escalation worker failed to start;', err);
+}
+
 app.addHook('onClose', async () => {
+  try { escalationWorker?.stop(); } catch { /* ignore */ }
   try { await gdprConsumer?.disconnect(); } catch { /* ignore */ }
   try { await producer.disconnect(); } catch { /* ignore */ }
 });

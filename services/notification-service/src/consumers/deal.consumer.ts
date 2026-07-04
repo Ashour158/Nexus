@@ -1,21 +1,57 @@
 import { NexusConsumer, TOPICS } from '@nexus/kafka';
 import type { InAppChannel } from '../channels/in-app.channel.js';
 import type { EmailChannel } from '../channels/email.channel.js';
+import type { SmsChannel } from '../channels/sms.channel.js';
+import type { PushChannel } from '../channels/push.channel.js';
 import { renderActionEmail } from '../channels/email.channel.js';
 
 interface OwnerLookup {
-  (tenantId: string, userId: string): Promise<{ email?: string; name?: string }>;
+  (
+    tenantId: string,
+    userId: string
+  ): Promise<{ email?: string; name?: string; phone?: string; deviceToken?: string }>;
 }
 
 interface DealConsumerDeps {
   inApp: InAppChannel;
   email: EmailChannel;
+  sms: SmsChannel;
+  push: PushChannel;
   lookupOwner: OwnerLookup;
   log: {
     info: (...args: unknown[]) => void;
     warn: (...args: unknown[]) => void;
     error: (...args: unknown[]) => void;
   };
+}
+
+/**
+ * Best-effort SMS + push fan-out. Each channel is already a guarded no-op when
+ * unconfigured; this helper additionally isolates any unexpected failure so one
+ * channel can never block the other or the consumer.
+ */
+async function fanOutSmsPush(
+  deps: Pick<DealConsumerDeps, 'sms' | 'push' | 'log'>,
+  target: { phone?: string; deviceToken?: string },
+  msg: { title: string; body: string; actionUrl?: string }
+): Promise<void> {
+  await Promise.allSettled([
+    target.phone
+      ? deps.sms
+          .send({ to: target.phone, body: `${msg.title}: ${msg.body}` })
+          .catch((err) => deps.log.error({ err }, 'sms fan-out failed'))
+      : Promise.resolve(),
+    target.deviceToken
+      ? deps.push
+          .send({
+            to: target.deviceToken,
+            title: msg.title,
+            body: msg.body,
+            actionUrl: msg.actionUrl,
+          })
+          .catch((err) => deps.log.error({ err }, 'push fan-out failed'))
+      : Promise.resolve(),
+  ]);
 }
 
 /**
@@ -54,6 +90,11 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
         }),
       });
     }
+    await fanOutSmsPush(deps, owner, {
+      title,
+      body,
+      actionUrl: `/deals/${payload.dealId}`,
+    });
   });
 
   consumer.on('deal.lost', async (event) => {
@@ -84,6 +125,11 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
         }),
       });
     }
+    await fanOutSmsPush(deps, owner, {
+      title,
+      body,
+      actionUrl: `/deals/${payload.dealId}`,
+    });
   });
 
   consumer.on('deal.stage_changed', async (event) => {
@@ -101,16 +147,24 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
         (Date.now() - stageChangedAt) / (1000 * 60 * 60 * 24)
       );
       if (daysInStage > rottenDays) {
+        const title = '⏰ Deal is stalling';
+        const body = `Deal ${payload.dealId} has been in stage for ${daysInStage} days (limit ${rottenDays}). Time to nudge it.`;
         await deps.inApp.send({
           tenantId: event.tenantId,
           userId: payload.ownerId,
           type: 'deal.rotten',
-          title: '⏰ Deal is stalling',
-          body: `Deal ${payload.dealId} has been in stage for ${daysInStage} days (limit ${rottenDays}). Time to nudge it.`,
+          title,
+          body,
           entityType: 'Deal',
           entityId: payload.dealId,
           actionUrl: `/deals/${payload.dealId}`,
           metadata: { daysInStage, rottenDays },
+        });
+        const owner = await deps.lookupOwner(event.tenantId, payload.ownerId);
+        await fanOutSmsPush(deps, owner, {
+          title,
+          body,
+          actionUrl: `/deals/${payload.dealId}`,
         });
       }
     }

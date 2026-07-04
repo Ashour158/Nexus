@@ -2,9 +2,10 @@ import 'dotenv/config';
 import { createService, registerHealthRoutes, startService, checkDatabase, requireEnv } from '@nexus/service-utils';
 import { startTracing } from '@nexus/service-utils/tracing';
 import rateLimit from '@fastify/rate-limit';
-import { createAccountsPrisma, tenantAls } from './prisma.js';
+import { createAccountsPrisma, createAccountsBasePrisma, tenantAls } from './prisma.js';
 import { registerRoutes } from './routes/index.js';
 import { registerGraphQL } from './graphql/index.js';
+import { startAccountHealthConsumer } from './consumers/account-health.consumer.js';
 
 const env = requireEnv(['ACCOUNTS_DATABASE_URL', 'JWT_SECRET']);
 const port = Number(process.env.PORT ?? '3031');
@@ -41,6 +42,23 @@ registerHealthRoutes(app, 'accounts-service', [() => checkDatabase(prisma as any
 
 await registerRoutes(app, prisma as any);
 await registerGraphQL(app, prisma);
+
+// ─── Account health scoring consumer (best-effort) ─────────────────────────
+// Maintains AccountHealthScore from deal.* events. Guarded so a missing/broken
+// Kafka never prevents the service from booting or serving HTTP traffic.
+const healthPrisma = createAccountsBasePrisma();
+let healthConsumer: Awaited<ReturnType<typeof startAccountHealthConsumer>> | null = null;
+try {
+  healthConsumer = await startAccountHealthConsumer(healthPrisma as any, app.log as any);
+  app.log.info('accounts-service: account-health consumer started');
+} catch (err) {
+  app.log.error({ err }, 'accounts-service: failed to start account-health consumer (continuing without it)');
+}
+
+app.addHook('onClose', async () => {
+  try { if (healthConsumer) await healthConsumer.disconnect(); } catch { /* ignore */ }
+  try { await (healthPrisma as any).$disconnect(); } catch { /* ignore */ }
+});
 
 await startService(app, port, async () => {
   await (prisma as any).$disconnect();

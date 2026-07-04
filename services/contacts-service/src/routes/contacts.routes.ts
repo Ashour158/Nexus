@@ -46,6 +46,14 @@ const DuplicateSchema = z.object({
   lastName: z.string().optional(),
   accountId: z.string().optional(),
 });
+const ConsentSchema = z.object({
+  channel: z.string().min(1),
+  status: z.enum(['granted', 'withdrawn', 'pending']),
+  source: z.string().optional(),
+  ipAddress: z.string().optional(),
+  expiresAt: z.coerce.date().optional(),
+  notes: z.string().optional(),
+});
 const BulkSchema = z.object({
   ids: z.array(z.string().min(1)).min(1),
   action: z.enum(['archive', 'restore', 'update']).optional(),
@@ -290,6 +298,30 @@ export async function registerContactsRoutes(
           const jwt = request.user as JwtPayload;
           const rows = await contacts.listAuditEvents(jwt.tenantId, id);
           return reply.send({ success: true, data: rows });
+        }
+      );
+
+      r.get(
+        '/contacts/:id/consent',
+        { preHandler: requirePermission(PERMISSIONS.CONTACTS.READ) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const consents = await contacts.listConsents(jwt.tenantId, id);
+          return reply.send({ success: true, data: consents });
+        }
+      );
+
+      r.post(
+        '/contacts/:id/consent',
+        { preHandler: requirePermission(PERMISSIONS.CONTACTS.UPDATE) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const parsed = ConsentSchema.safeParse(request.body);
+          if (!parsed.success) throw new ValidationError('Invalid body', parsed.error.flatten());
+          const jwt = request.user as JwtPayload;
+          const consent = await contacts.recordConsent(jwt.tenantId, id, parsed.data, actorId(request.user));
+          return reply.code(201).send({ success: true, data: consent });
         }
       );
 

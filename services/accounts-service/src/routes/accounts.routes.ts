@@ -18,6 +18,28 @@ import { createCodingClient } from '@nexus/service-utils';
 
 const codingClient = createCodingClient({ baseURL: process.env.METADATA_SERVICE_URL ?? 'http://localhost:3004' });
 
+/** Lightweight projection returned for each node in a hierarchy response. */
+const HIERARCHY_NODE_SELECT = {
+  id: true,
+  name: true,
+  parentAccountId: true,
+  type: true,
+  status: true,
+} as const;
+
+interface HierarchyNode {
+  id: string;
+  name: string;
+  parentAccountId: string | null;
+  type: AccountType;
+  status: AccountStatus;
+}
+
+interface HierarchyTreeNode extends HierarchyNode {
+  childrenCount: number;
+  children: HierarchyTreeNode[];
+}
+
 /**
  * Registers the standalone accounts route family.
  */
@@ -107,6 +129,149 @@ export async function registerAccountsRoutes(
             });
           }
           return reply.send({ success: true, data: account });
+        }
+      );
+
+      // ─── HIERARCHY: parent + direct children ────────────────────────────
+      r.get(
+        '/accounts/:id/hierarchy',
+        { preHandler: requirePermission(PERMISSIONS.ACCOUNTS.READ) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const tenantId = jwt.tenantId;
+
+          const root = await prisma.account.findFirst({
+            where: { id, tenantId, deletedAt: null },
+          });
+          if (!root) {
+            return reply.code(404).send({
+              success: false,
+              error: { code: 'NOT_FOUND', message: 'Account not found', requestId: request.id },
+            });
+          }
+
+          const parent = root.parentAccountId
+            ? await prisma.account.findFirst({
+                where: { id: root.parentAccountId, tenantId, deletedAt: null },
+                select: HIERARCHY_NODE_SELECT,
+              })
+            : null;
+
+          // Depth cap guards against cycles / pathological trees. We resolve the
+          // subtree breadth-first, one level per query, never revisiting an id.
+          const MAX_DEPTH = 10;
+          const visited = new Set<string>([root.id]);
+          const nodesById = new Map<string, HierarchyNode>();
+          const childrenByParent = new Map<string, HierarchyNode[]>();
+
+          let frontier: string[] = [root.id];
+          let depth = 0;
+          let truncated = false;
+
+          while (frontier.length > 0) {
+            if (depth >= MAX_DEPTH) {
+              truncated = true;
+              break;
+            }
+            const children = await prisma.account.findMany({
+              where: { tenantId, deletedAt: null, parentAccountId: { in: frontier } },
+              select: HIERARCHY_NODE_SELECT,
+            });
+            const next: string[] = [];
+            for (const child of children) {
+              if (visited.has(child.id)) continue; // cycle guard
+              visited.add(child.id);
+              nodesById.set(child.id, child);
+              const bucket = childrenByParent.get(child.parentAccountId!) ?? [];
+              bucket.push(child);
+              childrenByParent.set(child.parentAccountId!, bucket);
+              next.push(child.id);
+            }
+            frontier = next;
+            depth += 1;
+          }
+
+          // Aggregate local pipeline roll-up from health records across the subtree.
+          const subtreeIds = [root.id, ...nodesById.keys()];
+          const healthRows = await prisma.accountHealthScore.findMany({
+            where: { tenantId, accountId: { in: subtreeIds } },
+            select: { accountId: true, openDealsCount: true, wonDealsCount: true, lostDealsCount: true },
+          });
+          const rollup = healthRows.reduce(
+            (acc, h) => {
+              acc.openDealsCount += h.openDealsCount;
+              acc.wonDealsCount += h.wonDealsCount;
+              acc.lostDealsCount += h.lostDealsCount;
+              return acc;
+            },
+            { openDealsCount: 0, wonDealsCount: 0, lostDealsCount: 0 }
+          );
+
+          const buildSubtree = (node: HierarchyNode): HierarchyTreeNode => {
+            const kids = childrenByParent.get(node.id) ?? [];
+            return {
+              ...node,
+              childrenCount: kids.length,
+              children: kids.map(buildSubtree),
+            };
+          };
+
+          const rootChildren = childrenByParent.get(root.id) ?? [];
+          const subtree: HierarchyTreeNode = {
+            id: root.id,
+            name: root.name,
+            parentAccountId: root.parentAccountId,
+            type: root.type,
+            status: root.status,
+            childrenCount: rootChildren.length,
+            children: rootChildren.map(buildSubtree),
+          };
+
+          return reply.send({
+            success: true,
+            data: {
+              account: subtree,
+              parent,
+              totalDescendants: nodesById.size,
+              maxDepth: MAX_DEPTH,
+              truncated,
+              pipelineRollup: rollup,
+            },
+          });
+        }
+      );
+
+      // ─── HIERARCHY: direct children only ────────────────────────────────
+      r.get(
+        '/accounts/:id/children',
+        { preHandler: requirePermission(PERMISSIONS.ACCOUNTS.READ) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const tenantId = jwt.tenantId;
+
+          const parentExists = await prisma.account.findFirst({
+            where: { id, tenantId, deletedAt: null },
+            select: { id: true },
+          });
+          if (!parentExists) {
+            return reply.code(404).send({
+              success: false,
+              error: { code: 'NOT_FOUND', message: 'Account not found', requestId: request.id },
+            });
+          }
+
+          const children = await prisma.account.findMany({
+            where: { tenantId, deletedAt: null, parentAccountId: id },
+            select: HIERARCHY_NODE_SELECT,
+            orderBy: { name: 'asc' },
+          });
+
+          return reply.send({
+            success: true,
+            data: { children, childrenCount: children.length },
+          });
         }
       );
 

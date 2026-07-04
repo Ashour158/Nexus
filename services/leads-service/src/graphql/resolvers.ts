@@ -1,5 +1,6 @@
 import { GraphQLScalarType, Kind } from 'graphql';
 import type { GraphQLContext } from './context.js';
+import { computeLeadScore } from '../scoring.js';
 
 const DateTime = new GraphQLScalarType({
   name: 'DateTime',
@@ -41,12 +42,14 @@ export const resolvers = {
   JSON: JSONScalar,
   Query: {
     async leads(_parent: unknown, { limit = 20, offset = 0 }: { limit?: number; offset?: number }, ctx: GraphQLContext) {
-      const where = ctx.tenantId ? { tenantId: ctx.tenantId } : {};
+      // Exclude soft-deleted rows, matching the REST convention.
+      const where: any = { deletedAt: null };
+      if (ctx.tenantId) where.tenantId = ctx.tenantId;
       const records = await ctx.prisma.lead.findMany({ where, take: Math.min(limit, 100), skip: offset });
       return records.map(mapRecord);
     },
     async lead(_parent: unknown, { id }: { id: string }, ctx: GraphQLContext) {
-      const where: any = { id };
+      const where: any = { id, deletedAt: null };
       if (ctx.tenantId) where.tenantId = ctx.tenantId;
       const record = await ctx.prisma.lead.findFirst({ where });
       return record ? mapRecord(record) : null;
@@ -87,19 +90,30 @@ export const resolvers = {
   },
   Mutation: {
     async createLead(_parent: unknown, { input }: { input: any }, ctx: GraphQLContext) {
-      const data = { ...input, tenantId: input.tenantId ?? ctx.tenantId ?? '' };
+      const tenantId = input.tenantId ?? ctx.tenantId ?? '';
+      // Configurable scoring rules drive the score (fail-open to a default).
+      const score = await computeLeadScore(ctx.prisma, tenantId || null, input);
+      const data = { ...input, tenantId, score };
       const record = await ctx.prisma.lead.create({ data });
       return mapRecord(record);
     },
     async updateLead(_parent: unknown, { id, input }: { id: string; input: any }, ctx: GraphQLContext) {
       const where = ctx.tenantId ? { id, tenantId: ctx.tenantId } : { id };
-      const { count } = await ctx.prisma.lead.updateMany({ where, data: input });
+      const existing = await ctx.prisma.lead.findFirst({ where: { ...where, deletedAt: null } });
+      if (!existing) throw new Error('NOT_FOUND');
+      // Re-score using configurable rules over the merged (existing + patch) lead.
+      const score = await computeLeadScore(ctx.prisma, ctx.tenantId, { ...existing, ...input });
+      const { count } = await ctx.prisma.lead.updateMany({ where, data: { ...input, score } });
       if (count === 0) throw new Error('NOT_FOUND');
       return mapRecord(await ctx.prisma.lead.findUnique({ where: { id } }));
     },
     async deleteLead(_parent: unknown, { id }: { id: string }, ctx: GraphQLContext) {
+      // Soft-delete, matching the REST service behavior (was a hard deleteMany).
       const where = ctx.tenantId ? { id, tenantId: ctx.tenantId } : { id };
-      const { count } = await ctx.prisma.lead.deleteMany({ where });
+      const { count } = await ctx.prisma.lead.updateMany({
+        where: { ...where, deletedAt: null },
+        data: { deletedAt: new Date() },
+      });
       if (count === 0) throw new Error('NOT_FOUND');
       return true;
     },

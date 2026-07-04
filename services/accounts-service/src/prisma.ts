@@ -48,6 +48,17 @@ async function publishEvent(
   }
 }
 
+/**
+ * Creates a bare Prisma client (no tenant extension, no outbox hook). Used by
+ * background workers (e.g. the account-health Kafka consumer) that run outside
+ * a request context and therefore pass `tenantId` explicitly in every query.
+ */
+export function createAccountsBasePrisma(): PrismaClient {
+  return new PrismaClient({
+    datasources: { db: { url: process.env.ACCOUNTS_DATABASE_URL } },
+  });
+}
+
 export function createAccountsPrisma() {
   const base = createPrismaClientWithReplicas(
     (url: string) => new PrismaClient({ datasources: { db: { url } } }),

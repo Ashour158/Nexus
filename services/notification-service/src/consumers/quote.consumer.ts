@@ -1,11 +1,15 @@
 import { NexusConsumer, TOPICS } from '@nexus/kafka';
 import type { InAppChannel } from '../channels/in-app.channel.js';
 import type { EmailChannel } from '../channels/email.channel.js';
+import type { SmsChannel } from '../channels/sms.channel.js';
+import type { PushChannel } from '../channels/push.channel.js';
 import { renderActionEmail } from '../channels/email.channel.js';
 
 interface QuoteConsumerDeps {
   inApp: InAppChannel;
   email: EmailChannel;
+  sms: SmsChannel;
+  push: PushChannel;
   log: {
     info: (...args: unknown[]) => void;
     warn: (...args: unknown[]) => void;
@@ -13,10 +17,39 @@ interface QuoteConsumerDeps {
   };
 }
 
+/**
+ * Best-effort SMS + push fan-out. Channels are already guarded no-ops when
+ * unconfigured; this isolates any failure so one channel can never block the
+ * other or the consumer.
+ */
+async function fanOutSmsPush(
+  deps: Pick<QuoteConsumerDeps, 'sms' | 'push' | 'log'>,
+  target: { phone?: string; deviceToken?: string },
+  msg: { title: string; body: string; actionUrl?: string }
+): Promise<void> {
+  await Promise.allSettled([
+    target.phone
+      ? deps.sms
+          .send({ to: target.phone, body: `${msg.title}: ${msg.body}` })
+          .catch((err) => deps.log.error({ err }, 'sms fan-out failed'))
+      : Promise.resolve(),
+    target.deviceToken
+      ? deps.push
+          .send({
+            to: target.deviceToken,
+            title: msg.title,
+            body: msg.body,
+            actionUrl: msg.actionUrl,
+          })
+          .catch((err) => deps.log.error({ err }, 'push fan-out failed'))
+      : Promise.resolve(),
+  ]);
+}
+
 async function resolveDealOwner(
   tenantId: string,
   dealId: string
-): Promise<{ ownerId?: string; email?: string } | null> {
+): Promise<{ ownerId?: string; email?: string; phone?: string; deviceToken?: string } | null> {
   const base = process.env.CRM_SERVICE_URL ?? 'http://localhost:3001/api/v1';
   try {
     const controller = new AbortController();
@@ -35,9 +68,20 @@ async function resolveDealOwner(
     const json = (await res.json()) as { data?: unknown };
     const body = (json.data ?? json) as {
       ownerId?: string;
-      owner?: { email?: string };
+      owner?: {
+        email?: string;
+        phone?: string;
+        phoneNumber?: string;
+        deviceToken?: string;
+        pushToken?: string;
+      };
     };
-    return { ownerId: body?.ownerId, email: body?.owner?.email };
+    return {
+      ownerId: body?.ownerId,
+      email: body?.owner?.email,
+      phone: body?.owner?.phone ?? body?.owner?.phoneNumber,
+      deviceToken: body?.owner?.deviceToken ?? body?.owner?.pushToken,
+    };
   } catch {
     return null;
   }
@@ -97,6 +141,11 @@ export async function startQuoteConsumer(
         }),
       });
     }
+    await fanOutSmsPush(deps, info, {
+      title,
+      body,
+      actionUrl: `/quotes/${event.payload.quoteId}`,
+    });
   });
 
   consumer.on('quote.rejected', async (event) => {

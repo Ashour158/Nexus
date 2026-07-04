@@ -5,6 +5,7 @@ import { NexusProducer, TOPICS } from '@nexus/kafka';
 import { Prisma } from '../../../../node_modules/.prisma/contacts-client/index.js';
 import type {
   Contact,
+  ConsentRecord,
   ContactAuditEvent,
   ContactDocument,
   ContactFieldHistory,
@@ -44,6 +45,15 @@ export interface ContactMailThreadInput {
   lastMessageAt?: Date;
   snippet?: string;
   isRead?: boolean;
+}
+
+export interface ConsentRecordInput {
+  channel: string;
+  status: string;
+  source?: string;
+  ipAddress?: string;
+  expiresAt?: Date;
+  notes?: string;
 }
 
 const codingClient = createCodingClient({ baseURL: process.env.METADATA_SERVICE_URL ?? 'http://localhost:3004' });
@@ -226,6 +236,8 @@ async function writeOutbox(
   await tx.outboxMessage.create({
     data: {
       topic,
+      tenantId,
+      eventType: topic,
       aggregateId: contactId,
       payload: { tenantId, contactId, ...payload },
       headers: { actorId },
@@ -577,6 +589,75 @@ export function createContactsService(prisma: ContactsPrisma, producer: NexusPro
       return prisma.outboxMessage.findMany({ where: { aggregateId: contactId }, orderBy: { createdAt: 'desc' } });
     },
 
+    /**
+     * GDPR governance: record a consent grant/withdrawal for a channel. Upserts
+     * on (tenantId, contactId, channel) so the latest state per channel is
+     * authoritative, keeps grantedAt/withdrawnAt in step with the status, and
+     * keeps the contact's gdprConsent flag coherent for the email channel.
+     */
+    async recordConsent(
+      tenantId: string,
+      contactId: string,
+      input: ConsentRecordInput,
+      actorId: string
+    ): Promise<ConsentRecord> {
+      await loadOrThrow(tenantId, contactId);
+      const now = new Date();
+      const granted = input.status.toLowerCase() === 'granted';
+      const withdrawn = input.status.toLowerCase() === 'withdrawn';
+      return prisma.$transaction(async (tx) => {
+        const record = await tx.consentRecord.upsert({
+          where: { tenantId_contactId_channel: { tenantId, contactId, channel: input.channel } },
+          update: {
+            status: input.status,
+            source: input.source ?? null,
+            ipAddress: input.ipAddress ?? null,
+            expiresAt: input.expiresAt ?? null,
+            notes: input.notes ?? null,
+            recordedBy: actorId,
+            grantedAt: granted ? now : undefined,
+            withdrawnAt: withdrawn ? now : undefined,
+          },
+          create: {
+            tenantId,
+            contactId,
+            channel: input.channel,
+            status: input.status,
+            source: input.source ?? null,
+            ipAddress: input.ipAddress ?? null,
+            expiresAt: input.expiresAt ?? null,
+            notes: input.notes ?? null,
+            recordedBy: actorId,
+            grantedAt: granted ? now : null,
+            withdrawnAt: withdrawn ? now : null,
+          },
+        });
+        if (input.channel.toLowerCase() === 'email') {
+          await tx.contact.update({
+            where: { id: contactId },
+            data: { gdprConsent: granted, gdprConsentAt: granted ? now : null },
+          });
+        }
+        await writeAudit(tx, tenantId, contactId, 'Consent recorded', actorId, {
+          channel: input.channel,
+          status: input.status,
+        });
+        await writeOutbox(tx, 'contact.consent_recorded', tenantId, contactId, {
+          channel: input.channel,
+          status: input.status,
+        }, actorId);
+        return record;
+      });
+    },
+
+    async listConsents(tenantId: string, contactId: string): Promise<ConsentRecord[]> {
+      await loadOrThrow(tenantId, contactId);
+      return prisma.consentRecord.findMany({
+        where: { tenantId, contactId },
+        orderBy: { updatedAt: 'desc' },
+      });
+    },
+
     async listTimeline(tenantId: string, contactId: string): Promise<Array<Record<string, unknown>>> {
       await loadOrThrow(tenantId, contactId);
       const [audit, fieldHistory, documents, mailThreads, lifecycle] = await Promise.all([
@@ -647,6 +728,64 @@ export function createContactsService(prisma: ContactsPrisma, producer: NexusPro
             version: { increment: 1 },
           },
         });
+        // Reparent the duplicate's child rows onto the master so they are not
+        // orphaned on the tombstone. Simple 1:N children move unconditionally.
+        const reparented: Record<string, number> = {};
+        reparented.notes = (await tx.note.updateMany({
+          where: { tenantId, contactId: duplicate.id },
+          data: { contactId: master.id },
+        })).count;
+        reparented.documents = (await tx.contactDocument.updateMany({
+          where: { tenantId, contactId: duplicate.id },
+          data: { contactId: master.id },
+        })).count;
+        reparented.auditEvents = (await tx.contactAuditEvent.updateMany({
+          where: { tenantId, contactId: duplicate.id },
+          data: { contactId: master.id },
+        })).count;
+        reparented.fieldHistory = (await tx.contactFieldHistory.updateMany({
+          where: { tenantId, contactId: duplicate.id },
+          data: { contactId: master.id },
+        })).count;
+        reparented.lifecycleEvents = (await tx.contactLifecycleEvent.updateMany({
+          where: { tenantId, contactId: duplicate.id },
+          data: { contactId: master.id },
+        })).count;
+
+        // Mail threads and consent records carry composite unique constraints
+        // ((tenantId, provider, externalId) and (tenantId, contactId, channel)),
+        // so a blind updateMany could collide with an existing master row.
+        // Move only the rows whose key is not already present on the master.
+        const dupThreads = await tx.contactMailThread.findMany({
+          where: { tenantId, contactId: duplicate.id, deletedAt: null },
+          select: { id: true, provider: true, externalId: true },
+        });
+        for (const thread of dupThreads) {
+          const clash = await tx.contactMailThread.findFirst({
+            where: { tenantId, contactId: master.id, provider: thread.provider, externalId: thread.externalId },
+            select: { id: true },
+          });
+          if (!clash) {
+            await tx.contactMailThread.update({ where: { id: thread.id }, data: { contactId: master.id } });
+            reparented.mailThreads = (reparented.mailThreads ?? 0) + 1;
+          }
+        }
+
+        const dupConsents = await tx.consentRecord.findMany({
+          where: { tenantId, contactId: duplicate.id },
+          select: { id: true, channel: true },
+        });
+        for (const consent of dupConsents) {
+          const clash = await tx.consentRecord.findFirst({
+            where: { tenantId, contactId: master.id, channel: consent.channel },
+            select: { id: true },
+          });
+          if (!clash) {
+            await tx.consentRecord.update({ where: { id: consent.id }, data: { contactId: master.id } });
+            reparented.consents = (reparented.consents ?? 0) + 1;
+          }
+        }
+
         await tx.contact.update({
           where: { id: duplicate.id },
           data: {
@@ -658,7 +797,7 @@ export function createContactsService(prisma: ContactsPrisma, producer: NexusPro
             lifecycleStage: 'Archived',
           },
         });
-        await writeAudit(tx, tenantId, master.id, 'Contact merged', actorId, { mergedContactId: duplicate.id });
+        await writeAudit(tx, tenantId, master.id, 'Contact merged', actorId, { mergedContactId: duplicate.id, reparented });
         await writeOutbox(tx, 'contact.merged', tenantId, master.id, { mergedContactId: duplicate.id }, actorId);
         return merged;
       });

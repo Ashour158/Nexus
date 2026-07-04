@@ -17,6 +17,7 @@ import {
 } from '@nexus/validation';
 import type { LeadsPrisma } from '../prisma.js';
 import { createCodingClient } from '@nexus/service-utils';
+import { computeLeadScore } from '../scoring.js';
 
 const codingClient = createCodingClient({ baseURL: process.env.METADATA_SERVICE_URL ?? 'http://localhost:3004' });
 const crmClient = createHttpClient({ baseURL: process.env.CRM_SERVICE_URL ?? 'http://localhost:3001' });
@@ -105,8 +106,10 @@ export async function registerLeadsRoutes(
           }
           const jwt = request.user as JwtPayload;
           const code = await codingClient.allocateCode(jwt.tenantId, 'LEAD', { ownerId: parsed.data.ownerId });
+          // Configurable scoring rules drive the score (fail-open to a default).
+          const score = await computeLeadScore(prisma, jwt.tenantId, parsed.data);
           const lead = await prisma.lead.create({
-            data: { ...parsed.data, tenantId: jwt.tenantId, code } as Prisma.LeadCreateInput,
+            data: { ...parsed.data, tenantId: jwt.tenantId, code, score } as Prisma.LeadCreateInput,
           });
           return reply.code(201).send({ success: true, data: lead });
         }
@@ -143,9 +146,15 @@ export async function registerLeadsRoutes(
             throw new ValidationError('Invalid body', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
+          // Re-score using configurable rules over the merged (existing + patch)
+          // lead. Fail-open: computeLeadScore never throws, so update is safe.
+          const existing = await prisma.lead.findFirst({
+            where: { id, tenantId: jwt.tenantId, deletedAt: null },
+          });
+          const score = await computeLeadScore(prisma, jwt.tenantId, { ...(existing ?? {}), ...parsed.data });
           const lead = await prisma.lead.update({
             where: { id_tenantId: { id, tenantId: jwt.tenantId } },
-            data: parsed.data as Prisma.LeadUpdateInput,
+            data: { ...parsed.data, score } as Prisma.LeadUpdateInput,
           });
           return reply.send({ success: true, data: lead });
         }

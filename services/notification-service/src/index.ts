@@ -13,6 +13,8 @@ import { buildDatabaseUrl } from '@nexus/service-utils/db';
 import { createNotificationPrisma, tenantAls } from './prisma.js';
 import { createEmailChannel } from './channels/email.channel.js';
 import { createInAppChannel } from './channels/in-app.channel.js';
+import { createSmsChannel } from './channels/sms.channel.js';
+import { createPushChannel } from './channels/push.channel.js';
 import { startDealConsumer } from './consumers/deal.consumer.js';
 import { startActivityConsumer } from './consumers/activity.consumer.js';
 import { startQuoteConsumer } from './consumers/quote.consumer.js';
@@ -70,6 +72,11 @@ registerHealthRoutes(app, 'notification-service', [
 app.setErrorHandler(globalErrorHandler);
 
 const email = createEmailChannel(app.log);
+// SMS + push channels are fully env-gated. With no provider config they are
+// guarded no-ops (see sms.channel.ts / push.channel.ts) and never throw, so
+// existing email + in-app behaviour is unchanged.
+const sms = createSmsChannel(app.log);
+const push = createPushChannel(app.log);
 
 // Kafka producer for real-time push via NOTIFICATIONS topic
 let kafkaProducer: NexusProducer | undefined;
@@ -90,7 +97,7 @@ const inApp = createInAppChannel(prisma, kafkaProducer);
 async function lookupOwner(
   tenantId: string,
   userId: string
-): Promise<{ email?: string; name?: string }> {
+): Promise<{ email?: string; name?: string; phone?: string; deviceToken?: string }> {
   const base = process.env.AUTH_SERVICE_URL ?? 'http://localhost:3010/api/v1';
   try {
     const controller = new AbortController();
@@ -111,10 +118,16 @@ async function lookupOwner(
       email?: string;
       firstName?: string;
       lastName?: string;
+      phone?: string;
+      phoneNumber?: string;
+      deviceToken?: string;
+      pushToken?: string;
     };
     return {
       email: body?.email,
       name: [body?.firstName, body?.lastName].filter(Boolean).join(' ') || undefined,
+      phone: body?.phone ?? body?.phoneNumber,
+      deviceToken: body?.deviceToken ?? body?.pushToken,
     };
   } catch {
     return {};
@@ -124,9 +137,9 @@ async function lookupOwner(
 // Start Kafka consumers. If the cluster is unavailable we log and continue —
 // the HTTP surface still works for reading / marking-read.
 try {
-  await startDealConsumer({ inApp, email, lookupOwner, log: app.log });
+  await startDealConsumer({ inApp, email, sms, push, lookupOwner, log: app.log });
   await startActivityConsumer({ inApp, log: app.log });
-  await startQuoteConsumer({ inApp, email, log: app.log });
+  await startQuoteConsumer({ inApp, email, sms, push, log: app.log });
 } catch (err) {
   app.log.warn({ err }, 'Kafka consumers failed to start; HTTP-only mode');
 }

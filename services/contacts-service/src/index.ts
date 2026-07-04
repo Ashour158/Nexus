@@ -8,6 +8,7 @@ import { registerContactsRoutes } from './routes/contacts.routes.js';
 import { registerAccountsRoutes } from './routes/accounts.routes.js';
 import { registerCompaniesRoutes } from './routes/companies.routes.js';
 import { registerGraphQL } from './graphql/index.js';
+import { startOutboxRelay } from './outbox-relay.js';
 // REMOVED: Self-consuming sync consumer (anti-pattern). A service must not consume
 // its own events to update its own database — the write path already does that.
 // If read-models are needed, use a dedicated consumer service (e.g. search-service).
@@ -41,7 +42,12 @@ try {
   app.log.warn({ err }, 'Kafka producer connect failed; continuing without event publishing');
 }
 
+// Drain the transactional outbox: publish PENDING OutboxMessage rows to Kafka.
+// Guarded + unref'd so a Kafka/DB hiccup can never crash the service.
+const outboxRelay = startOutboxRelay(prisma, producer, app.log);
+
 app.addHook('onClose', async () => {
+  outboxRelay.stop();
   try { await producer.disconnect(); } catch { /* ignore */ }
 });
 

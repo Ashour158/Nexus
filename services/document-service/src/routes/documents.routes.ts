@@ -4,8 +4,32 @@ import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
 import { renderQuoteHtml, type QuoteData } from '../services/templates/quote.template.js';
 import { renderContractHtml } from '../services/templates/contract.template.js';
 import { htmlToPdf } from '../services/pdf.service.js';
+import {
+  storePdf,
+  downloadUrlForKey,
+  type DocumentStoragePrisma,
+} from '../services/document-storage.service.js';
+
+/** Prisma surface this route module needs beyond the storage helper's. */
+interface DocumentsRoutesPrisma extends DocumentStoragePrisma {
+  document: DocumentStoragePrisma['document'] & {
+    findFirst(args: {
+      where: Record<string, unknown>;
+    }): Promise<{ id: string; storageKey: string; name: string } | null>;
+  };
+}
 
 const QuoteIdParams = z.object({ quoteId: z.string().cuid() });
+const DocumentIdParams = z.object({ documentId: z.string().uuid() });
+const DownloadQuery = z.object({
+  expirySeconds: z.coerce.number().min(60).max(604800).optional(),
+});
+
+/** Extract tenantId / userId from the verified JWT on the request. */
+function principal(request: unknown): { tenantId: string; userId: string } {
+  const u = (request as { user?: { tenantId?: string; sub?: string } }).user;
+  return { tenantId: u?.tenantId ?? 'unknown', userId: u?.sub ?? 'unknown' };
+}
 const RenderSchema = z.object({
   template: z.enum(['quote', 'contract']),
   data: z.record(z.unknown()),
@@ -48,7 +72,7 @@ function sanitizeHtmlStrings(obj: unknown): unknown {
   return obj;
 }
 
-export async function registerDocumentsRoutes(app: FastifyInstance) {
+export async function registerDocumentsRoutes(app: FastifyInstance, prisma?: DocumentsRoutesPrisma) {
   app.post(
     '/api/v1/documents/quotes/:quoteId/pdf',
     { preHandler: requirePermission(PERMISSIONS.DOCUMENTS.READ) },
@@ -89,6 +113,18 @@ export async function registerDocumentsRoutes(app: FastifyInstance) {
       lineItems,
     } satisfies QuoteData);
     const pdf = await htmlToPdf(html);
+    // GUARDED: persist to MinIO if configured; never block the PDF response.
+    if (prisma) {
+      const { tenantId, userId } = principal(request);
+      const stored = await storePdf(prisma, request.log, {
+        tenantId,
+        ownerId: userId,
+        name: `quote-${String(q.quoteNumber ?? 'NA')}.pdf`,
+        bytes: pdf,
+      });
+      if (stored.documentId) reply.header('X-Document-Id', stored.documentId);
+      if (stored.storageKey) reply.header('X-Storage-Key', stored.storageKey);
+    }
     reply
       .header('Content-Type', 'application/pdf')
       .header(
@@ -109,6 +145,18 @@ export async function registerDocumentsRoutes(app: FastifyInstance) {
         ? renderQuoteHtml(sanitizedData as unknown as QuoteData)
         : renderContractHtml(sanitizedData);
     const pdf = await htmlToPdf(html);
+    // GUARDED: persist to MinIO if configured; never block the PDF response.
+    if (prisma) {
+      const { tenantId, userId } = principal(request);
+      const stored = await storePdf(prisma, request.log, {
+        tenantId,
+        ownerId: userId,
+        name: `${body.template}.pdf`,
+        bytes: pdf,
+      });
+      if (stored.documentId) reply.header('X-Document-Id', stored.documentId);
+      if (stored.storageKey) reply.header('X-Storage-Key', stored.storageKey);
+    }
     reply.header('Content-Type', 'application/pdf');
     return reply.send(pdf);
   });
@@ -124,6 +172,22 @@ export async function registerDocumentsRoutes(app: FastifyInstance) {
         : renderContractHtml(sanitizedData);
     const pdf = await htmlToPdf(html);
 
+    // GUARDED: persist the generated e-sign document to MinIO if configured.
+    // Falls back to inline preview (existing behavior) when unavailable.
+    let esignStorageKey: string | undefined;
+    let esignDocumentId: string | undefined;
+    if (prisma) {
+      const { tenantId, userId } = principal(request);
+      const stored = await storePdf(prisma, request.log, {
+        tenantId,
+        ownerId: userId,
+        name: `${body.documentType}.pdf`,
+        bytes: pdf,
+      });
+      esignStorageKey = stored.storageKey;
+      esignDocumentId = stored.documentId;
+    }
+
     const accountId = process.env.DOCUSIGN_ACCOUNT_ID;
     const accessToken = process.env.DOCUSIGN_ACCESS_TOKEN;
     const baseUrl = process.env.DOCUSIGN_BASE_URL ?? 'https://demo.docusign.net/restapi';
@@ -135,6 +199,8 @@ export async function registerDocumentsRoutes(app: FastifyInstance) {
           envelopeId: null,
           status: 'PENDING_PROVIDER_CONFIGURATION',
           previewUrl: `data:application/pdf;base64,${pdf.toString('base64')}`,
+          documentId: esignDocumentId ?? null,
+          storageKey: esignStorageKey ?? null,
           signers: body.signers,
           message: 'DocuSign is not configured. Set DOCUSIGN_ACCOUNT_ID and DOCUSIGN_ACCESS_TOKEN to enable sending.',
         },
@@ -194,8 +260,55 @@ export async function registerDocumentsRoutes(app: FastifyInstance) {
       data: {
         envelopeId: dsData.envelopeId,
         status: dsData.status.toUpperCase(),
+        documentId: esignDocumentId ?? null,
+        storageKey: esignStorageKey ?? null,
         signers: body.signers,
       },
     });
   });
+
+  // Presigned download URL for a stored document (mirrors storage-service).
+  app.get(
+    '/api/v1/documents/:documentId/download-url',
+    { preHandler: requirePermission(PERMISSIONS.DOCUMENTS.READ) },
+    async (request, reply) => {
+      const { documentId } = DocumentIdParams.parse(request.params);
+      const { expirySeconds } = DownloadQuery.parse(request.query);
+      if (!prisma) {
+        return reply.code(503).send({
+          success: false,
+          error: {
+            code: 'STORAGE_UNAVAILABLE',
+            message: 'Document persistence is not enabled.',
+            requestId: request.id,
+          },
+        });
+      }
+      const { tenantId } = principal(request);
+      const doc = await prisma.document.findFirst({
+        where: { id: documentId, tenantId, isDeleted: false },
+      });
+      if (!doc) {
+        return reply.code(404).send({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Document not found', requestId: request.id },
+        });
+      }
+      const result = downloadUrlForKey(request.log, doc.storageKey, expirySeconds ?? 3600);
+      if (!result) {
+        return reply.code(503).send({
+          success: false,
+          error: {
+            code: 'STORAGE_UNAVAILABLE',
+            message: 'Object storage is not configured for presigned downloads.',
+            requestId: request.id,
+          },
+        });
+      }
+      return reply.send({
+        success: true,
+        data: { documentId: doc.id, name: doc.name, ...result },
+      });
+    }
+  );
 }

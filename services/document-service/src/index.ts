@@ -39,7 +39,7 @@ app.addHook('preHandler', async (request) => {
 
 registerHealthRoutes(app, 'document-service', [() => checkDatabase(prismaBase)]);
 
-await registerRoutes(app);
+await registerRoutes(app, prisma as unknown as Parameters<typeof registerRoutes>[1]);
 await registerGraphQL(app, prisma);
 
 await startService(app, port, async () => { /* routes already registered above */ });

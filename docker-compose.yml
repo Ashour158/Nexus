@@ -320,32 +320,12 @@ services:
       timeout: 10s
       retries: 3
 
-  deals-service:
-    build:
-      context: .
-      dockerfile: ./services/deals-service/Dockerfile
-    container_name: nexus-deals
-    restart: unless-stopped
-    ports:
-      - '3042:3042'
-    environment:
-      PORT: '3042'
-      DEALS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_deals
-      KAFKA_BROKERS: kafka:29092
-      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
-      JWT_SECRET: ${JWT_SECRET}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
-      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3042/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # deals-service DECOMMISSIONED — orphaned duplicate of crm-service (the wired deal
+  # authority). Deal CRUD was served by crm-service; its only remaining live feature,
+  # the TOPICS.QUOTES quote-projection read-model behind the deal-detail Quotes tab,
+  # was migrated into crm-service (QuoteProjection model + crm-service.quote-projections
+  # consumer + GET /deals/:id/quotes). Removed to end the split-brain.
+  # See services/deals-service/DEPRECATED.md.
 
   activities-service:
     build:

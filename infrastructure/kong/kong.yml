@@ -277,14 +277,6 @@ services:
           - /contacts-ms
         strip_path: false
 
-  - name: deals-service
-    url: http://deals-service:3042
-    routes:
-      - name: deals-ms
-        paths:
-          - /deals-ms
-        strip_path: false
-
   - name: activities-service
     url: http://activities-service:3043
     routes:

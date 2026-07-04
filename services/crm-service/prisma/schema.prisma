@@ -56,6 +56,15 @@ model Lead {
   scoreRecord      LeadScore?
   routingEvents    LeadRoutingEvent[]
   dataQualityScore Int?
+  // ─── Explainable predictive AI layer (additive, nullable, fail-open) ──────
+  // Calibrated conversion probability (0.0-1.0) from the in-tenant model.
+  aiConversionProbability Float?
+  // Convenience 0-100 integer projection of aiConversionProbability.
+  aiScore                 Int?
+  // Explanation blob: { probability, confidence, lowData, topFactors[],
+  // nextBestActions[] }.
+  aiInsights              Json?
+  aiScoredAt              DateTime?
 
   @@unique([id, tenantId])
   @@index([tenantId])
@@ -357,6 +366,16 @@ model Deal {
   dealRoom          DealRoom?
   closeReason       String?
   dataQualityScore  Int?
+  // ─── Explainable predictive AI layer (additive, nullable, fail-open) ──────
+  // Calibrated win probability (0.0-1.0) from the in-tenant logistic model.
+  aiWinProbability  Float?
+  // Convenience 0-100 integer projection of aiWinProbability.
+  aiScore           Int?
+  // Full explanation blob: { probability, confidence, lowData, topFactors[],
+  // nextBestActions[] }. Plain-language, derived from feature contributions.
+  aiInsights        Json?
+  // When the AI prediction was last computed.
+  aiScoredAt        DateTime?
 
   @@unique([id, tenantId])
   @@index([tenantId])
@@ -959,6 +978,36 @@ model LeadScoringRule {
   @@unique([tenantId, signal, name])
   @@unique([id, tenantId])
   @@index([tenantId])
+}
+
+/// Per-tenant, per-kind, versioned model store for the explainable predictive
+/// AI layer. Coefficients are trained locally from the tenant's own history
+/// (or seeded from priors when data is thin). One tenant's data never trains
+/// another's — every query is tenant-scoped. `isActive` marks the version the
+/// scoring service uses; older versions are retained for audit / rollback.
+model AiModel {
+  id          String    @id @default(uuid())
+  tenantId    String
+  // "deal_win" | "lead_conversion"
+  kind        String
+  version     Int       @default(1)
+  // feature→weight map plus an "__intercept" bias term.
+  coefficients Json     @default("{}")
+  // Standardization means/stds per feature (for z-scoring at predict time).
+  featureMeans Json?
+  featureStds  Json?
+  // Rows the model was trained on. 0 => priors-only (lowData).
+  sampleSize  Int       @default(0)
+  // { auc, logloss, accuracy, positiveRate } — null for priors-only models.
+  metrics     Json?
+  isActive    Boolean   @default(true)
+  trainedAt   DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([tenantId, kind, version])
+  @@index([tenantId])
+  @@index([tenantId, kind, isActive])
 }
 
 model EnrichmentJob {

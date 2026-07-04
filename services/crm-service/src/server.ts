@@ -12,6 +12,7 @@ import { startQuoteProjectionConsumer } from './consumers/quote-projection.consu
 import { startEngagementTimelineConsumer } from './consumers/engagement-timeline.consumer.js';
 import { NexusProducer } from '@nexus/kafka';
 import { startRottenDealsPoller } from './lib/rotten-deals.poller.js';
+import { startAiScoringPoller } from './lib/ai/scoring.poller.js';
 import type { FastifyInstance } from 'fastify';
 
 export async function buildServer(): Promise<{ app: FastifyInstance; prismaHealth: PrismaClient }> {
@@ -87,6 +88,23 @@ export async function buildServer(): Promise<{ app: FastifyInstance; prismaHealt
     app.log.warn({ err }, 'Rotten-deals poller failed to start; continuing without stage-gating');
   }
 
+  // Explainable predictive AI (re)scoring poller. Guarded identically; disabled
+  // by setting AI_SCORING_INTERVAL_MS=0.
+  let aiScoringPoller: ReturnType<typeof startAiScoringPoller> | null = null;
+  try {
+    const aiIntervalRaw = optionalEnv('AI_SCORING_INTERVAL_MS', '');
+    const aiIntervalMs = aiIntervalRaw ? Number(aiIntervalRaw) : undefined;
+    if (aiIntervalMs !== 0) {
+      aiScoringPoller = startAiScoringPoller(prisma, producer, {
+        intervalMs:
+          aiIntervalMs && Number.isFinite(aiIntervalMs) && aiIntervalMs > 0 ? aiIntervalMs : undefined,
+      });
+      app.log.info('AI scoring poller started');
+    }
+  } catch (err) {
+    app.log.warn({ err }, 'AI scoring poller failed to start; continuing without AI (re)scoring');
+  }
+
   app.addHook('onClose', async () => {
     try { await producer.disconnect(); } catch { /* ignore */ }
     try { await scoringConsumer?.disconnect(); } catch { /* ignore */ }
@@ -95,6 +113,7 @@ export async function buildServer(): Promise<{ app: FastifyInstance; prismaHealt
     try { await engagementTimelineConsumer?.disconnect(); } catch { /* ignore */ }
     try { await quoteProjectionConsumer?.disconnect(); } catch { /* ignore */ }
     try { rottenDealsPoller?.stop(); } catch { /* ignore */ }
+    try { aiScoringPoller?.stop(); } catch { /* ignore */ }
   });
 
   await registerAllRoutes(app, prisma, producer);

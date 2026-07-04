@@ -4,6 +4,7 @@ import {
   recalculateAccountHealth,
 } from '../lib/lead-scoring.engine.js';
 import { DeterministicScoringEngine } from '../lib/deterministic-scoring.engine.js';
+import { scoreDeal, scoreLead } from '../lib/ai/scoring.service.js';
 
 type EventWithPayload = {
   tenantId?: string;
@@ -45,6 +46,8 @@ export async function startScoringConsumer(prisma: CrmPrisma): Promise<NexusCons
     // Use deterministic scoring for new leads
     const scoringEngine = new DeterministicScoringEngine(prisma, tenantId);
     await scoringEngine.recalculateScoreRealTime(leadId);
+    // Explainable AI conversion prediction (fail-open, idempotent).
+    await scoreLead(prisma, tenantId, leadId);
   });
 
   consumer.on('lead.updated', async (event) => {
@@ -56,14 +59,36 @@ export async function startScoringConsumer(prisma: CrmPrisma): Promise<NexusCons
     // Recalculate score on lead updates (e.g., new contact info, company changes)
     const scoringEngine = new DeterministicScoringEngine(prisma, tenantId);
     await scoringEngine.recalculateScoreRealTime(leadId);
+    await scoreLead(prisma, tenantId, leadId);
+  });
+
+  const scoreDealFromEvent = async (event: unknown): Promise<void> => {
+    const e = event as EventWithPayload;
+    const tenantId = getTenantId(e);
+    const dealId =
+      (e.payload?.dealId as string | undefined) ?? (e.payload?.id as string | undefined);
+    if (tenantId && dealId) {
+      // Explainable AI win prediction (fail-open, idempotent).
+      await scoreDeal(prisma, tenantId, dealId);
+    }
+  };
+
+  consumer.on('deal.created', async (event) => {
+    await scoreDealFromEvent(event);
+  });
+
+  consumer.on('deal.stage_changed', async (event) => {
+    await scoreDealFromEvent(event);
   });
 
   consumer.on('deal.updated', async (event) => {
     const e = event as unknown as EventWithPayload;
     const tenantId = getTenantId(e);
     const accountId = e.payload?.accountId as string | undefined;
-    if (!tenantId || !accountId) return;
-    await recalculateAccountHealth(prisma, tenantId, accountId);
+    if (tenantId && accountId) {
+      await recalculateAccountHealth(prisma, tenantId, accountId);
+    }
+    await scoreDealFromEvent(event);
   });
 
   // New event handlers for enhanced scoring triggers

@@ -6,6 +6,12 @@ import {
   recalculateAccountHealth,
 } from '../lib/lead-scoring.engine.js';
 import { DeterministicScoringEngine } from '../lib/deterministic-scoring.engine.js';
+import {
+  scoreDeal,
+  scoreLead,
+  detectAtRiskDeal,
+  retrainModel,
+} from '../lib/ai/scoring.service.js';
 
 function resolveTenantId(req: { user?: unknown }): string | undefined {
   const user = (req as any).user as JwtPayload | undefined;
@@ -455,5 +461,84 @@ export async function registerScoringRoutes(app: FastifyInstance, prisma: CrmPri
         },
       });
     });
+
+    // ─── EXPLAINABLE PREDICTIVE AI ──────────────────────────────────────────
+    // In-tenant logistic model: real probabilities + "show me why" feature
+    // contributions. All fail-open; a scoring error yields a 200 with lowData.
+
+    // Recompute + persist a deal's AI win prediction on demand.
+    r.post(
+      '/ai/deals/:id/score',
+      { preHandler: requirePermission(PERMISSIONS.DEALS.UPDATE) },
+      async (req, reply) => {
+        const tenantId = resolveTenantId(req);
+        if (!tenantId) return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'tenant is required', requestId: req.id } });
+        const { id } = req.params as { id: string };
+        const result = await scoreDeal(prisma, tenantId, id);
+        if (!result) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Deal not found or not scorable', requestId: req.id } });
+        return reply.send({ success: true, data: result });
+      }
+    );
+
+    // Read a lead's AI conversion prediction (scores on demand if stale/absent).
+    r.get(
+      '/leads/:id/ai-prediction',
+      { preHandler: requirePermission(PERMISSIONS.LEADS.READ) },
+      async (req, reply) => {
+        const tenantId = resolveTenantId(req);
+        if (!tenantId) return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'tenant is required', requestId: req.id } });
+        const { id } = req.params as { id: string };
+        const result = await scoreLead(prisma, tenantId, id);
+        if (!result) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Lead not found', requestId: req.id } });
+        return reply.send({ success: true, data: result });
+      }
+    );
+
+    // Explainable at-risk / anomaly detection for a deal.
+    r.get(
+      '/ai/deals/:id/at-risk',
+      { preHandler: requirePermission(PERMISSIONS.DEALS.READ) },
+      async (req, reply) => {
+        const tenantId = resolveTenantId(req);
+        if (!tenantId) return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'tenant is required', requestId: req.id } });
+        const { id } = req.params as { id: string };
+        const result = await detectAtRiskDeal(prisma, tenantId, id);
+        return reply.send({ success: true, data: result });
+      }
+    );
+
+    // Retrain a tenant's model from its own history and activate the new version.
+    // Guarded by an admin-ish permission (settings:write); honestly reports when
+    // it keeps priors due to insufficient data.
+    r.post(
+      '/ai/models/retrain',
+      { preHandler: requirePermission(PERMISSIONS.SETTINGS.WRITE) },
+      async (req, reply) => {
+        const tenantId = resolveTenantId(req);
+        if (!tenantId) return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'tenant is required', requestId: req.id } });
+        const { kind } = (req.body ?? {}) as { kind?: string };
+        if (kind !== 'deal_win' && kind !== 'lead_conversion') {
+          return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'kind must be "deal_win" or "lead_conversion"', requestId: req.id } });
+        }
+        const result = await retrainModel(prisma, tenantId, kind);
+        return reply.send({ success: true, data: result });
+      }
+    );
+
+    // List a tenant's model versions (audit / rollback visibility).
+    r.get(
+      '/ai/models',
+      { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
+      async (req, reply) => {
+        const tenantId = resolveTenantId(req);
+        if (!tenantId) return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'tenant is required', requestId: req.id } });
+        const models = await prisma.aiModel.findMany({
+          where: { tenantId },
+          orderBy: [{ kind: 'asc' }, { version: 'desc' }],
+          select: { id: true, kind: true, version: true, sampleSize: true, metrics: true, isActive: true, trainedAt: true },
+        });
+        return reply.send({ success: true, data: models });
+      }
+    );
   }, { prefix: '/api/v1' });
 }

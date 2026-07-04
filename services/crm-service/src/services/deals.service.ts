@@ -20,6 +20,7 @@ import { recordFieldChanges } from '../lib/field-history.js';
 import { toPaginatedResult } from '@nexus/shared-types';
 import { updateDealDataQuality } from '../lib/data-quality.js';
 import { computeDealHealth, deriveMeddicGaps } from '../lib/deal-health.engine.js';
+import { scoreDeal } from '../lib/ai/scoring.service.js';
 import { assertValidStageTransition } from '../lib/blueprint-client.js';
 import {
   enforceValidationRules,
@@ -899,10 +900,22 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         meddicGaps,
       });
 
+      // Explainable AI win prediction (additive, fail-open). Recomputes +
+      // persists aiWinProbability / aiInsights; a failure yields null and the
+      // deterministic signals below are still returned unchanged.
+      const ai = await scoreDeal(prisma, tenantId, deal.id).catch(() => null);
+
       return {
         dealId: deal.id,
         healthScore: healthResult.healthScore,
         health: healthResult.health,
+        ai: ai
+          ? {
+              winProbability: ai.probability,
+              score: ai.aiScore,
+              insights: ai.insights,
+            }
+          : null,
         signals: {
           status: deal.status,
           isOpen,

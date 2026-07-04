@@ -299,12 +299,8 @@ services:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
-  quotes-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-quotes-service:${IMAGE_TAG:-latest}
-    restart: always
-    deploy:
-      resources:
-        limits: { cpus: '0.5', memory: 512M }
+  # quotes-service DECOMMISSIONED — merged into finance-service (see
+  # services/quotes-service/DEPRECATED.md). Removed from the stack.
 
   router-coprocessor:
     image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-router-coprocessor:${IMAGE_TAG:-latest}

@@ -1,36 +1,40 @@
 _format_version: "3.0"
 
-# Production TLS: Replace env vars with real certificates (Let's Encrypt / ACM / cert-manager).
-# Internal service-to-service traffic remains HTTP; only the gateway edge terminates TLS.
-certificates:
-  - id: nexus-api-cert
-    cert: "${TLS_CERT:-}"
-    key: "${TLS_KEY:-}"
-    snis:
-      - name: "${TLS_SNI:-localhost}"
+# NOTE: Kong's declarative loader does NOT expand shell-style ${VAR} placeholders.
+# The previous config embedded ${TLS_CERT}/${TLS_SNI}/${JWT_PUBLIC_KEY} literally,
+# which Kong tried to parse as a real PEM / SNI / RSA key and rejected at boot
+# (crash-looped indefinitely). TLS termination and edge JWT are handled outside
+# Kong in this deployment (the browser talks to the Next.js BFF; every upstream
+# service independently verifies its own RS256 JWT via JWKS), so the gateway here
+# is a plain HTTP router with global rate-limiting + CORS.
+#
+# To add real edge TLS in production: mount actual cert/key files and add a
+# `certificates:` entry with their literal contents (or use decK/Vault refs).
+# To add edge JWT: use an OIDC/JWKS-capable plugin (Kong's OSS `jwt` plugin needs
+# a static RSA key and can't follow JWKS key rotation).
 
 plugins:
-  - name: pre-function
-    config:
-      access:
-        - |
-          if kong.request.get_scheme() == "http" then
-            return kong.response.exit(301, nil, { ["Location"] = "https://" .. kong.request.get_host() .. ":8443" .. kong.request.get_path() })
-          end
   - name: rate-limiting
     config:
       minute: 100
-      policy: redis
-      redis_host: redis
-
-  - name: jwt
+      policy: local
+  - name: cors
     config:
-      uri_param_names: []
-      cookie_names: []
-      key_claim_name: iss
-      secret_is_base64: false
-      claims_to_verify:
-        - exp
+      origins:
+        - "*"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      headers:
+        - Authorization
+        - Content-Type
+        - x-tenant-id
+      credentials: false
+      max_age: 3600
 
 services:
   - name: graphql-gateway
@@ -55,14 +59,6 @@ services:
       - name: crm
         paths:
           - /crm
-        strip_path: false
-
-  - name: quotes-service
-    url: http://quotes-service:3033
-    routes:
-      - name: quotes
-        paths:
-          - /quotes
         strip_path: false
 
   - name: analytics-service
@@ -289,14 +285,6 @@ services:
           - /deals-ms
         strip_path: false
 
-  - name: leads-service
-    url: http://leads-service:3030
-    routes:
-      - name: leads-ms
-        paths:
-          - /leads-ms
-        strip_path: false
-
   - name: activities-service
     url: http://activities-service:3043
     routes:
@@ -312,10 +300,3 @@ services:
         paths:
           - /notes-ms
         strip_path: false
-
-consumers:
-  - username: nexus-web
-    jwt_secrets:
-      - algorithm: RS256
-        rsa_public_key: "${JWT_PUBLIC_KEY}"
-        key: "nexus-web"

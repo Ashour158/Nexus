@@ -288,32 +288,10 @@ services:
       timeout: 10s
       retries: 3
 
-  leads-service:
-    build:
-      context: .
-      dockerfile: ./services/leads-service/Dockerfile
-    container_name: nexus-leads
-    restart: unless-stopped
-    ports:
-      - '3030:3030'
-    environment:
-      PORT: '3030'
-      LEADS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_leads
-      KAFKA_BROKERS: kafka:29092
-      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
-      JWT_SECRET: ${JWT_SECRET}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
-      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3030/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # leads-service DECOMMISSIONED — orphaned duplicate of crm-service (the wired
+  # authority for leads). Nothing routed to it (BFF → crm-service:3001), it ran no
+  # Kafka consumers, and its lead.* outbox duplicated crm-service. Removed to end
+  # the split-brain. See services/leads-service/DEPRECATED.md.
 
   contacts-service:
     build:
@@ -423,32 +401,11 @@ services:
       timeout: 10s
       retries: 3
 
-  quotes-service:
-    build:
-      context: .
-      dockerfile: ./services/quotes-service/Dockerfile
-    container_name: nexus-quotes
-    restart: unless-stopped
-    ports:
-      - '3033:3033'
-    environment:
-      PORT: '3033'
-      QUOTES_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_quotes
-      KAFKA_BROKERS: kafka:29092
-      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
-      JWT_SECRET: ${JWT_SECRET}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
-      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3033/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # quotes-service DECOMMISSIONED — per its own DEPRECATED.md, quote authority moved
+  # to finance-service (the wired backend: BFF → finance-service:3002). It ran no
+  # Kafka consumers; its quote lifecycle events + expiry poller duplicated
+  # finance-service. Removed to end the dual-quote-table split. See
+  # services/quotes-service/DEPRECATED.md.
 
   notification-service:
     build:

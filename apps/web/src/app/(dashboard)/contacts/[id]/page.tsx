@@ -27,6 +27,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { CallButton } from '@/components/crm/call-button';
+import { timelineMeta } from '@/lib/timeline-icons';
 import { useContact, useContactDeals } from '@/hooks/use-contacts';
 import { useActivities } from '@/hooks/use-activities';
 import { api } from '@/lib/api-client';
@@ -234,6 +236,13 @@ export default function ContactDetailPage() {
                   </Button>
                 </>
               ) : null}
+              <CallButton
+                contactId={contactId}
+                accountId={contact.accountId ?? undefined}
+                defaultNumber={contact.phone ?? contact.mobile}
+                disabled={contact.doNotCall}
+                disabledReason="Contact has opted out of calls"
+              />
               <Link href={`/contacts/${contactId}/portal`}>
                 <Button variant="secondary">Portal</Button>
               </Link>
@@ -383,6 +392,7 @@ export default function ContactDetailPage() {
           {tab === 'activities' && <ActivitiesTab data={activitiesQuery.data} isLoading={activitiesQuery.isLoading} />}
           {tab === 'timeline' && (
             <RecordsTab
+              showTypeIcon
               rows={timelineQuery.data?.events ?? []}
               isLoading={timelineQuery.isLoading}
               emptyTitle="No timeline events"
@@ -899,11 +909,13 @@ function RecordsTab({
   isLoading,
   emptyTitle,
   emptyDescription,
+  showTypeIcon,
 }: {
   rows: Array<Record<string, unknown>>;
   isLoading: boolean;
   emptyTitle: string;
   emptyDescription: string;
+  showTypeIcon?: boolean;
 }) {
   if (isLoading) {
     return (
@@ -922,8 +934,9 @@ function RecordsTab({
       {rows.map((row) => (
         <div key={String(row.id ?? row.title ?? row.name ?? row.subject ?? row.action)} className="rounded-lg border border-slate-200 bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-bold text-slate-900">
-              {String(row.title ?? row.subject ?? row.name ?? row.action ?? row.topic ?? row.field ?? 'Record')}
+            <p className="flex items-center gap-2 text-sm font-bold text-slate-900">
+              {showTypeIcon ? timelineMeta(row).icon : null}
+              {String(row.title ?? row.subject ?? row.name ?? row.action ?? row.topic ?? row.field ?? (showTypeIcon ? timelineMeta(row).label : 'Record'))}
             </p>
             {row.status ? (
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">

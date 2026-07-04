@@ -8,6 +8,8 @@ import type { Note, PaginatedResult, TimelineEvent } from '@nexus/shared-types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { CallButton } from '@/components/crm/call-button';
+import { timelineMeta } from '@/lib/timeline-icons';
 import { useDeal, useDealTimeline, useDealScoringInsights } from '@/hooks/use-deals';
 import type { DealHealth, DealScoringInsights } from '@/hooks/use-deals';
 import { useDealNotes } from '@/hooks/use-notes';
@@ -180,6 +182,7 @@ export default function DealDetailPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={() => router.push('/deals')}>Back</Button>
+          <CallButton dealId={dealId} accountId={deal.accountId ?? undefined} />
           {canUpdate && <Button onClick={() => router.push(`/deals/${dealId}/edit`)}>Edit</Button>}
         </div>
       </div>
@@ -406,16 +409,22 @@ function TimelineTab({ data, isLoading }: { data: PaginatedResult<TimelineEvent>
   if (events.length === 0) return <EmptyState icon="timeline" title="No timeline events" description="Activities, quotes and stage changes will appear here." />;
   return (
     <div className="space-y-3">
-      {events.map((evt) => (
-        <div key={evt.id} className="rounded-lg border border-slate-200 bg-white p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-slate-900">{evt.title}</p>
-            <span className="text-xs text-slate-400">{formatDateTime(evt.at)}</span>
+      {events.map((evt) => {
+        const meta = timelineMeta(evt as unknown as Record<string, unknown>);
+        return (
+          <div key={evt.id} className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="flex items-center justify-between">
+              <p className="flex items-center gap-2 text-sm font-medium text-slate-900">
+                {meta.icon}
+                {evt.title}
+              </p>
+              <span className="text-xs text-slate-400">{formatDateTime(evt.at)}</span>
+            </div>
+            {evt.description && <p className="mt-1 text-xs text-slate-500">{evt.description}</p>}
+            <span className="mt-2 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{meta.label}</span>
           </div>
-          {evt.description && <p className="mt-1 text-xs text-slate-500">{evt.description}</p>}
-          <span className="mt-2 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{evt.type}</span>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

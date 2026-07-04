@@ -80,6 +80,27 @@ const BASE_URLS: Record<string, string> = {
     process.env.NEXT_PUBLIC_INCENTIVE_URL ?? 'http://localhost:3024/api/v1',
   data:
     process.env.NEXT_PUBLIC_DATA_URL ?? 'http://localhost:3015/api/v1',
+  // Low-code platform (metadata-service). Base is the BFF root so both
+  // `/custom-modules/**` and `/formula/evaluate` resolve. In dev the browser
+  // cannot reach metadata-service (:3004) directly, so route through the Next
+  // BFF (see app/api/custom-modules/** + app/api/formula/**). In prod use the
+  // service base or an explicit env URL.
+  customModules:
+    DEV_BFF_URL ??
+    process.env.NEXT_PUBLIC_METADATA_URL ??
+    'http://localhost:3004/api/v1',
+  // CommandCenter journeys (workflow-service). Dev routes through the BFF at
+  // /api/command-center (see app/api/command-center/**).
+  commandCenter:
+    (DEV_BFF_URL ? `${DEV_BFF_URL}/command-center` : undefined) ??
+    process.env.NEXT_PUBLIC_WF_URL ??
+    'http://localhost:3007/api/v1/command-center',
+  // Omnichannel CTI telephony (comm-service). Dev routes through the BFF at
+  // /api/telephony (see app/api/telephony/**).
+  telephony:
+    (DEV_BFF_URL ? `${DEV_BFF_URL}/telephony` : undefined) ??
+    process.env.NEXT_PUBLIC_COMMS_URL ??
+    'http://localhost:3009/api/v1/telephony',
 };
 
 interface ApiErrorEnvelope {
@@ -247,6 +268,9 @@ export const apiClients = {
   knowledge: makeTypedClient(createApiClient(BASE_URLS.knowledge)),
   incentive: makeTypedClient(createApiClient(BASE_URLS.incentive)),
   data: makeTypedClient(createApiClient(BASE_URLS.data)),
+  customModules: makeTypedClient(createApiClient(BASE_URLS.customModules)),
+  commandCenter: makeTypedClient(createApiClient(BASE_URLS.commandCenter)),
+  telephony: makeTypedClient(createApiClient(BASE_URLS.telephony)),
 };
 
 /** Default CRM-scoped client — the one consumed by `hooks/use-deals.ts`. */

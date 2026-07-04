@@ -172,6 +172,14 @@ model Quote {
   buyerTaxReg      String?
   dueDate          DateTime?
   version          Int             @default(1)
+  /// Set when the quote reaches a terminal archive state (expired / voided /
+  /// superseded). Non-archived quotes have `archivedAt = null` so the hot list
+  /// filters `archivedAt: null` to stay clean; archived quotes are read via the
+  /// dedicated `/api/v1/quotes/archived` endpoint.
+  archivedAt       DateTime?
+  /// When this quote was superseded by a newer revision/version, points at the
+  /// quote id that replaced it (null otherwise).
+  supersededById   String?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   discountRequests DiscountRequest[]
@@ -186,6 +194,7 @@ model Quote {
   @@index([tenantId, contactId])
   @@index([tenantId, status])
   @@index([tenantId, dueDate])
+  @@index([tenantId, archivedAt])
   @@unique([id, tenantId])
 }
 
@@ -200,6 +209,13 @@ enum QuoteStatus {
   EXPIRED
   VOID
   CONVERTED
+  // Terminal status for quotes replaced by a newer revision/version. Present in
+  // finance CPQ code paths (commercial-records.use-case.ts) that previously
+  // referenced it despite it being absent from the enum (schema/code drift).
+  SUPERSEDED
+  // Terminal status for quotes whose e-sign envelope completed. Referenced by
+  // the MARK_SIGNED transition path; added to resolve the same drift.
+  SIGNED
 }
 
 model QuoteLine {

@@ -19,6 +19,7 @@ import type { CrmPrisma } from '../prisma.js';
 import { recordFieldChanges } from '../lib/field-history.js';
 import { toPaginatedResult } from '@nexus/shared-types';
 import { updateDealDataQuality } from '../lib/data-quality.js';
+import { computeDealHealth, deriveMeddicGaps } from '../lib/deal-health.engine.js';
 import { assertValidStageTransition } from '../lib/blueprint-client.js';
 import {
   enforceValidationRules,
@@ -183,6 +184,34 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
       throw new NotFoundError('Deal', id);
     }
     return row;
+  }
+
+  /**
+   * Counts how many times a deal's `expectedCloseDate` was pushed *later* using
+   * the field-change log (populated on deal writes). A push is a change where
+   * both old and new values parse as dates and the new date is later than the
+   * old. Fail-open: any read/parse error yields 0 so scoring never breaks.
+   */
+  async function countCloseDatePushes(tenantId: string, dealId: string): Promise<number> {
+    try {
+      const changes = await prisma.fieldChangeLog.findMany({
+        where: { tenantId, objectType: 'deal', objectId: dealId, fieldName: 'expectedCloseDate' },
+        orderBy: { changedAt: 'asc' },
+        select: { oldValue: true, newValue: true },
+      });
+      let pushes = 0;
+      for (const change of changes) {
+        if (!change.oldValue || !change.newValue) continue;
+        const oldTime = new Date(change.oldValue).getTime();
+        const newTime = new Date(change.newValue).getTime();
+        if (Number.isFinite(oldTime) && Number.isFinite(newTime) && newTime > oldTime) {
+          pushes += 1;
+        }
+      }
+      return pushes;
+    } catch {
+      return 0;
+    }
   }
 
   /** Loads a deal with all detail relations or throws `NotFoundError`. */
@@ -798,14 +827,13 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
     /**
      * Deterministic "scoring insights" for a deal (Section 34.2 →
      * `GET /deals/:id/scoring-insights`). Surfaces only signals that already
-     * exist on the record — NO AI/ML. Combines data-quality, MEDDIC, stage age
-     * vs `rottenDays`, and last-activity recency into a derived health label.
+     * exist on the record — NO AI/ML. Delegates the health scoring to the
+     * deterministic {@link computeDealHealth} engine, which weighs activity
+     * recency/frequency, stage idle time vs `rottenDays`, MEDDIC completeness,
+     * close-date slippage, data quality and probability alignment into a
+     * 0-100 `healthScore` + label + next-best-action recommendations.
      *
-     * Health rules (first match wins):
-     *  - won / lost  → mirror deal status
-     *  - stalled     → stage age ≥ rottenDays, OR ≥ 30 days since last activity
-     *  - at_risk     → dataQuality < 50, OR meddic < 40, OR stage age ≥ 70% of rottenDays
-     *  - healthy     → otherwise
+     * Fully fail-open at the route layer; this method only reads existing data.
      */
     async getDealScoringInsights(tenantId: string, id: string) {
       const deal = await prisma.deal.findFirst({
@@ -827,12 +855,20 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
       );
       const rottenDays = deal.stage?.rottenDays ?? null;
 
-      // Days since the most recent activity on this deal (null if none).
-      const lastActivity = await prisma.activity.findFirst({
-        where: { dealId: id, tenantId },
-        orderBy: { createdAt: 'desc' },
-        select: { createdAt: true },
-      });
+      // Days since the most recent activity on this deal (null if none) plus the
+      // trailing-30-day activity count for the frequency signal. Both fail-open.
+      const thirtyDaysAgo = new Date(now - 30 * DAY_MS);
+      const [lastActivity, activityCountLast30Days, closeDatePushCount] = await Promise.all([
+        prisma.activity.findFirst({
+          where: { dealId: id, tenantId },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true },
+        }),
+        prisma.activity.count({
+          where: { dealId: id, tenantId, createdAt: { gte: thirtyDaysAgo } },
+        }),
+        countCloseDatePushes(tenantId, id),
+      ]);
       const daysSinceLastActivity = lastActivity
         ? Math.max(0, Math.floor((now - lastActivity.createdAt.getTime()) / DAY_MS))
         : null;
@@ -844,39 +880,29 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
       const dataQualityScore = deal.dataQualityScore ?? null;
       const meddicScore = deal.meddicicScore ?? null;
       const meddic = (deal.meddicicData ?? {}) as Record<string, unknown>;
+      const meddicGaps = deriveMeddicGaps(meddic);
+      const stageExpectedProbability = deal.stage?.probability ?? null;
 
-      const isStale =
-        (rottenDays != null && rottenDays > 0 && stageAgeDays >= rottenDays) ||
-        (daysSinceLastActivity != null && daysSinceLastActivity >= 30);
-      const isAtRisk =
-        (dataQualityScore != null && dataQualityScore < 50) ||
-        (meddicScore != null && meddicScore < 40) ||
-        (rottenDays != null && rottenDays > 0 && stageAgeDays >= rottenDays * 0.7);
-
-      let health: 'won' | 'lost' | 'stalled' | 'at_risk' | 'healthy';
-      if (isWon) health = 'won';
-      else if (isLost) health = 'lost';
-      else if (isStale) health = 'stalled';
-      else if (isAtRisk) health = 'at_risk';
-      else health = 'healthy';
-
-      const recommendations: string[] = [];
-      if (isOpen && daysSinceLastActivity != null && daysSinceLastActivity >= 14) {
-        recommendations.push('No recent activity — log a touchpoint to keep momentum.');
-      }
-      if (isOpen && rottenDays != null && rottenDays > 0 && stageAgeDays >= rottenDays) {
-        recommendations.push(`Deal has sat in "${deal.stage?.name ?? 'stage'}" for ${stageAgeDays} days (limit ${rottenDays}) — advance or re-qualify.`);
-      }
-      if (dataQualityScore != null && dataQualityScore < 50) {
-        recommendations.push('Data quality is low — fill in missing fields (amount, close date, owner).');
-      }
-      if (meddicScore != null && meddicScore < 40) {
-        recommendations.push('MEDDIC coverage is thin — identify the economic buyer and decision criteria.');
-      }
+      const healthResult = computeDealHealth({
+        status: deal.status,
+        stageAgeDays,
+        rottenDays,
+        daysSinceLastActivity,
+        activityCountLast30Days,
+        meddicScore,
+        dataQualityScore,
+        probability: deal.probability,
+        stageExpectedProbability,
+        expectedCloseDate: deal.expectedCloseDate?.toISOString() ?? null,
+        closeDatePushCount,
+        stageName: deal.stage?.name ?? null,
+        meddicGaps,
+      });
 
       return {
         dealId: deal.id,
-        health,
+        healthScore: healthResult.healthScore,
+        health: healthResult.health,
         signals: {
           status: deal.status,
           isOpen,
@@ -885,6 +911,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           dataQualityScore,
           meddicScore,
           meddic,
+          meddicGaps,
           stageId: deal.stageId,
           stageName: deal.stage?.name ?? null,
           stageAgeDays,
@@ -892,12 +919,18 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           isRotten:
             rottenDays != null && rottenDays > 0 ? stageAgeDays >= rottenDays : false,
           daysSinceLastActivity,
+          activityCountLast30Days,
+          closeDatePushCount,
           probability: deal.probability,
+          stageExpectedProbability,
           amount: decimalToNumber(deal.amount),
           currency: deal.currency,
           expectedCloseDate: deal.expectedCloseDate?.toISOString() ?? null,
+          subScores: healthResult.subScores,
+          contributions: healthResult.contributions,
+          weights: healthResult.weights,
         },
-        recommendations,
+        recommendations: healthResult.recommendations,
       };
     },
 

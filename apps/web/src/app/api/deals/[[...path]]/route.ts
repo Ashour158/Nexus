@@ -217,6 +217,89 @@ async function proxy(
       return NextResponse.json(apiSuccess({ data: rows }));
     }
 
+    if (method === 'GET' && segments[1] === 'scoring-insights') {
+      const DAY_MS = 24 * 60 * 60 * 1000;
+      const status = String(deal.status ?? 'OPEN');
+      const isOpen = status === 'OPEN';
+      const isWon = status === 'WON';
+      const isLost = status === 'LOST';
+      const stageAgeDays = Math.max(
+        0,
+        Math.floor((Date.now() - new Date(String(deal.updatedAt ?? deal.createdAt ?? Date.now())).getTime()) / DAY_MS)
+      );
+      const stage = state.pipelines
+        .flatMap((pipeline) => pipeline.stages)
+        .find((candidate) => candidate.id === deal.stageId);
+      const rottenDays = stage?.rottenDays ?? null;
+      const dealActivities = state.activities.filter((activity) => activity.dealId === id);
+      const lastActivityAt = dealActivities
+        .map((activity) => new Date(String(activity.createdAt)).getTime())
+        .sort((a, b) => b - a)[0];
+      const daysSinceLastActivity =
+        lastActivityAt != null ? Math.max(0, Math.floor((Date.now() - lastActivityAt) / DAY_MS)) : null;
+      const dataQualityScore =
+        typeof deal.dataQualityScore === 'number' ? deal.dataQualityScore : null;
+      const meddicScore = typeof deal.meddicicScore === 'number' ? deal.meddicicScore : null;
+
+      const isStale =
+        (rottenDays != null && rottenDays > 0 && stageAgeDays >= rottenDays) ||
+        (daysSinceLastActivity != null && daysSinceLastActivity >= 30);
+      const isAtRisk =
+        (dataQualityScore != null && dataQualityScore < 50) ||
+        (meddicScore != null && meddicScore < 40) ||
+        (rottenDays != null && rottenDays > 0 && stageAgeDays >= rottenDays * 0.7);
+
+      let health: 'won' | 'lost' | 'stalled' | 'at_risk' | 'healthy';
+      if (isWon) health = 'won';
+      else if (isLost) health = 'lost';
+      else if (isStale) health = 'stalled';
+      else if (isAtRisk) health = 'at_risk';
+      else health = 'healthy';
+
+      const recommendations: string[] = [];
+      if (isOpen && daysSinceLastActivity != null && daysSinceLastActivity >= 14) {
+        recommendations.push('No recent activity — log a touchpoint to keep momentum.');
+      }
+      if (isOpen && rottenDays != null && rottenDays > 0 && stageAgeDays >= rottenDays) {
+        recommendations.push(
+          `Deal has sat in "${stage?.name ?? 'stage'}" for ${stageAgeDays} days (limit ${rottenDays}) — advance or re-qualify.`
+        );
+      }
+      if (dataQualityScore != null && dataQualityScore < 50) {
+        recommendations.push('Data quality is low — fill in missing fields (amount, close date, owner).');
+      }
+      if (meddicScore != null && meddicScore < 40) {
+        recommendations.push('MEDDIC coverage is thin — identify the economic buyer and decision criteria.');
+      }
+
+      return NextResponse.json(
+        apiSuccess({
+          dealId: id,
+          health,
+          signals: {
+            status,
+            isOpen,
+            isWon,
+            isLost,
+            dataQualityScore,
+            meddicScore,
+            meddic: (deal.meddicicData as Record<string, unknown>) ?? {},
+            stageId: deal.stageId,
+            stageName: stage?.name ?? null,
+            stageAgeDays,
+            rottenDays,
+            isRotten: rottenDays != null && rottenDays > 0 ? stageAgeDays >= rottenDays : false,
+            daysSinceLastActivity,
+            probability: deal.probability,
+            amount: Number(deal.amount ?? 0),
+            currency: deal.currency,
+            expectedCloseDate: deal.expectedCloseDate ?? null,
+          },
+          recommendations,
+        })
+      );
+    }
+
     if (method === 'GET' && segments[1] === 'timeline') {
       const activityRows = state.activities
         .filter((activity) => activity.dealId === id)

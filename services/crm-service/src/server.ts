@@ -8,6 +8,7 @@ import { registerGraphQL } from './graphql/index.js';
 import { startScoringConsumer } from './consumers/scoring.consumer.js';
 import { startGdprConsumer } from './consumers/gdpr.consumer.js';
 import { startFinanceTimelineConsumer } from './consumers/finance-timeline.consumer.js';
+import { startEngagementTimelineConsumer } from './consumers/engagement-timeline.consumer.js';
 import { NexusProducer } from '@nexus/kafka';
 import { startRottenDealsPoller } from './lib/rotten-deals.poller.js';
 import type { FastifyInstance } from 'fastify';
@@ -62,6 +63,10 @@ export async function buildServer(): Promise<{ app: FastifyInstance; prismaHealt
     app.log.warn({ err }, 'Finance timeline consumer failed to start; continuing without finance timeline projection');
     return null;
   });
+  const engagementTimelineConsumer = await startEngagementTimelineConsumer(prisma).catch((err) => {
+    app.log.warn({ err }, 'Engagement timeline consumer failed to start; continuing without email/portal timeline projection');
+    return null;
+  });
 
   // Stage-gating rotten-deal detector. Guarded so a start failure can never
   // break the service; the interval is unref'd inside the poller.
@@ -82,6 +87,7 @@ export async function buildServer(): Promise<{ app: FastifyInstance; prismaHealt
     try { await scoringConsumer?.disconnect(); } catch { /* ignore */ }
     try { await gdprConsumer?.disconnect(); } catch { /* ignore */ }
     try { await financeTimelineConsumer?.disconnect(); } catch { /* ignore */ }
+    try { await engagementTimelineConsumer?.disconnect(); } catch { /* ignore */ }
     try { rottenDealsPoller?.stop(); } catch { /* ignore */ }
   });
 

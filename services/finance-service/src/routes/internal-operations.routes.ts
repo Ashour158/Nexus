@@ -187,6 +187,48 @@ export async function registerInternalOperationsRoutes(
         return reply.send({ success: true, data });
       });
 
+      // ─── VIEW-TRACKING (portal → finance) ───────────────────────────────
+      // Called by portal-service when a shared quote link is opened. Flips the
+      // quote SENT → VIEWED (idempotently) and stamps viewedAt. Service-to-
+      // service; guarded by x-service-token (no end-user JWT).
+      r.post('/internal/quotes/:id/mark-viewed', async (req, reply) => {
+        if (!verifyServiceToken(req)) {
+          return reply.code(401).send({
+            success: false,
+            error: { code: 'UNAUTHORIZED', message: 'Unauthorized', requestId: req.id },
+          });
+        }
+        const params = z.object({ id: z.string().min(1) }).safeParse(req.params);
+        if (!params.success) {
+          return reply.code(400).send({
+            success: false,
+            error: { code: 'VALIDATION_ERROR', message: 'Invalid quote id', requestId: req.id },
+          });
+        }
+        const tenantId = headerValue(req, 'x-tenant-id');
+        if (!tenantId) {
+          return reply.code(400).send({
+            success: false,
+            error: { code: 'VALIDATION_ERROR', message: 'x-tenant-id is required', requestId: req.id },
+          });
+        }
+        const correlationId = headerValue(req, 'x-correlation-id') ?? req.id;
+        try {
+          const quote = await commercial.markQuoteViewed(systemContext(req, tenantId, correlationId), params.data.id);
+          return reply.send({ success: true, data: { id: quote.id, status: quote.status, viewedAt: quote.viewedAt } });
+        } catch (error) {
+          const code = (error as { statusCode?: number }).statusCode ?? 500;
+          return reply.code(code === 404 ? 404 : 500).send({
+            success: false,
+            error: {
+              code: (error as { name?: string }).name ?? 'MARK_VIEWED_FAILED',
+              message: error instanceof Error ? error.message : String(error),
+              requestId: req.id,
+            },
+          });
+        }
+      });
+
       r.get('/internal/cpq/observability', async (req, reply) => {
         if (!verifyServiceToken(req)) {
           return reply.code(401).send({

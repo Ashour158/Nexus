@@ -8,14 +8,15 @@ import type { Note, PaginatedResult, TimelineEvent } from '@nexus/shared-types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { useDeal, useDealTimeline } from '@/hooks/use-deals';
+import { useDeal, useDealTimeline, useDealScoringInsights } from '@/hooks/use-deals';
+import type { DealHealth, DealScoringInsights } from '@/hooks/use-deals';
 import { useDealNotes } from '@/hooks/use-notes';
 import { api } from '@/lib/api-client';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/auth.store';
 
-type DealTab = 'timeline' | 'notes' | 'cpq' | 'orders' | 'documents' | 'stakeholders' | 'governance' | 'competitors';
+type DealTab = 'health' | 'timeline' | 'notes' | 'cpq' | 'orders' | 'documents' | 'stakeholders' | 'governance' | 'competitors';
 type AnyRecord = Record<string, unknown>;
 
 interface Stakeholder {
@@ -45,7 +46,7 @@ export default function DealDetailPage() {
   const params = useParams();
   const router = useRouter();
   const dealId = params.id as string;
-  const [tab, setTab] = useState<DealTab>('timeline');
+  const [tab, setTab] = useState<DealTab>('health');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const queryClient = useQueryClient();
   const hasPermission = useAuthStore((s) => s.hasPermission);
@@ -54,6 +55,7 @@ export default function DealDetailPage() {
   const canUpdate = isDevPreview || hasPermission('deals:update') || hasPermission('deals:*');
   const dealQuery = useDeal(dealId);
   const timelineQuery = useDealTimeline(dealId);
+  const insightsQuery = useDealScoringInsights(dealId);
   const notesQuery = useDealNotes(dealId, { limit: 50 });
 
   const stakeholdersQuery = useQuery<{ data: Stakeholder[] }>({
@@ -150,6 +152,7 @@ export default function DealDetailPage() {
   }
 
   const tabs: { id: DealTab; label: string }[] = [
+    { id: 'health', label: 'Health' },
     { id: 'timeline', label: 'Timeline' },
     { id: 'notes', label: 'Notes' },
     { id: 'cpq', label: 'CPQ / Quotes' },
@@ -229,6 +232,13 @@ export default function DealDetailPage() {
             ))}
           </div>
 
+          {tab === 'health' && (
+            <HealthTab
+              data={insightsQuery.data}
+              isLoading={insightsQuery.isLoading}
+              isError={insightsQuery.isError}
+            />
+          )}
           {tab === 'timeline' && <TimelineTab data={timelineQuery.data} isLoading={timelineQuery.isLoading} />}
           {tab === 'notes' && (
             <NotesTab
@@ -304,6 +314,90 @@ function StatusBadge({ status }: { status: string }) {
           ? 'bg-slate-100 text-slate-700'
           : 'bg-blue-100 text-blue-700';
   return <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', color)}>{status}</span>;
+}
+
+const HEALTH_META: Record<DealHealth, { label: string; score: number; badge: string; bar: string }> = {
+  healthy: { label: 'Healthy', score: 90, badge: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-500' },
+  at_risk: { label: 'At risk', score: 55, badge: 'bg-amber-100 text-amber-700', bar: 'bg-amber-500' },
+  stalled: { label: 'Stalled', score: 35, badge: 'bg-orange-100 text-orange-700', bar: 'bg-orange-500' },
+  won: { label: 'Won', score: 100, badge: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-500' },
+  lost: { label: 'Lost', score: 0, badge: 'bg-red-100 text-red-700', bar: 'bg-red-500' },
+};
+
+function HealthTab({ data, isLoading, isError }: { data: DealScoringInsights | undefined; isLoading: boolean; isError: boolean }) {
+  if (isLoading) return <Skeleton className="h-48" />;
+  if (isError || !data) {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        Deal health could not be computed right now. It is derived from the deal&apos;s stage age, MEDDIC coverage,
+        data quality and recent activity.
+      </div>
+    );
+  }
+  const meta = HEALTH_META[data.health] ?? HEALTH_META.at_risk;
+  // The service returns a categorical `health`; fall back to a label-derived
+  // score when no numeric `healthScore` is provided.
+  const score = data.healthScore ?? meta.score;
+  const s = data.signals ?? {};
+
+  const signalRows: Array<{ label: string; value: string }> = [
+    { label: 'Stage', value: s.stageName ?? String(s.stageId ?? '-') },
+    { label: 'Stage age', value: s.stageAgeDays != null ? `${s.stageAgeDays} days` : '-' },
+    { label: 'Rotten limit', value: s.rottenDays != null ? `${s.rottenDays} days` : 'Not set' },
+    { label: 'Last activity', value: s.daysSinceLastActivity != null ? `${s.daysSinceLastActivity} days ago` : 'None logged' },
+    { label: 'Data quality', value: s.dataQualityScore != null ? `${s.dataQualityScore}%` : 'Not scored' },
+    { label: 'MEDDIC', value: s.meddicScore != null ? `${s.meddicScore}` : 'Not scored' },
+    { label: 'Probability', value: s.probability != null ? `${s.probability}%` : '-' },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Deal Health</h3>
+          <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-semibold', meta.badge)}>{meta.label}</span>
+        </div>
+        <div className="mt-3 flex items-end gap-2">
+          <span className="text-4xl font-bold text-slate-900">{score}</span>
+          <span className="pb-1 text-sm text-slate-400">/ 100</span>
+        </div>
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+          <div className={cn('h-full rounded-full', meta.bar)} style={{ width: `${Math.max(0, Math.min(100, score))}%` }} />
+        </div>
+        {s.isRotten ? (
+          <p className="mt-3 text-xs font-medium text-orange-600">This deal has exceeded its stage rotten-day limit.</p>
+        ) : null}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Signals</h3>
+        <dl className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2">
+          {signalRows.map((row) => (
+            <div key={row.label} className="flex items-center justify-between border-b border-slate-50 py-1 text-sm">
+              <dt className="text-slate-500">{row.label}</dt>
+              <dd className="font-medium text-slate-800">{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Recommendations</h3>
+        {data.recommendations.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-500">No action needed — this deal looks on track.</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {data.recommendations.map((rec, i) => (
+              <li key={i} className="flex gap-2 text-sm text-slate-700">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+                <span>{rec}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function TimelineTab({ data, isLoading }: { data: PaginatedResult<TimelineEvent> | undefined; isLoading: boolean }) {

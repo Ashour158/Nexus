@@ -90,6 +90,35 @@ export async function registerQuotesRoutes(
         }
       );
 
+      // ─── LIST ARCHIVED ──────────────────────────────────────────────────
+      // Terminal quotes (expired / voided / superseded) excluded from the hot
+      // list above. Paginated, tenant-scoped, permission-guarded.
+      r.get(
+        '/quotes/archived',
+        { preHandler: requirePermission(PERMISSIONS.QUOTES.READ) },
+        async (request, reply) => {
+          const parsed = QuoteListQuerySchema.safeParse(request.query);
+          if (!parsed.success) {
+            throw new ValidationError('Invalid query', parsed.error.flatten());
+          }
+          const jwt = request.user as JwtPayload;
+          const result = await commercial.listArchivedQuotes(engineContextFromJwt(request.id, jwt), parsed.data);
+          return reply.send({ success: true, data: result });
+        }
+      );
+
+      // ─── RESTORE (un-archive) ───────────────────────────────────────────
+      r.post(
+        '/quotes/:id/restore',
+        { preHandler: requirePermission(PERMISSIONS.QUOTES.UPDATE) },
+        async (request, reply) => {
+          const { id } = QuoteIdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const quote = await commercial.restoreQuote(engineContextFromJwt(request.id, jwt), id);
+          return reply.send({ success: true, data: quote });
+        }
+      );
+
       // ─── CREATE (runs CPQ engine, persists quote) ───────────────────────
       r.post(
         '/quotes',

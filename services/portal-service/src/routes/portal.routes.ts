@@ -1,7 +1,17 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
+import type { FastifyRequest } from 'fastify';
 import { createPortalService, IllegalPortalTransitionError } from '../services/portal.service.js';
+
+/** Capture ip / user-agent from the request for the portal audit trail. */
+function reqCtx(request: FastifyRequest): { ipAddress: string | null; userAgent: string | null } {
+  const ua = request.headers['user-agent'];
+  return {
+    ipAddress: request.ip ?? null,
+    userAgent: typeof ua === 'string' ? ua : null,
+  };
+}
 
 export async function registerPortalRoutes(
   app: FastifyInstance,
@@ -9,7 +19,7 @@ export async function registerPortalRoutes(
 ): Promise<void> {
   app.get('/portal/:token', async (request, reply) => {
     const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
-    const data = await portal.getPortalContext(token);
+    const data = await portal.getPortalContext(token, reqCtx(request));
     if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Portal link expired or invalid', requestId: request.id } });
     return reply.send({ success: true, data });
   });
@@ -18,7 +28,7 @@ export async function registerPortalRoutes(
     const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
     let data;
     try {
-      data = await portal.accept(token);
+      data = await portal.accept(token, reqCtx(request));
     } catch (err) {
       if (err instanceof IllegalPortalTransitionError) {
         return reply.code(409).send({ success: false, error: { code: 'ILLEGAL_TRANSITION', message: err.message, requestId: request.id } });
@@ -34,7 +44,7 @@ export async function registerPortalRoutes(
     const body = z.object({ reason: z.string().optional() }).parse(request.body ?? {});
     let data;
     try {
-      data = await portal.reject(token, body.reason);
+      data = await portal.reject(token, body.reason, reqCtx(request));
     } catch (err) {
       if (err instanceof IllegalPortalTransitionError) {
         return reply.code(409).send({ success: false, error: { code: 'ILLEGAL_TRANSITION', message: err.message, requestId: request.id } });
@@ -47,9 +57,10 @@ export async function registerPortalRoutes(
 
   app.get('/portal/:token/download', async (request, reply) => {
     const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
-    const ctx = await portal.getPortalContext(token);
+    const rc = reqCtx(request);
+    const ctx = await portal.getPortalContext(token, rc);
     if (!ctx) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Portal link expired or invalid', requestId: request.id } });
-    await portal.recordAction(token, 'downloaded');
+    await portal.recordAction(token, 'downloaded', undefined, undefined, undefined, rc);
     const documentUrl = process.env.DOCUMENT_SERVICE_URL ?? 'http://localhost:3016';
     const res = await fetch(`${documentUrl}/api/v1/documents/quotes/${ctx.entityId}/pdf`, {
       headers: { Authorization: `Bearer ${process.env.INTERNAL_SERVICE_TOKEN ?? ''}` },

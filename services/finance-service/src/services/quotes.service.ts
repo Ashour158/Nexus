@@ -69,7 +69,9 @@ function buildWhere(
   tenantId: string,
   f: QuoteListFilters
 ): Prisma.QuoteWhereInput {
-  const where: Prisma.QuoteWhereInput = { tenantId };
+  // Default quote lists exclude archived rows so the hot list stays clean.
+  // Archived quotes are read exclusively via `listArchivedQuotes` below.
+  const where: Prisma.QuoteWhereInput = { tenantId, archivedAt: null };
   if (f.dealId) where.dealId = f.dealId;
   if (f.accountId) where.accountId = f.accountId;
   if (f.contactId) where.contactId = f.contactId;
@@ -414,6 +416,29 @@ export function createQuotesService(
       return updated;
     },
 
+    /**
+     * View-tracking: idempotently flips a quote SENT → VIEWED and stamps
+     * `viewedAt` the first time a shared portal link is opened. Only transitions
+     * from SENT (so an already-VIEWED/ACCEPTED/etc. quote is returned unchanged
+     * and repeated views are a no-op). Returns the (possibly unchanged) quote.
+     */
+    async markQuoteViewed(tenantId: string, id: string): Promise<Quote> {
+      const existing = await loadOrThrow(tenantId, id);
+      if (existing.status !== 'SENT') {
+        return existing;
+      }
+      const updated = await prisma.quote.update({
+        where: { id },
+        data: {
+          status: 'VIEWED',
+          viewedAt: new Date(),
+          version: { increment: 1 },
+        },
+      });
+      await persistQuoteArtifacts(prisma, tenantId, updated, 'quote.viewed');
+      return updated;
+    },
+
     async acceptQuote(tenantId: string, id: string): Promise<Quote> {
       const existing = await loadOrThrow(tenantId, id);
       assertInStatus(existing, ['SENT', 'VIEWED'], 'accept');
@@ -529,17 +554,102 @@ export function createQuotesService(
       const existing = await loadOrThrow(tenantId, id);
       assertInStatus(existing, ['DRAFT', 'SENT', 'VIEWED'], 'void');
 
+      const now = new Date();
       const updated = await prisma.quote.update({
         where: { id },
         data: {
           status: 'VOID',
-          voidedAt: new Date(),
+          voidedAt: now,
           voidReason: reason,
+          // Archive-on-terminal: voided quotes leave the hot list.
+          archivedAt: now,
           version: { increment: 1 },
         },
       });
       await persistQuoteArtifacts(prisma, tenantId, updated, 'quote.voided');
 
+      return updated;
+    },
+
+    /**
+     * Supersede-on-terminal: marks a quote as replaced by a newer revision or
+     * version. Sets status → SUPERSEDED, stamps `archivedAt`, and records the
+     * replacing quote id in `supersededById`. Only non-terminal quotes can be
+     * superseded; already-archived quotes are returned unchanged (idempotent).
+     */
+    async supersedeQuote(
+      tenantId: string,
+      id: string,
+      supersededById?: string | null
+    ): Promise<Quote> {
+      const existing = await loadOrThrow(tenantId, id);
+      if (existing.archivedAt) return existing;
+      const now = new Date();
+      const updated = await prisma.quote.update({
+        where: { id },
+        data: {
+          status: 'SUPERSEDED',
+          archivedAt: now,
+          supersededById: supersededById ?? null,
+          version: { increment: 1 },
+        },
+      });
+      await persistQuoteArtifacts(prisma, tenantId, updated, 'quote.superseded');
+      return updated;
+    },
+
+    /**
+     * Lists archived quotes (terminal: expired / voided / superseded) — the
+     * complement of `listQuotes`, which filters them out. Paginated,
+     * tenant-scoped; supports the same optional filters.
+     */
+    async listArchivedQuotes(
+      tenantId: string,
+      filters: QuoteListFilters,
+      pagination: ListPagination
+    ): Promise<PaginatedResult<Quote>> {
+      const where: Prisma.QuoteWhereInput = { tenantId, archivedAt: { not: null } };
+      if (filters.dealId) where.dealId = filters.dealId;
+      if (filters.accountId) where.accountId = filters.accountId;
+      if (filters.contactId) where.contactId = filters.contactId;
+      if (filters.ownerId) where.ownerId = filters.ownerId;
+      if (filters.status) where.status = filters.status;
+      const { page, limit, sortDir } = pagination;
+      const [total, rows] = await Promise.all([
+        prisma.quote.count({ where }),
+        prisma.quote.findMany({
+          where,
+          skip: (page - 1) * limit,
+          take: limit,
+          orderBy: { archivedAt: sortDir },
+        }),
+      ]);
+      return toPaginatedResult(rows, total, page, limit);
+    },
+
+    /**
+     * Restores an archived quote by clearing `archivedAt` and moving it back to
+     * a sane, editable status (`DRAFT`). Only archived quotes can be restored.
+     * Terminal business fields (voidedAt/voidReason) are cleared so the quote is
+     * genuinely usable again; supersededById is cleared too.
+     */
+    async restoreQuote(tenantId: string, id: string): Promise<Quote> {
+      const existing = await loadOrThrow(tenantId, id);
+      if (!existing.archivedAt) {
+        throw new BusinessRuleError('Only archived quotes can be restored');
+      }
+      const updated = await prisma.quote.update({
+        where: { id },
+        data: {
+          status: 'DRAFT',
+          archivedAt: null,
+          supersededById: null,
+          voidedAt: null,
+          voidReason: null,
+          version: { increment: 1 },
+        },
+      });
+      await persistQuoteArtifacts(prisma, tenantId, updated, 'quote.restored');
       return updated;
     },
   };

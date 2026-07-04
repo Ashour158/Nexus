@@ -35,10 +35,40 @@ export const dealKeys = {
 
 // ─── Query response shapes ──────────────────────────────────────────────────
 
-export interface DealAiInsights {
+export type DealHealth = 'won' | 'lost' | 'stalled' | 'at_risk' | 'healthy';
+
+export interface DealScoringSignals {
+  status?: string;
+  isOpen?: boolean;
+  isWon?: boolean;
+  isLost?: boolean;
+  dataQualityScore?: number | null;
+  meddicScore?: number | null;
+  meddic?: Record<string, unknown>;
+  stageId?: string;
+  stageName?: string | null;
+  stageAgeDays?: number;
+  rottenDays?: number | null;
+  isRotten?: boolean;
+  daysSinceLastActivity?: number | null;
+  probability?: number;
+  amount?: number;
+  currency?: string;
+  expectedCloseDate?: string | null;
+}
+
+/**
+ * Deterministic (NOT AI) deal-health insights returned by
+ * `GET /deals/:id/scoring-insights`. `healthScore` is optional because the
+ * service derives a categorical `health` label; the UI computes a numeric
+ * score from the label when the backend omits it.
+ */
+export interface DealScoringInsights {
   dealId: string;
-  aiWinProbability: number | null;
-  aiInsights: unknown;
+  healthScore?: number | null;
+  health: DealHealth;
+  signals: DealScoringSignals;
+  recommendations: string[];
 }
 
 type DealListResponse = PaginatedResult<Deal>;
@@ -106,15 +136,21 @@ export function useDeal(id: string) {
   });
 }
 
-/** Fetches the scoring insights blob and win probability for a deal. */
-export function useDealAiInsights(id: string) {
-  return useQuery<DealAiInsights>({
+/**
+ * Fetches deterministic deal-health scoring insights (health label, signals,
+ * recommendations) from `GET /deals/:id/scoring-insights`.
+ */
+export function useDealScoringInsights(id: string) {
+  return useQuery<DealScoringInsights>({
     queryKey: dealKeys.insights(id),
-    queryFn: () => api.get<DealAiInsights>(`/deals/${id}/scoring-insights`),
+    queryFn: () => api.get<DealScoringInsights>(`/deals/${id}/scoring-insights`),
     enabled: Boolean(id),
     staleTime: 5 * 60_000,
   });
 }
+
+/** @deprecated Renamed to {@link useDealScoringInsights}. */
+export const useDealAiInsights = useDealScoringInsights;
 
 /** Fetches the chronological timeline for a deal. */
 export function useDealTimeline(id: string) {

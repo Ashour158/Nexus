@@ -1679,6 +1679,91 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
       return quotes.getQuoteById(actor(ctx).tenantId, id);
     },
 
+    async listArchivedQuotes(ctx: EngineContext, query: QuoteListQuery) {
+      const tenantId = actor(ctx).tenantId;
+      return quotes.listArchivedQuotes(
+        tenantId,
+        {
+          dealId: query.dealId,
+          accountId: query.accountId,
+          ownerId: query.ownerId,
+          status: query.status,
+        },
+        { page: query.page, limit: query.limit, sortDir: query.sortDir }
+      );
+    },
+
+    async restoreQuote(ctx: EngineContext, id: string) {
+      const quote = await quotes.restoreQuote(actor(ctx).tenantId, id);
+      await emitCommercialEvent(ctx, {
+        type: 'quote.restored',
+        aggregateType: 'quote',
+        aggregateId: quote.id,
+        payload: {
+          quoteId: quote.id,
+          quoteNumber: quote.quoteNumber,
+          accountId: quote.accountId,
+          contactId: quote.contactId,
+          dealId: quote.dealId,
+          status: quote.status,
+        },
+      });
+      return quote;
+    },
+
+    /**
+     * Supersede a quote (archive it, mark SUPERSEDED, link the replacement).
+     * Additive terminal transition used when a newer revision/version replaces
+     * an existing quote.
+     */
+    async supersedeQuote(ctx: EngineContext, id: string, supersededById?: string | null) {
+      const quote = await quotes.supersedeQuote(actor(ctx).tenantId, id, supersededById);
+      await emitCommercialEvent(ctx, {
+        type: 'quote.superseded',
+        aggregateType: 'quote',
+        aggregateId: quote.id,
+        payload: {
+          quoteId: quote.id,
+          quoteNumber: quote.quoteNumber,
+          accountId: quote.accountId,
+          contactId: quote.contactId,
+          dealId: quote.dealId,
+          status: quote.status,
+          supersededById: supersededById ?? null,
+        },
+      });
+      return quote;
+    },
+
+    /**
+     * View-tracking entry point (called by portal-service when a shared quote
+     * link is opened). Idempotent SENT → VIEWED; emits `quote.viewed` only when
+     * the status actually flips so downstream timelines aren't spammed by
+     * repeated portal opens.
+     */
+    async markQuoteViewed(ctx: EngineContext, id: string) {
+      const tenantId = actor(ctx).tenantId;
+      const before = await quotes.getQuoteById(tenantId, id);
+      const quote = await quotes.markQuoteViewed(tenantId, id);
+      if (before.status === 'SENT' && quote.status === 'VIEWED') {
+        await emitCommercialEvent(ctx, {
+          type: 'quote.viewed',
+          aggregateType: 'quote',
+          aggregateId: quote.id,
+          payload: {
+            quoteId: quote.id,
+            quoteNumber: quote.quoteNumber,
+            accountId: quote.accountId,
+            contactId: quote.contactId,
+            dealId: quote.dealId,
+            status: quote.status,
+            viewedAt: quote.viewedAt?.toISOString() ?? null,
+          },
+        });
+      }
+      return quote;
+    },
+
     async updateQuote(ctx: EngineContext, id: string, data: UpdateQuoteInput) {
       const tenantId = actor(ctx).tenantId;
       const existing = await quotes.getQuoteById(tenantId, id);
@@ -1794,6 +1879,8 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
           where: { id: quote.id },
           data: {
             status: 'EXPIRED',
+            // Archive-on-terminal: expired quotes leave the hot list.
+            archivedAt: ctx.now,
             version: { increment: 1 },
           },
         });

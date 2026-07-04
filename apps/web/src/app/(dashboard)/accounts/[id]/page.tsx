@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Account, AccountHealthInsight, Contact, Deal, PaginatedResult } from '@nexus/shared-types';
+import type { Account, AccountHealthInsight, Contact, Deal, PaginatedResult, TimelineEvent } from '@nexus/shared-types';
 import type { UpdateAccountInput } from '@nexus/validation';
 import {
   ArrowLeft,
@@ -34,12 +34,13 @@ import {
   useUpdateAccount,
 } from '@/hooks/use-accounts';
 import { api } from '@/lib/api-client';
-import { formatCurrency, formatDate } from '@/lib/format';
+import { formatCurrency, formatDate, formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/auth.store';
 import { useRealtimeAccount } from '@/hooks/use-realtime';
 
 type AccountTab =
+  | 'timeline'
   | 'contacts'
   | 'deals'
   | 'quotes'
@@ -79,6 +80,11 @@ export default function AccountDetailPage() {
   const updateAccount = useUpdateAccount();
   useRealtimeAccount(accountId);
 
+  const timelineQuery = useQuery<PaginatedResult<TimelineEvent>>({
+    queryKey: ['accounts', accountId, 'timeline'],
+    queryFn: () => api.get<PaginatedResult<TimelineEvent>>(`/accounts/${accountId}/timeline`),
+    enabled: Boolean(accountId) && tab === 'timeline',
+  });
   const hierarchyQuery = useQuery<HierarchyNode>({
     queryKey: ['accounts', accountId, 'hierarchy'],
     queryFn: () => api.get<HierarchyNode>(`/accounts/${accountId}/hierarchy`),
@@ -153,6 +159,7 @@ export default function AccountDetailPage() {
   }
 
   const tabs: { id: AccountTab; label: string }[] = [
+    { id: 'timeline', label: 'Timeline' },
     { id: 'quotes', label: 'CPQ Quotes' },
     { id: 'orders', label: 'Orders' },
     { id: 'documents', label: 'Documents' },
@@ -320,6 +327,13 @@ export default function AccountDetailPage() {
           ))}
         </div>
         <div className="p-6">
+          {tab === 'timeline' && (
+            <TimelineTab
+              data={timelineQuery.data}
+              isLoading={timelineQuery.isLoading}
+              isError={timelineQuery.isError}
+            />
+          )}
           {tab === 'quotes' && <CommercialTab icon="quote" rows={quotesQuery.data?.data ?? []} isLoading={quotesQuery.isLoading} empty="No quotes linked to this account." />}
           {tab === 'orders' && <CommercialTab icon="order" rows={ordersQuery.data?.data ?? []} isLoading={ordersQuery.isLoading} empty="No orders linked to this account." />}
           {tab === 'documents' && (
@@ -464,6 +478,43 @@ function DealsTab({ data, isLoading }: { data: PaginatedResult<Deal> | undefined
           <p className="text-sm font-bold text-slate-950">{deal.name}</p>
           <p className="mt-1 text-xs text-slate-500">{formatCurrency(deal.amount, deal.currency)} · {deal.probability}% · {deal.status}</p>
         </Link>
+      ))}
+    </div>
+  );
+}
+
+function TimelineTab({
+  data,
+  isLoading,
+  isError,
+}: {
+  data: PaginatedResult<TimelineEvent> | undefined;
+  isLoading: boolean;
+  isError: boolean;
+}) {
+  if (isLoading) return <Skeleton className="h-48" />;
+  if (isError) {
+    return (
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        The account timeline could not be loaded right now.
+      </div>
+    );
+  }
+  const events = data?.data ?? [];
+  if (events.length === 0) {
+    return <EmptyState icon="🕑" title="No timeline events" description="Activities and notes for this account will appear here." />;
+  }
+  return (
+    <div className="space-y-3">
+      {events.map((evt) => (
+        <div key={evt.id} className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <p className="text-sm font-bold text-slate-950">{evt.title}</p>
+            <span className="text-xs text-slate-400">{formatDateTime(evt.at)}</span>
+          </div>
+          {evt.description ? <p className="mt-1 text-xs text-slate-500">{evt.description}</p> : null}
+          <span className="mt-2 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{evt.type}</span>
+        </div>
       ))}
     </div>
   );

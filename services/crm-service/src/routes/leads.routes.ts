@@ -23,6 +23,7 @@ import { createAttachmentsService } from '../services/attachments.service.js';
 import { getFieldHistory } from '../lib/field-history.js';
 import { uploadToStorage } from '../lib/storage.js';
 import { createSalesRecordsUseCase } from '../use-cases/sales-records.use-case.js';
+import { buildReadAccessContext } from '../lib/access-context.js';
 import type { EngineContext } from '@nexus/domain-core';
 
 const MassIdsSchema = z.object({ ids: z.array(z.string().cuid()).min(1).max(200) });
@@ -128,6 +129,7 @@ export async function registerLeadsRoutes(
           }
           const jwt = request.user as JwtPayload;
           const q = parsed.data;
+          const access = await buildReadAccessContext(jwt, 'lead', request.headers.authorization);
           const result = await leads.listLeads(
             jwt.tenantId,
             {
@@ -137,7 +139,8 @@ export async function registerLeadsRoutes(
               rating: q.rating,
               search: q.search,
             },
-            { page: q.page, limit: q.limit, sortBy: q.sortBy, sortDir: q.sortDir }
+            { page: q.page, limit: q.limit, sortBy: q.sortBy, sortDir: q.sortDir },
+            access
           );
           return reply.send({ success: true, data: result });
         }
@@ -468,7 +471,8 @@ export async function registerLeadsRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
-          const lead = await leads.getLeadById(jwt.tenantId, id);
+          const access = await buildReadAccessContext(jwt, 'lead', request.headers.authorization);
+          const lead = await leads.getLeadById(jwt.tenantId, id, access);
           return reply.send({ success: true, data: lead });
         }
       );

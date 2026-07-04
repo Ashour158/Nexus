@@ -21,6 +21,7 @@ import { createAttachmentsService } from '../services/attachments.service.js';
 import { uploadToStorage } from '../lib/storage.js';
 import { getFieldHistory } from '../lib/field-history.js';
 import { createCustomerRecordsUseCase } from '../use-cases/customer-records.use-case.js';
+import { buildReadAccessContext } from '../lib/access-context.js';
 import type { EngineContext } from '@nexus/domain-core';
 
 const dataServiceProxyClient = createHttpClient({
@@ -118,6 +119,7 @@ export async function registerAccountsRoutes(
           }
           const jwt = request.user as JwtPayload;
           const q = parsed.data;
+          const access = await buildReadAccessContext(jwt, 'account', request.headers.authorization);
           const result = await accounts.listAccounts(jwt.tenantId, {
             ownerId: q.ownerId,
             type: q.type,
@@ -130,7 +132,7 @@ export async function registerAccountsRoutes(
             limit: q.limit,
             sortBy: q.sortBy,
             sortDir: q.sortDir,
-          });
+          }, access);
           return reply.send({ success: true, data: result });
         }
       );
@@ -371,7 +373,8 @@ export async function registerAccountsRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
-          const account = await accounts.getAccountById(jwt.tenantId, id);
+          const access = await buildReadAccessContext(jwt, 'account', request.headers.authorization);
+          const account = await accounts.getAccountById(jwt.tenantId, id, access);
           return reply.send({ success: true, data: account });
         }
       );

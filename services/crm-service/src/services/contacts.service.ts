@@ -15,8 +15,10 @@ import { updateContactDataQuality } from '../lib/data-quality.js';
 import {
   enforceValidationRules,
   applyFieldPermissions,
+  maskFieldPermissions,
   mergeForValidation,
 } from '../lib/write-guards.js';
+import type { ReadAccessContext } from './deals.service.js';
 
 type ContactListFilters = Omit<
   ContactListQuery,
@@ -70,9 +72,14 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
     async listContacts(
       tenantId: string,
       filters: ContactListFilters,
-      pagination: ListPagination
+      pagination: ListPagination,
+      access?: ReadAccessContext
     ): Promise<PaginatedResult<Contact>> {
-      const where = buildWhere(tenantId, filters);
+      // Ownership scope is intersected into the tenant+filter where (additive).
+      const where = {
+        ...buildWhere(tenantId, filters),
+        ...(access?.ownershipWhere ?? {}),
+      } as Prisma.ContactWhereInput;
       const sortField = resolveSortField(pagination.sortBy);
       const orderBy: Prisma.ContactOrderByWithRelationInput = {
         [sortField]: pagination.sortDir,
@@ -86,16 +93,29 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
           orderBy,
         }),
       ]);
-      return toPaginatedResult(rows, total, pagination.page, pagination.limit);
+      const masked = (await maskFieldPermissions(
+        prisma,
+        tenantId,
+        'contact',
+        rows as unknown as Record<string, unknown>[],
+        access?.roles
+      )) as unknown as Contact[];
+      return toPaginatedResult(masked, total, pagination.page, pagination.limit);
     },
 
-    async getContactById(tenantId: string, id: string): Promise<Contact & { emails: unknown[]; addresses: unknown[] }> {
+    async getContactById(tenantId: string, id: string, access?: ReadAccessContext): Promise<Contact & { emails: unknown[]; addresses: unknown[] }> {
       const contact = await prisma.contact.findFirst({
         where: { id, tenantId },
         include: { emails: true, addresses: true },
       });
       if (!contact) throw new NotFoundError('Contact', id);
-      return contact as Contact & { emails: unknown[]; addresses: unknown[] };
+      return (await maskFieldPermissions(
+        prisma,
+        tenantId,
+        'contact',
+        contact as unknown as Record<string, unknown>,
+        access?.roles
+      )) as unknown as Contact & { emails: unknown[]; addresses: unknown[] };
     },
 
     async createContact(tenantId: string, data: CreateContactInput & { emails?: Array<{ email: string; label?: string; isPrimary?: boolean }>; addresses?: Array<{ label?: string; street?: string; city?: string; state?: string; postalCode?: string; country?: string }> }): Promise<Contact> {

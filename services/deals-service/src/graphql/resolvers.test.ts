@@ -5,6 +5,9 @@ function makeContext() {
   return {
     tenantId: 'tenant_1',
     userId: 'user_1',
+    // Verified-token claims the resolver guards read (quotes:read for reads).
+    permissions: ['quotes:read', 'deals:read', 'deals:create', 'deals:update', 'deals:delete'],
+    roles: ['SALES_REP'],
     prisma: {
       quote: {
         create: vi.fn(),

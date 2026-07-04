@@ -18,8 +18,19 @@ export async function GET(req: NextRequest) {
     });
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
-  } catch {
-    return NextResponse.json(buildPreviewWinLoss(Number(searchParams.get('period') ?? 90)));
+  } catch (err: unknown) {
+    // Upstream unreachable: surface a real error instead of fabricating analytics.
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'SERVICE_UNAVAILABLE',
+          message:
+            err instanceof Error ? err.message : 'Failed to connect to CRM analytics service',
+        },
+      },
+      { status: 503 }
+    );
   }
 }
 

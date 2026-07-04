@@ -24,7 +24,19 @@ export async function GET(req: NextRequest) {
     });
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
-  } catch {
-    return NextResponse.json(apiSuccess([]));
+  } catch (err: unknown) {
+    // Upstream unreachable: surface a real error instead of an empty-but-successful list,
+    // so the UI can distinguish "no data" from "service down".
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'SERVICE_UNAVAILABLE',
+          message:
+            err instanceof Error ? err.message : 'Failed to connect to CRM analytics service',
+        },
+      },
+      { status: 503 }
+    );
   }
 }

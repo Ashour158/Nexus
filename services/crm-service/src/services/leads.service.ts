@@ -27,8 +27,10 @@ import {
 import {
   enforceValidationRules,
   applyFieldPermissions,
+  maskFieldPermissions,
   mergeForValidation,
 } from '../lib/write-guards.js';
+import type { ReadAccessContext } from './deals.service.js';
 
 type LeadListFilters = Omit<
   LeadListQuery,
@@ -111,9 +113,14 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
     async listLeads(
       tenantId: string,
       filters: LeadListFilters,
-      pagination: ListPagination
+      pagination: ListPagination,
+      access?: ReadAccessContext
     ): Promise<PaginatedResult<Lead>> {
-      const where = buildWhere(tenantId, filters);
+      // Ownership scope is intersected into the tenant+filter where (additive).
+      const where = {
+        ...buildWhere(tenantId, filters),
+        ...(access?.ownershipWhere ?? {}),
+      } as Prisma.LeadWhereInput;
       const sortField = resolveSortField(pagination.sortBy);
       const orderBy: Prisma.LeadOrderByWithRelationInput = {
         [sortField]: pagination.sortDir,
@@ -127,11 +134,25 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
           orderBy,
         }),
       ]);
-      return toPaginatedResult(rows, total, pagination.page, pagination.limit);
+      const masked = (await maskFieldPermissions(
+        prisma,
+        tenantId,
+        'lead',
+        rows as unknown as Record<string, unknown>[],
+        access?.roles
+      )) as unknown as Lead[];
+      return toPaginatedResult(masked, total, pagination.page, pagination.limit);
     },
 
-    async getLeadById(tenantId: string, id: string): Promise<Lead> {
-      return loadOrThrow(tenantId, id);
+    async getLeadById(tenantId: string, id: string, access?: ReadAccessContext): Promise<Lead> {
+      const row = await loadOrThrow(tenantId, id);
+      return (await maskFieldPermissions(
+        prisma,
+        tenantId,
+        'lead',
+        row as unknown as Record<string, unknown>,
+        access?.roles
+      )) as unknown as Lead;
     },
 
     async findDuplicateLeads(

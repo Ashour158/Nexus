@@ -23,8 +23,10 @@ import { recordFieldChanges } from '../lib/field-history.js';
 import {
   enforceValidationRules,
   applyFieldPermissions,
+  maskFieldPermissions,
   mergeForValidation,
 } from '../lib/write-guards.js';
+import type { ReadAccessContext } from './deals.service.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -140,9 +142,14 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
     async listAccounts(
       tenantId: string,
       filters: AccountListFilters,
-      pagination: ListPagination
+      pagination: ListPagination,
+      access?: ReadAccessContext
     ): Promise<PaginatedResult<Account>> {
-      const where = buildWhere(tenantId, filters);
+      // Ownership scope is intersected into the tenant+filter where (additive).
+      const where = {
+        ...buildWhere(tenantId, filters),
+        ...(access?.ownershipWhere ?? {}),
+      } as Prisma.AccountWhereInput;
       const sortField = resolveSortField(pagination.sortBy);
       const orderBy: Prisma.AccountOrderByWithRelationInput = {
         [sortField]: pagination.sortDir,
@@ -156,11 +163,25 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
           orderBy,
         }),
       ]);
-      return toPaginatedResult(rows, total, pagination.page, pagination.limit);
+      const masked = (await maskFieldPermissions(
+        prisma,
+        tenantId,
+        'account',
+        rows as unknown as Record<string, unknown>[],
+        access?.roles
+      )) as unknown as Account[];
+      return toPaginatedResult(masked, total, pagination.page, pagination.limit);
     },
 
-    async getAccountById(tenantId: string, id: string): Promise<Account> {
-      return loadOrThrow(tenantId, id);
+    async getAccountById(tenantId: string, id: string, access?: ReadAccessContext): Promise<Account> {
+      const row = await loadOrThrow(tenantId, id);
+      return (await maskFieldPermissions(
+        prisma,
+        tenantId,
+        'account',
+        row as unknown as Record<string, unknown>,
+        access?.roles
+      )) as unknown as Account;
     },
 
     async createAccount(tenantId: string, data: CreateAccountInput): Promise<Account> {

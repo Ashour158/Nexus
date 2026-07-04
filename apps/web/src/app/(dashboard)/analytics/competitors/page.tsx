@@ -13,15 +13,23 @@ interface CompetitorStat {
 export default function CompetitorAnalyticsPage() {
   const [stats, setStats] = useState<CompetitorStat[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/crm/analytics/competitors')
-      .then(async (r) => (await r.json()) as { data?: CompetitorStat[] })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`Competitor request failed (${r.status})`);
+        return (await r.json()) as { data?: CompetitorStat[] };
+      })
       .then((d) => {
         setStats(d.data ?? []);
+        setError(null);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Unable to load competitor intelligence');
+        setLoading(false);
+      });
   }, []);
 
   return (
@@ -33,13 +41,18 @@ export default function CompetitorAnalyticsPage() {
         </div>
       </div>
 
+      {error ? (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {error}
+        </div>
+      ) : null}
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-16 animate-pulse rounded-xl bg-gray-100" />
           ))}
         </div>
-      ) : stats.length === 0 ? (
+      ) : error ? null : stats.length === 0 ? (
         <div className="py-16 text-center">
           <p className="font-medium text-gray-600">No competitor data yet</p>
           <p className="mt-1 text-sm text-gray-400">Log competitors on deals to build this report</p>

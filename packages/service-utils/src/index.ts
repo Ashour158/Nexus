@@ -14,5 +14,6 @@ export * from './env.js';
 export * from './rbac.js';
 export * from './errors.js';
 export * from './graphql.js';
+export * from './verify-token.js';
 export * from './coding-client.js';
 export * from './rule-engine.js';

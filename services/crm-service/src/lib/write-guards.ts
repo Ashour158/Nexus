@@ -149,3 +149,91 @@ export async function applyFieldPermissions<T extends Record<string, unknown>>(
     return { update, stripped: [] };
   }
 }
+
+/**
+ * FieldPermission-aware READ masking — the read-path mirror of
+ * {@link applyFieldPermissions}.
+ *
+ * When FieldPermission rows exist for (tenant, objectType, field), a field is
+ * only readable by a caller holding at least one of the field's `allowedRoles`.
+ * Fields the caller may not read are OMITTED from the returned object (their
+ * values never reach the client). Objects are shallow-cloned; the input is not
+ * mutated. Relation/nested objects are left as-is (only top-level scalar keys
+ * matching a FieldPermission row are considered).
+ *
+ * FAIL-OPEN contract (mirrors the write path, but errs toward NOT blanking the
+ * UI — a masking outage should degrade to showing data, not to an empty screen):
+ *  - `roles` undefined  → no role context → no masking (return input untouched).
+ *  - No FieldPermission rows for the objectType → no masking.
+ *  - ADMIN / SUPER_ADMIN callers are never masked.
+ *  - Any error during lookup/evaluation → no masking (log a warning + return input).
+ *  - A field with NO matching FieldPermission row is always readable.
+ *
+ * @param prisma      tenant-scoped CRM prisma client
+ * @param tenantId    caller tenant
+ * @param objectType  canonical entity key: 'lead' | 'deal' | 'account' | 'contact'
+ * @param records     a single record or an array of records to mask
+ * @param roles       the caller's roles (from the JWT)
+ * @returns the masked record(s), same cardinality as the input.
+ */
+export async function maskFieldPermissions<T extends Record<string, unknown>>(
+  prisma: CrmPrisma,
+  tenantId: string,
+  objectType: string,
+  records: T | T[],
+  roles: string[] | undefined
+): Promise<T | T[]> {
+  const isArray = Array.isArray(records);
+  const list = (isArray ? records : [records]) as T[];
+
+  // No role context => cannot evaluate => fail-open (identical to today).
+  if (roles === undefined) return records;
+  if (list.length === 0) return records;
+
+  try {
+    const roleSet = new Set(roles);
+    // Admin roles are never restricted by field permissions.
+    if (roleSet.has('ADMIN') || roleSet.has('SUPER_ADMIN')) {
+      return records;
+    }
+
+    const perms = await prisma.fieldPermission.findMany({
+      where: { tenantId, objectType },
+      select: { fieldName: true, allowedRoles: true },
+    });
+
+    // No rows => no restriction (fail-open).
+    if (perms.length === 0) return records;
+
+    // Precompute the set of top-level fields the caller may NOT read.
+    const blockedFields = new Set<string>();
+    for (const p of perms) {
+      const allowed = Array.isArray(p.allowedRoles)
+        ? (p.allowedRoles as unknown[]).filter((x): x is string => typeof x === 'string')
+        : [];
+      const permitted = allowed.some((r) => roleSet.has(r));
+      if (!permitted) blockedFields.add(p.fieldName);
+    }
+
+    if (blockedFields.size === 0) return records;
+
+    const masked = list.map((row) => {
+      const next = { ...row } as Record<string, unknown>;
+      for (const field of blockedFields) {
+        if (field in next) delete next[field];
+      }
+      return next as T;
+    });
+
+    return (isArray ? masked : masked[0]) as T | T[];
+  } catch (err) {
+    // Any failure => fail-open (behave as if no permissions configured). We log
+    // so masking outages are visible, but we DO NOT blank the UI.
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[write-guards] field read-masking failed for ${objectType}; returning unmasked (fail-open)`,
+      err
+    );
+    return records;
+  }
+}

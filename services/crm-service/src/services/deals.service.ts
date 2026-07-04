@@ -23,6 +23,7 @@ import { assertValidStageTransition } from '../lib/blueprint-client.js';
 import {
   enforceValidationRules,
   applyFieldPermissions,
+  maskFieldPermissions,
   mergeForValidation,
 } from '../lib/write-guards.js';
 
@@ -63,6 +64,19 @@ export interface DealListPagination {
   limit: number;
   sortBy?: 'createdAt' | 'updatedAt' | 'amount' | 'expectedCloseDate';
   sortDir: 'asc' | 'desc';
+}
+
+/**
+ * Per-request access context for read paths. Carries the ownership-scope `where`
+ * fragment (from `applyOwnershipScope`) that must be intersected into every list
+ * query, and the caller's roles for FieldPermission read-masking. Both are
+ * optional so existing callers/tests behave exactly as before when omitted.
+ */
+export interface ReadAccessContext {
+  /** Ownership-scope Prisma `where` fragment (`{}` = all, `{ ownerId: ... }`, etc.). */
+  ownershipWhere?: Record<string, unknown>;
+  /** Caller roles from the JWT, used for field-level read masking. */
+  roles?: string[];
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -200,9 +214,16 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
     async listDeals(
       tenantId: string,
       filters: DealListFilters,
-      pagination: DealListPagination
+      pagination: DealListPagination,
+      access?: ReadAccessContext
     ): Promise<PaginatedResult<Deal>> {
-      const where = buildDealListWhere(tenantId, filters);
+      // Intersect the ownership-scope fragment with the filter-derived where.
+      // `own`/`team` add an `ownerId` constraint; `all` (or omitted) adds nothing.
+      // This is ADDITIVE to the tenantId isolation already baked into where.
+      const where = {
+        ...buildDealListWhere(tenantId, filters),
+        ...(access?.ownershipWhere ?? {}),
+      } as Prisma.DealWhereInput;
       const { page, limit, sortDir } = pagination;
       const sortField = resolveSortField(pagination.sortBy);
       const orderBy: Prisma.DealOrderByWithRelationInput = {
@@ -219,15 +240,34 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         }),
       ]);
 
-      return toPaginatedResult(rows, total, page, limit);
+      const masked = (await maskFieldPermissions(
+        prisma,
+        tenantId,
+        'deal',
+        rows as unknown as Record<string, unknown>[],
+        access?.roles
+      )) as unknown as Deal[];
+
+      return toPaginatedResult(masked, total, page, limit);
     },
 
     /**
      * Returns a deal with `account`, `pipeline`, `stage`, and `contacts.contact`.
      * Throws `NotFoundError` if the deal is not in the tenant.
      */
-    async getDealById(tenantId: string, id: string): Promise<DealWithRelations> {
-      return loadDealWithRelations(tenantId, id);
+    async getDealById(
+      tenantId: string,
+      id: string,
+      access?: ReadAccessContext
+    ): Promise<DealWithRelations> {
+      const row = await loadDealWithRelations(tenantId, id);
+      return (await maskFieldPermissions(
+        prisma,
+        tenantId,
+        'deal',
+        row as unknown as Record<string, unknown>,
+        access?.roles
+      )) as unknown as DealWithRelations;
     },
 
     /**

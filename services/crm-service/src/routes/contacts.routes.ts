@@ -21,6 +21,7 @@ import { createAttachmentsService } from '../services/attachments.service.js';
 import { getFieldHistory } from '../lib/field-history.js';
 import { uploadToStorage } from '../lib/storage.js';
 import { createCustomerRecordsUseCase } from '../use-cases/customer-records.use-case.js';
+import { buildReadAccessContext } from '../lib/access-context.js';
 import type { EngineContext } from '@nexus/domain-core';
 
 const ContactDealsPaginationQuery = PaginationSchema.pick({ page: true, limit: true });
@@ -123,6 +124,7 @@ export async function registerContactsRoutes(
           }
           const jwt = request.user as JwtPayload;
           const q = parsed.data;
+          const access = await buildReadAccessContext(jwt, 'contact', request.headers.authorization);
           const result = await contacts.listContacts(jwt.tenantId, {
             accountId: q.accountId,
             ownerId: q.ownerId,
@@ -133,7 +135,7 @@ export async function registerContactsRoutes(
             limit: q.limit,
             sortBy: q.sortBy,
             sortDir: q.sortDir,
-          });
+          }, access);
           return reply.send({ success: true, data: result });
         }
       );
@@ -430,7 +432,8 @@ export async function registerContactsRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
-          const contact = await contacts.getContactById(jwt.tenantId, id);
+          const access = await buildReadAccessContext(jwt, 'contact', request.headers.authorization);
+          const contact = await contacts.getContactById(jwt.tenantId, id, access);
           return reply.send({ success: true, data: contact });
         }
       );

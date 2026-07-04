@@ -9,39 +9,10 @@ import { fastifyRequestContext } from '@fastify/request-context';
 import { createRedisClient } from './redis.js';
 import pino from 'pino';
 import * as Sentry from '@sentry/node';
-import { createPublicKey, type KeyObject } from 'node:crypto';
-
-
-/**
- * JWKS resolution with a short TTL cache. Consuming services verify RS256 tokens
- * issued by auth-service by fetching its public keys from `/.well-known/jwks.json`.
- * The keyset is cached per URL so we do not fetch on every request; a cache miss
- * on the requested `kid` (e.g. after a key rotation) forces a single refetch.
- */
-interface JwksEntry {
-  // Public keys as SPKI PEM strings. fast-jwt (via @fastify/jwt) accepts PEM
-  // strings/buffers for verification but not Node KeyObject handles.
-  keysByKid: Map<string, string>;
-  fetchedAt: number;
-}
-const JWKS_TTL_MS = 5 * 60 * 1000;
-const jwksCache = new Map<string, JwksEntry>();
-
-async function fetchJwks(url: string): Promise<JwksEntry> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`JWKS fetch failed: ${res.status} ${url}`);
-  const body = (await res.json()) as { keys?: Array<{ kid?: string; [k: string]: unknown }> };
-  const keysByKid = new Map<string, string>();
-  for (const jwk of body.keys ?? []) {
-    if (!jwk.kid) continue;
-    const pem = createPublicKey({ key: jwk as Record<string, unknown>, format: 'jwk' })
-      .export({ type: 'spki', format: 'pem' }) as string;
-    keysByKid.set(jwk.kid, pem);
-  }
-  const entry: JwksEntry = { keysByKid, fetchedAt: Date.now() };
-  jwksCache.set(url, entry);
-  return entry;
-}
+import { type KeyObject } from 'node:crypto';
+// JWKS resolution is shared with the standalone GraphQL/context verifier so REST
+// and GraphQL enforce exactly the same trust model against one keyset cache.
+import { resolveJwksPublicKey } from './verify-token.js';
 
 /** Pull the raw JWT out of the request's Authorization: Bearer header. */
 function rawBearerToken(request: { headers?: Record<string, unknown> }): string {
@@ -49,21 +20,6 @@ function rawBearerToken(request: { headers?: Record<string, unknown> }): string 
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : auth;
   if (!token) throw new Error('Missing bearer token');
   return token;
-}
-
-async function resolveJwksPublicKey(url: string, token: string): Promise<string> {
-  const header = JSON.parse(Buffer.from(token.split('.')[0]!, 'base64url').toString()) as { kid?: string };
-  const kid = header.kid;
-  if (!kid) throw new Error('Token header is missing a `kid`');
-
-  let entry = jwksCache.get(url);
-  const stale = !entry || Date.now() - entry.fetchedAt > JWKS_TTL_MS;
-  if (!entry || stale || !entry.keysByKid.has(kid)) {
-    entry = await fetchJwks(url);
-  }
-  const key = entry.keysByKid.get(kid);
-  if (!key) throw new Error(`Unknown kid: ${kid}`);
-  return key;
 }
 
 

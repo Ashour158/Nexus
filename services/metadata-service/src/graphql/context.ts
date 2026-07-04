@@ -1,10 +1,13 @@
 import type { PrismaClient } from '@prisma/client';
 import DataLoader from 'dataloader';
+import { verifyBearerToken } from '@nexus/service-utils';
 
 export interface GraphQLContext {
   prisma: PrismaClient;
   tenantId: string | null;
   userId: string | null;
+  permissions: string[];
+  roles: string[];
   loaders: {
     fieldDefLoader: DataLoader<string, any>;
     permissionLoader: DataLoader<string, any>;
@@ -53,14 +56,21 @@ export function buildContext(prisma: PrismaClient) {
   return async function createContext({ request }: { request: Request }): Promise<GraphQLContext> {
     let tenantId: string | null = request.headers.get('x-tenant-id');
     let userId: string | null = null;
-    const authHeader = request.headers.get('authorization');
-    if (authHeader?.startsWith('Bearer ')) {
-      try {
-        const payload = JSON.parse(Buffer.from(authHeader.split('.')[1], 'base64').toString());
-        tenantId = payload.tenantId ?? tenantId;
-        userId = payload.sub ?? null;
-      } catch { /* ignore */ }
+    let permissions: string[] = [];
+    let roles: string[] = [];
+
+    // Cryptographically verify the JWT (RS256 via AUTH_JWKS_URL, else HS256 via
+    // JWT_SECRET) — the same trust model the REST routes enforce. An invalid or
+    // missing token yields an unauthenticated context rather than trusted claims.
+    const payload = await verifyBearerToken(request.headers.get('authorization'));
+    if (payload) {
+      // Prefer the verified token's tenant over any client-supplied header.
+      tenantId = payload.tenantId ?? tenantId;
+      userId = payload.sub ?? null;
+      permissions = payload.permissions ?? [];
+      roles = payload.roles ?? [];
     }
-    return { prisma, tenantId, userId, loaders: createLoaders(prisma) };
+
+    return { prisma, tenantId, userId, permissions, roles, loaders: createLoaders(prisma) };
   };
 }

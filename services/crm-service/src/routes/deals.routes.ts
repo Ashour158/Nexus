@@ -25,6 +25,7 @@ import { createAttachmentsService } from '../services/attachments.service.js';
 import { getFieldHistory } from '../lib/field-history.js';
 import { uploadToStorage } from '../lib/storage.js';
 import { createSalesRecordsUseCase } from '../use-cases/sales-records.use-case.js';
+import { buildReadAccessContext } from '../lib/access-context.js';
 import type { EngineContext } from '@nexus/domain-core';
 
 // ─── Local param schemas ────────────────────────────────────────────────────
@@ -140,6 +141,7 @@ export async function registerDealsRoutes(
           }
           const jwt = request.user as JwtPayload;
           const q = parsed.data;
+          const access = await buildReadAccessContext(jwt, 'deal', request.headers.authorization);
           const result = await deals.listDeals(jwt.tenantId, {
             pipelineId: q.pipelineId,
             stageId: q.stageId,
@@ -155,7 +157,7 @@ export async function registerDealsRoutes(
             limit: q.limit,
             sortBy: q.sortBy as import('../services/deals.service.js').DealListPagination['sortBy'],
             sortDir: q.sortDir,
-          });
+          }, access);
           return reply.send({ success: true, data: result });
         }
       );
@@ -549,7 +551,8 @@ export async function registerDealsRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
-          const deal = await deals.getDealById(jwt.tenantId, id);
+          const access = await buildReadAccessContext(jwt, 'deal', request.headers.authorization);
+          const deal = await deals.getDealById(jwt.tenantId, id, access);
           return reply.send({ success: true, data: deal });
         }
       );

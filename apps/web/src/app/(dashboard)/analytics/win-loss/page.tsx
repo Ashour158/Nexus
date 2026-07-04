@@ -78,7 +78,7 @@ export default function WinLossPage() {
           {error}
         </div>
       ) : null}
-      {loading || !data ? (
+      {error ? null : loading || !data ? (
         <div className="grid grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-24 animate-pulse rounded-xl bg-gray-100" />

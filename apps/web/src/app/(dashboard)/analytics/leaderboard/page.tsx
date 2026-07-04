@@ -21,16 +21,24 @@ export default function LeaderboardPage() {
   const [period, setPeriod] = useState('30');
   const [reps, setReps] = useState<RepData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
     fetch(`/api/crm/analytics/leaderboard?period=${period}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`Leaderboard request failed (${r.status})`);
+        return r.json();
+      })
       .then((d) => {
         setReps(d.data || []);
+        setError(null);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Unable to load leaderboard');
+        setLoading(false);
+      });
   }, [period]);
 
   return (
@@ -56,13 +64,18 @@ export default function LeaderboardPage() {
           ))}
         </div>
       </div>
+      {error ? (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {error}
+        </div>
+      ) : null}
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-16 animate-pulse rounded-xl bg-gray-100" />
           ))}
         </div>
-      ) : (
+      ) : error ? null : (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 bg-gray-50">

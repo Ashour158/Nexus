@@ -47,6 +47,21 @@ export async function registerCustomFieldsRoutes(
         }
       );
 
+      // GET /api/v1/custom-fields/:id/dependent-options?controllingValue=US
+      // Returns the picklist options available for the given controlling
+      // (parent) value. Options with no controllingValues are always returned.
+      r.get(
+        '/custom-fields/:id/dependent-options',
+        { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const { controllingValue } = request.query as { controllingValue?: string };
+          const result = await service.getDependentOptions(jwt.tenantId, id, controllingValue);
+          return reply.send({ success: true, data: result });
+        }
+      );
+
       r.patch(
         '/custom-fields/:id',
         { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) },

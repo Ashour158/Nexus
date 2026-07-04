@@ -1,5 +1,5 @@
-import { stringify } from 'csv-stringify/sync';
 import type { DataPrisma } from '../prisma.js';
+import { serializeCsv } from '../lib/csv.js';
 
 interface CrmListResponse {
   data?: Record<string, unknown>[];
@@ -68,21 +68,8 @@ export function createExportService(_prisma: DataPrisma) {
               }, new Set<string>())
             );
 
-      const records = rows.map((row) => {
-        const out: Record<string, string> = {};
-        for (const col of selectedColumns) {
-          const value = row[col];
-          out[col] =
-            value === null || value === undefined
-              ? ''
-              : typeof value === 'object'
-                ? JSON.stringify(value)
-                : String(value);
-        }
-        return out;
-      });
-
-      return stringify(records, { header: true, columns: selectedColumns });
+      // serializeCsv handles null/undefined/object coercion and CSV escaping.
+      return serializeCsv(rows, selectedColumns);
     },
   };
 }

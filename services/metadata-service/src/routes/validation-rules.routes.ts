@@ -45,18 +45,30 @@ export async function registerValidationRulesRoutes(
         }
       );
 
+      // POST /api/v1/validation-rules/validate
+      // Body: { objectType: string, payload: Record<string, unknown> }
+      // Returns: { valid, rulesEvaluated, violations: [{ruleId,ruleName,errorMessage}], errors: string[] }
+      // FAIL-OPEN: on any internal error we return valid:true so a broken rule
+      // engine never blocks a caller's write path.
       r.post(
         '/validation-rules/validate',
         { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
         async (request, reply) => {
           const jwt = request.user as JwtPayload;
           const body = request.body as { objectType?: string; payload?: Record<string, unknown> };
-          if (!body.objectType?.trim()) return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'objectType required', requestId: request.id } });
-          const rules = await prisma.validationRule.findMany({
-            where: { tenantId: jwt.tenantId, objectType: body.objectType, isActive: true },
-          });
-          const result = service.validate(body.objectType, body.payload ?? {}, rules);
-          return reply.send({ success: true, data: result });
+          if (!body.objectType?.trim()) {
+            return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'objectType required', requestId: request.id } });
+          }
+          try {
+            const rules = await prisma.validationRule.findMany({
+              where: { tenantId: jwt.tenantId, objectType: body.objectType, isActive: true },
+            });
+            const result = service.validate(body.objectType, body.payload ?? {}, rules);
+            return reply.send({ success: true, data: result });
+          } catch (err) {
+            request.log.warn({ err, objectType: body.objectType }, 'validation evaluation failed; returning valid (fail-open)');
+            return reply.send({ success: true, data: { valid: true, rulesEvaluated: 0, violations: [], errors: [] } });
+          }
         }
       );
 

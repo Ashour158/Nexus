@@ -60,6 +60,13 @@ model OAuthConnection {
   email        String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  // Connector sync state — makes syncs resumable and observable at the
+  // connection level (independent of individual SyncJob runs).
+  syncStatus       SyncStatus @default(PENDING)
+  syncCursor       String?    @db.Text
+  lastSyncedAt     DateTime?
+  lastSyncError    String?    @db.Text
+  syncedRecords    Int        @default(0)
   syncJobs     SyncJob[]
 
   @@unique([tenantId, userId, provider, scope])

@@ -5,6 +5,8 @@ import { google } from 'googleapis';
 import { registerGraphQL } from './graphql/index.js';
 import { PrismaClient } from '../../../node_modules/.prisma/email-sync-client/index.js';
 import { buildDatabaseUrl } from '@nexus/service-utils/db';
+import { NexusProducer } from '@nexus/kafka';
+import { enrichMessage, extractEmailAddress } from './lib/enrich.js';
 
 startTracing({ serviceName: 'email-sync-service' });
 const port = parseInt(process.env.PORT ?? '3026', 10);
@@ -34,6 +36,11 @@ const prisma = new PrismaClient({
 });
 
 registerHealthRoutes(app, 'email-sync-service', [() => checkDatabase(prisma)]);
+
+// Kafka producer for emitting timeline/comm events. Fail-open: if the broker is
+// unavailable the connect is best-effort and enrichment simply skips emission.
+const producer = new NexusProducer('email-sync-service');
+await producer.connect().catch((err: any) => app.log.warn({ err: err?.message }, 'kafka producer connect failed'));
 
 function getTenantId(req: any): string | null {
   const payload = (req as any).user as any;
@@ -292,29 +299,32 @@ app.post('/send/:userId', async (req, reply) => {
 
 /* ── Sync ───────────────────────────────────────────────────────────────────── */
 
-app.post('/sync/:userId', async (req, reply) => {
-  const { userId } = req.params as { userId: string };
-  const conn = await prisma.emailConnection.findUnique({ where: { userId } });
-  if (!conn) {
-    return reply.code(404).send({ success: false, error: { code: 'NOT_CONNECTED', message: 'No email connection found.' } });
-  }
+type Conn = NonNullable<Awaited<ReturnType<typeof prisma.emailConnection.findUnique>>>;
 
-  try {
-    const auth = buildOauth2Client(conn);
-    const gmail = google.gmail({ version: 'v1', auth });
-    const maxResults = 50;
+/**
+ * Pull recent Gmail messages for one connection, persist any new ones (with
+ * their RFC 5322 correlation headers) and enrich each: correlate the thread,
+ * resolve sender/recipient → contact/deal, and emit a timeline event.
+ * Fully guarded — per-message failures are logged and skipped, never thrown.
+ */
+async function syncUser(conn: Conn): Promise<{ synced: number; total: number }> {
+  const userId = conn.userId;
+  const auth = buildOauth2Client(conn);
+  const gmail = google.gmail({ version: 'v1', auth });
+  const maxResults = 50;
 
-    const listRes = await gmail.users.messages.list({
-      userId: 'me',
-      maxResults,
-      q: conn.lastSyncAt ? `after:${Math.floor(conn.lastSyncAt.getTime() / 1000)}` : undefined,
-    });
+  const listRes = await gmail.users.messages.list({
+    userId: 'me',
+    maxResults,
+    q: conn.lastSyncAt ? `after:${Math.floor(conn.lastSyncAt.getTime() / 1000)}` : undefined,
+  });
 
-    const messages = listRes.data.messages ?? [];
-    let synced = 0;
+  const messages = listRes.data.messages ?? [];
+  let synced = 0;
 
-    for (const { id: msgId } of messages) {
-      if (!msgId) continue;
+  for (const { id: msgId } of messages) {
+    if (!msgId) continue;
+    try {
       const existing = await prisma.emailMessage.findUnique({ where: { messageId: msgId } });
       if (existing) continue;
 
@@ -338,8 +348,12 @@ app.post('/sync/:userId', async (req, reply) => {
       const subject = headers['subject'] ?? '(no subject)';
       const dateStr = headers['date'];
       const sentAt = dateStr ? new Date(dateStr) : new Date();
+      const rfcMessageId = headers['message-id'] ?? null;
+      const inReplyTo = headers['in-reply-to'] ?? null;
+      const references = headers['references'] ?? null;
+      const isInbound = !from.includes(conn.email);
 
-      await prisma.emailMessage.create({
+      const created = await prisma.emailMessage.create({
         data: {
           tenantId: conn.tenantId,
           userId,
@@ -352,22 +366,94 @@ app.post('/sync/:userId', async (req, reply) => {
           snippet: msg.data.snippet ?? bodyText.slice(0, 100),
           body: bodyText,
           isRead: !(msg.data.labelIds?.includes('UNREAD') ?? true),
-          isInbound: !from.includes(conn.email),
+          isInbound,
           sentAt,
+          rfcMessageId: rfcMessageId ? rfcMessageId.trim().replace(/^<|>$/g, '') : null,
+          inReplyTo: inReplyTo ? inReplyTo.trim().replace(/^<|>$/g, '') : null,
         },
       });
       synced++;
-    }
 
-    await prisma.emailConnection.update({ where: { userId }, data: { lastSyncAt: new Date() } });
-    return reply.send({ success: true, data: { synced, total: messages.length } });
+      // Enrich (correlate thread + resolve contact/deal + emit event). Fail-open.
+      // Resolve the counterparty: for inbound that's the sender, for outbound the recipient.
+      const counterpartyEmail = isInbound ? extractEmailAddress(from) : extractEmailAddress(to);
+      await enrichMessage({
+        prisma: prisma as any,
+        producer,
+        log: app.log,
+        message: {
+          id: created.id,
+          tenantId: conn.tenantId,
+          from,
+          to,
+          threadId: created.threadId,
+          isInbound,
+          contactId: created.contactId,
+          dealId: created.dealId,
+        },
+        headers: { rfcMessageId, inReplyTo, references },
+        counterpartyEmail,
+        subject,
+        sentAt,
+      }).catch((err: any) => app.log.warn({ err: err?.message, msgId }, 'enrich failed'));
+    } catch (err: any) {
+      app.log.warn({ err: err?.message, msgId }, 'sync: message failed, skipping');
+    }
+  }
+
+  await prisma.emailConnection.update({ where: { userId }, data: { lastSyncAt: new Date() } });
+  return { synced, total: messages.length };
+}
+
+app.post('/sync/:userId', async (req, reply) => {
+  const { userId } = req.params as { userId: string };
+  const conn = await prisma.emailConnection.findUnique({ where: { userId } });
+  if (!conn) {
+    return reply.code(404).send({ success: false, error: { code: 'NOT_CONNECTED', message: 'No email connection found.' } });
+  }
+
+  try {
+    const { synced, total } = await syncUser(conn);
+    return reply.send({ success: true, data: { synced, total } });
   } catch (err: any) {
     app.log.error({ err: err.message }, 'Gmail sync failed');
     return reply.code(502).send({ success: false, error: { code: 'SYNC_FAILED', message: err.message } });
   }
 });
 
+/* ── Background poller ─────────────────────────────────────────────────────────
+ * Optional: periodically sync all enabled connections so inbound replies are
+ * ingested + enriched without a manual /sync call. Disabled unless
+ * EMAIL_SYNC_POLL_INTERVAL_MS is set. Reentrancy-guarded and unref'd so it never
+ * blocks shutdown and never overlaps runs.
+ */
+const pollIntervalMs = parseInt(process.env.EMAIL_SYNC_POLL_INTERVAL_MS ?? '0', 10);
+let pollRunning = false;
+if (pollIntervalMs > 0) {
+  const timer = setInterval(async () => {
+    if (pollRunning) return;
+    pollRunning = true;
+    try {
+      const conns = await prisma.emailConnection.findMany({ where: { syncEnabled: true }, take: 500 });
+      for (const c of conns) {
+        try {
+          await syncUser(c);
+        } catch (err: any) {
+          app.log.warn({ err: err?.message, userId: c.userId }, 'poller: syncUser failed');
+        }
+      }
+    } catch (err: any) {
+      app.log.warn({ err: err?.message }, 'poller: iteration failed');
+    } finally {
+      pollRunning = false;
+    }
+  }, pollIntervalMs);
+  timer.unref();
+  app.log.info({ pollIntervalMs }, 'email-sync poller enabled');
+}
+
 app.addHook('onClose', async () => {
+  try { await producer.disconnect(); } catch { /* ignore */ }
   await prisma.$disconnect();
   app.log.info('email-sync-service shutdown complete');
 });

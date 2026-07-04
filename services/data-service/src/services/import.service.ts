@@ -1,21 +1,21 @@
-import { parse } from 'csv-parse';
+import type { NexusProducer } from '@nexus/kafka';
 import type { DataPrisma } from '../prisma.js';
-
-interface CsvRow {
-  [key: string]: string;
-}
+import { parseCsv } from '../lib/csv.js';
+import { getModuleConfig, validateRow } from '../lib/import-modules.js';
 
 type FieldMap = Record<string, string>;
 
-function authHeaders(): Record<string, string> {
-  const token = process.env.INTERNAL_SERVICE_TOKEN ?? '';
-  return {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${token}`,
-  };
+interface RowError {
+  row: number;
+  error: string;
 }
 
-export function createImportService(prisma: DataPrisma) {
+/** Rows are processed in chunks so a large file never blocks the event loop. */
+const CHUNK_SIZE = 100;
+/** Cap the persisted error report so a bad file can't bloat the DB row. */
+const MAX_ERRORS = 500;
+
+export function createImportService(prisma: DataPrisma, producer?: NexusProducer) {
   return {
     async createJob(
       tenantId: string,
@@ -36,68 +36,149 @@ export function createImportService(prisma: DataPrisma) {
       });
     },
 
+    /**
+     * Parse the uploaded CSV, apply the column→field mapping, validate each
+     * row, and emit a create event per valid row via the Kafka producer.
+     *
+     * Fail-open: a bad row is recorded in the per-row error report and skipped;
+     * it never fails the whole job. Any unexpected error marks the job FAILED
+     * but is caught so the request/service never crashes.
+     */
     async processJob(jobId: string, csvBuffer: Buffer) {
-      const job = await prisma.importJob.findUnique({ where: { id: jobId } });
-      if (!job) return null;
-      const fieldMap = (job.fieldMap as FieldMap) ?? {};
-      const parser = parse(csvBuffer, {
-        columns: true,
-        skip_empty_lines: true,
-        trim: true,
-      });
+      try {
+        const job = await prisma.importJob.findUnique({ where: { id: jobId } });
+        if (!job) return null;
 
-      await prisma.importJob.update({
-        where: { id: jobId },
-        data: { status: 'PROCESSING' },
-      });
+        const fieldMap = (job.fieldMap as FieldMap) ?? {};
+        const config = getModuleConfig(job.module);
 
-      let imported = 0;
-      let failed = 0;
-      let totalRows = 0;
-      const errors: Array<{ row: number; error: string }> = [];
-      const crmUrl = process.env.CRM_SERVICE_URL ?? 'http://localhost:3001';
+        await prisma.importJob.update({
+          where: { id: jobId },
+          data: { status: 'PROCESSING' },
+        });
 
-      for await (const row of parser as AsyncIterable<CsvRow>) {
-        totalRows += 1;
-        const payload: Record<string, string> = {};
-        for (const [csvKey, targetKey] of Object.entries(fieldMap)) {
-          payload[targetKey] = row[csvKey] ?? '';
-        }
+        let parsed: ReturnType<typeof parseCsv>;
         try {
-          const res = await fetch(`${crmUrl}/api/v1/${job.module}`, {
-            method: 'POST',
-            headers: authHeaders(),
-            body: JSON.stringify(payload),
-          });
-          if (!res.ok) {
-            const body = await res.text();
-            failed += 1;
-            errors.push({ row: totalRows, error: body.slice(0, 500) });
-          } else {
-            imported += 1;
-          }
+          parsed = parseCsv(csvBuffer.toString('utf8'));
         } catch (err) {
-          failed += 1;
-          errors.push({
-            row: totalRows,
-            error: err instanceof Error ? err.message : String(err),
+          await prisma.importJob.update({
+            where: { id: jobId },
+            data: {
+              status: 'FAILED',
+              errors: [
+                {
+                  row: 0,
+                  error: `CSV parse failed: ${err instanceof Error ? err.message : String(err)}`,
+                },
+              ],
+              completedAt: new Date(),
+            },
           });
+          return prisma.importJob.findUnique({ where: { id: jobId } });
         }
-      }
 
-      const status = failed > 0 && imported === 0 ? 'FAILED' : 'COMPLETED';
-      await prisma.importJob.update({
-        where: { id: jobId },
-        data: {
-          status,
-          totalRows,
-          imported,
-          failed,
-          errors,
-          completedAt: new Date(),
-        },
-      });
-      return prisma.importJob.findUnique({ where: { id: jobId } });
+        const totalRows = parsed.rows.length;
+        let imported = 0;
+        let failed = 0;
+        const errors: RowError[] = [];
+
+        for (let start = 0; start < parsed.rows.length; start += CHUNK_SIZE) {
+          const chunk = parsed.rows.slice(start, start + CHUNK_SIZE);
+
+          await Promise.all(
+            chunk.map(async (row, offset) => {
+              // 1-based, header-aware row number for the error report.
+              const rowNumber = start + offset + 2;
+              try {
+                // Apply column→field mapping. Keys are CSV columns, values are
+                // target field names. Fall back to identity if no map given.
+                const mapped: Record<string, string> = {};
+                if (Object.keys(fieldMap).length > 0) {
+                  for (const [csvKey, targetKey] of Object.entries(fieldMap)) {
+                    mapped[targetKey] = row[csvKey] ?? '';
+                  }
+                } else {
+                  Object.assign(mapped, row);
+                }
+
+                const result = validateRow(config, mapped);
+                if (!result.ok) {
+                  failed += 1;
+                  if (errors.length < MAX_ERRORS) {
+                    errors.push({ row: rowNumber, error: result.error });
+                  }
+                  return;
+                }
+
+                // Emit a create event for downstream services to persist.
+                if (producer) {
+                  await producer
+                    .publish(config.topic, {
+                      type: config.eventType,
+                      tenantId: job.tenantId,
+                      payload: {
+                        ...result.value,
+                        source: 'import',
+                        importJobId: job.id,
+                        createdBy: job.createdBy,
+                      },
+                    })
+                    .catch((err) => {
+                      throw err instanceof Error ? err : new Error(String(err));
+                    });
+                }
+                imported += 1;
+              } catch (err) {
+                failed += 1;
+                if (errors.length < MAX_ERRORS) {
+                  errors.push({
+                    row: rowNumber,
+                    error: err instanceof Error ? err.message : String(err),
+                  });
+                }
+              }
+            })
+          );
+
+          // Persist incremental progress so the SSE status endpoint can report it.
+          await prisma.importJob
+            .update({
+              where: { id: jobId },
+              data: { totalRows, imported, failed },
+            })
+            .catch(() => undefined);
+        }
+
+        const status = failed > 0 && imported === 0 ? 'FAILED' : 'COMPLETED';
+        await prisma.importJob.update({
+          where: { id: jobId },
+          data: {
+            status,
+            totalRows,
+            imported,
+            failed,
+            errors: errors as unknown as object[],
+            completedAt: new Date(),
+          },
+        });
+        return prisma.importJob.findUnique({ where: { id: jobId } });
+      } catch (err) {
+        // Fail-open: never let an unexpected error escape and crash the service.
+        console.warn(`[import] processJob ${jobId} failed:`, err);
+        await prisma.importJob
+          .update({
+            where: { id: jobId },
+            data: {
+              status: 'FAILED',
+              errors: [
+                { row: 0, error: err instanceof Error ? err.message : String(err) },
+              ],
+              completedAt: new Date(),
+            },
+          })
+          .catch(() => undefined);
+        return null;
+      }
     },
 
     async getJob(tenantId: string, id: string) {

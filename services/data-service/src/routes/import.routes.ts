@@ -22,9 +22,9 @@ const CreateBody = z.object({
 export async function registerImportRoutes(
   app: FastifyInstance,
   prisma: DataPrisma,
-  _producer: NexusProducer
+  producer: NexusProducer
 ) {
-  const service = createImportService(prisma);
+  const service = createImportService(prisma, producer);
 
   app.post('/api/v1/import/:module', { preHandler: requirePermission(PERMISSIONS.DATA.IMPORT) }, async (request, reply) => {
     const { module } = ModuleParams.parse(request.params);

@@ -40,12 +40,17 @@ model EmailMessage {
   sentAt     DateTime
   contactId  String?
   dealId     String?
+  accountId  String?
+  // RFC 5322 headers used to correlate replies into threads.
+  rfcMessageId String?  // value of the message's own Message-ID header
+  inReplyTo    String?  // value of the In-Reply-To header (parent Message-ID)
   createdAt  DateTime @default(now())
 
   @@index([tenantId])
   @@index([userId, threadId])
   @@index([contactId])
   @@index([dealId])
+  @@index([tenantId, rfcMessageId])
 }
 
 model OutboxMessage {

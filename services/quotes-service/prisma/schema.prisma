@@ -28,6 +28,9 @@ model Quote {
   sentAt          DateTime?
   viewedAt        DateTime?
   acceptedAt      DateTime?
+  rejectedAt      DateTime?
+  expiredAt       DateTime?
+  rejectionReason String?
   terms           String?
   notes           String?
   lineItems       Json        @default("[]")

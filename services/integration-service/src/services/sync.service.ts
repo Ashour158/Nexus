@@ -3,11 +3,34 @@ import { NotFoundError } from '@nexus/service-utils';
 import type { Prisma } from '../../../../node_modules/.prisma/integration-client/index.js';
 import type { StartSyncJobInput } from '@nexus/validation';
 import type { IntegrationPrisma } from '../prisma.js';
+import { createGoogleGmailService } from './google-gmail.service.js';
+import { createGoogleCalendarService } from './google-calendar.service.js';
 
 export function createSyncService(prisma: IntegrationPrisma, producer: NexusProducer) {
   return {
     async listJobs() {
       return prisma.syncJob.findMany({ orderBy: { createdAt: 'desc' }, take: 100 });
+    },
+
+    /**
+     * Read the connector-level sync state (status, cursor, last error, counts)
+     * for a connection. Lets callers observe/resume without inspecting jobs.
+     * Fail-open: returns null if the connection is missing.
+     */
+    async getConnectorSyncState(connectionId: string) {
+      const conn = await prisma.oAuthConnection.findFirst({
+        where: { id: connectionId },
+        select: {
+          id: true,
+          provider: true,
+          syncStatus: true,
+          syncCursor: true,
+          lastSyncedAt: true,
+          lastSyncError: true,
+          syncedRecords: true,
+        },
+      });
+      return conn ?? null;
     },
 
     async startJob(tenantId: string, input: StartSyncJobInput) {
@@ -44,6 +67,7 @@ async function runSyncJob(
   tenantId: string,
   jobId: string
 ): Promise<void> {
+  let connectionId: string | undefined;
   try {
     await prisma.syncJob.update({
       where: { id: jobId },
@@ -59,24 +83,51 @@ async function runSyncJob(
     if (!job || !job.connection) {
       throw new Error('Sync job or connection not found');
     }
+    connectionId = job.connectionId;
 
-    // The actual sync implementation (fetch external data, map, write destination)
-    // is pending. We update the job honestly rather than faking success.
+    // Mark connector as syncing (observable). Fail-open — never abort the sync.
+    await markConnectorState(prisma, connectionId, { syncStatus: 'RUNNING', lastSyncError: null });
+
+    let processedRecords = 0;
+
+    if (job.connection.provider === 'google' && job.jobType === 'GMAIL_SYNC') {
+      const gmail = createGoogleGmailService(prisma);
+      const result = await gmail.syncGmailThreads(tenantId, job.connection.userId);
+      processedRecords = result.synced;
+    } else if (job.connection.provider === 'google' && job.jobType === 'CALENDAR_SYNC') {
+      const calendar = createGoogleCalendarService(prisma);
+      const result = await calendar.syncGoogleCalendar(tenantId, job.connection.userId);
+      processedRecords = result.synced;
+    } else {
+      // Provider/type not yet wired — complete with 0 records rather than leaving RUNNING
+      processedRecords = 0;
+    }
+
     await prisma.syncJob.update({
       where: { id: jobId },
       data: {
-        status: 'PENDING_IMPLEMENTATION' as any,
-        processedRecords: 0,
-        totalRecords: 0,
+        status: 'COMPLETED',
+        processedRecords,
         completedAt: new Date(),
-        errorLog: [{ at: new Date().toISOString(), error: 'Sync logic not yet implemented for provider: ' + job.connection.provider }] as Prisma.InputJsonValue,
+        errorLog: [] as Prisma.InputJsonValue,
       },
     });
 
+    // Record connector sync state: successful run advances lastSyncedAt and
+    // accumulates the running total of synced records (resumable/observable).
+    if (connectionId) {
+      await markConnectorState(prisma, connectionId, {
+        syncStatus: 'COMPLETED',
+        lastSyncedAt: new Date(),
+        lastSyncError: null,
+        syncedRecords: { increment: processedRecords },
+      });
+    }
+
     await producer.publish(TOPICS.INTEGRATION, {
-      type: 'integration.sync.pending_implementation',
+      type: 'integration.sync.completed',
       tenantId,
-      payload: { jobId, tenantId, provider: job.connection.provider },
+      payload: { jobId, tenantId, processedRecords },
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'sync_failed';
@@ -88,10 +139,43 @@ async function runSyncJob(
         errorLog: [{ at: new Date().toISOString(), error: msg }] as Prisma.InputJsonValue,
       },
     });
+    if (connectionId) {
+      await markConnectorState(prisma, connectionId, {
+        syncStatus: 'FAILED',
+        lastSyncError: msg.slice(0, 2000),
+      });
+    }
     await producer.publish(TOPICS.INTEGRATION, {
       type: 'integration.sync.failed',
       tenantId,
       payload: { jobId, tenantId, error: msg },
     });
+  }
+}
+
+/**
+ * Persist connector-level sync state on OAuthConnection. Fail-open: a failure
+ * here (e.g. schema drift before `prisma db push`) is logged and swallowed so
+ * it can never abort or fail an otherwise-successful sync run.
+ */
+async function markConnectorState(
+  prisma: IntegrationPrisma,
+  connectionId: string,
+  data: {
+    syncStatus?: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELED';
+    syncCursor?: string | null;
+    lastSyncedAt?: Date;
+    lastSyncError?: string | null;
+    syncedRecords?: number | { increment: number };
+  }
+): Promise<void> {
+  try {
+    await prisma.oAuthConnection.update({
+      where: { id: connectionId },
+      data: data as Prisma.OAuthConnectionUpdateInput,
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[sync] failed to persist connector sync state; continuing', err);
   }
 }

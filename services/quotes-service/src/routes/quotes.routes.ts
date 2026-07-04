@@ -12,6 +12,7 @@ import {
 } from '@nexus/validation';
 import type { QuotesPrisma } from '../prisma.js';
 import type { Prisma, QuoteStatus } from '../../../../node_modules/.prisma/quotes-client/index.js';
+import { registerQuoteLifecycleHandlers } from './quote-lifecycle.routes.js';
 
 function disabledQuoteMutation(requestId: string) {
   return {
@@ -34,6 +35,9 @@ export async function registerQuotesRoutes(
 ): Promise<void> {
   await app.register(
     async (r) => {
+      // ─── LIFECYCLE TRANSITIONS (additive, guarded) ──────────────────────
+      registerQuoteLifecycleHandlers(r, prisma);
+
       // ─── LIST ───────────────────────────────────────────────────────────
       r.get(
         '/quotes',

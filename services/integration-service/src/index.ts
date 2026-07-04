@@ -28,6 +28,7 @@ import { registerCalendarRoutes } from './routes/calendar.routes.js';
 import { registerEmailRoutes } from './routes/email.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 import { startIntegrationEventsConsumer } from './consumers/events.consumer.js';
+import { startWebhookDeliveryPoller } from './workers/webhook-delivery.poller.js';
 import { webhookQueue } from './queues/webhook.queue.js';
 
 startTracing({ serviceName: 'integration-service' });
@@ -99,7 +100,18 @@ try {
   app.log.warn({ err }, 'Kafka consumer start failed');
 }
 
+// Drive the DB-backed outbound webhook delivery queue. Fail-open: if the poller
+// cannot start it must never block the service or its endpoints.
+let webhookDeliveryPoller: ReturnType<typeof startWebhookDeliveryPoller> | null = null;
+try {
+  webhookDeliveryPoller = startWebhookDeliveryPoller(webhooks);
+  app.log.info('Webhook delivery poller started');
+} catch (err) {
+  app.log.warn({ err }, 'Webhook delivery poller start failed');
+}
+
 app.addHook('onClose', async () => {
+  try { webhookDeliveryPoller?.stop(); } catch { /* ignore */ }
   try { await eventsConsumer?.disconnect(); } catch { /* ignore */ }
   try { await producer.disconnect(); } catch { /* ignore */ }
   try { await webhookQueue.close(); } catch { /* ignore */ }

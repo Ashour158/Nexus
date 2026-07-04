@@ -181,7 +181,7 @@ export class NexusProducer {
     try {
       await this.producer.send({
         topic,
-        compression: CompressionTypes.Snappy,
+        compression: CompressionTypes.GZIP,
         acks: -1,
         messages: [
           {
@@ -209,7 +209,7 @@ export class NexusProducer {
     try {
       await this.producer.send({
         topic,
-        compression: CompressionTypes.Snappy,
+        compression: CompressionTypes.GZIP,
         acks: -1,
         messages: events.map((event) => ({
           key: event.tenantId,

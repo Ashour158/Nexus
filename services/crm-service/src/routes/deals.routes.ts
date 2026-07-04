@@ -459,6 +459,18 @@ export async function registerDealsRoutes(
         }
       );
 
+      // ─── SCORING INSIGHTS (deterministic signals — no AI) ───────────────
+      r.get(
+        '/deals/:id/scoring-insights',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.READ) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const data = await deals.getDealScoringInsights(jwt.tenantId, id);
+          return reply.send({ success: true, data });
+        }
+      );
+
       // ─── STAGE MOVE ─────────────────────────────────────────────────────
       r.patch(
         '/deals/:id/stage',

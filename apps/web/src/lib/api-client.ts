@@ -24,8 +24,13 @@ const BASE_URLS: Record<string, string> = {
   finance: process.env.NEXT_PUBLIC_FINANCE_URL ?? 'http://localhost:3002/api/v1',
   comms: process.env.NEXT_PUBLIC_COMMS_URL ?? 'http://localhost:3009/api/v1',
   workflow: process.env.NEXT_PUBLIC_WF_URL ?? 'http://localhost:3007/api/v1',
+  // In dev the browser cannot reach the analytics service (:3008) directly, so
+  // route through the Next BFF proxy under /api/analytics (see
+  // app/api/analytics/**). In prod use the service base or an explicit env URL.
   analytics:
-    process.env.NEXT_PUBLIC_ANALYTICS_URL ?? 'http://localhost:3008/api/v1/analytics',
+    (DEV_BFF_URL ? `${DEV_BFF_URL}/analytics` : undefined) ??
+    process.env.NEXT_PUBLIC_ANALYTICS_URL ??
+    'http://localhost:3008/api/v1/analytics',
   auth: process.env.NEXT_PUBLIC_AUTH_URL ?? 'http://localhost:3000/api/v1',
   notification:
     process.env.NEXT_PUBLIC_NOTIFICATION_SERVICE_URL ??

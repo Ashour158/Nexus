@@ -45,6 +45,15 @@ const AttachmentIdParamSchema = z.object({
   id: z.string().cuid(),
   attachmentId: z.string().cuid(),
 });
+const LeadStatusEnum = z.enum([
+  'NEW',
+  'ASSIGNED',
+  'WORKING',
+  'QUALIFIED',
+  'UNQUALIFIED',
+  'CONVERTED',
+]);
+const LeadStatusBodySchema = z.object({ status: LeadStatusEnum });
 
 /**
  * Registers the `/api/v1/leads/*` route family — Section 34.2 → "Leads".
@@ -386,6 +395,70 @@ export async function registerLeadsRoutes(
             data: parsed.data as Record<string, unknown>,
           });
           return reply.send({ success: true, data: result });
+        }
+      );
+
+      // ─── STATUS (Kanban) ────────────────────────────────────────────────
+      // Web `useUpdateLeadStatus` PATCHes here when a card is dragged between
+      // columns. Delegates to the status-transition service, which emits
+      // `lead.updated` and (for QUALIFIED/UNQUALIFIED) `lead.qualified`.
+      r.patch(
+        '/leads/:id/status',
+        { preHandler: requirePermission(PERMISSIONS.LEADS.UPDATE) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const parsed = LeadStatusBodySchema.safeParse(request.body);
+          if (!parsed.success) {
+            throw new ValidationError('Invalid body', parsed.error.flatten());
+          }
+          const jwt = request.user as JwtPayload;
+          const lead = await leads.transitionLeadStatus(
+            jwt.tenantId,
+            id,
+            parsed.data.status,
+            jwt.sub,
+            jwt.email,
+            jwt.roles ?? []
+          );
+          return reply.send({ success: true, data: lead });
+        }
+      );
+
+      // ─── QUALIFY ────────────────────────────────────────────────────────
+      r.post(
+        '/leads/:id/qualify',
+        { preHandler: requirePermission(PERMISSIONS.LEADS.UPDATE) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const lead = await leads.transitionLeadStatus(
+            jwt.tenantId,
+            id,
+            'QUALIFIED',
+            jwt.sub,
+            jwt.email,
+            jwt.roles ?? []
+          );
+          return reply.send({ success: true, data: lead });
+        }
+      );
+
+      // ─── DISQUALIFY ─────────────────────────────────────────────────────
+      r.post(
+        '/leads/:id/disqualify',
+        { preHandler: requirePermission(PERMISSIONS.LEADS.UPDATE) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const lead = await leads.transitionLeadStatus(
+            jwt.tenantId,
+            id,
+            'UNQUALIFIED',
+            jwt.sub,
+            jwt.email,
+            jwt.roles ?? []
+          );
+          return reply.send({ success: true, data: lead });
         }
       );
 

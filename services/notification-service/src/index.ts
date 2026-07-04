@@ -18,6 +18,7 @@ import { createPushChannel } from './channels/push.channel.js';
 import { startDealConsumer } from './consumers/deal.consumer.js';
 import { startActivityConsumer } from './consumers/activity.consumer.js';
 import { startQuoteConsumer } from './consumers/quote.consumer.js';
+import { startLeadConsumer } from './consumers/lead.consumer.js';
 import { registerNotificationsRoutes } from './routes/notifications.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 import { NexusProducer } from '@nexus/kafka';
@@ -136,15 +137,23 @@ async function lookupOwner(
 
 // Start Kafka consumers. If the cluster is unavailable we log and continue —
 // the HTTP surface still works for reading / marking-read.
+let leadConsumer: Awaited<ReturnType<typeof startLeadConsumer>> | undefined;
 try {
   await startDealConsumer({ inApp, email, sms, push, lookupOwner, log: app.log });
   await startActivityConsumer({ inApp, log: app.log });
   await startQuoteConsumer({ inApp, email, sms, push, log: app.log });
+  leadConsumer = await startLeadConsumer({ inApp, email, sms, push, lookupOwner, log: app.log });
 } catch (err) {
   app.log.warn({ err }, 'Kafka consumers failed to start; HTTP-only mode');
 }
 
 app.addHook('onClose', async () => {
+  // Guarded, fail-open: never let consumer teardown block shutdown.
+  if (leadConsumer) {
+    await leadConsumer.disconnect().catch((err) => {
+      app.log.warn({ err }, 'lead consumer disconnect failed');
+    });
+  }
   await prismaHealth.$disconnect();
 });
 

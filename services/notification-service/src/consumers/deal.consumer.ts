@@ -55,8 +55,25 @@ async function fanOutSmsPush(
 }
 
 /**
+ * Payload shape of the `deal.rotten` event as emitted by crm-service's
+ * rotten-deals poller (see services/crm-service/src/lib/rotten-deals.poller.ts).
+ * `deal.rotten` is not part of the shared `NexusKafkaEvent` union, so we describe
+ * its payload locally and read it defensively.
+ */
+interface DealRottenPayload {
+  dealId?: string;
+  ownerId?: string;
+  accountId?: string;
+  stageId?: string;
+  idleDays?: number;
+  rottenDays?: number;
+  detectedAt?: string;
+}
+
+/**
  * Deal events → notifications. Handles deal.won / deal.lost /
- * deal.stage_changed (with rotten-deal detection against the CRM service).
+ * deal.stage_changed (with rotten-deal detection against the CRM service) and
+ * deal.rotten (emitted asynchronously by the crm-service rotten-deals poller).
  */
 export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusConsumer> {
   const consumer = new NexusConsumer('notification-service.deals');
@@ -168,6 +185,63 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
         });
       }
     }
+  });
+
+  // `deal.rotten` is published once per rotten-crossing by the crm-service
+  // rotten-deals poller. The NexusConsumer already dedupes by eventId, so this
+  // won't spam on every poll; we additionally guard on required fields so a
+  // malformed event can never throw and stall the loop.
+  consumer.on('deal.rotten', async (event) => {
+    // `deal.rotten` is not in the shared NexusKafkaEvent union, so we read the
+    // event shape generically. The handler is only dispatched for this type.
+    const evt = event as { tenantId: string; payload?: unknown };
+    const payload = (evt.payload ?? {}) as DealRottenPayload;
+    if (!payload.dealId || !payload.ownerId) return;
+    const idleDays = payload.idleDays;
+    const rottenDays = payload.rottenDays;
+    const idlePhrase =
+      typeof idleDays === 'number'
+        ? `has been idle for ${idleDays} day${idleDays === 1 ? '' : 's'}`
+        : 'has gone stale';
+    const limitPhrase =
+      typeof rottenDays === 'number' ? ` (threshold ${rottenDays} days)` : '';
+    const title = '⏰ Deal has gone rotten';
+    const body = `Deal ${payload.dealId} ${idlePhrase}${limitPhrase}. Time to follow up.`;
+    await deps.inApp.send({
+      tenantId: evt.tenantId,
+      userId: payload.ownerId,
+      type: 'DEAL_ROTTEN',
+      title,
+      body,
+      entityType: 'deal',
+      entityId: payload.dealId,
+      actionUrl: `/deals/${payload.dealId}`,
+      metadata: {
+        idleDays,
+        rottenDays,
+        stageId: payload.stageId,
+        accountId: payload.accountId,
+        detectedAt: payload.detectedAt,
+      },
+    });
+    const owner = await deps.lookupOwner(evt.tenantId, payload.ownerId);
+    if (owner.email) {
+      await deps.email.send({
+        to: owner.email,
+        subject: title,
+        html: renderActionEmail({
+          heading: title,
+          body,
+          actionLabel: 'View deal',
+          actionUrl: `/deals/${payload.dealId}`,
+        }),
+      });
+    }
+    await fanOutSmsPush(deps, owner, {
+      title,
+      body,
+      actionUrl: `/deals/${payload.dealId}`,
+    });
   });
 
   await consumer.subscribe([TOPICS.DEALS]);

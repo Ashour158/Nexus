@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal } from '@/components/ui/modal';
+import { useAuthStore } from '@/stores/auth.store';
+import { notify } from '@/lib/toast';
 
 type Flag = { name: string; description: string; enabled: boolean; tenants: string[]; users: string; rollout: number; modifiedBy: string; modifiedAt: string };
 
@@ -19,56 +21,160 @@ const INITIAL_FLAGS: Flag[] = [
 ];
 
 export default function AdminFlagsPage() {
+  const accessToken = useAuthStore((s) => s.accessToken);
   const [flags, setFlags] = useState<Flag[]>(INITIAL_FLAGS);
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [newRollout, setNewRollout] = useState('0');
+
+  const authHeaders = useCallback((): Record<string, string> => {
+    return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  }, [accessToken]);
+
+  // Load persisted flags from the BFF; seed with defaults if none are stored.
+  const loadedRef = useRef(false);
+  useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+    fetch('/api/admin/flags', { headers: authHeaders() })
+      .then((r) => r.json())
+      .then((json: { flags?: Flag[] }) => {
+        if (Array.isArray(json.flags) && json.flags.length > 0) {
+          setFlags(json.flags);
+        }
+      })
+      .catch(() => {
+        /* keep defaults; surface nothing — read is best-effort */
+      })
+      .finally(() => setLoading(false));
+  }, [authHeaders]);
+
+  // Persist the full flags array. Optimistic: caller already applied `next`;
+  // on failure we roll back to `previous` and toast.
+  const persist = useCallback(
+    async (next: Flag[], previous: Flag[]) => {
+      setSaving(true);
+      try {
+        const res = await fetch('/api/admin/flags', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({ flags: next }),
+        });
+        if (!res.ok) throw new Error('Save failed');
+        notify.success('Feature flags saved');
+      } catch {
+        setFlags(previous);
+        notify.error('Failed to save feature flags');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [authHeaders]
+  );
+
+  // Apply an update optimistically then persist.
+  const mutate = useCallback(
+    (updater: (prev: Flag[]) => Flag[]) => {
+      setFlags((prev) => {
+        const next = updater(prev);
+        void persist(next, prev);
+        return next;
+      });
+    },
+    [persist]
+  );
+
+  const updateAt = (idx: number, patch: Partial<Flag>) =>
+    mutate((prev) =>
+      prev.map((f, i) =>
+        i === idx ? { ...f, ...patch, modifiedBy: 'admin', modifiedAt: new Date().toISOString() } : f
+      )
+    );
+
+  const createFlag = () => {
+    const name = newName.trim();
+    if (!name) return;
+    const rollout = Math.min(100, Math.max(0, Number(newRollout) || 0));
+    mutate((prev) => [
+      ...prev,
+      {
+        name,
+        description: newDescription.trim(),
+        enabled: false,
+        tenants: [],
+        users: '',
+        rollout,
+        modifiedBy: 'admin',
+        modifiedAt: new Date().toISOString(),
+      },
+    ]);
+    setNewName('');
+    setNewDescription('');
+    setNewRollout('0');
+    setOpen(false);
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Feature Flags</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-2xl font-bold">Feature Flags</h2>
+          {saving ? <span className="text-xs text-gray-400">Saving…</span> : null}
+        </div>
         <button onClick={() => setOpen(true)} className="rounded bg-blue-600 px-3 py-2 text-sm">Create flag</button>
       </div>
 
-      <div className="space-y-3">
-        {flags.map((flag, idx) => (
-          <div key={flag.name} className="rounded-xl border border-gray-800 bg-gray-900 p-4">
-            <div className="grid gap-3 lg:grid-cols-6">
-              <div className="lg:col-span-2">
-                <p className="font-mono text-sm text-blue-300">{flag.name}</p>
-                <p className="mt-1 text-xs text-gray-400">{flag.description}</p>
+      {loading ? (
+        <div className="space-y-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-24 animate-pulse rounded-xl bg-gray-800" />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {flags.map((flag, idx) => (
+            <div key={flag.name} className="rounded-xl border border-gray-800 bg-gray-900 p-4">
+              <div className="grid gap-3 lg:grid-cols-6">
+                <div className="lg:col-span-2">
+                  <p className="font-mono text-sm text-blue-300">{flag.name}</p>
+                  <p className="mt-1 text-xs text-gray-400">{flag.description}</p>
+                </div>
+                <label className="text-xs">
+                  Global
+                  <input
+                    type="checkbox"
+                    className="ms-2"
+                    checked={flag.enabled}
+                    onChange={(e) => updateAt(idx, { enabled: e.target.checked })}
+                  />
+                </label>
+                <input value={flag.tenants.join(',')} onChange={(e) => updateAt(idx, { tenants: e.target.value.split(',').map((v) => v.trim()).filter(Boolean) })} placeholder="tenants csv" className="rounded border border-gray-700 bg-gray-950 px-2 py-1.5 text-xs" />
+                <input value={flag.users} onChange={(e) => updateAt(idx, { users: e.target.value })} placeholder="user emails" className="rounded border border-gray-700 bg-gray-950 px-2 py-1.5 text-xs" />
+                <div>
+                  <input type="range" min={0} max={100} value={flag.rollout} onChange={(e) => updateAt(idx, { rollout: Number(e.target.value) })} />
+                  <p className="text-xs text-gray-400">{flag.rollout}%</p>
+                </div>
               </div>
-              <label className="text-xs">
-                Global
-                <input
-                  type="checkbox"
-                  className="ms-2"
-                  checked={flag.enabled}
-                  onChange={(e) => setFlags((prev) => prev.map((f, i) => i === idx ? { ...f, enabled: e.target.checked, modifiedAt: new Date().toISOString(), modifiedBy: 'admin' } : f))}
-                />
-              </label>
-              <input value={flag.tenants.join(',')} onChange={(e) => setFlags((prev) => prev.map((f, i) => i === idx ? { ...f, tenants: e.target.value.split(',').map((v) => v.trim()).filter(Boolean), modifiedBy: 'admin', modifiedAt: new Date().toISOString() } : f))} placeholder="tenants csv" className="rounded border border-gray-700 bg-gray-950 px-2 py-1.5 text-xs" />
-              <input value={flag.users} onChange={(e) => setFlags((prev) => prev.map((f, i) => i === idx ? { ...f, users: e.target.value, modifiedBy: 'admin', modifiedAt: new Date().toISOString() } : f))} placeholder="user emails" className="rounded border border-gray-700 bg-gray-950 px-2 py-1.5 text-xs" />
-              <div>
-                <input type="range" min={0} max={100} value={flag.rollout} onChange={(e) => setFlags((prev) => prev.map((f, i) => i === idx ? { ...f, rollout: Number(e.target.value), modifiedBy: 'admin', modifiedAt: new Date().toISOString() } : f))} />
-                <p className="text-xs text-gray-400">{flag.rollout}%</p>
-              </div>
+              <p className="mt-2 text-xs text-gray-500">Last modified by {flag.modifiedBy} at {new Date(flag.modifiedAt).toLocaleString()}</p>
             </div>
-            <p className="mt-2 text-xs text-gray-500">Last modified by {flag.modifiedBy} at {new Date(flag.modifiedAt).toLocaleString()}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       <Modal open={open} onClose={() => setOpen(false)} title="Create Feature Flag" size="lg">
           <div className="w-full rounded-xl border border-gray-800 bg-gray-900 p-4">
             <h3 className="text-lg font-semibold">Create Feature Flag</h3>
             <div className="mt-3 grid gap-2">
-              <input placeholder="FLAG_NAME" className="rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm" />
-              <input placeholder="Description" className="rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm" />
-              <input type="number" min={0} max={100} placeholder="Rollout %" className="rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm" />
+              <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="FLAG_NAME" className="rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm" />
+              <input value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Description" className="rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm" />
+              <input value={newRollout} onChange={(e) => setNewRollout(e.target.value)} type="number" min={0} max={100} placeholder="Rollout %" className="rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm" />
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={() => setOpen(false)} className="rounded border border-gray-700 px-3 py-1.5 text-sm">Cancel</button>
-              <button onClick={() => setOpen(false)} className="rounded bg-blue-600 px-3 py-1.5 text-sm">Create</button>
+              <button onClick={createFlag} disabled={!newName.trim()} className="rounded bg-blue-600 px-3 py-1.5 text-sm disabled:opacity-50">Create</button>
             </div>
           </div>
       </Modal>

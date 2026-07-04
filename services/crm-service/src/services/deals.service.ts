@@ -756,6 +756,112 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
     },
 
     /**
+     * Deterministic "scoring insights" for a deal (Section 34.2 →
+     * `GET /deals/:id/scoring-insights`). Surfaces only signals that already
+     * exist on the record — NO AI/ML. Combines data-quality, MEDDIC, stage age
+     * vs `rottenDays`, and last-activity recency into a derived health label.
+     *
+     * Health rules (first match wins):
+     *  - won / lost  → mirror deal status
+     *  - stalled     → stage age ≥ rottenDays, OR ≥ 30 days since last activity
+     *  - at_risk     → dataQuality < 50, OR meddic < 40, OR stage age ≥ 70% of rottenDays
+     *  - healthy     → otherwise
+     */
+    async getDealScoringInsights(tenantId: string, id: string) {
+      const deal = await prisma.deal.findFirst({
+        where: { id, tenantId },
+        include: { stage: true },
+      });
+      if (!deal) {
+        throw new NotFoundError('Deal', id);
+      }
+
+      const now = Date.now();
+      const DAY_MS = 24 * 60 * 60 * 1000;
+
+      // Stage age proxied by updatedAt (stage moves bump updatedAt), matching
+      // the rotten-deals poller convention.
+      const stageAgeDays = Math.max(
+        0,
+        Math.floor((now - deal.updatedAt.getTime()) / DAY_MS)
+      );
+      const rottenDays = deal.stage?.rottenDays ?? null;
+
+      // Days since the most recent activity on this deal (null if none).
+      const lastActivity = await prisma.activity.findFirst({
+        where: { dealId: id, tenantId },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
+      });
+      const daysSinceLastActivity = lastActivity
+        ? Math.max(0, Math.floor((now - lastActivity.createdAt.getTime()) / DAY_MS))
+        : null;
+
+      const isWon = deal.status === 'WON';
+      const isLost = deal.status === 'LOST';
+      const isOpen = deal.status === 'OPEN';
+
+      const dataQualityScore = deal.dataQualityScore ?? null;
+      const meddicScore = deal.meddicicScore ?? null;
+      const meddic = (deal.meddicicData ?? {}) as Record<string, unknown>;
+
+      const isStale =
+        (rottenDays != null && rottenDays > 0 && stageAgeDays >= rottenDays) ||
+        (daysSinceLastActivity != null && daysSinceLastActivity >= 30);
+      const isAtRisk =
+        (dataQualityScore != null && dataQualityScore < 50) ||
+        (meddicScore != null && meddicScore < 40) ||
+        (rottenDays != null && rottenDays > 0 && stageAgeDays >= rottenDays * 0.7);
+
+      let health: 'won' | 'lost' | 'stalled' | 'at_risk' | 'healthy';
+      if (isWon) health = 'won';
+      else if (isLost) health = 'lost';
+      else if (isStale) health = 'stalled';
+      else if (isAtRisk) health = 'at_risk';
+      else health = 'healthy';
+
+      const recommendations: string[] = [];
+      if (isOpen && daysSinceLastActivity != null && daysSinceLastActivity >= 14) {
+        recommendations.push('No recent activity — log a touchpoint to keep momentum.');
+      }
+      if (isOpen && rottenDays != null && rottenDays > 0 && stageAgeDays >= rottenDays) {
+        recommendations.push(`Deal has sat in "${deal.stage?.name ?? 'stage'}" for ${stageAgeDays} days (limit ${rottenDays}) — advance or re-qualify.`);
+      }
+      if (dataQualityScore != null && dataQualityScore < 50) {
+        recommendations.push('Data quality is low — fill in missing fields (amount, close date, owner).');
+      }
+      if (meddicScore != null && meddicScore < 40) {
+        recommendations.push('MEDDIC coverage is thin — identify the economic buyer and decision criteria.');
+      }
+
+      return {
+        dealId: deal.id,
+        health,
+        signals: {
+          status: deal.status,
+          isOpen,
+          isWon,
+          isLost,
+          dataQualityScore,
+          meddicScore,
+          meddic,
+          stageId: deal.stageId,
+          stageName: deal.stage?.name ?? null,
+          stageAgeDays,
+          rottenDays,
+          isRotten:
+            rottenDays != null && rottenDays > 0 ? stageAgeDays >= rottenDays : false,
+          daysSinceLastActivity,
+          probability: deal.probability,
+          amount: decimalToNumber(deal.amount),
+          currency: deal.currency,
+          expectedCloseDate: deal.expectedCloseDate?.toISOString() ?? null,
+        },
+        recommendations,
+      };
+    },
+
+    /**
      * Returns a chronological timeline (newest first) of activities and
      * notes linked to the deal, merged into a unified `TimelineEvent[]`
      * and paginated in-memory.

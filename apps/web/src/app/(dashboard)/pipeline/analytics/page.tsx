@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, BarChart3, Gauge, Hourglass, Target } from 'lucide-react';
 import { EmptyState } from '@/components/dashboard/EmptyState';
 import { StatCard } from '@/components/dashboard/StatCard';
+import { AnalyticsReadModelSection } from './analytics-readmodel';
 
 const PipelineFunnelChart = dynamic(
   () => import('./charts').then((m) => m.PipelineFunnelChart),
@@ -61,6 +62,7 @@ export default function PipelineAnalyticsPage() {
             Deep visibility into conversions, velocity, and forecast confidence.
           </p>
         </header>
+        <AnalyticsReadModelSection />
         <EmptyState
           icon={<BarChart3 className="h-5 w-5" />}
           title="Pipeline analytics not yet available"
@@ -78,6 +80,8 @@ export default function PipelineAnalyticsPage() {
           Deep visibility into conversions, velocity, and forecast confidence.
         </p>
       </header>
+
+      <AnalyticsReadModelSection />
 
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">Funnel visualization</h2>

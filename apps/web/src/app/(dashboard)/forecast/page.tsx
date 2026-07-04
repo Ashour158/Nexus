@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth.store';
 import { notify } from '@/lib/toast';
+import { AnalyticsForecastSection } from './analytics-forecast';
 
 
 interface ForecastStage {
@@ -252,6 +253,8 @@ export default function ForecastPage() {
           ) : null}
         </section>
       )}
+
+      <AnalyticsForecastSection />
     </div>
   );
 }

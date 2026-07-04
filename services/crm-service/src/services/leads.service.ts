@@ -242,6 +242,20 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
             assignedTo: assignment.salesRepId,
           },
         });
+        // Notify downstream (realtime + notification) that the lead now has an
+        // owner. Fire-and-forget/guarded so a publish failure never breaks create.
+        await producer
+          .publish(TOPICS.LEADS, {
+            type: 'lead.assigned',
+            tenantId,
+            payload: {
+              leadId: created.id,
+              tenantId,
+              ownerId: assignment.userId,
+              territoryId: assignment.territoryId,
+            },
+          })
+          .catch(() => undefined);
       }
 
       // Data quality scoring (fire-and-forget)
@@ -346,6 +360,54 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
         .catch(() => undefined);
       // Recalculate data quality when key fields change
       updateLeadDataQuality(prisma, id).catch(() => undefined);
+      return updated;
+    },
+
+    /**
+     * Kanban status transition (Section 34.2 → `PATCH /leads/:id/status`).
+     * Delegates the field write + `lead.updated` emission to `updateLead`, then
+     * — when the target status is `QUALIFIED` or `UNQUALIFIED` — additionally
+     * publishes a `lead.qualified` event (realtime-service subscribes to it).
+     *
+     * Guards against illegal transitions out of a `CONVERTED` lead. Publishing
+     * the qualification event is fire-and-forget so it can never break the write.
+     */
+    async transitionLeadStatus(
+      tenantId: string,
+      id: string,
+      status: Lead['status'],
+      changedBy?: string,
+      changedByName?: string,
+      roles?: string[]
+    ): Promise<Lead> {
+      const existing = await loadOrThrow(tenantId, id);
+      if (existing.status === 'CONVERTED' && status !== 'CONVERTED') {
+        throw new BusinessRuleError('Cannot change the status of a converted lead');
+      }
+      const updated = await this.updateLead(
+        tenantId,
+        id,
+        { status } as UpdateLeadInput,
+        changedBy,
+        changedByName,
+        roles
+      );
+      if (status === 'QUALIFIED' || status === 'UNQUALIFIED') {
+        await producer
+          .publish(TOPICS.LEADS, {
+            type: 'lead.qualified',
+            tenantId,
+            payload: {
+              leadId: updated.id,
+              tenantId,
+              ownerId: updated.ownerId,
+              status: updated.status,
+              qualified: status === 'QUALIFIED',
+              qualifiedBy: changedBy,
+            },
+          })
+          .catch(() => undefined);
+      }
       return updated;
     },
 

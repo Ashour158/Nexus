@@ -46,6 +46,29 @@ const app = await createService({
 
 registerHealthRoutes(app, 'finance-service', [() => checkDatabase(prismaHealth)]);
 
+// The RFQ/quote lifecycle transition routes (send/review/ready/convert/approve…)
+// are body-less POSTs whose handlers read only params + JWT. A client that sets
+// Content-Type: application/json with an empty body makes Fastify's default JSON
+// parser throw FST_ERR_CTP_EMPTY_JSON_BODY (400), breaking every such transition
+// from the UI. Treat an empty/whitespace JSON body as `{}` so they succeed.
+app.addContentTypeParser(
+  'application/json',
+  { parseAs: 'string' },
+  (_req, body: string, done) => {
+    const raw = typeof body === 'string' ? body.trim() : body;
+    if (!raw) {
+      done(null, {});
+      return;
+    }
+    try {
+      done(null, JSON.parse(raw as string));
+    } catch (err) {
+      (err as { statusCode?: number }).statusCode = 400;
+      done(err as Error, undefined);
+    }
+  }
+);
+
 app.setErrorHandler(globalErrorHandler);
 
 await app.register(rateLimit, {

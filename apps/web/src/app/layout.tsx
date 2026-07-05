@@ -33,19 +33,20 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <script
           dangerouslySetInnerHTML={{
             __html: `
+              /* The old caching service worker pinned users to a stale app
+                 shell. Unregister any existing SW and clear caches on every
+                 load; re-registering /sw.js (now a kill-switch) is intentionally
+                 removed until offline support is redone network-first. */
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function() {
-                  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-                    navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                      registrations.forEach(function(registration) {
-                        registration.unregister();
-                      });
-                    });
-                    return;
+                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    registrations.forEach(function(registration) { registration.unregister(); });
+                  }).catch(function(){});
+                  if (window.caches && caches.keys) {
+                    caches.keys().then(function(keys) {
+                      keys.forEach(function(k) { caches.delete(k); });
+                    }).catch(function(){});
                   }
-                  navigator.serviceWorker.register('/sw.js').catch(function(err) {
-                    console.error('SW registration failed:', err);
-                  });
                 });
               }
             `,

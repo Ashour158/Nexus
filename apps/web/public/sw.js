@@ -1,159 +1,46 @@
 /**
- * Nexus CRM Service Worker — PWA + Offline Support
+ * Nexus CRM — kill-switch service worker.
+ *
+ * The previous caching service worker served a stale app shell (cache-first on
+ * navigations), which pinned users to an old build even through hard refreshes
+ * and broke post-deploy login. Browsers always revalidate the sw.js script on
+ * navigation, so shipping this self-unregistering worker reliably evicts the old
+ * one: on activate it deletes every cache, unregisters itself, and reloads open
+ * tabs so they fetch fresh HTML directly from the network.
+ *
+ * PWA offline caching can be reintroduced later with a network-first strategy
+ * for navigations + a versioned precache — not the cache-first shell that caused
+ * the stale-app problem.
  */
-
-const CACHE_NAME = 'nexus-crm-v1';
-const STATIC_ASSETS = [
-  '/',
-  '/deals',
-  '/contacts',
-  '/reports',
-  '/offline.html',
-];
-
-const API_CACHE_NAME = 'nexus-api-v1';
-const API_ROUTES = [
-  '/api/health',
-  '/api/deals',
-  '/api/contacts',
-];
-
-// Install event — cache static assets
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
-  );
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
-// Activate event — clean old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_NAME && name !== API_CACHE_NAME)
-          .map((name) => caches.delete(name))
-      );
-    })
-  );
-  self.clients.claim();
-});
-
-// Fetch event — serve from cache, fallback to network
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
-
-  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
-    return;
-  }
-
-  // API requests — network first, cache fallback
-  if (API_ROUTES.some((route) => url.pathname.startsWith(route))) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const clone = response.clone();
-          caches.open(API_CACHE_NAME).then((cache) => {
-            cache.put(request, clone);
-          });
-          return response;
-        })
-        .catch(() => {
-          return caches.match(request).then((cached) => {
-            if (cached) return cached;
-            return new Response(
-              JSON.stringify({ error: 'Offline', cached: true }),
-              { status: 503, headers: { 'Content-Type': 'application/json' } }
-            );
-          });
-        })
-    );
-    return;
-  }
-
-  // Navigation requests — network first, fallback to offline page
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, clone);
-          });
-          return response;
-        })
-        .catch(() => {
-          return caches.match(request).then((cached) => {
-            if (cached) return cached;
-            return caches.match('/offline.html');
-          });
-        })
-    );
-    return;
-  }
-
-  // Static assets — cache first, network fallback
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request)
-        .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, clone);
-          });
-          return response;
-        })
-        .catch(() => {
-          // If this is a navigation request and we have nothing, show offline page
-          if (request.mode === 'navigate') {
-            return caches.match('/offline.html');
-          }
-          // Otherwise fail silently
-          return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
-        });
-    })
-  );
-});
-
-// Background sync for offline mutations
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-mutations') {
-    event.waitUntil(syncMutations());
-  }
-});
-
-async function syncMutations() {
-  const db = await openDB('nexus-mutations', 1);
-  const mutations = await db.getAll('mutations');
-  for (const mutation of mutations) {
-    try {
-      await fetch(mutation.url, {
-        method: mutation.method,
-        headers: mutation.headers,
-        body: JSON.stringify(mutation.body),
-      });
-      await db.delete('mutations', mutation.id);
-    } catch (err) {
-      console.error('Sync failed for mutation:', mutation.id, err);
-    }
-  }
-}
-
-function openDB(name, version) {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(name, version);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains('mutations')) {
-        db.createObjectStore('mutations', { keyPath: 'id' });
+    (async () => {
+      try {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      } catch {
+        /* ignore */
       }
-    };
-  });
-}
+      try {
+        await self.registration.unregister();
+      } catch {
+        /* ignore */
+      }
+      try {
+        const clients = await self.clients.matchAll({ type: 'window' });
+        for (const client of clients) {
+          client.navigate(client.url);
+        }
+      } catch {
+        /* ignore */
+      }
+    })()
+  );
+});
+
+// Pass every request straight through to the network — never serve from cache.
+self.addEventListener('fetch', () => {});

@@ -62,17 +62,18 @@ export default function LoginPage() {
         process.env.NEXT_PUBLIC_AUTH_URL ?? 'http://localhost:3010/api/v1';
       const res = await axios.post<{
         success: boolean;
-        data: { accessToken: string };
+        data: { accessToken: string; refreshToken?: string };
       }>(`${authUrl}/auth/login`, { email, password });
 
       if (!res.data?.success || !res.data.data?.accessToken) {
         throw new Error('Authentication failed');
       }
-      const { accessToken } = res.data.data;
+      const { accessToken, refreshToken } = res.data.data;
       // Identity/roles/permissions live in the JWT claims, not the response body.
       const claims = decodeJwt(accessToken);
       setSession({
         accessToken,
+        refreshToken,
         userId: String(claims.sub ?? ''),
         tenantId: String(claims.tenantId ?? ''),
         roles: Array.isArray(claims.roles) ? (claims.roles as string[]) : [],

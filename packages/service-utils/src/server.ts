@@ -235,6 +235,14 @@ export async function createService(config: ServiceConfig): Promise<FastifyInsta
       timeWindow: rateLimitWindow,
       redis: redis,
       skipOnError: true,
+      // Never rate-limit infra probes: liveness/readiness health checks and
+      // Prometheus /metrics scrapes all originate from a single IP with no JWT,
+      // so they share one bucket and would trip the limit — starving the probe
+      // and marking the container unhealthy (→ restart loops under an orchestrator).
+      allowList: (req: any) => {
+        const path = pathOnly(req.url);
+        return path.startsWith('/health') || path.startsWith('/metrics') || path.startsWith('/ready');
+      },
       keyGenerator: (req: any) => {
         const tenantId = req.headers['x-tenant-id'] as string | undefined;
         // Extract user sub from JWT payload (no signature verification needed for bucketing)

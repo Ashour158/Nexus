@@ -10,7 +10,7 @@ function request(path: string) {
   });
 }
 
-function mockProjectionFetch() {
+function mockQuotesFetch() {
   const fetchMock = vi.fn(async () =>
     new Response(JSON.stringify({ success: true, data: { data: [], total: 0 } }), {
       status: 200,
@@ -21,13 +21,17 @@ function mockProjectionFetch() {
   return fetchMock;
 }
 
-describe('quote history projection BFF routes', () => {
+// The deals-service quote-projection read-model was decommissioned along with the
+// standalone deals-service. Account/contact quote tabs now read finance-service
+// (which owns quotes and supports accountId/contactId filters); the deal quote tab
+// falls through the deals catch-all to crm-service.
+describe('360 quote tab BFF routes', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('reads account quote history from deals-service QuoteProjection', async () => {
-    const fetchMock = mockProjectionFetch();
+  it('reads account quotes from finance-service filtered by accountId', async () => {
+    const fetchMock = mockQuotesFetch();
     const route = await import('./accounts/[id]/quotes/route');
 
     const response = await route.GET(request('/api/accounts/acct-1/quotes?page=2&limit=5'), {
@@ -36,13 +40,13 @@ describe('quote history projection BFF routes', () => {
 
     expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:3042/api/v1/data/quote-projections/account/acct-1?page=2&limit=5',
+      'http://finance-service:3002/api/v1/quotes?page=2&limit=5&accountId=acct-1',
       expect.objectContaining({ cache: 'no-store' })
     );
   });
 
-  it('reads contact quote history from deals-service QuoteProjection', async () => {
-    const fetchMock = mockProjectionFetch();
+  it('reads contact quotes from finance-service filtered by contactId', async () => {
+    const fetchMock = mockQuotesFetch();
     const route = await import('./contacts/[id]/quotes/route');
 
     const response = await route.GET(request('/api/contacts/contact-1/quotes?limit=10'), {
@@ -51,13 +55,13 @@ describe('quote history projection BFF routes', () => {
 
     expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:3042/api/v1/data/quote-projections/contact/contact-1?limit=10',
+      'http://finance-service:3002/api/v1/quotes?limit=10&contactId=contact-1',
       expect.objectContaining({ cache: 'no-store' })
     );
   });
 
-  it('reads deal quote history from deals-service QuoteProjection instead of CRM quote tables', async () => {
-    const fetchMock = mockProjectionFetch();
+  it('reads deal quotes from crm-service via the deals catch-all proxy', async () => {
+    const fetchMock = mockQuotesFetch();
     const route = await import('./deals/[[...path]]/route');
 
     const response = await route.GET(request('/api/deals/deal-1/quotes?limit=10'), {
@@ -67,8 +71,8 @@ describe('quote history projection BFF routes', () => {
     expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:3042/api/v1/data/quote-projections/deal/deal-1?limit=10',
-      expect.objectContaining({ cache: 'no-store' })
+      'http://localhost:3001/api/v1/deals/deal-1/quotes?limit=10',
+      expect.objectContaining({ method: 'GET' })
     );
   });
 });

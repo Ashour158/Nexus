@@ -6,6 +6,8 @@ import { GitMerge } from 'lucide-react';
 
 const TABS = [
   { href: '/settings/profile', label: 'Profile' },
+  { href: '/settings/company', label: 'Company' },
+  { href: '/settings/org-structure', label: 'Org Structure' },
   { href: '/settings/integrations', label: 'Integrations' },
   { href: '/settings/users', label: 'Users' },
   { href: '/settings/pipelines', label: 'Pipelines' },

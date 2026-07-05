@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
 import { useConfirm } from '@/hooks/use-confirm';
+import { OrgAssignmentPanel } from '@/components/admin/org-assignment-panel';
 
 const RESOURCES = ['contacts', 'deals', 'reports', 'workflows'] as const;
 
@@ -117,6 +118,7 @@ export default function AdminUserDetailPage({ params }: { params: { id: string }
           ))}
         </div>
       </section>
+      <OrgAssignmentPanel userId={params.id} />
       <section className="rounded-xl border border-gray-800 bg-gray-900 p-4">
         <h3 className="mb-2 font-semibold">Login history</h3>
         <ul className="space-y-1 text-sm text-gray-300">{history.map((h) => <li key={h.id}>{new Date(h.at).toLocaleString()} - {h.action}</li>)}</ul>

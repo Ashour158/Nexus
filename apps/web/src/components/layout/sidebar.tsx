@@ -55,6 +55,7 @@ type NavItem = {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  adminOnly?: boolean;
 };
 
 type NavGroup = {
@@ -166,6 +167,7 @@ const NAV_GROUPS: NavGroup[] = CRM_MODULE_GROUPS.map((group) => ({
       href: module.href,
       label: module.label,
       icon: module.icon,
+      adminOnly: module.adminOnly,
     })),
 })).filter((group) => group.items.length > 0);
 
@@ -243,6 +245,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps): ReactEleme
 
             const visibleItems = group.items.filter((item) => {
               if (item.href === '/settings/users' && !roles.includes('admin')) return false;
+              if (item.adminOnly && !roles.includes('admin')) return false;
               return true;
             });
             if (visibleItems.length === 0) return null;

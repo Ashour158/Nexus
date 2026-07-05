@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const res = await fetch(`${CRM_SERVICE}/api/v1/activities/call`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantId },
+    headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantId, authorization: req.headers.get('authorization') ?? '' },
     body: JSON.stringify(body),
   });
   const data = await res.json();
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const qs = searchParams.toString();
   const res = await fetch(`${CRM_SERVICE}/api/v1/activities/calls${qs ? `?${qs}` : ''}`, {
-    headers: { 'x-tenant-id': tenantId },
+    headers: { 'x-tenant-id': tenantId, authorization: req.headers.get('authorization') ?? '' },
   });
   const data = await res.json();
   return NextResponse.json(data, { status: res.status });

@@ -7,7 +7,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const body = await req.json();
   const res = await fetch(`${CRM_SERVICE}/api/v1/competitors/${params.id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantId },
+    headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantId, authorization: req.headers.get('authorization') ?? '' },
     body: JSON.stringify(body),
   });
   const data = await res.json();
@@ -18,7 +18,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const tenantId = req.headers.get('x-tenant-id') || 'default';
   await fetch(`${CRM_SERVICE}/api/v1/competitors/${params.id}`, {
     method: 'DELETE',
-    headers: { 'x-tenant-id': tenantId },
+    headers: { 'x-tenant-id': tenantId, authorization: req.headers.get('authorization') ?? '' },
   });
   return new NextResponse(null, { status: 204 });
 }

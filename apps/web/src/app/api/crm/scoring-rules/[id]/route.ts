@@ -22,7 +22,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   try {
     const res = await fetch(`${CRM_SERVICE}/api/v1/scoring-rules/${params.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantId },
+      headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantId, authorization: req.headers.get('authorization') ?? '' },
       body: JSON.stringify(body),
     });
     const data = await res.json();
@@ -43,7 +43,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   try {
     await fetch(`${CRM_SERVICE}/api/v1/scoring-rules/${params.id}`, {
       method: 'DELETE',
-      headers: { 'x-tenant-id': tenantId },
+      headers: { 'x-tenant-id': tenantId, authorization: req.headers.get('authorization') ?? '' },
     });
     return new NextResponse(null, { status: 204 });
   } catch {

@@ -7,7 +7,7 @@ import {
   getDevPreviewState,
 } from '@/lib/server/dev-preview-data';
 
-const FINANCE_URL = process.env.FINANCE_SERVICE_URL ?? 'http://finance-service:3002/api/v1';
+const FINANCE_URL = `${process.env.FINANCE_SERVICE_URL ?? 'http://finance-service:3002'}/api/v1`;
 const TRIGGERS = new Set(['deal_stage_changed', 'rfq_received', 'deal_created', 'quote_expiring', 'discount_requested']);
 const ACTIONS = new Set(['create_quote', 'assign_owner', 'request_approval', 'render_template', 'send_notification']);
 

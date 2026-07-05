@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const qs = searchParams.toString();
   const res = await fetch(`${CRM_SERVICE}/api/v1/duplicates/check?${qs}`, {
-    headers: { 'x-tenant-id': tenantId },
+    headers: { 'x-tenant-id': tenantId, authorization: req.headers.get('authorization') ?? '' },
   });
   const data = await res.json();
   return NextResponse.json(data, { status: res.status });

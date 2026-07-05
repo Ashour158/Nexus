@@ -5,7 +5,7 @@ const REPORTING_SERVICE = process.env.REPORTING_SERVICE_URL || 'http://localhost
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const tenantId = req.headers.get('x-tenant-id') || 'default';
   const res = await fetch(`${REPORTING_SERVICE}/api/v1/reports/${params.id}`, {
-    headers: { 'x-tenant-id': tenantId },
+    headers: { 'x-tenant-id': tenantId, authorization: req.headers.get('authorization') ?? '' },
   });
   return NextResponse.json(await res.json(), { status: res.status });
 }

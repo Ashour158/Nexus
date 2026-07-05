@@ -11,7 +11,7 @@ import {
 } from '@/lib/server/dev-preview-data';
 import { assertRfqConvertible } from '@/lib/server/cpq-authority';
 
-const FINANCE_URL = process.env.FINANCE_SERVICE_URL ?? 'http://finance-service:3002/api/v1';
+const FINANCE_URL = `${process.env.FINANCE_SERVICE_URL ?? 'http://finance-service:3002'}/api/v1`;
 
 export async function POST(
   req: NextRequest,

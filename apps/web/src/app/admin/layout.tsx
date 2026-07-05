@@ -12,7 +12,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isAdmin = roles.some((role) => role.toLowerCase() === 'admin');
 
   useEffect(() => {
-    setHydrated(useAuthStore.persist?.hasHydrated?.() ?? true);
+    // The auth store uses `skipHydration: true`, so it only populates after an
+    // explicit rehydrate(). /admin/* lives outside the (dashboard) group and its
+    // HydrationGate, so if we don't rehydrate here `hasHydrated()` stays false
+    // forever and every admin page is stuck on "Redirecting…" (blank panel).
+    void useAuthStore.persist?.rehydrate?.();
+    if (useAuthStore.persist?.hasHydrated?.()) {
+      setHydrated(true);
+    }
     const unsubscribe = useAuthStore.persist?.onFinishHydration?.(() => setHydrated(true));
     return () => unsubscribe?.();
   }, []);

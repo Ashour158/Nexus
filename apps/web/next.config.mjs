@@ -39,11 +39,18 @@ const nextConfig = {
       { source: '/bff/auth/:path*', destination: 'http://auth-service:3000/api/v1/:path*' },
       { source: '/bff/crm/:path*', destination: 'http://crm-service:3001/api/v1/:path*' },
       { source: '/bff/finance/:path*', destination: 'http://finance-service:3002/api/v1/:path*' },
+      // Approval requests live on approval-service, not workflow-service. The
+      // approvals UI calls them via the workflow BFF (apiClients.workflow), so
+      // route just the /approval/* subpath to approval-service. Must precede the
+      // general /bff/workflow rule below (Next matches rewrites in order).
+      { source: '/bff/workflow/approval/:path*', destination: 'http://approval-service:3014/api/v1/approval/:path*' },
       { source: '/bff/workflow/:path*', destination: 'http://workflow-service:3007/api/v1/:path*' },
       { source: '/bff/comms/:path*', destination: 'http://comm-service:3009/api/v1/:path*' },
       { source: '/bff/notification/:path*', destination: 'http://notification-service:3003/api/v1/:path*' },
       { source: '/bff/search/:path*', destination: 'http://search-service:3006/api/v1/search/:path*' },
-      { source: '/bff/storage/:path*', destination: 'http://storage-service:3010/api/v1/storage/:path*' },
+      // storage-service registers file routes under /api/v1 (e.g. /api/v1/files),
+      // NOT /api/v1/storage — the extra segment 404s every upload/list call.
+      { source: '/bff/storage/:path*', destination: 'http://storage-service:3010/api/v1/:path*' },
       { source: '/bff/analytics/:path*', destination: 'http://analytics-service:3008/api/v1/analytics/:path*' },
       { source: '/bff/integration/:path*', destination: 'http://integration-service:3012/api/v1/:path*' },
     ];

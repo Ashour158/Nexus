@@ -6,7 +6,7 @@ import {
   getDevPreviewState,
 } from '@/lib/server/dev-preview-data';
 
-const FINANCE_URL = process.env.FINANCE_SERVICE_URL ?? 'http://finance-service:3002/api/v1';
+const FINANCE_URL = `${process.env.FINANCE_SERVICE_URL ?? 'http://finance-service:3002'}/api/v1`;
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = req.headers.get('authorization');

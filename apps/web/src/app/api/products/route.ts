@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(`${process.env.FINANCE_SERVICE_URL}/products?q=${encodeURIComponent(q)}`, {
+    const res = await fetch(`${process.env.FINANCE_SERVICE_URL}/api/v1/products?q=${encodeURIComponent(q)}`, {
       headers: { Authorization: auth },
       cache: 'no-store',
     });
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(`${process.env.FINANCE_SERVICE_URL}/products`, {
+    const res = await fetch(`${process.env.FINANCE_SERVICE_URL}/api/v1/products`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: auth },
       body: JSON.stringify(payload),

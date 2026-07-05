@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   const qs = searchParams.toString();
   const tenantId = req.headers.get('x-tenant-id') || 'default';
   const res = await fetch(`${CRM_SERVICE}/api/v1/lead-scores${qs ? `?${qs}` : ''}`, {
-    headers: { 'x-tenant-id': tenantId },
+    headers: { 'x-tenant-id': tenantId, authorization: req.headers.get('authorization') ?? '' },
   });
   const data = await res.json();
   return NextResponse.json(data, { status: res.status });

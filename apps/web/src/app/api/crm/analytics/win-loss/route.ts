@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const res = await fetch(`${CRM_SERVICE}/api/v1/analytics/win-loss${qs ? `?${qs}` : ''}`, {
-      headers: { 'x-tenant-id': tenantId },
+      headers: { 'x-tenant-id': tenantId, authorization: req.headers.get('authorization') ?? '' },
     });
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });

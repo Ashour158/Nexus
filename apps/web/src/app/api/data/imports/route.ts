@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
   const res = await fetch(`${DATA_SERVICE}/api/v1/import/contacts`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantId },
+    headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantId, authorization: req.headers.get('authorization') ?? '' },
     body: JSON.stringify({
       fileName: file.name,
       csvBase64,

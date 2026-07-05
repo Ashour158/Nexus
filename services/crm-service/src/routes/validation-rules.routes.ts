@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { JwtPayload } from '@nexus/shared-types';
-import { PERMISSIONS, requirePermission, ValidationError, createHttpClient } from '@nexus/service-utils';
+import { PERMISSIONS, requirePermission, ValidationError } from '@nexus/service-utils';
 import { z } from 'zod';
 import type { Prisma } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { CrmPrisma } from '../prisma.js';
@@ -13,10 +13,6 @@ const CreateRuleBody = z.object({
   condition: z.record(z.unknown()),
   requirement: z.record(z.unknown()),
   errorMessage: z.string().min(1).max(1000),
-});
-
-const metadataProxyClient = createHttpClient({
-  baseURL: process.env.METADATA_SERVICE_URL ?? 'http://localhost:3004',
 });
 
 function getPath(obj: unknown, path: string): unknown {
@@ -96,11 +92,22 @@ export async function registerValidationRulesRoutes(app: FastifyInstance, prisma
         '/validation-rules',
         { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
         async (request, reply) => {
-          const queryString = new URLSearchParams(request.query as Record<string, string>).toString();
-          const path = '/api/v1/validation-rules' + (queryString ? '?' + queryString : '');
-          const authHeader = request.headers.authorization as string | undefined;
-          const result = await metadataProxyClient.get(path, authHeader ? { Authorization: authHeader } : undefined);
-          return reply.send(result);
+          // Read from this service's own ValidationRule table — the same store
+          // that POST/validate/PATCH/DELETE below write to. (It previously
+          // proxied to metadata-service, which both 500'd when METADATA_SERVICE_URL
+          // was unset AND returned an empty list that never reflected rules
+          // created here.)
+          const jwt = request.user as JwtPayload;
+          const { objectType } = request.query as { objectType?: string };
+          const rules = await prisma.validationRule.findMany({
+            where: {
+              tenantId: jwt.tenantId,
+              deletedAt: null,
+              ...(objectType ? { objectType } : {}),
+            },
+            orderBy: { createdAt: 'asc' },
+          });
+          return reply.send({ success: true, data: rules });
         }
       );
 

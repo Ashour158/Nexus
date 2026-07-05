@@ -197,6 +197,7 @@ services:
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_crm
+      METADATA_SERVICE_URL: http://metadata-service:3004
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
@@ -600,7 +601,7 @@ services:
       AUDIT_CONSUMER_URL: http://audit-consumer:3028
       ACCOUNTS_SERVICE_URL: http://accounts-service:3031
       NOTES_SERVICE_URL: http://notes-service:3032
-      CONTACTS_SERVICE_URL: http://contacts-service:3041
+      CONTACTS_SERVICE_URL: http://crm-service:3001
       ACTIVITIES_SERVICE_URL: http://activities-service:3043
       DEALS_SERVICE_URL: http://crm-service:3001
       QUOTES_SERVICE_URL: http://finance-service:3002
@@ -852,6 +853,8 @@ services:
     environment:
       PORT: '3020'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_planning
+      CRM_SERVICE_URL: http://crm-service:3001
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
@@ -874,6 +877,9 @@ services:
     environment:
       PORT: '3021'
       REPORTING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_reporting
+      CRM_SERVICE_URL: http://crm-service:3001
+      ANALYTICS_SERVICE_URL: http://analytics-service:3008/api/v1/analytics
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}

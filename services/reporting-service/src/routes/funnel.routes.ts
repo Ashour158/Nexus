@@ -20,6 +20,39 @@ export async function registerFunnelRoutes(app: FastifyInstance, prisma: Reporti
     }
   });
 
+  // Pipeline analytics page (/pipeline/analytics) reads funnel + stageDays from
+  // this endpoint. Reuses the funnel engine; there was no route here before, so
+  // the web /api/reports/pipeline proxy 404'd.
+  app.get('/api/v1/reports/pipeline', async (req, reply) => {
+    const jwt = (req as any).user as JwtPayload;
+    const { from, to, pipelineId } = req.query as { from?: string; to?: string; pipelineId?: string };
+    const fromDate = from ? new Date(from) : new Date(Date.now() - 90 * 86400000);
+    const toDate = to ? new Date(to) : new Date();
+    try {
+      const report = await buildFunnelReport(prisma, jwt.tenantId, fromDate, toDate, pipelineId);
+      return reply.send({
+        funnel: report.stages.map((s) => ({
+          stage: s.stage,
+          deals: s.count,
+          value: s.totalValue,
+          conversion: s.conversionRate,
+        })),
+        stageDays: report.stages.map((s) => ({ stage: s.stage, days: s.avgDaysInStage })),
+        dealFlow: [],
+        cohort: [],
+        stats: {
+          totalDeals: report.totalDeals,
+          totalWon: report.totalWon,
+          overallConversionRate: report.overallConversionRate,
+          avgSalesCycledays: report.avgSalesCycledays,
+        },
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Pipeline report failed';
+      return reply.code(502).send({ success: false, error: { code: 'BAD_GATEWAY', message: 'Request failed', details: msg, requestId: req.id } });
+    }
+  });
+
   app.get('/api/v1/analytics/snapshots', async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { from, to, pipelineId } = req.query as { from?: string; to?: string; pipelineId?: string };

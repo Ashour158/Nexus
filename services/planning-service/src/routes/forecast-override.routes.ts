@@ -87,12 +87,6 @@ export async function registerForecastOverrideRoutes(app: FastifyInstance, prism
     const qs = new URLSearchParams({
       periodKey,
     }).toString();
-    const crmRes = await fetch(`${crmBase}/api/v1/forecast/rep-summary?${qs}`, {
-      headers: {
-        authorization: request.headers.authorization ?? '',
-        'x-tenant-id': jwt.tenantId,
-      },
-    });
     let repForecasts: Array<{
       ownerId: string;
       ownerName: string;
@@ -100,6 +94,14 @@ export async function registerForecastOverrideRoutes(app: FastifyInstance, prism
       weightedValue: number;
     }> = [];
     try {
+      // Guard the whole cross-service call: a transport failure (e.g. CRM_SERVICE_URL
+      // unset -> localhost refused) must degrade to empty reps, not 500 the endpoint.
+      const crmRes = await fetch(`${crmBase}/api/v1/forecast/rep-summary?${qs}`, {
+        headers: {
+          authorization: request.headers.authorization ?? '',
+          'x-tenant-id': jwt.tenantId,
+        },
+      });
       const crmBody = (await crmRes.json()) as {
         success?: boolean;
         data?: typeof repForecasts;

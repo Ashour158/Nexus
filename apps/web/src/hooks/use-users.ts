@@ -46,7 +46,9 @@ export function useUsers(filters: UserListFilters = {}) {
   const normalized = {
     search: filters.search?.trim() || undefined,
     page: filters.page ?? 1,
-    limit: filters.limit ?? 100,
+    // auth-service caps list `limit` at 100 (>100 → 422/400). Several callers
+    // request 200 for user-pickers; clamp so those pickers load instead of 400ing.
+    limit: Math.min(filters.limit ?? 100, 100),
     isActive: filters.isActive,
     roleId: filters.roleId,
   };

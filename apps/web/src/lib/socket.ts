@@ -26,6 +26,13 @@ export function getSocket(): Socket {
 }
 
 export function connectSocket(): void {
+  // Only attempt a live connection when a realtime URL is actually configured.
+  // Without it the client would dial ws://localhost:3005 from the browser (the
+  // user's own machine) and fail noisily/repeatedly. Live updates are disabled
+  // until NEXT_PUBLIC_REALTIME_URL points at a browser-reachable endpoint.
+  if (!process.env.NEXT_PUBLIC_REALTIME_URL) {
+    return;
+  }
   getSocket().connect();
 }
 

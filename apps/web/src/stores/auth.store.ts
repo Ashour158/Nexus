@@ -80,6 +80,12 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'nexus-auth',
       storage: createJSONStorage(() => sessionStorage),
+      // Do NOT auto-hydrate: otherwise the client's first render has the
+      // persisted session (permissions populated) while the server render has an
+      // empty store, so permission-gated pages that swap their whole tree on
+      // hasPermission() produce a hydration mismatch (React #418). A HydrationGate
+      // rehydrates this store on mount and only then renders the dashboard.
+      skipHydration: true,
       partialize: (state) => ({
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,

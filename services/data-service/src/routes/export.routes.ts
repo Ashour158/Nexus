@@ -21,7 +21,8 @@ export async function registerExportRoutes(app: FastifyInstance, prisma: DataPri
       user.tenantId,
       module,
       body.filters,
-      body.columns
+      body.columns,
+      request.headers.authorization
     );
     reply
       .header('Content-Type', 'text/csv')

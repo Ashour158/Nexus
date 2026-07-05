@@ -8,9 +8,14 @@ interface CrmListResponse {
   totalPages?: number;
 }
 
-function authHeaders(): Record<string, string> {
-  const token = process.env.INTERNAL_SERVICE_TOKEN ?? '';
-  return { Authorization: `Bearer ${token}` };
+function authHeaders(authToken: string | undefined): Record<string, string> {
+  // Export runs on behalf of the requesting user against crm's end-user-gated
+  // list routes, so forward the caller's JWT (they hold <module>:read). Fall
+  // back to the service token only if no caller auth was provided.
+  if (authToken && authToken.trim()) {
+    return { Authorization: authToken.startsWith('Bearer ') ? authToken : `Bearer ${authToken}` };
+  }
+  return { Authorization: `Bearer ${process.env.INTERNAL_SERVICE_TOKEN ?? ''}` };
 }
 
 export function createExportService(_prisma: DataPrisma) {
@@ -19,7 +24,8 @@ export function createExportService(_prisma: DataPrisma) {
       _tenantId: string,
       module: string,
       filters: Record<string, unknown> | undefined,
-      columns: string[] | undefined
+      columns: string[] | undefined,
+      authToken?: string
     ) {
       const crmUrl = process.env.CRM_SERVICE_URL ?? 'http://localhost:3001';
       const pageSize = 500;

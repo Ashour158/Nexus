@@ -27,6 +27,15 @@ const DEV_AUTH_BYPASS = process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === 'true';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Send the bare root to the app home in middleware. Rendering the root `/`
+  // page segment hits a Next.js standalone-output bug (undefined client
+  // reference manifest → "Cannot read properties of undefined (reading
+  // 'clientModules'/'entryCSSFiles')") that 500s regardless of page content, so
+  // never render it. /deals then runs the normal auth check below.
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL('/deals', request.url));
+  }
+
   // Allow public assets and API routes unconditionally
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();

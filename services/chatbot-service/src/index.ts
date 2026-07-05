@@ -20,6 +20,11 @@ const app = await createService({
   port,
   jwtSecret,
   corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(',').map((s) => s.trim()),
+  // Public website live-chat widget: /api/v1/chat/* is reached by unauthenticated
+  // visitors. The handlers still enforce their own embed-key/tenant + per-session
+  // token checks (see chat.routes.ts), so we only bypass the transport-level JWT
+  // preHandler here.
+  publicPrefixes: ['/api/v1/chat'],
 });
 
 // Capture raw body for webhook signature verification

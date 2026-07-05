@@ -13,10 +13,20 @@ import type { NotesPrisma } from '../prisma.js';
  *        "thanks @[clx123abc] — can you review with @[clx456def]?"
  *
  * We union both sources into a de-duplicated set of mentioned user ids, drop the
- * author (never notify yourself), and emit one `notification.created` event on
+ * author (never notify yourself), and emit one `note.mentioned` domain event on
  * {@link TOPICS.NOTIFICATIONS} per newly-mentioned user. The notification-service
- * in-app channel + realtime-service consume this topic, so the mentioned user
- * gets a bell notification and a WebSocket push.
+ * mention consumer turns each event into a persisted in-app Notification (and
+ * re-publishes the realtime `notification.created` push via its in-app channel),
+ * so the mentioned user gets a bell notification and a WebSocket push.
+ *
+ * NOTE ON THE ENVELOPE: this must be a *domain* event (`note.mentioned`), NOT the
+ * `notification.created` realtime-push event. `notification.created` on
+ * {@link TOPICS.NOTIFICATIONS} is the *output* of the notification pipeline —
+ * realtime-service consumes it to fan a WebSocket frame, and nothing persists it.
+ * Publishing `notification.created` here (the previous behaviour) therefore never
+ * created a Notification row: the mention silently vanished. Following the
+ * `deal.won` reference pattern, the source service emits a domain event and the
+ * notification-service consumer owns persistence + realtime re-publish.
  *
  * IDEMPOTENCY (per note version): the note row persists a `mentionsNotified`
  * array — the ids we have already notified. We only emit for ids in the current
@@ -92,7 +102,7 @@ function actionUrlFor(entity: { entityType: string; entityId: string } | null): 
 }
 
 /**
- * Emit `notification.created` events for every newly-mentioned user on a note and
+ * Emit `note.mentioned` events for every newly-mentioned user on a note and
  * fold those ids into `mentionsNotified` for idempotency. Best-effort: returns the
  * count actually notified; never throws.
  *
@@ -121,11 +131,10 @@ export async function notifyMentions(
     for (const userId of fresh) {
       try {
         await producer.publish(TOPICS.NOTIFICATIONS, {
-          type: 'notification.created',
+          type: 'note.mentioned',
           tenantId: note.tenantId,
           payload: {
             userId,
-            notificationType: 'NOTE_MENTION',
             title: 'You were mentioned in a note',
             body:
               note.content.length > 240
@@ -134,7 +143,8 @@ export async function notifyMentions(
             entityType: entity?.entityType ?? 'note',
             entityId: entity?.entityId ?? note.id,
             actionUrl,
-            metadata: { noteId: note.id, authorId: note.authorId },
+            noteId: note.id,
+            authorId: note.authorId,
           },
         });
         notified.push(userId);

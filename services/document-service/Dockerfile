@@ -32,7 +32,12 @@ COPY --from=builder --chown=service:nodejs /app/services/document-service/packag
 COPY --from=builder --chown=service:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=service:nodejs /app/packages ./packages
 
-RUN apk add --no-cache openssl && ln -sf /app/node_modules /node_modules
+# Chromium for Puppeteer PDF rendering (Alpine has no bundled browser). Install
+# the system chromium + fonts and tell Puppeteer to use it instead of trying to
+# download/run its own (which won't run on musl/Alpine).
+RUN apk add --no-cache openssl chromium nss freetype harfbuzz ttf-freefont \
+ && ln -sf /app/node_modules /node_modules
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser PUPPETEER_SKIP_DOWNLOAD=true
 USER service
 EXPOSE 3016
 ENV NODE_ENV=production PORT=3016

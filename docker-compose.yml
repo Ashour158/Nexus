@@ -632,6 +632,10 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
       AUTH_SERVICE_URL: http://auth-service:3000
+      # Sequence enroll validates the contact against crm's internal route via
+      # the shared mesh token (x-service-token). Must match crm's value.
+      CRM_SERVICE_URL: http://crm-service:3001
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -701,6 +705,10 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+      # CSV export streams source rows from crm-service; without this the client
+      # fell back to localhost:3001 (nothing in-container) → export 500'd.
+      CRM_SERVICE_URL: http://crm-service:3001
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -742,6 +750,10 @@ services:
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       KAFKA_BROKERS: kafka:29092
       PORT: '3017'
+      # Public chat widget maps embed key → tenant. Format: key1:tenantA,key2:tenantB.
+      # Set in the droplet .env; without it the widget reaches the handler but
+      # returns 403 embed_key_required (by design) rather than the old 401.
+      CHAT_EMBED_KEYS: ${CHAT_EMBED_KEYS:-}
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_chatbot
     depends_on:
       postgres:

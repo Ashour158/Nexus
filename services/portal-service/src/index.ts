@@ -19,6 +19,13 @@ const app = await createService({
   port,
   jwtSecret,
   corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(',').map((s) => s.trim()),
+  // Customer-facing portal routes are consumed via a share token in the URL
+  // (`GET /portal/:token`, plus /accept, /reject, /download) and carry NO
+  // end-user JWT. They must bypass the global JWT preHandler; the token itself
+  // is validated (existence + expiry) inside the portal service. The admin/CRUD
+  // routes live under `/api/v1/portal/...`, which does NOT match this prefix and
+  // therefore remains JWT- + permission-protected.
+  publicPrefixes: ['/portal/'],
 });
 
 const prisma = getPrisma();

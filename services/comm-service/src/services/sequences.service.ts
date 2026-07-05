@@ -2,7 +2,7 @@ import { BusinessRuleError, NotFoundError } from '@nexus/service-utils';
 import type { Prisma } from '../../../../node_modules/.prisma/comm-client/index.js';
 import type { EmailSequence, SequenceEnrollment } from '../../../../node_modules/.prisma/comm-client/index.js';
 import type { CommPrisma } from '../prisma.js';
-import { fetchContactEmail } from '../lib/crm-client.js';
+import { fetchContact, fetchContactEmail } from '../lib/crm-client.js';
 import type { EmailChannel } from '../channels/smtp.channel.js';
 import { createTemplatesService } from './templates.service.js';
 
@@ -97,11 +97,14 @@ export function createSequencesService(
       }
       const skipCrm = process.env.COMM_ENROLL_SKIP_CRM === 'true';
       if (!skipCrm) {
-        const contact = await fetchContactEmail(tenantId, contactId);
-        if (!contact) {
-          throw new BusinessRuleError(
-            'Contact not found for tenant (set NEXUS_SERVICE_JWT or COMM_ENROLL_SKIP_CRM=true for local dev)'
-          );
+        // Validate the contact against CRM via the internal mesh route. Only a
+        // definitive 'not_found' blocks enrollment (fail-closed). A transport/auth
+        // failure ('unavailable') must NOT block a legitimate enroll — mirror the
+        // mesh's fail-open posture (email-sync / cadence skip on transport errors)
+        // so a transient CRM blip can't wedge sequence enrollment.
+        const lookup = await fetchContact(tenantId, contactId);
+        if (lookup.outcome === 'not_found') {
+          throw new BusinessRuleError('Contact not found for tenant');
         }
       }
       const first = seq.steps[0];

@@ -560,6 +560,38 @@ export async function registerCrmInternalRoutes(
         return reply.send({ success: true, data });
       });
 
+      /**
+       * Contact read for the service mesh (used by comm-service sequence enroll
+       * to validate a contact + resolve its email). Protected by `x-service-token`
+       * — no end-user JWT. Tenant scoping is enforced from the `x-tenant-id` header.
+       */
+      r.get('/internal/contacts/:id', async (req, reply) => {
+        if (!verifyServiceToken(req)) {
+          return reply.code(401).send({ success: false, error: { code: 'UNAUTHORIZED', message: 'Unauthorized', requestId: req.id } });
+        }
+        const tenantId = tenantIdFromRequest(req);
+        if (!tenantId) {
+          return reply.code(400).send({ success: false, error: { code: 'MISSING_X_TENANT_ID', message: 'Missing X-Tenant-Id header', requestId: req.id } });
+        }
+        const { id } = req.params as { id: string };
+        const contact = await prisma.contact.findFirst({
+          where: { id, tenantId },
+          include: { emails: true },
+        });
+        if (!contact) {
+          return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Contact not found', requestId: req.id } });
+        }
+        const primaryEmail =
+          contact.email ??
+          contact.emails.find((e) => e.isPrimary)?.email ??
+          contact.emails[0]?.email ??
+          null;
+        return reply.send({
+          success: true,
+          data: { id: contact.id, email: primaryEmail },
+        });
+      });
+
       /** PATCH lead owner (used by territory-service after async routing). */
       r.patch('/internal/leads/:id/owner', async (req, reply) => {
         if (!verifyServiceToken(req)) {

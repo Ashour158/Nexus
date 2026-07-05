@@ -32,7 +32,15 @@ COPY --from=builder --chown=service:nodejs /app/services/finance-service/package
 COPY --from=builder --chown=service:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=service:nodejs /app/packages ./packages
 
-RUN apk add --no-cache openssl && ln -sf /app/node_modules /node_modules
+# Chromium for Puppeteer quote-PDF rendering. finance-service launches
+# puppeteer-core with executablePath = process.env.CHROMIUM_PATH, and
+# docker-compose sets CHROMIUM_PATH=/usr/bin/chromium. The Alpine `chromium`
+# package installs the binary as /usr/bin/chromium-browser, so symlink
+# /usr/bin/chromium to it and also export the standard Puppeteer env vars.
+RUN apk add --no-cache openssl chromium nss freetype harfbuzz ttf-freefont \
+ && ln -sf /usr/bin/chromium-browser /usr/bin/chromium \
+ && ln -sf /app/node_modules /node_modules
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser PUPPETEER_SKIP_DOWNLOAD=true CHROMIUM_PATH=/usr/bin/chromium-browser
 USER service
 EXPOSE 3002
 ENV NODE_ENV=production PORT=3002

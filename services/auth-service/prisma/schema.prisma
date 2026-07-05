@@ -232,6 +232,13 @@ model UserProfile {
   personalPhone     String?
   jobTitle          String?
   department        String?
+  // Org-structure FKs (CRM system-control layer). `department` (free-text) is
+  // kept for backward compatibility; `departmentId`/`levelId` are the
+  // structured references. `managerId` remains the reporting-line source.
+  departmentId      String?
+  departmentRef     Department? @relation("DepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
+  levelId           String?
+  levelRef          Level?      @relation("LevelMembers", fields: [levelId], references: [id], onDelete: SetNull)
   managerId         String?
   employeeId        String?
   startDate         DateTime?
@@ -254,5 +261,78 @@ model UserProfile {
   updatedAt         DateTime @updatedAt
 
   @@index([tenantId])
+  @@index([tenantId, departmentId])
+  @@index([tenantId, levelId])
+  @@index([tenantId, managerId])
+  @@unique([id, tenantId])
+}
+
+// ─── CRM System-Control: People / Org Structure ───────────────────────────────
+// Additive, tenant-scoped org layer used by the CRM for system control (company
+// profile, hierarchical departments, seniority levels, reporting lines). This is
+// NOT a full HR module — HR lives in a separate service. All models carry
+// `tenantId` and are auto-scoped by the tenant Prisma extension (see prisma.ts).
+
+// Per-tenant company profile. One row per tenant (enforced by @@unique).
+model Company {
+  id           String   @id @default(cuid())
+  tenantId     String
+  name         String
+  legalName    String?
+  domain       String?
+  logoUrl      String?
+  industry     String?
+  size         String?
+  phone        String?
+  website      String?
+  street       String?
+  city         String?
+  state        String?
+  country      String?
+  postalCode   String?
+  timezone     String?
+  currency     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([tenantId])
+  @@unique([id, tenantId])
+}
+
+// Hierarchical department. `parentDepartmentId` self-relation builds the tree.
+model Department {
+  id                 String       @id @default(cuid())
+  tenantId           String
+  name               String
+  code               String?
+  description        String?
+  parentDepartmentId String?
+  parent             Department?  @relation("DepartmentHierarchy", fields: [parentDepartmentId], references: [id], onDelete: SetNull)
+  children           Department[] @relation("DepartmentHierarchy")
+  headUserId         String?
+  members            UserProfile[] @relation("DepartmentMembers")
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, parentDepartmentId])
+  @@unique([tenantId, name])
+  @@unique([id, tenantId])
+}
+
+// Seniority / grade level. `rank` orders levels (lower = junior by convention).
+model Level {
+  id          String        @id @default(cuid())
+  tenantId    String
+  name        String
+  rank        Int
+  description String?
+  members     UserProfile[] @relation("LevelMembers")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
+  @@unique([tenantId, rank])
   @@unique([id, tenantId])
 }

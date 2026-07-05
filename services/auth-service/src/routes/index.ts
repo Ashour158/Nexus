@@ -17,6 +17,10 @@ import { registerPermissionsRoutes } from './permissions.routes.js';
 import { registerMfaRoutes } from './mfa.routes.js';
 import { registerIpRestrictionRoutes } from './ip-restriction.routes.js';
 import { registerInternalRoutes } from './internal.routes.js';
+import { registerCompanyRoutes } from './company.routes.js';
+import { registerDepartmentsRoutes } from './departments.routes.js';
+import { registerLevelsRoutes } from './levels.routes.js';
+import { registerOrgRoutes } from './org.routes.js';
 
 /**
  * Registers all auth-service HTTP routes under `/api/v1` (Section 34.1).
@@ -42,4 +46,8 @@ export async function registerAllRoutes(
   await registerPermissionsRoutes(app, prisma);
   await registerIpRestrictionRoutes(app, prisma, unifiedAudit);
   await registerInternalRoutes(app, prisma);
+  await registerCompanyRoutes(app, prisma);
+  await registerDepartmentsRoutes(app, prisma);
+  await registerLevelsRoutes(app, prisma);
+  await registerOrgRoutes(app, prisma);
 }

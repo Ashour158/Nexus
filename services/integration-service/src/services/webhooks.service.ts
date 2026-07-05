@@ -226,6 +226,71 @@ export function createWebhooksService(deps: {
       });
     },
 
+    /** Paginated delivery log for a subscription, newest first. Tenant-scoped; never leaks the secret. */
+    async listDeliveries(subscriptionId: string, opts: { page: number; limit: number }) {
+      // Confirm the subscription exists within the caller's tenant (prisma is tenant-scoped).
+      const sub = await prisma.webhookSubscription.findFirst({
+        where: { id: subscriptionId },
+        select: { id: true },
+      });
+      if (!sub) throw new NotFoundError('WebhookSubscription', subscriptionId);
+
+      const skip = (opts.page - 1) * opts.limit;
+      const [rows, total] = await Promise.all([
+        prisma.webhookDelivery.findMany({
+          where: { subscriptionId },
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: opts.limit,
+          select: {
+            id: true,
+            eventType: true,
+            status: true,
+            httpStatus: true,
+            attemptCount: true,
+            nextRetryAt: true,
+            deliveredAt: true,
+            createdAt: true,
+          },
+        }),
+        prisma.webhookDelivery.count({ where: { subscriptionId } }),
+      ]);
+      return { data: rows, page: opts.page, limit: opts.limit, total };
+    },
+
+    /** Single delivery detail (may include responseBody). Tenant-scoped. Returns null if not found. */
+    async getDelivery(deliveryId: string) {
+      const row = await prisma.webhookDelivery.findFirst({
+        where: { id: deliveryId },
+        select: {
+          id: true,
+          subscriptionId: true,
+          eventType: true,
+          payload: true,
+          status: true,
+          httpStatus: true,
+          responseBody: true,
+          attemptCount: true,
+          nextRetryAt: true,
+          deliveredAt: true,
+          createdAt: true,
+        },
+      });
+      return row;
+    },
+
+    /** Rotate a subscription's signing secret. Returns the new plaintext secret ONCE. Tenant-scoped. */
+    async rotateSecret(subscriptionId: string) {
+      const cur = await prisma.webhookSubscription.findFirst({ where: { id: subscriptionId } });
+      if (!cur) throw new NotFoundError('WebhookSubscription', subscriptionId);
+      const plain = newSigningSecret();
+      await prisma.webhookSubscription.update({
+        where: { id: subscriptionId },
+        data: { secret: crypto.encrypt(plain), version: { increment: 1 } },
+      });
+      return { id: subscriptionId, signingSecret: plain };
+    },
+
     async replayDelivery(deliveryId: string): Promise<boolean> {
       const row = await raw.webhookDelivery.findFirst({
         where: { id: deliveryId },

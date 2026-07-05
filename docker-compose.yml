@@ -721,6 +721,10 @@ services:
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       KAFKA_BROKERS: kafka:29092
       PORT: '3016'
+      # schema.prisma datasource reads DOCUMENT_DATABASE_URL; it was absent from
+      # this block entirely, so every DB query failed and /health returned 503.
+      DOCUMENT_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_document
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
     depends_on:
       - finance-service
 

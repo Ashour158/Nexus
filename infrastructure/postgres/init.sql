@@ -25,6 +25,7 @@ CREATE DATABASE nexus_data;
 CREATE DATABASE nexus_chatbot;
 CREATE DATABASE nexus_document;
 CREATE DATABASE nexus_email_sync;
+CREATE DATABASE nexus_audit;
 
 GRANT ALL PRIVILEGES ON DATABASE nexus_auth TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_crm TO nexus;
@@ -38,6 +39,7 @@ GRANT ALL PRIVILEGES ON DATABASE nexus_integration TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_blueprint TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_approval TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_cadence TO nexus;
+GRANT ALL PRIVILEGES ON DATABASE nexus_audit TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_territory TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_planning TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_reporting TO nexus;

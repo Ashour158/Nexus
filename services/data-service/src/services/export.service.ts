@@ -44,7 +44,7 @@ export function createExportService(_prisma: DataPrisma) {
 
         const res = await fetch(
           `${crmUrl}/api/v1/${module}?${params.toString()}`,
-          { headers: authHeaders() }
+          { headers: authHeaders(authToken) }
         );
         if (!res.ok) {
           throw new Error(`CRM export fetch failed for module ${module}`);

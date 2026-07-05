@@ -64,7 +64,11 @@ export function globalErrorHandler(
   request: FastifyRequest,
   reply: FastifyReply
 ): void {
-  if (!error.statusCode || error.statusCode >= 500) {
+  const isZodError =
+    (error as { name?: string }).name === 'ZodError' &&
+    Array.isArray((error as { issues?: unknown }).issues);
+  // ZodError is malformed client input (→ 400), never a server fault; skip Sentry.
+  if (!isZodError && (!error.statusCode || error.statusCode >= 500)) {
     Sentry.captureException(error, {
       extra: {
         url: request.url,
@@ -83,6 +87,25 @@ export function globalErrorHandler(
         code: error.code,
         message: error.message,
         details: error.details,
+        requestId: request.id,
+      },
+    });
+    return;
+  }
+
+  // Raw ZodError from manual `Schema.parse(request.params/body/query)` inside a
+  // handler (as opposed to Fastify schema validation, handled via
+  // `error.validation` below). Detected by shape rather than `instanceof` so it
+  // survives multiple zod copies hoisted under pnpm. Malformed client input is a
+  // 400 — NOT a 500 — and must not be reported to Sentry as a server error.
+  const zodIssues = (error as { name?: string; issues?: unknown }).issues;
+  if ((error as { name?: string }).name === 'ZodError' && Array.isArray(zodIssues)) {
+    reply.code(400).send({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Validation failed',
+        details: zodIssues,
         requestId: request.id,
       },
     });

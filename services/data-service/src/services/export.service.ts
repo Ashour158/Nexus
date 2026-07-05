@@ -28,7 +28,8 @@ export function createExportService(_prisma: DataPrisma) {
       authToken?: string
     ) {
       const crmUrl = process.env.CRM_SERVICE_URL ?? 'http://localhost:3001';
-      const pageSize = 500;
+      // crm list endpoints cap `limit` (>100 → 422), so page at 100.
+      const pageSize = 100;
       let page = 1;
       let hasMore = true;
       const rows: Record<string, unknown>[] = [];

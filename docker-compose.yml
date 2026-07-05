@@ -567,6 +567,43 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      # The Next.js /api/* route handlers proxy to services via these env vars.
+      # Without them they fall back to localhost (unreachable in-container) and
+      # every reporting/analytics/forecast/etc call 500'd. Internal DNS names.
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      AUTH_SERVICE_URL: http://auth-service:3000
+      CRM_SERVICE_URL: http://crm-service:3001
+      FINANCE_SERVICE_URL: http://finance-service:3002
+      NOTIFICATION_SERVICE_URL: http://notification-service:3003
+      METADATA_SERVICE_URL: http://metadata-service:3004
+      REALTIME_SERVICE_URL: http://realtime-service:3005
+      SEARCH_SERVICE_URL: http://search-service:3006
+      WORKFLOW_SERVICE_URL: http://workflow-service:3007
+      ANALYTICS_SERVICE_URL: http://analytics-service:3008
+      COMM_SERVICE_URL: http://comm-service:3009
+      STORAGE_SERVICE_URL: http://storage-service:3010
+      BILLING_SERVICE_URL: http://billing-service:3011
+      INTEGRATION_SERVICE_URL: http://integration-service:3012
+      BLUEPRINT_SERVICE_URL: http://blueprint-service:3013
+      APPROVAL_SERVICE_URL: http://approval-service:3014
+      DATA_SERVICE_URL: http://data-service:3015
+      DOCUMENT_SERVICE_URL: http://document-service:3016
+      CHATBOT_SERVICE_URL: http://chatbot-service:3017
+      CADENCE_SERVICE_URL: http://cadence-service:3018
+      TERRITORY_SERVICE_URL: http://territory-service:3019
+      PLANNING_SERVICE_URL: http://planning-service:3020
+      REPORTING_SERVICE_URL: http://reporting-service:3021
+      PORTAL_SERVICE_URL: http://portal-service:3022
+      KNOWLEDGE_SERVICE_URL: http://knowledge-service:3023
+      INCENTIVE_SERVICE_URL: http://incentive-service:3024
+      EMAIL_SYNC_SERVICE_URL: http://email-sync-service:3026
+      AUDIT_CONSUMER_URL: http://audit-consumer:3028
+      ACCOUNTS_SERVICE_URL: http://accounts-service:3031
+      NOTES_SERVICE_URL: http://notes-service:3032
+      CONTACTS_SERVICE_URL: http://contacts-service:3041
+      ACTIVITIES_SERVICE_URL: http://activities-service:3043
+      DEALS_SERVICE_URL: http://crm-service:3001
+      QUOTES_SERVICE_URL: http://finance-service:3002
     restart: unless-stopped
     ports:
       - '3100:3000'

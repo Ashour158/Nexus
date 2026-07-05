@@ -114,7 +114,9 @@ function normalizeFilters<T extends Record<string, unknown>>(
 export function useAccounts(filters: AccountListFilters = {}) {
   const params = normalizeFilters({
     page: filters.page ?? 1,
-    limit: filters.limit ?? 20,
+    // crm-service caps the accounts list at 100; callers that ask for more
+    // (e.g. picker dropdowns requesting 200) otherwise get a 422.
+    limit: Math.min(filters.limit ?? 20, 100),
     search: filters.search,
     ownerId: filters.ownerId,
     type: filters.type,

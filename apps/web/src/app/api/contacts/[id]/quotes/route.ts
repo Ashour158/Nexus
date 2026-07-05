@@ -8,7 +8,9 @@ import {
   resolveDevContactIdForCommercialRecord,
 } from '@/lib/server/dev-preview-data';
 
-const DEALS_SERVICE_URL = process.env.DEALS_SERVICE_URL || 'http://localhost:3042';
+// Quotes live in finance-service (keyed by contactId), not a crm/deals
+// quote-projection read-model — that path 404'd the contact 360 quotes tab.
+const FINANCE_URL = `${process.env.FINANCE_SERVICE_URL ?? 'http://finance-service:3002'}/api/v1`;
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = req.headers.get('authorization');
@@ -24,8 +26,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json(apiSuccess(paginated(rows, req.nextUrl.searchParams)));
   }
 
-  const qs = req.nextUrl.searchParams.toString();
-  const res = await fetch(`${DEALS_SERVICE_URL}/api/v1/data/quote-projections/contact/${encodeURIComponent(params.id)}${qs ? `?${qs}` : ''}`, {
+  const sp = new URLSearchParams(req.nextUrl.searchParams);
+  sp.set('contactId', params.id);
+  const res = await fetch(`${FINANCE_URL}/quotes?${sp.toString()}`, {
     headers: {
       authorization: auth ?? '',
       'x-tenant-id': req.headers.get('x-tenant-id') ?? 'default',

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DEV_PREVIEW_ENABLED, apiSuccess, getDevPreviewState, paginated } from '@/lib/server/dev-preview-data';
 
-const DEALS_SERVICE_URL = process.env.DEALS_SERVICE_URL || 'http://localhost:3042';
+// Quotes live in finance-service, keyed by accountId — NOT in a deals/crm
+// quote-projection read-model (that route doesn't exist and 404'd the default
+// tab of every account 360).
+const FINANCE_URL = `${process.env.FINANCE_SERVICE_URL ?? 'http://finance-service:3002'}/api/v1`;
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = req.headers.get('authorization');
@@ -12,8 +15,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       .sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)));
     return NextResponse.json(apiSuccess(paginated(rows, req.nextUrl.searchParams)));
   }
-  const qs = req.nextUrl.searchParams.toString();
-  const res = await fetch(`${DEALS_SERVICE_URL}/api/v1/data/quote-projections/account/${encodeURIComponent(params.id)}${qs ? `?${qs}` : ''}`, {
+  const sp = new URLSearchParams(req.nextUrl.searchParams);
+  sp.set('accountId', params.id);
+  const res = await fetch(`${FINANCE_URL}/quotes?${sp.toString()}`, {
     headers: { authorization: auth ?? '', 'x-tenant-id': req.headers.get('x-tenant-id') ?? 'default' },
     cache: 'no-store',
   });

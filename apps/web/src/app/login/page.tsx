@@ -8,6 +8,19 @@ import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/stores/auth.store';
 
+/** Decode a JWT payload (base64url) in the browser without a dependency. */
+function decodeJwt(token: string): Record<string, unknown> {
+  try {
+    const part = token.split('.')[1];
+    if (!part) return {};
+    const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+    return JSON.parse(atob(padded));
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Minimal email/password login that exchanges credentials with `auth-service`
  * (POST /auth/login). Keycloak SSO will layer on top in a later prompt.
@@ -49,24 +62,21 @@ export default function LoginPage() {
         process.env.NEXT_PUBLIC_AUTH_URL ?? 'http://localhost:3010/api/v1';
       const res = await axios.post<{
         success: boolean;
-        data: {
-          accessToken: string;
-          user: { id: string; tenantId: string };
-          roles: string[];
-          permissions: string[];
-        };
+        data: { accessToken: string };
       }>(`${authUrl}/auth/login`, { email, password });
 
-      if (!res.data?.success) {
+      if (!res.data?.success || !res.data.data?.accessToken) {
         throw new Error('Authentication failed');
       }
-      const { accessToken, user, roles, permissions } = res.data.data;
+      const { accessToken } = res.data.data;
+      // Identity/roles/permissions live in the JWT claims, not the response body.
+      const claims = decodeJwt(accessToken);
       setSession({
         accessToken,
-        userId: user.id,
-        tenantId: user.tenantId,
-        roles,
-        permissions,
+        userId: String(claims.sub ?? ''),
+        tenantId: String(claims.tenantId ?? ''),
+        roles: Array.isArray(claims.roles) ? (claims.roles as string[]) : [],
+        permissions: Array.isArray(claims.permissions) ? (claims.permissions as string[]) : [],
       });
       // Set coarse-grained session cookie for middleware route protection
       document.cookie = 'nexus_session=1;path=/;max-age=86400;SameSite=Lax';

@@ -345,6 +345,12 @@ type CpqTransitionLedgerClient = {
     result: unknown;
     error: unknown;
   } | null>;
+  findFirst(args: Record<string, unknown>): Promise<{
+    id: string;
+    status: string;
+    result: unknown;
+    error: unknown;
+  } | null>;
   findMany?(args: Record<string, unknown>): Promise<Array<{
     id: string;
     tenantId?: string;
@@ -726,17 +732,22 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
       return execute();
     }
 
-    const where = {
-      tenantId_entity_entityId_action_idempotencyKey: {
+    // Look the row up by its five scalar components (which ARE the members of
+    // the `@@unique([tenantId, entity, entityId, action, idempotencyKey])`), via
+    // findFirst rather than findUnique's compound-key locator. The generated
+    // Prisma client's runtime intermittently fails to resolve that compound
+    // unique key (rejects it as an "unknown argument"), which 500'd EVERY CPQ
+    // state transition — the entire quote-to-cash write path. Scalar filters are
+    // always valid and select the same single row.
+    const existing = await ledger.findFirst({
+      where: {
         tenantId,
         entity: input.entity,
         entityId: input.entityId,
         action: input.action,
         idempotencyKey,
       },
-    };
-
-    const existing = await ledger.findUnique({ where });
+    });
     if (existing?.status === 'SUCCEEDED') {
       return existing.result as T;
     }

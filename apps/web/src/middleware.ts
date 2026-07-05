@@ -36,6 +36,21 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/deals', request.url));
   }
 
+  // The Next.js /api/* proxy handlers forward the incoming Authorization header
+  // to backend services, but browser calls to /api/* are plain fetch() with no
+  // token (the token lives in client sessionStorage). Inject it here from the
+  // nexus_token cookie so those handlers authenticate — otherwise every
+  // reporting/analytics/finance/etc call 401s.
+  if (pathname.startsWith('/api')) {
+    const token = request.cookies.get('nexus_token')?.value;
+    if (token) {
+      const headers = new Headers(request.headers);
+      headers.set('authorization', `Bearer ${token}`);
+      return NextResponse.next({ request: { headers } });
+    }
+    return NextResponse.next();
+  }
+
   // Allow public assets and API routes unconditionally
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();

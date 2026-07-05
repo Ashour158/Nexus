@@ -79,8 +79,12 @@ export default function LoginPage() {
         roles: Array.isArray(claims.roles) ? (claims.roles as string[]) : [],
         permissions: Array.isArray(claims.permissions) ? (claims.permissions as string[]) : [],
       });
-      // Set coarse-grained session cookie for middleware route protection
+      // Coarse-grained session cookie for middleware route protection.
       document.cookie = 'nexus_session=1;path=/;max-age=86400;SameSite=Lax';
+      // The access token in a cookie too, so server-side /api/* route handlers
+      // (which can't read the client's sessionStorage) can forward it upstream.
+      // Middleware injects it as the Authorization header on /api/* requests.
+      document.cookie = `nexus_token=${accessToken};path=/;max-age=86400;SameSite=Lax`;
       const redirect = searchParams.get('redirect');
       router.push(redirect ?? '/deals');
     } catch (err) {

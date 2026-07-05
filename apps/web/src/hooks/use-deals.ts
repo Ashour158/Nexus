@@ -135,7 +135,8 @@ export function usePipelineDeals(
     queryKey: dealKeys.pipeline(pipelineId),
     queryFn: () =>
       apiClients.deals.get<DealListResponse>('/deals', {
-        params: { pipelineId, limit: 500, ...filters },
+        // crm caps list limit at 100 (>100 → 422); pipeline board pages at 100.
+        params: { pipelineId, limit: 100, ...filters },
       }),
     staleTime: 30_000,
     enabled: Boolean(pipelineId),

@@ -19,7 +19,8 @@ export const roleKeys = {
 };
 
 export function useRoles(filters: { page?: number; limit?: number } = {}) {
-  const normalized = { page: filters.page ?? 1, limit: filters.limit ?? 200 };
+  // auth caps list limit at 100 (>100 → 400); clamp so roles load.
+  const normalized = { page: filters.page ?? 1, limit: Math.min(filters.limit ?? 100, 100) };
   return useQuery<PaginatedResult<RoleRef>>({
     queryKey: roleKeys.list(normalized),
     queryFn: () => apiClients.auth.get<PaginatedResult<RoleRef>>('/roles', { params: normalized }),

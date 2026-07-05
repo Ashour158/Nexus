@@ -66,7 +66,7 @@ export function useUsers(filters: UserListFilters = {}) {
 export function useRoles() {
   return useQuery<PaginatedResult<RoleRef>>({
     queryKey: [...userKeys.all, 'roles'],
-    queryFn: () => apiClients.auth.get<PaginatedResult<RoleRef>>('/roles', { params: { limit: 200 } }),
+    queryFn: () => apiClients.auth.get<PaginatedResult<RoleRef>>('/roles', { params: { limit: 100 } }),
     staleTime: 5 * 60_000,
   });
 }

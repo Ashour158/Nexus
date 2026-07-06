@@ -216,8 +216,8 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
           ) : null}
 
           <div className="flex items-center gap-3 border-t border-gray-100 bg-gray-50 px-4 py-2 text-[11px] text-gray-400">
-            <span>?? navigate</span>
-            <span>? select</span>
+            <span>&#8593;&#8595; navigate</span>
+            <span>&#8629; select</span>
             <span>Esc close</span>
           </div>
         </div>

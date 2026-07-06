@@ -168,14 +168,6 @@ export function Topbar(): ReactElement {
         </div>
       </div>
 
-      <div className="hidden items-center gap-2 xl:flex">
-        <button className="rounded-lg border border-slate-800 px-4 py-2 text-sm font-bold text-slate-800 transition hover:bg-slate-50">
-          Share
-        </button>
-        <button className="rounded-lg border border-slate-800 px-4 py-2 text-sm font-bold text-slate-800 transition hover:bg-slate-50">
-          Export
-        </button>
-      </div>
       <div className="mx-1 hidden h-6 w-px bg-slate-200 xl:block" />
       <div className="hidden md:block xl:hidden">
         <GlobalSearch compact />

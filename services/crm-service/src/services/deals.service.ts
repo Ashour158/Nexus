@@ -444,6 +444,24 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         });
       }
 
+      // Terminal-state guard (BL-13): a generic update must not silently change
+      // the lifecycle status of a closed deal, nor jump a deal to a terminal state
+      // (that must go through winDeal/loseDeal, which stamp the close date + emit
+      // the won/lost events, and reopenDeal to move a closed deal back to OPEN).
+      if (data.status !== undefined && data.status !== existing.status) {
+        const TERMINAL = ['WON', 'LOST'];
+        if (TERMINAL.includes(existing.status)) {
+          throw new BusinessRuleError(
+            `Deal is ${existing.status} — reopen it before changing status`
+          );
+        }
+        if (TERMINAL.includes(data.status)) {
+          throw new BusinessRuleError(
+            `Use the win/lose action to move a deal to ${data.status}`
+          );
+        }
+      }
+
       const updateData: Prisma.DealUpdateInput = {
         version: { increment: 1 },
       };

@@ -225,13 +225,47 @@ export function createDedupService(prisma: CrmPrisma) {
 
     const duplicateIds = group.records.map((r: { recordId: string }) => r.recordId).filter((id: string) => id !== masterId);
 
-    await p.contact.update({ where: { id: masterId }, data: mergedData });
-    await p.activity.updateMany({ where: { contactId: { in: duplicateIds } }, data: { contactId: masterId } });
-    await p.note.updateMany({ where: { contactId: { in: duplicateIds } }, data: { contactId: masterId } });
-    await p.contact.updateMany({ where: { id: { in: duplicateIds } }, data: { isActive: false } });
-    await p.duplicateGroup.update({
-      where: { id: groupId },
-      data: { status: 'merged', masterRecordId: masterId, resolvedAt: new Date(), resolvedBy: userId },
+    // Atomic merge (DI-09): all reparenting + soft-delete happen in one transaction,
+    // so a mid-way failure leaves the graph untouched rather than half-merged.
+    await p.$transaction(async (tx) => {
+      await tx.contact.update({ where: { id: masterId }, data: mergedData });
+
+      // Reparent the duplicate's child records to the master (DI-08). Optional-FK
+      // relations with no (dealId, contactId) uniqueness can be bulk-updated safely.
+      await tx.activity.updateMany({ where: { contactId: { in: duplicateIds } }, data: { contactId: masterId } });
+      await tx.note.updateMany({ where: { contactId: { in: duplicateIds } }, data: { contactId: masterId } });
+      await tx.quoteProjection.updateMany({ where: { tenantId, contactId: { in: duplicateIds } }, data: { contactId: masterId } });
+      await tx.emailThread.updateMany({ where: { contactId: { in: duplicateIds } }, data: { contactId: masterId } });
+
+      // Deal links carry a @@unique([dealId, contactId]) — moving a duplicate's link
+      // to a deal the master already sits on would violate it, so drop the redundant
+      // link and only reparent the genuinely new ones.
+      for (const relation of ['dealContact', 'dealStakeholder'] as const) {
+        const model = tx[relation] as unknown as {
+          findMany: (a: unknown) => Promise<Array<{ id: string; dealId: string }>>;
+          delete: (a: unknown) => Promise<unknown>;
+          update: (a: unknown) => Promise<unknown>;
+        };
+        const masterLinks = await model.findMany({ where: { contactId: masterId }, select: { dealId: true } }) as Array<{ dealId: string }>;
+        const masterDeals = new Set(masterLinks.map((l) => l.dealId));
+        const dupLinks = await model.findMany({ where: { contactId: { in: duplicateIds } } });
+        for (const link of dupLinks) {
+          if (masterDeals.has(link.dealId)) {
+            await model.delete({ where: { id: link.id } });
+          } else {
+            await model.update({ where: { id: link.id }, data: { contactId: masterId } });
+            masterDeals.add(link.dealId);
+          }
+        }
+      }
+
+      // Consistent soft-delete: mark duplicates inactive AND stamp deletedAt so they
+      // drop out of every list that filters on either flag.
+      await tx.contact.updateMany({ where: { id: { in: duplicateIds } }, data: { isActive: false, deletedAt: new Date() } });
+      await tx.duplicateGroup.update({
+        where: { id: groupId },
+        data: { status: 'merged', masterRecordId: masterId, resolvedAt: new Date(), resolvedBy: userId },
+      });
     });
 
     return { merged: duplicateIds.length, masterId };

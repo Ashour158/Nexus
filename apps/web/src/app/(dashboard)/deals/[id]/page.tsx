@@ -12,6 +12,7 @@ import { CallButton } from '@/components/crm/call-button';
 import { AiPredictionPanel } from '@/components/crm/AiPredictionPanel';
 import { timelineMeta } from '@/lib/timeline-icons';
 import { useDeal, useDealTimeline, useDealScoringInsights } from '@/hooks/use-deals';
+import { useUsers } from '@/hooks/use-users';
 import type { DealHealth, DealScoringInsights } from '@/hooks/use-deals';
 import { useDealNotes } from '@/hooks/use-notes';
 import { api } from '@/lib/api-client';
@@ -60,6 +61,7 @@ export default function DealDetailPage() {
   const timelineQuery = useDealTimeline(dealId);
   const insightsQuery = useDealScoringInsights(dealId);
   const notesQuery = useDealNotes(dealId, { limit: 50 });
+  const usersQuery = useUsers({ limit: 100 });
 
   const stakeholdersQuery = useQuery<{ data: Stakeholder[] }>({
     queryKey: ['deals', dealId, 'stakeholders'],
@@ -171,6 +173,15 @@ export default function DealDetailPage() {
   const accountRecord = dealRecord.account && typeof dealRecord.account === 'object' ? dealRecord.account as AnyRecord : {};
   const stageName = String(stageRecord.name ?? deal.stageId);
   const accountName = String(accountRecord.name ?? dealRecord.accountName ?? deal.accountId);
+  const ownerRecord = dealRecord.owner && typeof dealRecord.owner === 'object' ? dealRecord.owner as AnyRecord : {};
+  const ownerFromList = (usersQuery.data?.data ?? []).find((u) => u.id === deal.ownerId);
+  const ownerName = String(
+    ownerRecord.name ??
+      (ownerRecord.firstName ? `${ownerRecord.firstName} ${ownerRecord.lastName ?? ''}`.trim() : undefined) ??
+      dealRecord.ownerName ??
+      (ownerFromList ? ownerFromList.name || `${ownerFromList.firstName ?? ''} ${ownerFromList.lastName ?? ''}`.trim() || ownerFromList.email : undefined) ??
+      deal.ownerId,
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -198,7 +209,7 @@ export default function DealDetailPage() {
               <DetailItem label="Stage" value={stageName} />
               <DetailItem label="Status" value={<StatusBadge status={deal.status} />} />
               <DetailItem label="Probability" value={`${deal.probability}%`} />
-              <DetailItem label="Owner" value={deal.ownerId} />
+              <DetailItem label="Owner" value={ownerName} />
               <DetailItem label="Account" value={<Link href={`/accounts/${deal.accountId}`} className="text-brand-700 hover:underline">{accountName}</Link>} />
               <DetailItem label="Close Date" value={deal.expectedCloseDate ? formatDate(deal.expectedCloseDate) : '-'} />
               <DetailItem label="Forecast" value={deal.forecastCategory} />

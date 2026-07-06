@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Download } from 'lucide-react';
 import { notify } from '@/lib/toast';
+import { useAuthStore } from '@/stores/auth.store';
 
 interface ExportButtonProps {
   module: string;
@@ -23,12 +24,18 @@ export function ExportButton({ module, filters }: ExportButtonProps) {
       });
       if (format !== 'csv') params.set('format', format);
 
+      // Always go same-origin with the bearer token attached. leads/deals have
+      // richer dedicated CRM export routes; everything else routes through the
+      // authenticated generic proxy (/api/export/:module) — never call
+      // data-service (localhost:3015) directly from the browser (unauth + CORS).
+      const token = useAuthStore.getState().accessToken;
+      const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
       const localExportModules = new Set(['leads', 'deals']);
       const res = localExportModules.has(module)
-        ? await fetch(`/api/${module}/export?${params.toString()}`)
-        : await fetch(`${process.env.NEXT_PUBLIC_DATA_URL ?? 'http://localhost:3015/api/v1'}/export/${module}`, {
+        ? await fetch(`/api/${module}/export?${params.toString()}`, { headers: authHeaders })
+        : await fetch(`/api/export/${module}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
             body: JSON.stringify({ filters, format }),
           });
 

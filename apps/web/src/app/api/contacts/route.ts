@@ -14,7 +14,9 @@ import {
 } from '@/lib/server/module-api';
 import { findDuplicateContacts, hardenContactRecord } from '@/lib/server/contact-hardening';
 
-const CONTACTS_SERVICE_URL = process.env.CONTACTS_SERVICE_URL || process.env.CRM_SERVICE_URL || 'http://localhost:3041';
+// crm-service is the source of truth for contacts (the standalone contacts-service
+// on :3041 is a decommissioned zombie). Prefer CRM_SERVICE_URL; never default to :3041.
+const CONTACTS_SERVICE_URL = process.env.CRM_SERVICE_URL || process.env.CONTACTS_SERVICE_URL || 'http://localhost:3001';
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization');

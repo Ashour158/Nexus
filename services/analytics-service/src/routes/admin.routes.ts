@@ -61,6 +61,10 @@ export async function registerAdminRoutes(app: FastifyInstance, clickhouse: Clic
             query_params: { tenantId },
           });
 
+          // ClickHouse DateTime64(3) via JSONEachRow expects "YYYY-MM-DD HH:MM:SS.mmm"
+          // (space separator, no ISO "T"/"Z"); a raw ISO string fails to parse.
+          const chDateTime = (iso: string) => new Date(iso).toISOString().replace('T', ' ').replace('Z', '');
+
           if (deals.length > 0) {
             const values = [];
             for (const d of deals) {
@@ -80,7 +84,7 @@ export async function registerAdminRoutes(app: FastifyInstance, clickhouse: Clic
                 base_amount: baseAmount,
                 base_currency: baseCurrency,
                 probability: Number(d.probability ?? 0),
-                occurred_at: d.createdAt ?? new Date().toISOString(),
+                occurred_at: chDateTime(d.createdAt ?? new Date().toISOString()),
               });
             }
             await clickhouse.insert({ table: 'deal_events', values, format: 'JSONEachRow' });

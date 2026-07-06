@@ -1,4 +1,4 @@
-﻿{
+{
   "dashboard": {
     "title": "PostgreSQL Metrics",
     "tags": ["postgres", "database"],

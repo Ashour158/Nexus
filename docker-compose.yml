@@ -26,7 +26,9 @@ services:
     container_name: nexus-pgbouncer
     restart: unless-stopped
     ports:
-      - '6432:6432'
+      # Datastore bound to loopback — never reachable from the public internet.
+      # Internal services reach it over the docker network via the `pgbouncer` DNS name (unaffected).
+      - '127.0.0.1:6432:6432'
     depends_on:
       - postgres
     environment:
@@ -554,7 +556,9 @@ services:
     environment:
       CLICKHOUSE_DB: nexus_analytics
     ports:
-      - '8123:8123'
+      # Analytics datastore bound to loopback — not publicly reachable. Services use the
+      # `clickhouse` docker DNS name internally, which is unaffected by the host binding.
+      - '127.0.0.1:8123:8123'
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - ./services/analytics-service/src/ddl/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -1083,7 +1087,8 @@ services:
     container_name: nexus-prometheus
     restart: unless-stopped
     ports:
-      - '9090:9090'
+      # Monitoring bound to loopback — reach via SSH tunnel or the prod Caddy reverse proxy.
+      - '127.0.0.1:9090:9090'
     volumes:
       - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -1111,7 +1116,8 @@ services:
     container_name: nexus-grafana
     restart: unless-stopped
     ports:
-      - '3034:3000'
+      # Monitoring bound to loopback — reach via SSH tunnel or the prod Caddy reverse proxy.
+      - '127.0.0.1:3034:3000'
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-nexus_grafana}

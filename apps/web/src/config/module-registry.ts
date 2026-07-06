@@ -779,6 +779,18 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
         sidebar: true,
       },
       {
+        id: 'quote-admin',
+        label: 'Quote Administration',
+        href: '/settings/quotes',
+        icon: FileText,
+        status: 'wired',
+        service: 'finance-service',
+        description: 'Admin-controlled quote numbering (prefix/padding/reset) and multi-level approval thresholds.',
+        depth: ['auto numbering', 'approval tiers', 'discount thresholds', 'sequence control'],
+        sidebar: true,
+        adminOnly: true,
+      },
+      {
         id: 'sso',
         label: 'Single Sign-On',
         href: '/settings/sso',

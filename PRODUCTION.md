@@ -59,9 +59,87 @@ bash /opt/nexus/scripts/healthcheck.sh          # ALL HEALTHY (29/29) or non-zer
 
 ## 5. Pre-launch hardening checklist
 
+- [x] Datastore + monitoring ports bound to `127.0.0.1` (pgbouncer 6432, clickhouse 8123, prometheus 9090, grafana 3034 — see §6).
+- [x] Backup + healthcheck crons enabled (`crontab -l`; logs in `/var/log/nexus/`).
 - [ ] Point DNS + run step 1 (HTTPS).
-- [ ] Change `GRAFANA_ADMIN_PASSWORD`, `POSTGRES_PASSWORD`, `JWT_SECRET`, `INTERNAL_SERVICE_TOKEN` in `.env` (rotate off defaults).
-- [ ] Firewall: expose only 80/443 publicly; restrict 9090/3034/3100 and the Docker daemon to your IP.
-- [ ] Enable the backup + healthcheck cron (steps 2, 4).
+- [ ] Rotate secrets off defaults — see §7 for the safe order (Grafana is hot; JWT/Postgres are maintenance-window).
+- [ ] Bind the remaining app-service ports (3000–3043, 8080 Keycloak, 8000/8001 Kong) behind the Caddy reverse proxy or a firewall (see §6, "Extending the lockdown").
 - [ ] Set `NEXT_PUBLIC_SENTRY_DSN` if you want client error capture, then rebuild web.
 - [ ] Consider a larger droplet or a second `web`/`crm` replica — the current box shows transient contention under concurrent load.
+
+## 6. Network exposure lockdown (done for datastores/monitoring)
+
+`docker-compose.yml` binds these to loopback so they are **not** reachable from
+the public internet; internal services still reach them over the docker network
+by DNS name, unaffected:
+
+| Service    | Port | Reach it via |
+|------------|------|--------------|
+| pgbouncer  | 6432 | `docker exec` / SSH tunnel |
+| clickhouse | 8123 | `docker exec` / SSH tunnel |
+| prometheus | 9090 | SSH tunnel or Caddy (`/prometheus`) |
+| grafana    | 3034 | SSH tunnel or Caddy (`/grafana`) |
+
+SSH tunnel example (from your laptop): `ssh -L 3034:127.0.0.1:3034 root@<host>` then open `http://localhost:3034`.
+
+**Extending the lockdown** — the app service ports (3000–3043), Keycloak (8080),
+and Kong (8000/8001) are still published on `0.0.0.0`. They are all JWT/auth
+protected, but for defence-in-depth put everything behind Caddy (step 1) and
+either (a) change each `- 'PORT:PORT'` to `- '127.0.0.1:PORT:PORT'` in compose,
+or (b) since Docker bypasses `ufw`, add a `DOCKER-USER` iptables rule:
+`iptables -I DOCKER-USER -p tcp -m multiport --dports 3000:3043,8080,8000,8001 ! -s <your-ip> -j DROP`.
+
+## 7. Secret rotation
+
+**Hot (rotate anytime, no downtime):**
+- `GRAFANA_ADMIN_PASSWORD` — set in `.env`, then `docker compose up -d grafana`.
+
+**Maintenance-window (invalidates sessions or needs care):**
+- `JWT_SECRET` / signing keys — rotating **logs every user out** (all existing
+  access/refresh tokens fail verification). Do it during a window: set new value,
+  `docker compose up -d` the auth-service and every service that verifies JWTs,
+  then announce re-login. Prefer key rotation with an overlap (publish the new
+  JWKS key alongside the old, flip signing, retire the old after max token TTL).
+- `INTERNAL_SERVICE_TOKEN` — shared by service-to-service calls; roll all
+  services together (`docker compose up -d`) or internal calls 401 mid-flight.
+- `POSTGRES_PASSWORD` — the running Postgres was initialised with the old
+  password; changing `.env` alone does **not** re-init it. Rotate with
+  `ALTER ROLE ... PASSWORD` inside Postgres, update `.env` + pgbouncer userlist,
+  then recreate pgbouncer and the DB-connected services.
+
+Generate strong values with `openssl rand -base64 48`. Never commit real secrets
+to the repo — `.env` stays on the host only.
+
+## 8. Disaster recovery runbook
+
+**Backups:** `scripts/backup.sh` runs nightly (02:00, cron) → `pg_dump` of every
+database to `/opt/nexus/backups/` (system of record = Postgres). Copy these
+off-box (e.g. `rclone`/`aws s3 cp` to object storage) — a droplet-local backup
+does not survive droplet loss. Verify a backup monthly by restoring into a scratch DB.
+
+**RTO/RPO:** with nightly dumps, worst-case data loss (RPO) is ~24h; shorten by
+raising cron frequency or enabling Postgres WAL archiving/PITR. Target restore
+time (RTO) below assumes images already built.
+
+**Restore procedure (single DB):**
+```bash
+# 1. stop writers to that DB
+docker compose stop crm-service finance-service   # (the services owning it)
+# 2. restore the dump into direct Postgres (bypass pgbouncer)
+gunzip -c /opt/nexus/backups/<db>-<date>.sql.gz | \
+  docker exec -i nexus-postgres psql -U postgres -d <db>
+# 3. restart writers, then run the healthcheck
+docker compose start crm-service finance-service
+bash /opt/nexus/scripts/healthcheck.sh
+```
+
+**Full host loss:**
+1. Provision a new droplet, install Docker + compose.
+2. `git clone` the repo to `/opt/nexus`, restore `.env` from your secret store.
+3. `docker compose up -d` (Postgres init), then restore each DB dump (above).
+4. Re-run `scripts/healthcheck.sh` → expect `ALL HEALTHY`.
+5. Repoint DNS / TLS (step 1).
+
+**Event backbone recovery:** the outbox-relay drains any events queued in Postgres
+`outbox` tables to Kafka on restart, so a Kafka outage does not lose domain events
+committed to Postgres — they replay once Kafka is back.

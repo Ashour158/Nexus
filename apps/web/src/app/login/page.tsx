@@ -145,6 +145,12 @@ export default function LoginPage() {
             {submitting ? 'Signing in…' : 'Sign in'}
           </Button>
         </div>
+
+        <p className="mt-6 text-center text-xs text-slate-400">
+          By signing in you agree to our{' '}
+          <a href="/legal/terms" className="underline hover:text-slate-600">Terms</a>{' '}and{' '}
+          <a href="/legal/privacy" className="underline hover:text-slate-600">Privacy Policy</a>.
+        </p>
       </form>
     </main>
   );

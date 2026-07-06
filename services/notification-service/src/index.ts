@@ -23,6 +23,8 @@ import { startLeadConsumer } from './consumers/lead.consumer.js';
 import { startNoteConsumer } from './consumers/note.consumer.js';
 import { startApprovalConsumer } from './consumers/approval.consumer.js';
 import { registerNotificationsRoutes } from './routes/notifications.routes.js';
+import { registerPreferencesRoutes } from './routes/preferences.routes.js';
+import { createPreferencesService } from './services/preferences.service.js';
 import { registerWhatsAppWebhookRoutes } from './routes/whatsapp-webhook.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 import { NexusProducer } from '@nexus/kafka';
@@ -111,6 +113,10 @@ try {
 
 const inApp = createInAppChannel(prisma, kafkaProducer);
 
+// Per-user notification preferences (NOT-11). Enforcement in the consumers is
+// fail-open — a preference-lookup error never drops a notification.
+const prefs = createPreferencesService(prisma);
+
 /**
  * Resolves an owner's contact info from the auth-service. Best-effort; any
  * failure returns an empty object so the consumers fall back to in-app only.
@@ -159,12 +165,12 @@ async function lookupOwner(
 // the HTTP surface still works for reading / marking-read.
 let leadConsumer: Awaited<ReturnType<typeof startLeadConsumer>> | undefined;
 try {
-  await startDealConsumer({ inApp, email, sms, push, whatsapp, lookupOwner, log: app.log });
+  await startDealConsumer({ inApp, email, sms, push, whatsapp, prefs, lookupOwner, log: app.log });
   await startActivityConsumer({ inApp, log: app.log });
-  await startQuoteConsumer({ inApp, email, sms, push, whatsapp, log: app.log });
+  await startQuoteConsumer({ inApp, email, sms, push, whatsapp, prefs, log: app.log });
   await startNoteConsumer({ inApp, log: app.log });
   await startApprovalConsumer({ inApp, log: app.log });
-  leadConsumer = await startLeadConsumer({ inApp, email, sms, push, whatsapp, lookupOwner, log: app.log });
+  leadConsumer = await startLeadConsumer({ inApp, email, sms, push, whatsapp, prefs, lookupOwner, log: app.log });
 } catch (err) {
   app.log.warn({ err }, 'Kafka consumers failed to start; HTTP-only mode');
 }
@@ -183,6 +189,9 @@ await registerGraphQL(app, prisma);
 
 await startService(app, port, async (a) => {
   await registerNotificationsRoutes(a, prisma);
+  // Self-service per-channel notification preferences (NOT-11). Auth-only —
+  // scoped to the caller's own tenant + user; no extra permission required.
+  await registerPreferencesRoutes(a, prefs);
   // Inbound WhatsApp webhook (public per createService's /api/v1/webhooks/*
   // JWT exemption; POST is HMAC-verified). Emits `whatsapp.received` on the
   // comms topic for downstream timeline correlation. Guarded + fail-open.

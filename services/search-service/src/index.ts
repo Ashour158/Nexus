@@ -6,6 +6,8 @@ import { createMeilisearchClient } from './meilisearch.js';
 import { setupIndexes } from './indexes/setup.js';
 import { startIndexerConsumer } from './consumers/indexer.consumer.js';
 import { registerSearchRoutes } from './routes/search.routes.js';
+import { registerSavedSearchRoutes } from './routes/saved-search.routes.js';
+import { createSearchPrisma } from './prisma.js';
 import { registerGraphQL } from './graphql/index.js';
 
 startTracing({ serviceName: 'search-service' });
@@ -35,6 +37,8 @@ await app.register(rateLimit, {
 });
 app.setErrorHandler(globalErrorHandler);
 const meili = createMeilisearchClient();
+// Backs saved searches (SRCH-08) + recent-search history (SRCH-09).
+const prisma = createSearchPrisma();
 
 registerHealthRoutes(app, 'search-service', [
   async (): Promise<HealthCheck> => {
@@ -78,5 +82,6 @@ try {
 await registerGraphQL(app);
 
 await startService(app, port, async (a) => {
-  await registerSearchRoutes(a, meili);
+  await registerSearchRoutes(a, meili, prisma);
+  await registerSavedSearchRoutes(a, prisma);
 });

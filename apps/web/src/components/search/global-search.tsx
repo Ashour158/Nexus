@@ -2,8 +2,14 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Command, FileText, Search, TrendingUp, User, X } from 'lucide-react';
+import { Bookmark, BookmarkPlus, Clock, Command, FileText, Search, TrendingUp, Trash2, User, X } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
+import {
+  useCreateSavedSearch,
+  useDeleteSavedSearch,
+  useRecentSearches,
+  useSavedSearches,
+} from '@/hooks/use-saved-searches';
 
 interface SearchResult {
   id: string;
@@ -61,6 +67,21 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Saved searches (SRCH-08) + recent searches (SRCH-09). Recent is only fetched
+  // while the panel is open to avoid unnecessary requests.
+  const { data: recent = [] } = useRecentSearches(10, open);
+  const { data: saved = [] } = useSavedSearches();
+  const createSaved = useCreateSavedSearch();
+  const deleteSaved = useDeleteSavedSearch();
+
+  const trimmed = query.trim();
+  const alreadySaved = saved.some((s) => s.query.toLowerCase() === trimmed.toLowerCase());
+
+  function handleSaveCurrent() {
+    if (!trimmed || alreadySaved || createSaved.isPending) return;
+    createSaved.mutate({ name: trimmed, query: trimmed });
+  }
 
   useEffect(() => {
     function onKey(e: globalThis.KeyboardEvent) {
@@ -168,12 +189,93 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
               placeholder="Search across contacts, deals, leads, notes..."
               className="flex-1 py-3 text-sm text-gray-900 outline-none placeholder-gray-400"
             />
+            {trimmed ? (
+              <button
+                onClick={handleSaveCurrent}
+                disabled={alreadySaved || createSaved.isPending}
+                title={alreadySaved ? 'Already saved' : 'Save this search'}
+                aria-label={alreadySaved ? 'Search saved' : 'Save this search'}
+                className={`flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium transition-colors ${
+                  alreadySaved
+                    ? 'text-blue-600'
+                    : 'text-gray-400 hover:bg-blue-50 hover:text-blue-600'
+                } disabled:cursor-default`}
+              >
+                {alreadySaved ? <Bookmark className="h-4 w-4 fill-current" /> : <BookmarkPlus className="h-4 w-4" />}
+              </button>
+            ) : null}
             {query ? (
-              <button onClick={() => setQuery('')}>
+              <button onClick={() => setQuery('')} aria-label="Clear search">
                 <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
               </button>
             ) : null}
           </div>
+
+          {!trimmed ? (
+            <div className="max-h-72 overflow-y-auto py-1">
+              {recent.length > 0 ? (
+                <div>
+                  <p className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                    Recent
+                  </p>
+                  {recent.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => {
+                        setQuery(r.query);
+                        setTimeout(() => inputRef.current?.focus(), 0);
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-2 text-start transition-colors hover:bg-gray-50"
+                    >
+                      <Clock className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+                      <span className="truncate text-sm text-gray-700">{r.query}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {saved.length > 0 ? (
+                <div>
+                  <p className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                    Saved
+                  </p>
+                  {saved.map((s) => (
+                    <div
+                      key={s.id}
+                      className="group flex items-center gap-3 px-4 py-2 transition-colors hover:bg-gray-50"
+                    >
+                      <Bookmark className="h-3.5 w-3.5 flex-shrink-0 fill-current text-blue-500" />
+                      <button
+                        onClick={() => {
+                          setQuery(s.query);
+                          setTimeout(() => inputRef.current?.focus(), 0);
+                        }}
+                        className="min-w-0 flex-1 text-start"
+                      >
+                        <span className="block truncate text-sm text-gray-700">{s.name}</span>
+                        {s.name !== s.query ? (
+                          <span className="block truncate text-xs text-gray-400">{s.query}</span>
+                        ) : null}
+                      </button>
+                      <button
+                        onClick={() => deleteSaved.mutate(s.id)}
+                        aria-label={`Delete saved search ${s.name}`}
+                        className="flex-shrink-0 rounded p-1 text-gray-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {recent.length === 0 && saved.length === 0 ? (
+                <div className="px-4 py-6 text-center text-sm text-gray-400">
+                  Start typing to search across contacts, deals, leads and notes.
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           {loading ? <div className="px-4 py-6 text-center text-sm text-gray-400">Searching...</div> : null}
           {!loading && results.length === 0 && query.trim() ? (

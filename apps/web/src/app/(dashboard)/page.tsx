@@ -29,6 +29,7 @@ import { useDeals } from '@/hooks/use-deals';
 import { useActivities } from '@/hooks/use-activities';
 import { useUsers } from '@/hooks/use-users';
 import { usePipelines } from '@/hooks/use-pipelines';
+import { OnboardingChecklist } from '@/components/onboarding/onboarding-checklist';
 
 interface DashboardStats {
   pipeline: number;
@@ -269,6 +270,8 @@ export default function DashboardPage() {
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <OnboardingChecklist />
+
       {hasError ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
           Failed to load some dashboard data.{" "}

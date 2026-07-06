@@ -15,6 +15,7 @@ FROM deps AS builder
 COPY services/search-service/ ./services/search-service/
 COPY packages/ ./packages/
 
+RUN pnpm --filter @nexus/search-service run db:generate
 RUN pnpm --filter @nexus/search-service... run build
 
 # -- Stage 3: Production runner ----------------------------------------------------

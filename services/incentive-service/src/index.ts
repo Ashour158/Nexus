@@ -6,9 +6,11 @@ import { getPrisma } from './prisma.js';
 import { createContestsService } from './services/contests.service.js';
 import { createBadgesService } from './services/badges.service.js';
 import { createMetricsService } from './services/metrics.service.js';
+import { createCommissionService } from './services/commission.service.js';
 import { registerIncentiveConsumers, INCENTIVE_TOPICS } from './consumers.js';
 import { registerContestsRoutes } from './routes/contests.routes.js';
 import { registerBadgesRoutes } from './routes/badges.routes.js';
+import { registerCommissionRoutes } from './routes/commission.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 
 startTracing({ serviceName: 'incentive-service' });
@@ -29,6 +31,7 @@ const prisma = getPrisma();
 const contests = createContestsService(prisma);
 const badges = createBadgesService(prisma);
 const metrics = createMetricsService(prisma);
+const commission = createCommissionService(prisma);
 const consumer = new NexusConsumer('incentive-service');
 
 app.setErrorHandler(globalErrorHandler);
@@ -41,7 +44,7 @@ await badges.seedSystemBadges().catch((err) => {
 // Event-driven contest metrics + badge counters. Guarded so unavailable
 // Kafka/DB cannot crash boot: subscribe/start are best-effort, and each
 // handler isolates its own failures (see consumers.ts).
-registerIncentiveConsumers(consumer, { contests, badges, metrics });
+registerIncentiveConsumers(consumer, { contests, badges, metrics, commission });
 await consumer.subscribe([...INCENTIVE_TOPICS]).catch((err) => {
   app.log.warn({ err }, 'Kafka subscribe failed; contest metrics will rely on the periodic fallback');
 });
@@ -68,4 +71,5 @@ await registerGraphQL(app, prisma);
 await startService(app, port, async () => {
   await registerContestsRoutes(app, contests);
   await registerBadgesRoutes(app, badges);
+  await registerCommissionRoutes(app, commission);
 });

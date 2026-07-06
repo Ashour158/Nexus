@@ -3,10 +3,12 @@ import { TOPICS } from '@nexus/kafka';
 import type { createContestsService } from './services/contests.service.js';
 import type { createBadgesService } from './services/badges.service.js';
 import type { createMetricsService } from './services/metrics.service.js';
+import type { createCommissionService } from './services/commission.service.js';
 
 type Contests = ReturnType<typeof createContestsService>;
 type Badges = ReturnType<typeof createBadgesService>;
 type Metrics = ReturnType<typeof createMetricsService>;
+type Commission = ReturnType<typeof createCommissionService>;
 
 interface IncentiveEvent {
   type: string;
@@ -51,14 +53,23 @@ async function guard(label: string, fn: () => Promise<void>): Promise<void> {
  */
 export function registerIncentiveConsumers(
   consumer: NexusConsumer,
-  deps: { contests: Contests; badges: Badges; metrics: Metrics },
+  deps: { contests: Contests; badges: Badges; metrics: Metrics; commission: Commission },
 ): void {
-  const { contests, badges, metrics } = deps;
+  const { contests, badges, metrics, commission } = deps;
 
   // ── deal.won: keep legacy badge path AND drive contests + NEW_LOGOS ────────
   consumer.on('deal.won', async (event) => {
     const e = event as unknown as IncentiveEvent;
-    const payload = (e.payload ?? {}) as { ownerId?: string; amount?: number | string };
+    const payload = (e.payload ?? {}) as {
+      ownerId?: string;
+      amount?: number | string;
+      dealId?: string;
+      id?: string;
+      currency?: string;
+      productId?: string;
+      ownerRole?: string;
+      marginAmount?: number | string;
+    };
     if (!e.tenantId || !payload.ownerId) return;
     const amount = Number(payload.amount ?? 0);
 
@@ -79,6 +90,23 @@ export function registerIncentiveConsumers(
       await contests.applyEvent(e.tenantId, 'DEALS_WON_COUNT', payload.ownerId!, 1);
       if (amount > 0) await contests.applyEvent(e.tenantId, 'DEALS_WON_REVENUE', payload.ownerId!, amount);
       await contests.applyEvent(e.tenantId, 'NEW_LOGOS', payload.ownerId!, 1);
+    });
+
+    // Commission: compute + persist a statement for the won deal. Idempotent
+    // per [tenantId, dealId], so a replayed deal.won will not double-write.
+    await guard('deal.won:commission', async () => {
+      const dealId = payload.dealId ?? payload.id;
+      if (!dealId) return; // no deal identity → cannot make an idempotent statement
+      await commission.computeForWonDeal(e.tenantId, {
+        dealId,
+        ownerId: payload.ownerId!,
+        amount,
+        currency: payload.currency,
+        productId: payload.productId,
+        ownerRole: payload.ownerRole,
+        marginAmount: payload.marginAmount,
+        occurredAt: e.timestamp,
+      });
     });
   });
 

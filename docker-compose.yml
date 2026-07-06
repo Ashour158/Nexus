@@ -452,6 +452,8 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       MEILISEARCH_URL: http://meilisearch:7700
       MEILISEARCH_KEY: ${MEILI_MASTER_KEY:-nexus-dev}
+      # Saved/recent searches (SRCH-08/09) persist to their own small DB.
+      SEARCH_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_search
     depends_on:
       kafka:
         condition: service_started

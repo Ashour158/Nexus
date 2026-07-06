@@ -32,6 +32,33 @@ model Notification {
   @@unique([id, tenantId])
 }
 
+/// Per-user, per-channel notification opt-out (NOT-11).
+///
+/// Opt-out model: the ABSENCE of a row means the channel is enabled. A row is
+/// only written when a user explicitly toggles a channel, so a fresh tenant/user
+/// defaults to fully-enabled without any seeding. Enforcement is fail-open — a
+/// lookup error must never drop a notification (see preferences.service.ts).
+model NotificationPreference {
+  id        String                     @id @default(cuid())
+  tenantId  String
+  userId    String
+  channel   NotificationChannel
+  enabled   Boolean                    @default(true)
+  createdAt DateTime                   @default(now())
+  updatedAt DateTime                   @updatedAt
+
+  @@unique([tenantId, userId, channel])
+  @@index([tenantId, userId])
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  PUSH
+  WHATSAPP
+}
+
 model OutboxMessage {
   id             String   @id @default(cuid())
   topic          String

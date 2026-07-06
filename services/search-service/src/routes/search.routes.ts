@@ -10,6 +10,8 @@ import { LEADS_INDEX } from '../indexes/leads.index.js';
 import { ACTIVITIES_INDEX } from '../indexes/activities.index.js';
 import { QUOTES_INDEX } from '../indexes/quotes.index.js';
 import { KB_ARTICLES_INDEX } from '../indexes/kb-articles.index.js';
+import type { SearchPrisma } from '../prisma.js';
+import { recordRecentSearch } from './saved-search.routes.js';
 
 // All searchable entity types → their Meilisearch index uid. The four primary
 // entities are always part of the default global search; the additional types
@@ -43,7 +45,11 @@ const TypeFilterSchema = z
   .transform((raw) => (raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : undefined))
   .pipe(z.array(z.enum(Object.keys(INDEX_BY_TYPE) as [SearchType, ...SearchType[]])).optional());
 
-export async function registerSearchRoutes(app: FastifyInstance, client: MeiliSearch): Promise<void> {
+export async function registerSearchRoutes(
+  app: FastifyInstance,
+  client: MeiliSearch,
+  prisma?: SearchPrisma
+): Promise<void> {
   await app.register(async (r) => {
     r.get('/search', { preHandler: requirePermission(PERMISSIONS.DEALS.READ) }, async (request, reply) => {
       const parsed = SearchQuerySchema.safeParse(request.query);
@@ -58,6 +64,19 @@ export async function registerSearchRoutes(app: FastifyInstance, client: MeiliSe
       const filter = `tenantId = '${jwt.tenantId}'`;
 
       const requestedTypes = typeParsed.data;
+
+      // Record recent-search history (SRCH-09) fire-and-forget. Fully fail-open:
+      // recordRecentSearch swallows its own errors, and we never await it so it
+      // cannot slow the search response.
+      if (prisma) {
+        void recordRecentSearch(
+          prisma,
+          jwt.tenantId,
+          jwt.sub,
+          q,
+          requestedTypes && requestedTypes.length === 1 ? requestedTypes[0] : undefined
+        );
+      }
 
       // Default request (no `type`): preserve the original four-entity response
       // shape so existing clients keep working.

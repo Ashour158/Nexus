@@ -5,6 +5,7 @@ import type { SmsChannel } from '../channels/sms.channel.js';
 import type { PushChannel } from '../channels/push.channel.js';
 import type { WhatsAppChannel } from '../channels/whatsapp.channel.js';
 import { renderActionEmail } from '../channels/email.channel.js';
+import type { PreferencesService } from '../services/preferences.service.js';
 
 interface OwnerLookup {
   (
@@ -19,6 +20,7 @@ interface LeadConsumerDeps {
   sms: SmsChannel;
   push: PushChannel;
   whatsapp: WhatsAppChannel;
+  prefs: PreferencesService;
   lookupOwner: OwnerLookup;
   log: {
     info: (...args: unknown[]) => void;
@@ -47,31 +49,39 @@ interface LeadAssignedPayload {
  * when unconfigured; this isolates any failure so one channel can never block the
  * other or the consumer. WhatsApp reuses the recipient's phone number and is only
  * attempted when the channel is configured.
+ *
+ * Per-channel opt-out (NOT-11) is enforced here via fail-open preference checks.
  */
 async function fanOutSmsPush(
-  deps: Pick<LeadConsumerDeps, 'sms' | 'push' | 'whatsapp' | 'log'>,
-  target: { phone?: string; deviceToken?: string },
+  deps: Pick<LeadConsumerDeps, 'sms' | 'push' | 'whatsapp' | 'prefs' | 'log'>,
+  recipient: { tenantId: string; userId: string; phone?: string; deviceToken?: string },
   msg: { title: string; body: string; actionUrl?: string }
 ): Promise<void> {
+  const { tenantId, userId } = recipient;
+  const [smsOn, pushOn, whatsappOn] = await Promise.all([
+    deps.prefs.isChannelEnabled(tenantId, userId, 'SMS'),
+    deps.prefs.isChannelEnabled(tenantId, userId, 'PUSH'),
+    deps.prefs.isChannelEnabled(tenantId, userId, 'WHATSAPP'),
+  ]);
   await Promise.allSettled([
-    target.phone
+    recipient.phone && smsOn
       ? deps.sms
-          .send({ to: target.phone, body: `${msg.title}: ${msg.body}` })
+          .send({ to: recipient.phone, body: `${msg.title}: ${msg.body}` })
           .catch((err) => deps.log.error({ err }, 'sms fan-out failed'))
       : Promise.resolve(),
-    target.deviceToken
+    recipient.deviceToken && pushOn
       ? deps.push
           .send({
-            to: target.deviceToken,
+            to: recipient.deviceToken,
             title: msg.title,
             body: msg.body,
             actionUrl: msg.actionUrl,
           })
           .catch((err) => deps.log.error({ err }, 'push fan-out failed'))
       : Promise.resolve(),
-    target.phone && deps.whatsapp.isConfigured()
+    recipient.phone && whatsappOn && deps.whatsapp.isConfigured()
       ? deps.whatsapp
-          .send({ to: target.phone, body: `${msg.title}: ${msg.body}` })
+          .send({ to: recipient.phone, body: `${msg.title}: ${msg.body}` })
           .catch((err) => deps.log.error({ err }, 'whatsapp fan-out failed'))
       : Promise.resolve(),
   ]);
@@ -115,7 +125,10 @@ export async function startLeadConsumer(deps: LeadConsumerDeps): Promise<NexusCo
       },
     });
     const owner = await deps.lookupOwner(evt.tenantId, payload.ownerId);
-    if (owner.email) {
+    if (
+      owner.email &&
+      (await deps.prefs.isChannelEnabled(evt.tenantId, payload.ownerId, 'EMAIL'))
+    ) {
       await deps.email.send({
         to: owner.email,
         subject: title,
@@ -127,11 +140,11 @@ export async function startLeadConsumer(deps: LeadConsumerDeps): Promise<NexusCo
         }),
       });
     }
-    await fanOutSmsPush(deps, owner, {
-      title,
-      body,
-      actionUrl: `/leads/${payload.leadId}`,
-    });
+    await fanOutSmsPush(
+      deps,
+      { tenantId: evt.tenantId, userId: payload.ownerId, ...owner },
+      { title, body, actionUrl: `/leads/${payload.leadId}` }
+    );
   });
 
   await consumer.subscribe([TOPICS.LEADS]);

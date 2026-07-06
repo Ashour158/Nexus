@@ -8,27 +8,31 @@
     "build": "tsc --project tsconfig.build.json",
     "start": "node dist/index.js",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy"
   },
   "dependencies": {
+    "@apollo/subgraph": "^2.13.3",
     "@fastify/rate-limit": "^9.1.0",
     "@fastify/request-context": "^5.1.0",
+    "@fastify/swagger": "^9.0.0",
+    "@fastify/swagger-ui": "^5.0.0",
     "@nexus/kafka": "workspace:*",
     "@nexus/service-utils": "workspace:*",
     "@nexus/shared-types": "workspace:*",
     "@nexus/validation": "workspace:*",
+    "@prisma/client": "^5.22.0",
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
-    "meilisearch": "^0.46.0",
-    "zod": "^3.23.8",
-    "@fastify/swagger": "^9.0.0",
-    "@fastify/swagger-ui": "^5.0.0",
     "graphql": "^16.13.2",
     "graphql-yoga": "^5.21.0",
-    "@apollo/subgraph": "^2.13.3"
+    "meilisearch": "^0.46.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20.14.9",
+    "prisma": "^5.22.0",
     "tsx": "^4.16.0",
     "typescript": "^5.5.3",
     "vitest": "^1.6.0"

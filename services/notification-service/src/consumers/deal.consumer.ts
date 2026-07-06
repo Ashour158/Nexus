@@ -5,6 +5,7 @@ import type { SmsChannel } from '../channels/sms.channel.js';
 import type { PushChannel } from '../channels/push.channel.js';
 import type { WhatsAppChannel } from '../channels/whatsapp.channel.js';
 import { renderActionEmail } from '../channels/email.channel.js';
+import type { PreferencesService } from '../services/preferences.service.js';
 
 interface OwnerLookup {
   (
@@ -19,6 +20,7 @@ interface DealConsumerDeps {
   sms: SmsChannel;
   push: PushChannel;
   whatsapp: WhatsAppChannel;
+  prefs: PreferencesService;
   lookupOwner: OwnerLookup;
   log: {
     info: (...args: unknown[]) => void;
@@ -33,34 +35,72 @@ interface DealConsumerDeps {
  * failure so one channel can never block the other or the consumer. WhatsApp
  * reuses the recipient's phone number and is only attempted when the channel is
  * configured.
+ *
+ * Per-channel opt-out (NOT-11) is enforced here: each channel is checked against
+ * the recipient's preferences and skipped when disabled. Preference lookups are
+ * fail-open (see preferences.service.ts) so a check error never drops a send.
  */
 async function fanOutSmsPush(
-  deps: Pick<DealConsumerDeps, 'sms' | 'push' | 'whatsapp' | 'log'>,
-  target: { phone?: string; deviceToken?: string },
+  deps: Pick<DealConsumerDeps, 'sms' | 'push' | 'whatsapp' | 'prefs' | 'log'>,
+  recipient: { tenantId: string; userId: string; phone?: string; deviceToken?: string },
   msg: { title: string; body: string; actionUrl?: string }
 ): Promise<void> {
+  const { tenantId, userId } = recipient;
+  const [smsOn, pushOn, whatsappOn] = await Promise.all([
+    deps.prefs.isChannelEnabled(tenantId, userId, 'SMS'),
+    deps.prefs.isChannelEnabled(tenantId, userId, 'PUSH'),
+    deps.prefs.isChannelEnabled(tenantId, userId, 'WHATSAPP'),
+  ]);
   await Promise.allSettled([
-    target.phone
+    recipient.phone && smsOn
       ? deps.sms
-          .send({ to: target.phone, body: `${msg.title}: ${msg.body}` })
+          .send({ to: recipient.phone, body: `${msg.title}: ${msg.body}` })
           .catch((err) => deps.log.error({ err }, 'sms fan-out failed'))
       : Promise.resolve(),
-    target.deviceToken
+    recipient.deviceToken && pushOn
       ? deps.push
           .send({
-            to: target.deviceToken,
+            to: recipient.deviceToken,
             title: msg.title,
             body: msg.body,
             actionUrl: msg.actionUrl,
           })
           .catch((err) => deps.log.error({ err }, 'push fan-out failed'))
       : Promise.resolve(),
-    target.phone && deps.whatsapp.isConfigured()
+    recipient.phone && whatsappOn && deps.whatsapp.isConfigured()
       ? deps.whatsapp
-          .send({ to: target.phone, body: `${msg.title}: ${msg.body}` })
+          .send({ to: recipient.phone, body: `${msg.title}: ${msg.body}` })
           .catch((err) => deps.log.error({ err }, 'whatsapp fan-out failed'))
       : Promise.resolve(),
   ]);
+}
+
+/**
+ * Guarded email send that first honours the recipient's EMAIL preference
+ * (NOT-11). Fail-open via `isChannelEnabled`.
+ */
+async function sendEmailIfEnabled(
+  deps: Pick<DealConsumerDeps, 'email' | 'prefs' | 'log'>,
+  recipient: { tenantId: string; userId: string; email?: string },
+  mail: { subject: string; heading: string; body: string; actionLabel: string; actionUrl: string }
+): Promise<void> {
+  if (!recipient.email) return;
+  const enabled = await deps.prefs.isChannelEnabled(
+    recipient.tenantId,
+    recipient.userId,
+    'EMAIL'
+  );
+  if (!enabled) return;
+  await deps.email.send({
+    to: recipient.email,
+    subject: mail.subject,
+    html: renderActionEmail({
+      heading: mail.heading,
+      body: mail.body,
+      actionLabel: mail.actionLabel,
+      actionUrl: mail.actionUrl,
+    }),
+  });
 }
 
 /**
@@ -131,23 +171,16 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
       actionUrl: `/deals/${payload.dealId}`,
       metadata: { amount: payload.amount, currency: payload.currency },
     });
-    if (owner.email) {
-      await deps.email.send({
-        to: owner.email,
-        subject: title,
-        html: renderActionEmail({
-          heading: title,
-          body,
-          actionLabel: 'View deal',
-          actionUrl: `/deals/${payload.dealId}`,
-        }),
-      });
-    }
-    await fanOutSmsPush(deps, owner, {
-      title,
-      body,
-      actionUrl: `/deals/${payload.dealId}`,
-    });
+    await sendEmailIfEnabled(
+      deps,
+      { tenantId: event.tenantId, userId: payload.ownerId, email: owner.email },
+      { subject: title, heading: title, body, actionLabel: 'View deal', actionUrl: `/deals/${payload.dealId}` }
+    );
+    await fanOutSmsPush(
+      deps,
+      { tenantId: event.tenantId, userId: payload.ownerId, ...owner },
+      { title, body, actionUrl: `/deals/${payload.dealId}` }
+    );
   });
 
   consumer.on('deal.lost', async (event) => {
@@ -166,23 +199,16 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
       actionUrl: `/deals/${payload.dealId}`,
     });
     const owner = await deps.lookupOwner(event.tenantId, payload.ownerId);
-    if (owner.email) {
-      await deps.email.send({
-        to: owner.email,
-        subject: title,
-        html: renderActionEmail({
-          heading: title,
-          body,
-          actionLabel: 'View deal',
-          actionUrl: `/deals/${payload.dealId}`,
-        }),
-      });
-    }
-    await fanOutSmsPush(deps, owner, {
-      title,
-      body,
-      actionUrl: `/deals/${payload.dealId}`,
-    });
+    await sendEmailIfEnabled(
+      deps,
+      { tenantId: event.tenantId, userId: payload.ownerId, email: owner.email },
+      { subject: title, heading: title, body, actionLabel: 'View deal', actionUrl: `/deals/${payload.dealId}` }
+    );
+    await fanOutSmsPush(
+      deps,
+      { tenantId: event.tenantId, userId: payload.ownerId, ...owner },
+      { title, body, actionUrl: `/deals/${payload.dealId}` }
+    );
   });
 
   consumer.on('deal.stage_changed', async (event) => {
@@ -214,11 +240,11 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
           metadata: { daysInStage, rottenDays },
         });
         const owner = await deps.lookupOwner(event.tenantId, payload.ownerId);
-        await fanOutSmsPush(deps, owner, {
-          title,
-          body,
-          actionUrl: `/deals/${payload.dealId}`,
-        });
+        await fanOutSmsPush(
+          deps,
+          { tenantId: event.tenantId, userId: payload.ownerId, ...owner },
+          { title, body, actionUrl: `/deals/${payload.dealId}` }
+        );
       }
     }
   });
@@ -261,23 +287,16 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
       },
     });
     const owner = await deps.lookupOwner(evt.tenantId, payload.ownerId);
-    if (owner.email) {
-      await deps.email.send({
-        to: owner.email,
-        subject: title,
-        html: renderActionEmail({
-          heading: title,
-          body,
-          actionLabel: 'View deal',
-          actionUrl: `/deals/${payload.dealId}`,
-        }),
-      });
-    }
-    await fanOutSmsPush(deps, owner, {
-      title,
-      body,
-      actionUrl: `/deals/${payload.dealId}`,
-    });
+    await sendEmailIfEnabled(
+      deps,
+      { tenantId: evt.tenantId, userId: payload.ownerId, email: owner.email },
+      { subject: title, heading: title, body, actionLabel: 'View deal', actionUrl: `/deals/${payload.dealId}` }
+    );
+    await fanOutSmsPush(
+      deps,
+      { tenantId: evt.tenantId, userId: payload.ownerId, ...owner },
+      { title, body, actionUrl: `/deals/${payload.dealId}` }
+    );
   });
 
   // `deal.at_risk` is published by the crm-service AI at-risk detector
@@ -324,23 +343,16 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
       },
     });
     const owner = await deps.lookupOwner(evt.tenantId, payload.ownerId);
-    if (owner.email) {
-      await deps.email.send({
-        to: owner.email,
-        subject: title,
-        html: renderActionEmail({
-          heading: title,
-          body,
-          actionLabel: 'View deal',
-          actionUrl: `/deals/${payload.dealId}`,
-        }),
-      });
-    }
-    await fanOutSmsPush(deps, owner, {
-      title,
-      body,
-      actionUrl: `/deals/${payload.dealId}`,
-    });
+    await sendEmailIfEnabled(
+      deps,
+      { tenantId: evt.tenantId, userId: payload.ownerId, email: owner.email },
+      { subject: title, heading: title, body, actionLabel: 'View deal', actionUrl: `/deals/${payload.dealId}` }
+    );
+    await fanOutSmsPush(
+      deps,
+      { tenantId: evt.tenantId, userId: payload.ownerId, ...owner },
+      { title, body, actionUrl: `/deals/${payload.dealId}` }
+    );
   });
 
   await consumer.subscribe([TOPICS.DEALS]);

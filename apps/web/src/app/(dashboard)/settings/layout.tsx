@@ -19,6 +19,7 @@ const TABS = [
   { href: '/settings/quote-automation', label: 'Quote Automation' },
   { href: '/settings/scoring-rules', label: 'Scoring Rules' },
   { href: '/settings/custom-fields', label: 'Custom Fields' },
+  { href: '/settings/notifications', label: 'Notifications' },
   { href: '/settings/migration', label: 'Migration' },
 ];
 

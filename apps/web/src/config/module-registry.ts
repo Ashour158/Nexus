@@ -362,6 +362,17 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
         depth: ['badges', 'contests', 'leaderboards', 'award tracking'],
         sidebar: true,
       },
+      {
+        id: 'commission',
+        label: 'Commission',
+        href: '/commission',
+        icon: Percent,
+        status: 'wired',
+        service: 'incentive-service',
+        description: 'Commission plans, rate rules, and per-rep commission statements on won deals.',
+        depth: ['plans + tiered rules', 'auto-computed on deal.won', 'rep statements', 'approve/pay workflow'],
+        sidebar: true,
+      },
     ],
   },
   {

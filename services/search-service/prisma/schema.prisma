@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/search-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("SEARCH_DATABASE_URL")
+}
+
+// Persisted saved searches (SRCH-08). Tenant + user scoped; a user names a query
+// (optionally constrained to an entity type / filters) to re-run later.
+model SavedSearch {
+  id         String   @id @default(cuid())
+  tenantId   String
+  userId     String
+  name       String
+  query      String
+  entityType String?
+  filters    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, userId, createdAt])
+}
+
+// Recent search history (SRCH-09). Recorded fail-open whenever a global search
+// runs. Kept capped per user (see recorder logic) and deduped by query.
+model RecentSearch {
+  id         String   @id @default(cuid())
+  tenantId   String
+  userId     String
+  query      String
+  entityType String?
+  searchedAt DateTime @default(now())
+
+  @@unique([tenantId, userId, query])
+  @@index([tenantId, userId, searchedAt])
+}

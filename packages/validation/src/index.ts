@@ -862,6 +862,7 @@ export const CreateQuoteSchema = z.object({
   ownerId: z.string().cuid(),
   accountId: z.string().cuid(),
   contactId: z.string().cuid().optional(),
+  templateId: z.string().cuid().optional(),
   name: z.string().min(1).max(200),
   currency: z.string().length(3).default('USD'),
   validUntil: z.string().datetime().optional(),
@@ -875,6 +876,10 @@ export const CreateQuoteSchema = z.object({
       z.object({
         productId: z.string().cuid(),
         quantity: z.number().int().min(1),
+        // Optional per-line label + description overrides for line governance;
+        // when omitted the line inherits the product's name/description.
+        name: z.string().min(1).max(200).optional(),
+        description: z.string().max(2000).optional(),
         competitiveOverridePrice: z.union([z.number(), z.string()]).optional(),
         manualOverridePrice: z.union([z.number(), z.string()]).optional(),
       })

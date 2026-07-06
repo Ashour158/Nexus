@@ -172,6 +172,11 @@ model Quote {
   buyerTaxReg      String?
   dueDate          DateTime?
   version          Int             @default(1)
+  /// Multi-level approval: the highest tier level this quote needs cleared
+  /// (0 = none) and how many levels have been approved so far. A quote is fully
+  /// approved when approvalLevel >= requiredApprovalLevel.
+  requiredApprovalLevel Int        @default(0)
+  approvalLevel         Int        @default(0)
   /// Set when the quote reaches a terminal archive state (expired / voided /
   /// superseded). Non-archived quotes have `archivedAt = null` so the hot list
   /// filters `archivedAt: null` to stay clean; archived quotes are read via the
@@ -195,6 +200,40 @@ model Quote {
   @@index([tenantId, status])
   @@index([tenantId, dueDate])
   @@index([tenantId, archivedAt])
+  @@unique([id, tenantId])
+}
+
+/// Admin-controlled quote-number format + atomic sequence, one row per tenant.
+/// `generateQuoteNumber` upserts+increments `nextSequence` inside a transaction
+/// so concurrent creates never collide, and lets admins set the prefix/padding/
+/// yearly-reset instead of the old hardcoded `QUO-{year}-{seq}`.
+model QuoteNumberConfig {
+  tenantId     String   @id
+  prefix       String   @default("QUO")
+  separator    String   @default("-")
+  includeYear  Boolean  @default(true)
+  padding      Int      @default(5)
+  resetYearly  Boolean  @default(true)
+  nextSequence Int      @default(1)
+  lastYear     Int?
+  updatedAt    DateTime @updatedAt
+}
+
+/// Multi-level quote approval policy. A quote requires the highest `level` of any
+/// active tier whose threshold it crosses (by total amount and/or discount %).
+model QuoteApprovalTier {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  name               String
+  level              Int
+  minAmount          Decimal? @db.Decimal(18, 2)
+  minDiscountPercent Decimal? @db.Decimal(9, 4)
+  approverRole       String?
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([tenantId, isActive])
   @@unique([id, tenantId])
 }
 

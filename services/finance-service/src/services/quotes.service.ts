@@ -48,21 +48,90 @@ export type QuoteWithLineItems = Quote;
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /**
- * Generates a tenant-scoped quote number of the form `QUO-{YEAR}-{SEQ}` where
- * SEQ is the count of quotes already issued this calendar year (padded).
+ * Generates the next tenant quote number from the admin-controlled
+ * `QuoteNumberConfig` (prefix / separator / year / padding / yearly reset). The
+ * sequence is incremented inside a transaction so concurrent quote creation can
+ * never mint the same number (the old count()-based scheme was race-prone).
  */
 async function generateQuoteNumber(
   prisma: FinancePrisma,
   tenantId: string
 ): Promise<string> {
   const year = new Date().getUTCFullYear();
-  const yearStart = new Date(Date.UTC(year, 0, 1));
-  const yearEnd = new Date(Date.UTC(year + 1, 0, 1));
-  const count = await prisma.quote.count({
-    where: { tenantId, createdAt: { gte: yearStart, lt: yearEnd } },
+  return prisma.$transaction(async (tx) => {
+    let cfg = await tx.quoteNumberConfig.findUnique({ where: { tenantId } });
+    if (!cfg) cfg = await tx.quoteNumberConfig.create({ data: { tenantId } });
+
+    let seq = cfg.nextSequence;
+    let lastYear = cfg.lastYear;
+    if (cfg.resetYearly && cfg.lastYear !== year) {
+      seq = 1;
+      lastYear = year;
+    }
+    await tx.quoteNumberConfig.update({
+      where: { tenantId },
+      data: { nextSequence: seq + 1, lastYear },
+    });
+
+    const parts = [cfg.prefix];
+    if (cfg.includeYear) parts.push(String(year));
+    parts.push(String(seq).padStart(Math.max(1, cfg.padding), '0'));
+    return parts.join(cfg.separator);
   });
-  const seq = String(count + 1).padStart(5, '0');
-  return `QUO-${year}-${seq}`;
+}
+
+/**
+ * Highest active approval tier this quote crosses (0 = no approval needed).
+ * A tier matches when the quote total >= its minAmount AND/OR the effective
+ * discount % >= its minDiscountPercent (unset thresholds are ignored).
+ */
+async function computeRequiredApprovalLevel(
+  prisma: FinancePrisma,
+  tenantId: string,
+  total: number,
+  discountPercent: number
+): Promise<number> {
+  const tiers = await prisma.quoteApprovalTier.findMany({
+    where: { tenantId, isActive: true },
+  });
+  let level = 0;
+  for (const t of tiers) {
+    const amountOk = t.minAmount == null || total >= Number(t.minAmount);
+    const discountOk =
+      t.minDiscountPercent == null || discountPercent >= Number(t.minDiscountPercent);
+    // A tier with both thresholds requires both; a tier with one requires that one.
+    const matches =
+      (t.minAmount != null && t.minDiscountPercent != null && amountOk && discountOk) ||
+      (t.minAmount != null && t.minDiscountPercent == null && amountOk) ||
+      (t.minAmount == null && t.minDiscountPercent != null && discountOk);
+    if (matches && t.level > level) level = t.level;
+  }
+  return level;
+}
+
+/**
+ * Pulls default terms / payment terms / notes / validity from an active
+ * QuoteTemplate so a quote created against a template inherits its boilerplate
+ * (only where the request didn't already supply the field).
+ */
+async function applyTemplateDefaults(
+  prisma: FinancePrisma,
+  tenantId: string,
+  templateId: string | null | undefined,
+  data: { terms?: string | null; paymentTerms?: string | null; notes?: string | null }
+): Promise<{ terms?: string | null; paymentTerms?: string | null; notes?: string | null }> {
+  if (!templateId) return data;
+  const tpl = await prisma.quoteTemplate.findFirst({
+    where: { id: templateId, tenantId },
+  });
+  if (!tpl) return data;
+  const vars = (tpl.variables ?? {}) as Record<string, unknown>;
+  return {
+    terms: data.terms ?? (typeof vars.terms === 'string' ? vars.terms : tpl.body ?? null),
+    paymentTerms:
+      data.paymentTerms ?? (typeof vars.paymentTerms === 'string' ? vars.paymentTerms : null),
+    notes: data.notes ?? (typeof vars.notes === 'string' ? vars.notes : null),
+  };
 }
 
 function buildWhere(
@@ -136,7 +205,10 @@ function normalizeQuoteLines(
     quoteId,
     productId: item.productId,
     productName: item.productName,
-    description: item.notes ?? null,
+    // Governance: every line carries a non-empty name AND description. Prefer an
+    // explicit note/description, else fall back to the product name so a line is
+    // never persisted blank.
+    description: item.notes?.trim() || item.productName || 'Line item',
     quantity: toPrismaDecimal(item.quantity),
     listPrice: toPrismaDecimal(item.listPrice),
     unitPrice: toPrismaDecimal(item.unitPrice),
@@ -261,6 +333,25 @@ export function createQuotesService(
         : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       assertFutureDate(expiry, 'Quote expiry date');
 
+      // Multi-level approval: does this quote's total / effective discount cross
+      // any active approval tier? Combined with the CPQ engine's own signal.
+      const subtotalNum = Number(pricingResult.subtotal) || 0;
+      const effectiveDiscountPct =
+        subtotalNum > 0 ? (Number(pricingResult.discountTotal) / subtotalNum) * 100 : 0;
+      const requiredLevel = await computeRequiredApprovalLevel(
+        prisma,
+        tenantId,
+        Number(pricingResult.total) || 0,
+        effectiveDiscountPct
+      );
+      const needsApproval = pricingResult.approvalRequired || requiredLevel > 0;
+      // Templates: inherit boilerplate terms / payment terms / notes.
+      const tpl = await applyTemplateDefaults(prisma, tenantId, data.templateId, {
+        terms: data.terms,
+        paymentTerms: data.paymentTerms,
+        notes: data.notes,
+      });
+
       try {
         const created = await prisma.quote.create({
           data: {
@@ -272,7 +363,10 @@ export function createQuotesService(
               quoteNumber,
               name: data.name,
               rfqId: data.rfqId ?? null,
-              status: pricingResult.approvalRequired ? 'PENDING_APPROVAL' : 'DRAFT',
+              templateId: data.templateId ?? null,
+              status: needsApproval ? 'PENDING_APPROVAL' : 'DRAFT',
+              requiredApprovalLevel: requiredLevel,
+              approvalLevel: 0,
               currency: data.currency,
               subtotal: toPrismaDecimal(pricingResult.subtotal),
               discountAmount: toPrismaDecimal(pricingResult.discountTotal),
@@ -280,10 +374,8 @@ export function createQuotesService(
               total: toPrismaDecimal(pricingResult.total),
               validUntil: expiry,
               expiresAt: expiry,
-              approvalRequired: pricingResult.approvalRequired,
-              approvalStatus: pricingResult.approvalRequired
-                ? 'PENDING'
-                : null,
+              approvalRequired: needsApproval,
+              approvalStatus: needsApproval ? 'PENDING' : null,
               // ── Flagship CPQ columns (features 1–3) ─────────────────────
               // All optional / null-safe: absent inputs leave columns null.
               priceBookId: pricingResult.priceBookId ?? data.priceBookId ?? null,
@@ -300,9 +392,9 @@ export function createQuotesService(
                 pricingResult.baseTotal !== undefined
                   ? toPrismaDecimal(pricingResult.baseTotal)
                   : null,
-              paymentTerms: data.paymentTerms ?? null,
-              terms: data.terms ?? null,
-              notes: data.notes ?? null,
+              paymentTerms: tpl.paymentTerms ?? null,
+              terms: tpl.terms ?? null,
+              notes: tpl.notes ?? null,
               appliedPromos: data.appliedPromos,
               lineItems: pricingResult.items as unknown as Prisma.InputJsonValue,
               pricingBreakdown: {

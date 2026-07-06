@@ -75,6 +75,71 @@ export async function registerQuotesRoutes(
 
   await app.register(
     async (r) => {
+      // ─── ADMIN: quote-number config (admin-controlled auto numbering) ────
+      r.get('/quotes/config/numbering', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
+        const jwt = request.user as JwtPayload;
+        const cfg = await prisma.quoteNumberConfig.upsert({
+          where: { tenantId: jwt.tenantId },
+          update: {},
+          create: { tenantId: jwt.tenantId },
+        });
+        return reply.send({ success: true, data: cfg });
+      });
+      r.put('/quotes/config/numbering', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+        const jwt = request.user as JwtPayload;
+        const b = (request.body ?? {}) as Record<string, unknown>;
+        const data: Record<string, unknown> = {};
+        if (typeof b.prefix === 'string') data.prefix = b.prefix.trim().slice(0, 12) || 'QUO';
+        if (typeof b.separator === 'string') data.separator = b.separator.slice(0, 3);
+        if (typeof b.includeYear === 'boolean') data.includeYear = b.includeYear;
+        if (typeof b.padding === 'number') data.padding = Math.min(10, Math.max(1, Math.floor(b.padding)));
+        if (typeof b.resetYearly === 'boolean') data.resetYearly = b.resetYearly;
+        if (typeof b.nextSequence === 'number' && b.nextSequence >= 1) data.nextSequence = Math.floor(b.nextSequence);
+        const cfg = await prisma.quoteNumberConfig.upsert({
+          where: { tenantId: jwt.tenantId },
+          update: data,
+          create: { tenantId: jwt.tenantId, ...data },
+        });
+        return reply.send({ success: true, data: cfg });
+      });
+
+      // ─── ADMIN: multi-level approval tiers ──────────────────────────────
+      r.get('/quotes/config/approval-tiers', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
+        const jwt = request.user as JwtPayload;
+        const tiers = await prisma.quoteApprovalTier.findMany({ where: { tenantId: jwt.tenantId }, orderBy: { level: 'asc' } });
+        return reply.send({ success: true, data: tiers });
+      });
+      r.post('/quotes/config/approval-tiers', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+        const jwt = request.user as JwtPayload;
+        const b = (request.body ?? {}) as Record<string, unknown>;
+        const name = String(b.name ?? '').trim();
+        const level = Number(b.level);
+        if (!name || !Number.isFinite(level) || level < 1) {
+          return reply.code(422).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'name and level (>=1) are required', requestId: request.id } });
+        }
+        if (b.minAmount == null && b.minDiscountPercent == null) {
+          return reply.code(422).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'a tier needs at least one threshold (minAmount or minDiscountPercent)', requestId: request.id } });
+        }
+        const tier = await prisma.quoteApprovalTier.create({
+          data: {
+            tenantId: jwt.tenantId,
+            name,
+            level: Math.floor(level),
+            minAmount: b.minAmount != null ? String(b.minAmount) : null,
+            minDiscountPercent: b.minDiscountPercent != null ? String(b.minDiscountPercent) : null,
+            approverRole: b.approverRole != null ? String(b.approverRole) : null,
+            isActive: b.isActive != null ? Boolean(b.isActive) : true,
+          },
+        });
+        return reply.code(201).send({ success: true, data: tier });
+      });
+      r.delete('/quotes/config/approval-tiers/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+        const jwt = request.user as JwtPayload;
+        const { id } = request.params as { id: string };
+        await prisma.quoteApprovalTier.deleteMany({ where: { id, tenantId: jwt.tenantId } });
+        return reply.send({ success: true });
+      });
+
       // ─── LIST ───────────────────────────────────────────────────────────
       r.get(
         '/quotes',

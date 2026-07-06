@@ -597,10 +597,10 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
     ],
   },
   {
-    id: 'admin-settings',
-    label: 'Admin & Settings',
-    icon: Settings2,
-    description: 'Administration, security, compliance, configuration, system map, and operational controls.',
+    id: 'administration',
+    label: 'Administration',
+    icon: ShieldCheck,
+    description: 'People, access, security, integrations, and workspace administration.',
     modules: [
       {
         id: 'system-map',
@@ -715,6 +715,14 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
         depth: ['roles', 'permission matrix', 'RBAC', 'system role protection'],
         sidebar: true,
       },
+    ],
+  },
+  {
+    id: 'configuration',
+    label: 'Configuration & Data',
+    icon: Settings2,
+    description: 'Data model, pipelines, finance setup, privacy, and record governance.',
+    modules: [
       {
         id: 'custom-fields',
         label: 'Custom Fields',

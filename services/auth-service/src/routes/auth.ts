@@ -15,6 +15,7 @@ import type { JwksKeyStore } from '../lib/jwt.js';
 import type { NexusProducer } from '@nexus/kafka';
 import type { UnifiedAuditLogger } from '../lib/unified-audit.js';
 import { setKeycloakUserPassword } from '../lib/keycloak-admin.js';
+import { clearLoginFailures, getLoginLock, recordLoginFailure } from '../lib/login-throttle.js';
 
 const PasswordLoginSchema = z.object({
   email: z.string().email(),
@@ -40,10 +41,31 @@ export async function registerAuthRoutes(
         // body carries credentials.
         const pw = PasswordLoginSchema.safeParse(request.body);
         if (pw.success) {
-          const result = await loginWithPassword(
-            keyStore, prisma, request, pw.data.email, pw.data.password,
-            { userAgent: request.headers['user-agent'], ip: request.ip }
-          );
+          // Brute-force lockout: reject before touching the credential store once
+          // an email has too many recent consecutive failures.
+          const lock = await getLoginLock(pw.data.email);
+          if (lock.locked) {
+            reply.header('Retry-After', String(lock.retryAfterSec));
+            return reply.code(429).send({
+              success: false,
+              error: {
+                code: 'ACCOUNT_LOCKED',
+                message: `Too many failed login attempts. Try again in ${Math.ceil(lock.retryAfterSec / 60)} minute(s).`,
+                requestId: request.id,
+              },
+            });
+          }
+          let result;
+          try {
+            result = await loginWithPassword(
+              keyStore, prisma, request, pw.data.email, pw.data.password,
+              { userAgent: request.headers['user-agent'], ip: request.ip }
+            );
+          } catch (err) {
+            await recordLoginFailure(pw.data.email);
+            throw err;
+          }
+          await clearLoginFailures(pw.data.email);
           if ('mfaRequired' in result && result.mfaRequired) {
             return reply.send({ success: true, data: { mfaRequired: true, mfaToken: result.mfaToken } });
           }

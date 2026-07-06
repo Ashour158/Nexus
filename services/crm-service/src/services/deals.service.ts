@@ -529,9 +529,9 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
       // 409 instead of silently clobbering a concurrent edit. Callers that omit
       // `version` keep the prior last-write-wins behaviour.
       const expectedVersion = (data as { version?: number }).version;
-      let updated;
+      let updated: Awaited<ReturnType<typeof prisma.deal.update>>;
       if (typeof expectedVersion === 'number') {
-        updated = await prisma.$transaction(async (tx: CrmPrisma) => {
+        updated = (await prisma.$transaction(async (tx: CrmPrisma) => {
           const claim = await tx.deal.updateMany({
             where: { id, tenantId, version: expectedVersion },
             data: { version: { increment: 1 } },
@@ -547,7 +547,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           // patch so we don't double-count it.
           const { version: _dropVersion, ...dataNoVersion } = safeUpdateData as Record<string, unknown>;
           return tx.deal.update({ where: { id }, data: dataNoVersion as Prisma.DealUpdateInput });
-        });
+        })) as Awaited<ReturnType<typeof prisma.deal.update>>;
       } else {
         updated = await prisma.deal.update({
           where: { id },

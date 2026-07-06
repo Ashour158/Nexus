@@ -13,6 +13,9 @@ import {
   useVoidQuote,
   type Quote,
 } from '@/hooks/use-quotes';
+import { useAccounts } from '@/hooks/use-accounts';
+import { useContacts } from '@/hooks/use-contacts';
+import { useUsers } from '@/hooks/use-users';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth.store';
 
@@ -47,6 +50,31 @@ export default function QuotesPage(): JSX.Element {
   const rows = query.data?.data ?? [];
   const total = query.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / 25));
+
+  // Resolve linked account / contact / owner names so the table reads clearly
+  // instead of showing truncated ids (finance quotes only carry ids).
+  const accountsQuery = useAccounts({ limit: 100 });
+  const contactsQuery = useContacts({ limit: 100 });
+  const usersQuery = useUsers({ limit: 100 });
+  const accountName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of accountsQuery.data?.data ?? []) m.set(a.id, a.name);
+    return m;
+  }, [accountsQuery.data]);
+  const contactName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of contactsQuery.data?.data ?? []) m.set(c.id, `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim());
+    return m;
+  }, [contactsQuery.data]);
+  const ownerName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const u of usersQuery.data?.data ?? []) {
+      const r = u as { id: string; name?: string; firstName?: string; lastName?: string; email?: string };
+      m.set(r.id, r.name || `${r.firstName ?? ''} ${r.lastName ?? ''}`.trim() || r.email || r.id);
+    }
+    return m;
+  }, [usersQuery.data]);
+  const short = (id: string) => `${id.slice(0, 8)}…`;
 
   const statusOptions = useMemo(
     () => ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'VOID'] as const,
@@ -131,12 +159,12 @@ export default function QuotesPage(): JSX.Element {
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>
                 <th className="px-3 py-2 text-start">Quote #</th>
-                <th className="px-3 py-2 text-start">Deal</th>
                 <th className="px-3 py-2 text-start">Account</th>
+                <th className="px-3 py-2 text-start">Contact</th>
                 <th className="px-3 py-2 text-start">Status</th>
                 <th className="px-3 py-2 text-end">Total</th>
-                <th className="px-3 py-2 text-center">Version</th>
-                <th className="px-3 py-2 text-start">Expires</th>
+                <th className="px-3 py-2 text-start">Approval</th>
+                <th className="px-3 py-2 text-start">Valid Until</th>
                 <th className="px-3 py-2 text-start">Owner</th>
                 <th className="px-3 py-2 text-start">Created</th>
                 <th className="px-3 py-2 text-end">Actions</th>
@@ -151,18 +179,26 @@ export default function QuotesPage(): JSX.Element {
                     </Link>
                   </td>
                   <td className="px-3 py-2">
-                    <Link href={`/deals/${q.dealId}`} className="text-brand-700 hover:underline">
-                      {q.dealId.slice(0, 8)}…
-                    </Link>
+                    {q.accountId ? (
+                      <Link href={`/accounts/${q.accountId}`} className="text-brand-700 hover:underline">
+                        {accountName.get(q.accountId) ?? short(q.accountId)}
+                      </Link>
+                    ) : '—'}
                   </td>
-                  <td className="px-3 py-2">{q.accountId.slice(0, 8)}…</td>
+                  <td className="px-3 py-2">
+                    {(q as { contactId?: string }).contactId ? (
+                      <Link href={`/contacts/${(q as { contactId?: string }).contactId}`} className="text-brand-700 hover:underline">
+                        {contactName.get((q as { contactId: string }).contactId) ?? short((q as { contactId: string }).contactId)}
+                      </Link>
+                    ) : <span className="text-slate-400">—</span>}
+                  </td>
                   <td className="px-3 py-2">
                     <StatusPill status={q.status} />
                   </td>
                   <td className="px-3 py-2 text-end">{formatCurrency(q.total, q.currency)}</td>
-                  <td className="px-3 py-2 text-center">{q.version}</td>
+                  <td className="px-3 py-2"><ApprovalCell quote={q} /></td>
                   <td className="px-3 py-2">{formatDate(q.expiresAt ?? q.validUntil)}</td>
-                  <td className="px-3 py-2">{q.ownerId.slice(0, 8)}…</td>
+                  <td className="px-3 py-2">{ownerName.get(q.ownerId) ?? short(q.ownerId)}</td>
                   <td className="px-3 py-2">{formatDate(q.createdAt)}</td>
                   <td className="px-3 py-2">
                     <div className="flex justify-end gap-1">
@@ -226,6 +262,21 @@ export default function QuotesPage(): JSX.Element {
         </div>
       </footer>
     </main>
+  );
+}
+
+function ApprovalCell({ quote }: { quote: Quote }) {
+  const q = quote as { requiredApprovalLevel?: number; approvalLevel?: number; approvalRequired?: boolean };
+  const req = q.requiredApprovalLevel ?? 0;
+  const cur = q.approvalLevel ?? 0;
+  if (!req && !q.approvalRequired) return <span className="text-xs text-slate-400">—</span>;
+  if (req && cur >= req) {
+    return <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Approved</span>;
+  }
+  return (
+    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+      {req ? `L${cur}/${req} pending` : 'Pending'}
+    </span>
   );
 }
 

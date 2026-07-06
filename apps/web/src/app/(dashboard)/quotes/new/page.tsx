@@ -69,6 +69,8 @@ export default function NewQuotePage(): JSX.Element {
   const [discountReasonNotes, setDiscountReasonNotes] = useState('');
   const [winningProbability, setWinningProbability] = useState('65');
   const [selectedCurrency, setSelectedCurrency] = useState('USD');
+  const [selectedContactId, setSelectedContactId] = useState('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [lineErrors, setLineErrors] = useState<Record<string, string>>({});
   const [uiArabic, setUiArabic] = useState(false);
 
@@ -88,6 +90,11 @@ export default function NewQuotePage(): JSX.Element {
   });
 
   const productsQuery = useProducts({ search: productSearch, limit: 100 });
+  const templatesQuery = useQuery<{ data: Array<{ id: string; name: string; isDefault?: boolean }> }>({
+    queryKey: ['quote-templates-picker'],
+    queryFn: () => apiClients.finance.get('/quote-templates', { params: { limit: 50 } }),
+    staleTime: 60_000,
+  });
   const cpqPrice = useCpqPrice();
   const createQuote = useCreateQuote();
   const submitQuote = useMutation({
@@ -97,6 +104,8 @@ export default function NewQuotePage(): JSX.Element {
         dealId: selectedDeal.id,
         ownerId: selectedDeal.ownerId,
         accountId: selectedDeal.accountId,
+        contactId: selectedContactId || undefined,
+        templateId: selectedTemplateId || undefined,
         name: quoteName || `Quote for ${selectedDeal.name}`,
         customFields: {},
         currency: selectedCurrency,
@@ -143,6 +152,14 @@ export default function NewQuotePage(): JSX.Element {
     [dealsQuery.data, selectedDealId]
   );
   const currency = selectedCurrency;
+
+  const contactsForAccountQuery = useQuery<{ data: Array<{ id: string; firstName?: string; lastName?: string; email?: string }> }>({
+    queryKey: ['quote-builder-contacts', selectedDeal?.accountId],
+    queryFn: () =>
+      apiClients.crm.get('/contacts', { params: { accountId: selectedDeal?.accountId, limit: 50 } }),
+    enabled: Boolean(selectedDeal?.accountId),
+    staleTime: 30_000,
+  });
 
   useEffect(() => {
     if (selectedDeal?.currency) {
@@ -314,10 +331,42 @@ export default function NewQuotePage(): JSX.Element {
             </FormField>
           </div>
           {selectedDeal ? (
-            <p className="mt-2 text-xs text-slate-600">
-              Account: {selectedDeal.accountId.slice(0, 8)}… • Currency:{' '}
-              {selectedCurrency}
-            </p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <FormField label="Primary contact (linked to this quote)">
+                {({ id }) => (
+                  <select
+                    id={id}
+                    value={selectedContactId}
+                    onChange={(e) => setSelectedContactId(e.target.value)}
+                    className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
+                  >
+                    <option value="">— No contact —</option>
+                    {(contactsForAccountQuery.data?.data ?? []).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {`${c.firstName ?? ''} ${c.lastName ?? ''}`.trim() || c.email || c.id.slice(0, 8)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+              <FormField label="Quote template (applies terms + boilerplate)">
+                {({ id }) => (
+                  <select
+                    id={id}
+                    value={selectedTemplateId}
+                    onChange={(e) => setSelectedTemplateId(e.target.value)}
+                    className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
+                  >
+                    <option value="">— No template —</option>
+                    {(templatesQuery.data?.data ?? []).map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}{t.isDefault ? ' (default)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            </div>
           ) : null}
           <div className="mt-3 max-w-xs">
             <FormField label="Quote currency">

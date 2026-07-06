@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { createHttpClient, PERMISSIONS, requirePermission } from '@nexus/service-utils';
 import type { IntegrationPrisma } from '../prisma.js';
 import type { createGoogleCalendarService } from '../services/google-calendar.service.js';
+import type { createFieldCrypto } from '../lib/crypto.js';
+
+type FieldCrypto = ReturnType<typeof createFieldCrypto>;
 
 const calendarClient = createHttpClient({
   baseURL: 'https://www.googleapis.com/calendar/v3',
@@ -27,7 +30,8 @@ const CreateCalendarEvent = z.object({
 export async function registerCalendarRoutes(
   app: FastifyInstance,
   prisma: IntegrationPrisma,
-  calendar: ReturnType<typeof createGoogleCalendarService>
+  calendar: ReturnType<typeof createGoogleCalendarService>,
+  crypto: FieldCrypto
 ) {
   app.get(
     '/api/v1/integrations/calendar/events',
@@ -74,6 +78,7 @@ export async function registerCalendarRoutes(
     let externalId = `local-${body.activityId}`;
     if (connection) {
       try {
+        const accessToken = crypto.decrypt(connection.accessToken);
         const created = await calendarClient.post<{ id?: string; etag?: string }>(
           '/calendars/primary/events',
           {
@@ -82,7 +87,7 @@ export async function registerCalendarRoutes(
             end: { dateTime: body.end },
             description: `activityId:${body.activityId}`,
           },
-          { Authorization: `Bearer ${connection.accessToken}` }
+          { Authorization: `Bearer ${accessToken}` }
         );
         externalId = created.id ?? externalId;
       } catch (err: any) {

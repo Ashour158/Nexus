@@ -3,8 +3,10 @@ import type { JwtPayload } from '@nexus/shared-types';
 import { Prisma } from '../../../../node_modules/.prisma/reporting-client/index.js';
 import type { ReportingPrisma } from '../prisma.js';
 import { executeReport, exportToCsv } from '../lib/report-engine.js';
+import { createReportAuditLogger } from '../lib/audit-logger.js';
 
 export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: ReportingPrisma): Promise<void> {
+  const audit = createReportAuditLogger(prisma);
   app.get('/api/v1/saved-reports', async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { folderId, isShared } = req.query as { folderId?: string; isShared?: string };
@@ -97,7 +99,13 @@ export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: R
   app.delete('/api/v1/saved-reports/:id', async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { id } = req.params as { id: string };
+    const existing = await prisma.savedReport.findFirst({ where: { id, tenantId: jwt.tenantId } });
     await prisma.savedReport.deleteMany({ where: { id, tenantId: jwt.tenantId } });
+    if (existing) {
+      audit
+        .log({ tenantId: jwt.tenantId, userId: jwt.sub, action: 'report_deleted', reportId: id, reportName: existing.name })
+        .catch((err) => app.log.warn({ err }, 'audit log failed'));
+    }
     return reply.send({ success: true });
   });
 
@@ -121,6 +129,10 @@ export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: R
       offset: Number(offset),
     }, { authorization: auth });
 
+    audit
+      .log({ tenantId: jwt.tenantId, userId: jwt.sub, action: 'report_executed', reportId: id, reportName: report.name })
+      .catch((err) => app.log.warn({ err }, 'audit log failed'));
+
     return reply.send({ success: true, data: { rows: result.rows, total: result.total } });
   });
 
@@ -140,6 +152,11 @@ export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: R
     }, { authorization: auth });
 
     const csv = await exportToCsv(result.rows, report.columns as string[]);
+
+    audit
+      .log({ tenantId: jwt.tenantId, userId: jwt.sub, action: 'report_exported', reportId: id, reportName: report.name, format: 'csv' })
+      .catch((err) => app.log.warn({ err }, 'audit log failed'));
+
     reply.header('Content-Type', 'text/csv');
     reply.header('Content-Disposition', `attachment; filename="${report.name.replace(/\s+/g, '_')}.csv"`);
     return reply.send(csv);
@@ -224,6 +241,9 @@ export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: R
         nextRunAt,
       },
     });
+    audit
+      .log({ tenantId: jwt.tenantId, userId: jwt.sub, action: 'report_scheduled', reportId: id, reportName: existing.name, format: body.format ?? 'csv' })
+      .catch((err) => app.log.warn({ err }, 'audit log failed'));
     return reply.code(201).send({ success: true, data: schedule });
   });
 

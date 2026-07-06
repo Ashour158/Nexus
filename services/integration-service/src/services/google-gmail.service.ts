@@ -1,5 +1,8 @@
 import { createHttpClient } from '@nexus/service-utils';
 import type { IntegrationPrisma } from '../prisma.js';
+import type { createFieldCrypto } from '../lib/crypto.js';
+
+type FieldCrypto = ReturnType<typeof createFieldCrypto>;
 
 const client = createHttpClient({
   baseURL: 'https://gmail.googleapis.com',
@@ -8,7 +11,7 @@ const client = createHttpClient({
   circuitBreaker: { failureThreshold: 5, resetTimeoutMs: 30000 },
 });
 
-export function createGoogleGmailService(prisma: IntegrationPrisma) {
+export function createGoogleGmailService(prisma: IntegrationPrisma, crypto: FieldCrypto) {
   return {
     async syncGmailThreads(tenantId: string, userId: string) {
       const conn = await prisma.oAuthConnection.findFirst({
@@ -16,9 +19,10 @@ export function createGoogleGmailService(prisma: IntegrationPrisma) {
       });
       if (!conn) return { synced: 0 };
       try {
+        const accessToken = crypto.decrypt(conn.accessToken);
         const body = await client.get<{ threads?: Array<{ id: string }> }>(
           '/gmail/v1/users/me/threads?maxResults=50',
-          { Authorization: `Bearer ${conn.accessToken}` }
+          { Authorization: `Bearer ${accessToken}` }
         );
         return { synced: body.threads?.length ?? 0 };
       } catch {
@@ -43,10 +47,11 @@ export function createGoogleGmailService(prisma: IntegrationPrisma) {
         .replaceAll('/', '_')
         .replaceAll('=', '');
       try {
+        const accessToken = crypto.decrypt(conn.accessToken);
         return await client.post(
           '/gmail/v1/users/me/messages/send',
           { raw },
-          { Authorization: `Bearer ${conn.accessToken}` }
+          { Authorization: `Bearer ${accessToken}` }
         );
       } catch {
         throw new Error('Gmail send failed');

@@ -53,12 +53,12 @@ app.addHook('onClose', async () => {
 await registerGraphQL(app, prisma);
 
 await startService(app, port, async (a) => {
-  await registerReportsRoutes(a, reports);
+  await registerReportsRoutes(a, reports, prisma);
   await registerSavedReportsRoutes(a, prisma);
   await registerDashboardsRoutes(a, prisma);
   await registerFunnelRoutes(a, prisma);
   await registerBiRoutes(a, prisma);
-  await registerExportRoutes(a, reports);
+  await registerExportRoutes(a, reports, prisma);
 
   // Start background jobs (non-blocking)
   try {

@@ -65,6 +65,24 @@ export function DialogContent({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onOpenChange(false);
+        return;
+      }
+      // Focus trap (UX-34): keep Tab / Shift+Tab cycling inside the dialog.
+      if (event.key === 'Tab' && contentRef.current) {
+        const focusable = contentRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (event.shiftKey && (active === first || !contentRef.current.contains(active))) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && active === last) {
+          event.preventDefault();
+          first.focus();
+        }
       }
     };
 

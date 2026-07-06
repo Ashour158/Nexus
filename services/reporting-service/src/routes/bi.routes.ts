@@ -15,6 +15,7 @@ import { Prisma } from '../../../../node_modules/.prisma/reporting-client/index.
 import type { ReportingPrisma } from '../prisma.js';
 import { validateReportSpec, isValidChartType } from '../lib/report-spec.js';
 import { runReportSpec } from '../lib/analytics-client.js';
+import { createReportAuditLogger } from '../lib/audit-logger.js';
 
 const READ = { preHandler: requirePermission(PERMISSIONS.ANALYTICS.READ) };
 const WRITE = { preHandler: requirePermission(PERMISSIONS.ANALYTICS.EXPORT) };
@@ -30,6 +31,8 @@ function unprocessable(reply: any, requestId: unknown, errors: string[]) {
 }
 
 export async function registerBiRoutes(app: FastifyInstance, prisma: ReportingPrisma): Promise<void> {
+  const audit = createReportAuditLogger(prisma);
+
   // ─── Saved reports ─────────────────────────────────────────────────────────
 
   // List: own reports + tenant-shared reports.
@@ -109,8 +112,12 @@ export async function registerBiRoutes(app: FastifyInstance, prisma: ReportingPr
   app.delete('/api/v1/bi/reports/:id', WRITE, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { id } = req.params as { id: string };
+    const existing = await prisma.biSavedReport.findFirst({ where: { id, tenantId: jwt.tenantId, ownerId: jwt.sub } });
     const result = await prisma.biSavedReport.deleteMany({ where: { id, tenantId: jwt.tenantId, ownerId: jwt.sub } });
     if (result.count === 0) return notFound(reply, req.id);
+    audit
+      .log({ tenantId: jwt.tenantId, userId: jwt.sub, action: 'report_deleted', reportId: id, reportName: existing?.name ?? id })
+      .catch((err) => app.log.warn({ err }, 'audit log failed'));
     return reply.send({ success: true });
   });
 
@@ -128,6 +135,11 @@ export async function registerBiRoutes(app: FastifyInstance, prisma: ReportingPr
     if (!validation.valid) return unprocessable(reply, req.id, validation.errors);
 
     const result = await runReportSpec(jwt.tenantId, validation.spec, req.headers.authorization);
+
+    audit
+      .log({ tenantId: jwt.tenantId, userId: jwt.sub, action: 'report_executed', reportId: id, reportName: report.name })
+      .catch((err) => app.log.warn({ err }, 'audit log failed'));
+
     return reply.send({
       success: true,
       data: {
@@ -222,8 +234,12 @@ export async function registerBiRoutes(app: FastifyInstance, prisma: ReportingPr
   app.delete('/api/v1/bi/dashboards/:id', WRITE, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { id } = req.params as { id: string };
+    const existing = await prisma.biDashboard.findFirst({ where: { id, tenantId: jwt.tenantId, ownerId: jwt.sub } });
     const result = await prisma.biDashboard.deleteMany({ where: { id, tenantId: jwt.tenantId, ownerId: jwt.sub } });
     if (result.count === 0) return notFound(reply, req.id);
+    audit
+      .log({ tenantId: jwt.tenantId, userId: jwt.sub, action: 'report_deleted', reportId: id, reportName: existing?.name ?? id, metadata: { kind: 'dashboard' } })
+      .catch((err) => app.log.warn({ err }, 'audit log failed'));
     return reply.send({ success: true });
   });
 

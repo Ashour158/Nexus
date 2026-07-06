@@ -107,6 +107,10 @@ export const UpdateDealSchema = CreateDealSchema.partial().extend({
     .enum(['PIPELINE', 'BEST_CASE', 'COMMIT', 'CLOSED', 'OMITTED'])
     .optional(),
   meddicicData: z.record(z.unknown()).optional(),
+  // Optimistic-concurrency token (DI-26). When supplied, the update only applies
+  // if the stored row is still at this version; otherwise it 409s. Optional so
+  // existing callers keep last-write-wins.
+  version: z.number().int().nonnegative().optional(),
 });
 
 /** Body for PATCH /deals/:id/stage (Section 34.2). */

@@ -3,10 +3,17 @@ import { NotFoundError } from '@nexus/service-utils';
 import type { Prisma } from '../../../../node_modules/.prisma/integration-client/index.js';
 import type { StartSyncJobInput } from '@nexus/validation';
 import type { IntegrationPrisma } from '../prisma.js';
+import type { createFieldCrypto } from '../lib/crypto.js';
 import { createGoogleGmailService } from './google-gmail.service.js';
 import { createGoogleCalendarService } from './google-calendar.service.js';
 
-export function createSyncService(prisma: IntegrationPrisma, producer: NexusProducer) {
+type FieldCrypto = ReturnType<typeof createFieldCrypto>;
+
+export function createSyncService(
+  prisma: IntegrationPrisma,
+  producer: NexusProducer,
+  crypto: FieldCrypto
+) {
   return {
     async listJobs() {
       return prisma.syncJob.findMany({ orderBy: { createdAt: 'desc' }, take: 100 });
@@ -55,7 +62,7 @@ export function createSyncService(prisma: IntegrationPrisma, producer: NexusProd
         payload: { jobId: job.id, tenantId, jobType: input.jobType },
       });
 
-      void runSyncJob(prisma, producer, tenantId, job.id);
+      void runSyncJob(prisma, producer, crypto, tenantId, job.id);
       return job;
     },
   };
@@ -64,6 +71,7 @@ export function createSyncService(prisma: IntegrationPrisma, producer: NexusProd
 async function runSyncJob(
   prisma: IntegrationPrisma,
   producer: NexusProducer,
+  crypto: FieldCrypto,
   tenantId: string,
   jobId: string
 ): Promise<void> {
@@ -91,11 +99,11 @@ async function runSyncJob(
     let processedRecords = 0;
 
     if (job.connection.provider === 'google' && job.jobType === 'GMAIL_SYNC') {
-      const gmail = createGoogleGmailService(prisma);
+      const gmail = createGoogleGmailService(prisma, crypto);
       const result = await gmail.syncGmailThreads(tenantId, job.connection.userId);
       processedRecords = result.synced;
     } else if (job.connection.provider === 'google' && job.jobType === 'CALENDAR_SYNC') {
-      const calendar = createGoogleCalendarService(prisma);
+      const calendar = createGoogleCalendarService(prisma, crypto);
       const result = await calendar.syncGoogleCalendar(tenantId, job.connection.userId);
       processedRecords = result.synced;
     } else {

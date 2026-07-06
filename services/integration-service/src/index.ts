@@ -81,10 +81,10 @@ app.setErrorHandler(globalErrorHandler);
 const webhooks = createWebhooksService({ prisma, raw: rawPrisma, crypto });
 const connections = createConnectionsService(prisma, crypto);
 const catalog = createCatalogService(prisma);
-const sync = createSyncService(prisma, producer);
+const sync = createSyncService(prisma, producer, crypto);
 const oauth = createOauthService(prisma, crypto);
-const calendar = createGoogleCalendarService(prisma);
-const gmail = createGoogleGmailService(prisma);
+const calendar = createGoogleCalendarService(prisma, crypto);
+const gmail = createGoogleGmailService(prisma, crypto);
 const geocoding = createGeocodingService(prisma);
 
 let eventsConsumer: Awaited<ReturnType<typeof startIntegrationEventsConsumer>> | null = null;
@@ -129,6 +129,6 @@ await startService(app, port, async (a) => {
   await registerCatalogRoutes(a, catalog);
   await registerSyncRoutes(a, sync);
   await registerOauthRoutes(a, oauth);
-  await registerCalendarRoutes(a, prisma, calendar);
+  await registerCalendarRoutes(a, prisma, calendar, crypto);
   await registerEmailRoutes(a, gmail);
 });

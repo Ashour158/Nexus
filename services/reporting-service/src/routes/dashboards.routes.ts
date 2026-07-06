@@ -3,8 +3,10 @@ import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
 import type { JwtPayload } from '@nexus/shared-types';
 import { Prisma } from '../../../../node_modules/.prisma/reporting-client/index.js';
 import type { ReportingPrisma } from '../prisma.js';
+import { createReportAuditLogger } from '../lib/audit-logger.js';
 
 export async function registerDashboardsRoutes(app: FastifyInstance, prisma: ReportingPrisma): Promise<void> {
+  const audit = createReportAuditLogger(prisma);
   app.get('/api/v1/dashboards', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const dashboards = await prisma.dashboard.findMany({
@@ -64,7 +66,13 @@ export async function registerDashboardsRoutes(app: FastifyInstance, prisma: Rep
   app.delete('/api/v1/dashboards/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.WRITE) }, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { id } = req.params as { id: string };
+    const existing = await prisma.dashboard.findFirst({ where: { id, tenantId: jwt.tenantId } });
     await prisma.dashboard.deleteMany({ where: { id, tenantId: jwt.tenantId } });
+    if (existing) {
+      audit
+        .log({ tenantId: jwt.tenantId, userId: jwt.sub, action: 'report_deleted', reportId: id, reportName: existing.name, metadata: { kind: 'dashboard' } })
+        .catch((err) => app.log.warn({ err }, 'audit log failed'));
+    }
     return reply.send({ success: true });
   });
 

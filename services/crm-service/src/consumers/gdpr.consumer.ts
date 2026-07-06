@@ -43,12 +43,13 @@ export async function startGdprConsumer(prisma: CrmPrisma): Promise<NexusConsume
       }
 
       if (contacts.length > 0) {
-        await prisma.activity.deleteMany({
-          where: { tenantId, contactId: { in: contacts.map((c) => c.id) } },
-        });
-        await prisma.note.deleteMany({
-          where: { tenantId, contactId: { in: contacts.map((c) => c.id) } },
-        });
+        const contactIds = contacts.map((c) => c.id);
+        await prisma.activity.deleteMany({ where: { tenantId, contactId: { in: contactIds } } });
+        await prisma.note.deleteMany({ where: { tenantId, contactId: { in: contactIds } } });
+        // Audit trail + attachments can hold the subject's PII in plaintext
+        // (old/new values, uploaded files) — purge them too so erasure is complete.
+        await prisma.fieldChangeLog.deleteMany({ where: { tenantId, objectId: { in: contactIds } } });
+        await prisma.attachment.deleteMany({ where: { tenantId, recordId: { in: contactIds } } });
       }
 
       if (subjectEmail) {
@@ -71,6 +72,11 @@ export async function startGdprConsumer(prisma: CrmPrisma): Promise<NexusConsume
               linkedInUrl: null,
             },
           });
+        }
+        if (leads.length > 0) {
+          const leadIds = leads.map((l) => l.id);
+          await prisma.fieldChangeLog.deleteMany({ where: { tenantId, objectId: { in: leadIds } } });
+          await prisma.attachment.deleteMany({ where: { tenantId, recordId: { in: leadIds } } });
         }
       }
     } catch (err) {

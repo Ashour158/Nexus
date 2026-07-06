@@ -44,6 +44,15 @@ export function createInAppChannel(prisma: NotificationPrisma, producer?: NexusP
 
       // Publish to Kafka so realtime-service can push via WebSocket
       if (producer) {
+        // Recipient's current unread count so realtime-service can update the
+        // badge. Fail-open: a count failure must not block the notification.
+        let unreadCount: number | undefined;
+        try {
+          unreadCount = await prisma.notification.count({
+            where: { tenantId: input.tenantId, userId: input.userId, isRead: false },
+          });
+        } catch { /* non-critical — badge just won't refresh this time */ }
+
         producer.publish(TOPICS.NOTIFICATIONS, {
           type: 'notification.created',
           version: 1,
@@ -58,6 +67,7 @@ export function createInAppChannel(prisma: NotificationPrisma, producer?: NexusP
             entityType: input.entityType,
             entityId: input.entityId,
             actionUrl: input.actionUrl,
+            unreadCount,
           },
         }).catch(() => { /* non-critical — DB write already succeeded */ });
       }

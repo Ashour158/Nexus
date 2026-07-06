@@ -524,10 +524,36 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         mergeForValidation(existing as Record<string, unknown>, patchForValidation)
       );
 
-      const updated = await prisma.deal.update({
-        where: { id },
-        data: safeUpdateData,
-      });
+      // Optimistic concurrency (DI-26): when the caller supplies the version it
+      // read, only apply the write if the row is still at that version — otherwise
+      // 409 instead of silently clobbering a concurrent edit. Callers that omit
+      // `version` keep the prior last-write-wins behaviour.
+      const expectedVersion = (data as { version?: number }).version;
+      let updated;
+      if (typeof expectedVersion === 'number') {
+        updated = await prisma.$transaction(async (tx: CrmPrisma) => {
+          const claim = await tx.deal.updateMany({
+            where: { id, tenantId, version: expectedVersion },
+            data: { version: { increment: 1 } },
+          });
+          if (claim.count === 0) {
+            const still = await tx.deal.findFirst({ where: { id, tenantId }, select: { id: true } });
+            if (!still) throw new NotFoundError('Deal', id);
+            throw new ConflictError(
+              'Deal was modified by another user since you loaded it — reload and re-apply your changes'
+            );
+          }
+          // The claim already bumped version; strip the increment from the field
+          // patch so we don't double-count it.
+          const { version: _dropVersion, ...dataNoVersion } = safeUpdateData as Record<string, unknown>;
+          return tx.deal.update({ where: { id }, data: dataNoVersion as Prisma.DealUpdateInput });
+        });
+      } else {
+        updated = await prisma.deal.update({
+          where: { id },
+          data: safeUpdateData,
+        });
+      }
 
       if (actor) {
         await recordFieldChanges(

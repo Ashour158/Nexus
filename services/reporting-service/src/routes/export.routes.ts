@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
 import type { createReportsService } from '../services/reports.service.js';
+import type { ReportingPrisma } from '../prisma.js';
+import { createReportAuditLogger } from '../lib/audit-logger.js';
 
 /**
  * PDF Export route for reports.
@@ -9,18 +11,22 @@ import type { createReportsService } from '../services/reports.service.js';
  */
 export async function registerExportRoutes(
   app: FastifyInstance,
-  reports: ReturnType<typeof createReportsService>
+  reports: ReturnType<typeof createReportsService>,
+  prisma: ReportingPrisma
 ): Promise<void> {
+  const audit = createReportAuditLogger(prisma);
   app.get(
     '/api/v1/reports/:id/export/pdf',
     { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
     async (request, reply) => {
-      const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+      const jwt = (request as unknown as { user: { tenantId: string; sub: string } }).user;
+      const tenantId = jwt.tenantId;
       const reportId = (request.params as { id: string }).id;
       const result = await reports.runReport(tenantId, reportId, {});
       if (!result) {
         return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Report not found' } });
       }
+      const report = await reports.getReport(tenantId, reportId);
 
       const rows = Array.isArray(result.rows) ? result.rows : [];
       const columns = rows.length > 0 ? Object.keys(rows[0] as Record<string, unknown>) : [];
@@ -53,6 +59,17 @@ export async function registerExportRoutes(
   </table>
 </body>
 </html>`;
+
+      audit
+        .log({
+          tenantId,
+          userId: jwt.sub,
+          action: 'report_exported',
+          reportId,
+          reportName: report?.name ?? reportId,
+          format: 'pdf',
+        })
+        .catch((err) => app.log.warn({ err }, 'audit log failed'));
 
       reply.header('Content-Type', 'text/html');
       reply.header('Content-Disposition', `attachment; filename="report-${reportId}.html"`);

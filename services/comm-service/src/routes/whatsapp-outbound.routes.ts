@@ -138,8 +138,17 @@ export async function registerWhatsAppOutboundRoutes(
 
     const statuses = body.entry?.[0]?.changes?.[0]?.value?.statuses ?? [];
     for (const status of statuses) {
-      await prisma.whatsAppMessage.updateMany({
+      // This webhook runs without JWT/tenant context, so the tenant Prisma
+      // extension is a no-op here. Resolve the owning tenant from the globally
+      // unique externalId, then scope the update to it. Defensive: skip unknown
+      // ids rather than performing an unscoped, cross-tenant write.
+      const owner = await prisma.whatsAppMessage.findFirst({
         where: { externalId: status.id },
+        select: { tenantId: true },
+      });
+      if (!owner) continue;
+      await prisma.whatsAppMessage.updateMany({
+        where: { externalId: status.id, tenantId: owner.tenantId },
         data: { status: status.status.toUpperCase() },
       });
     }

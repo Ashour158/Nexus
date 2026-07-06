@@ -1,5 +1,8 @@
 import { createHttpClient } from '@nexus/service-utils';
 import type { IntegrationPrisma } from '../prisma.js';
+import type { createFieldCrypto } from '../lib/crypto.js';
+
+type FieldCrypto = ReturnType<typeof createFieldCrypto>;
 
 const client = createHttpClient({
   baseURL: 'https://www.googleapis.com/calendar/v3',
@@ -12,7 +15,7 @@ function authHeader(accessToken: string): Record<string, string> {
   return { Authorization: `Bearer ${accessToken}` };
 }
 
-export function createGoogleCalendarService(prisma: IntegrationPrisma) {
+export function createGoogleCalendarService(prisma: IntegrationPrisma, crypto: FieldCrypto) {
   return {
     async syncGoogleCalendar(tenantId: string, userId: string) {
       const conn = await prisma.oAuthConnection.findFirst({
@@ -21,11 +24,12 @@ export function createGoogleCalendarService(prisma: IntegrationPrisma) {
       if (!conn) return { synced: 0 };
       const timeMin = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       try {
+        const accessToken = crypto.decrypt(conn.accessToken);
         const body = await client.get<{
           items?: Array<{ id: string; etag?: string; description?: string }>;
         }>(
           `/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&maxResults=250`,
-          authHeader(conn.accessToken)
+          authHeader(accessToken)
         );
         let synced = 0;
         for (const e of body.items ?? []) {
@@ -77,6 +81,7 @@ export function createGoogleCalendarService(prisma: IntegrationPrisma) {
         where: { activityId: activity.id },
       });
       try {
+        const accessToken = crypto.decrypt(conn.accessToken);
         const body = existing
           ? await client.patch<{ id: string; etag?: string }>(
               `/calendars/primary/events/${existing.externalId}`,
@@ -86,7 +91,7 @@ export function createGoogleCalendarService(prisma: IntegrationPrisma) {
                 start: { dateTime: startDate.toISOString() },
                 end: { dateTime: endDate.toISOString() },
               },
-              authHeader(conn.accessToken)
+              authHeader(accessToken)
             )
           : await client.post<{ id: string; etag?: string }>(
               '/calendars/primary/events',
@@ -96,7 +101,7 @@ export function createGoogleCalendarService(prisma: IntegrationPrisma) {
                 start: { dateTime: startDate.toISOString() },
                 end: { dateTime: endDate.toISOString() },
               },
-              authHeader(conn.accessToken)
+              authHeader(accessToken)
             );
         return prisma.syncedCalendarEvent.upsert({
           where: { activityId: activity.id },

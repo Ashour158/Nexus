@@ -251,6 +251,18 @@ export async function registerQuotesRoutes(
         }
       );
 
+      // ─── APPROVE (level-aware manager approval) ─────────────────────────
+      r.post(
+        '/quotes/:id/approve',
+        { preHandler: requirePermission(PERMISSIONS.QUOTES.APPROVE) },
+        async (request, reply) => {
+          const { id } = QuoteIdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const quote = await commercial.approveQuoteLevel(engineContextFromJwt(request.id, jwt), id);
+          return reply.send({ success: true, data: quote });
+        }
+      );
+
       // ─── ACCEPT ─────────────────────────────────────────────────────────
       r.post(
         '/quotes/:id/accept',

@@ -7,8 +7,11 @@ import { usePrompt } from '@/hooks/use-confirm';
 import { Input } from '@/components/ui/input';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import {
+  useApproveQuote,
+  useArchivedQuotes,
   useDuplicateQuote,
   useQuotes,
+  useRestoreQuote,
   useSendQuote,
   useVoidQuote,
   type Quote,
@@ -26,15 +29,15 @@ export default function QuotesPage(): JSX.Element {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
+  const [view, setView] = useState<'active' | 'archived'>('active');
   const [isHydrated, setIsHydrated] = useState(false);
   const roles = useAuthStore((s) => s.roles);
   const hasPermission = useAuthStore((s) => s.hasPermission);
-  const canUseStandaloneQuoteBuilder =
-    roles.some((role) => role.toLowerCase() === 'admin') ||
-    hasPermission('quotes:admin') ||
-    hasPermission('admin:*');
+  const isAdmin = roles.some((role) => role.toLowerCase() === 'admin');
+  const canUseStandaloneQuoteBuilder = isAdmin || hasPermission('quotes:admin') || hasPermission('admin:*');
+  const canApprove = isAdmin || hasPermission('quotes:approve');
 
-  const query = useQuotes({
+  const activeQuery = useQuotes({
     status: status || undefined,
     ownerId: ownerId.trim() || undefined,
     dateFrom: dateFrom ? new Date(dateFrom).toISOString() : undefined,
@@ -42,10 +45,17 @@ export default function QuotesPage(): JSX.Element {
     page,
     limit: 25,
   });
+  const archivedQuery = useArchivedQuotes(
+    { ownerId: ownerId.trim() || undefined, page, limit: 25 },
+    { enabled: view === 'archived' }
+  );
+  const query = view === 'archived' ? archivedQuery : activeQuery;
 
   const sendQuote = useSendQuote();
   const duplicateQuote = useDuplicateQuote();
   const voidQuote = useVoidQuote();
+  const approveQuote = useApproveQuote();
+  const restoreQuote = useRestoreQuote();
 
   const rows = query.data?.data ?? [];
   const total = query.data?.total ?? 0;
@@ -99,6 +109,22 @@ export default function QuotesPage(): JSX.Element {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Quotes</h1>
           <p className="text-sm text-slate-600">Finance quote lifecycle and actions.</p>
+        </div>
+        <div className="inline-flex overflow-hidden rounded-md border border-slate-300">
+          <button
+            type="button"
+            onClick={() => { setView('active'); setPage(1); }}
+            className={`px-3 py-1.5 text-sm font-medium ${view === 'active' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+          >
+            Active
+          </button>
+          <button
+            type="button"
+            onClick={() => { setView('archived'); setPage(1); }}
+            className={`px-3 py-1.5 text-sm font-medium ${view === 'archived' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+          >
+            Archived
+          </button>
         </div>
         {canUseStandaloneQuoteBuilder ? (
           <Link href="/quotes/new">
@@ -202,27 +228,37 @@ export default function QuotesPage(): JSX.Element {
                   <td className="px-3 py-2">{formatDate(q.createdAt)}</td>
                   <td className="px-3 py-2">
                     <div className="flex justify-end gap-1">
-                      {q.status === 'DRAFT' ? (
-                        <Button type="button" variant="secondary" onClick={() => sendQuote.mutate(q.id)}>
-                          Send
+                      {view === 'archived' ? (
+                        <Button type="button" variant="secondary" onClick={() => restoreQuote.mutate(q.id)} isLoading={restoreQuote.isPending}>
+                          Restore
                         </Button>
-                      ) : null}
-                      <Button type="button" variant="secondary" onClick={() => duplicateQuote.mutate(q.id)}>
-                        Duplicate
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        onClick={async () => {
-                          const reason = await prompt('Void reason', 'Void Quote');
-                          if (reason) voidQuote.mutate({ id: q.id, reason });
-                        }}
-                      >
-                        Void
-                      </Button>
-                      <Button type="button" variant="ghost">
-                        PDF
-                      </Button>
+                      ) : (
+                        <>
+                          {q.status === 'PENDING_APPROVAL' && canApprove ? (
+                            <Button type="button" onClick={() => approveQuote.mutate(q.id)} isLoading={approveQuote.isPending}>
+                              Approve
+                            </Button>
+                          ) : null}
+                          {q.status === 'DRAFT' || q.status === 'APPROVED' ? (
+                            <Button type="button" variant="secondary" onClick={() => sendQuote.mutate(q.id)}>
+                              Send
+                            </Button>
+                          ) : null}
+                          <Button type="button" variant="secondary" onClick={() => duplicateQuote.mutate(q.id)}>
+                            Duplicate
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={async () => {
+                              const reason = await prompt('Void reason', 'Void Quote');
+                              if (reason) voidQuote.mutate({ id: q.id, reason });
+                            }}
+                          >
+                            Void
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

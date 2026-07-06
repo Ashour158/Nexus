@@ -349,6 +349,57 @@ export function useVoidQuote() {
   });
 }
 
+/** Level-aware manager approval: advances a PENDING_APPROVAL quote one level. */
+export function useApproveQuote() {
+  const qc = useQueryClient();
+  return useMutation<Quote, Error, string>({
+    mutationFn: (id) => apiClients.finance.post<Quote>(`/quotes/${id}/approve`),
+    onSuccess: (quote) => {
+      qc.invalidateQueries({ queryKey: quoteKeys.detail(quote.id) });
+      qc.invalidateQueries({ queryKey: quoteKeys.lists() });
+      qc.invalidateQueries({ queryKey: quoteKeys.forDeal(quote.dealId) });
+      notify.success(quote.status === 'APPROVED' ? 'Quote fully approved' : 'Approval level recorded');
+    },
+    onError: (err) => {
+      notify.error('Failed to approve quote', err.message);
+    },
+  });
+}
+
+/** Archived (soft-deleted) quotes list. */
+export function useArchivedQuotes(filters: QuoteListFilters = {}, options: { enabled?: boolean } = {}) {
+  const normalized: Record<string, unknown> = {
+    page: filters.page ?? 1,
+    limit: filters.limit ?? 25,
+    ownerId: filters.ownerId,
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo,
+  };
+  return useQuery<QuoteListResponse>({
+    queryKey: [...quoteKeys.lists(), 'archived', normalized] as QueryKey,
+    queryFn: () => apiClients.quotes.get<QuoteListResponse>('/quotes/archived', { params: normalized }),
+    enabled: options.enabled ?? true,
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+  });
+}
+
+/** Restore (un-archive) a quote. */
+export function useRestoreQuote() {
+  const qc = useQueryClient();
+  return useMutation<Quote, Error, string>({
+    mutationFn: (id) => apiClients.finance.post<Quote>(`/quotes/${id}/restore`),
+    onSuccess: (quote) => {
+      qc.invalidateQueries({ queryKey: quoteKeys.lists() });
+      qc.invalidateQueries({ queryKey: quoteKeys.detail(quote.id) });
+      notify.success('Quote restored');
+    },
+    onError: (err) => {
+      notify.error('Failed to restore quote', err.message);
+    },
+  });
+}
+
 export function useDuplicateQuote() {
   const qc = useQueryClient();
   return useMutation<Quote, Error, string>({

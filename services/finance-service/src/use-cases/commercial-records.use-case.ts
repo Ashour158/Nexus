@@ -1151,6 +1151,77 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
   return {
     transitionCpqEntity,
 
+    /**
+     * Direct, level-aware manager approval of a quote sitting in PENDING_APPROVAL.
+     * Advances `approvalLevel` by one; only once it reaches `requiredApprovalLevel`
+     * does the quote flip to APPROVED (and become sendable). Multi-tier quotes need
+     * one call per level (each from a `quotes:approve` holder). This is the in-app
+     * counterpart to `approveQuoteFromApproval`, which is driven by the external
+     * approval-service workflow.
+     */
+    async approveQuoteLevel(ctx: EngineContext, id: string) {
+      const tenantId = actor(ctx).tenantId;
+      const userId = actor(ctx).userId;
+      const quote = await prisma.quote.findFirst({ where: { id, tenantId } });
+      if (!quote) throw new NotFoundError('Quote', id);
+      if (quote.status !== 'PENDING_APPROVAL') {
+        throw new BusinessRuleError(
+          `Only quotes pending approval can be approved (current status: ${quote.status})`
+        );
+      }
+      const required = Number(quote.requiredApprovalLevel ?? 0);
+      const nextLevel = Number(quote.approvalLevel ?? 0) + 1;
+      const fullyApproved = nextLevel >= required;
+      const nextVersion = Number(quote.version ?? 1) + 1;
+      const updated = await prisma.quote.update({
+        where: { id: quote.id },
+        data: {
+          approvalLevel: nextLevel,
+          status: fullyApproved ? 'APPROVED' : 'PENDING_APPROVAL',
+          approvalStatus: fullyApproved ? 'APPROVED' : 'PENDING',
+          approvedById: fullyApproved ? userId : quote.approvedById,
+          approvedAt: fullyApproved ? ctx.now : quote.approvedAt,
+          version: nextVersion,
+        },
+      });
+      await prisma.quoteRevision
+        .create({
+          data: {
+            tenantId,
+            quoteId: quote.id,
+            version: nextVersion,
+            reason: fullyApproved ? 'quote.approved' : 'quote.approval.level',
+            status: updated.status,
+            snapshot: quoteRevisionSnapshot(quote as unknown as Record<string, unknown>, {
+              status: updated.status,
+              approvalStatus: updated.approvalStatus,
+              approvalLevel: nextLevel,
+              requiredApprovalLevel: required,
+              approvedById: userId,
+              version: nextVersion,
+            }),
+            createdById: userId,
+          },
+        })
+        .catch((err: unknown) => {
+          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') return undefined;
+          throw err;
+        });
+      await emitCommercialEvent(ctx, {
+        type: fullyApproved ? 'quote.approved' : 'quote.approval.advanced',
+        aggregateType: 'quote',
+        aggregateId: quote.id,
+        payload: {
+          quoteId: quote.id,
+          approvalLevel: nextLevel,
+          requiredApprovalLevel: required,
+          status: updated.status,
+          approvedById: userId,
+        },
+      });
+      return updated;
+    },
+
     async approveQuoteFromApproval(ctx: EngineContext, quoteId: string, input: ApprovalTransitionInput) {
       const tenantId = actor(ctx).tenantId;
       return persistCpqTransition(ctx, {

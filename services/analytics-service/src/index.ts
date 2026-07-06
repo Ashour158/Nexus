@@ -15,6 +15,7 @@ import { registerRevenueAnalyticsRoutes } from './routes/revenue.routes.js';
 import { registerActivityAnalyticsRoutes } from './routes/activity.routes.js';
 import { registerForecastAnalyticsRoutes } from './routes/forecast.routes.js';
 import { registerQueryAnalyticsRoutes } from './routes/query.routes.js';
+import { registerAdminRoutes } from './routes/admin.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 import { startAnalyticsConsumer } from './consumers/events.consumer.js';
 import { ensureCurrencyColumns } from './ddl/ensure-currency-columns.js';
@@ -78,4 +79,5 @@ await startService(app, port, async (a) => {
   await registerActivityAnalyticsRoutes(a, clickhouse);
   await registerForecastAnalyticsRoutes(a, clickhouse);
   await registerQueryAnalyticsRoutes(a, clickhouse);
+  await registerAdminRoutes(a, clickhouse);
 });

@@ -539,6 +539,8 @@ services:
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       CLICKHOUSE_URL: http://clickhouse:8123
       CLICKHOUSE_DB: default
+      CRM_SERVICE_URL: http://crm-service:3001
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
     depends_on:
       kafka:
         condition: service_started

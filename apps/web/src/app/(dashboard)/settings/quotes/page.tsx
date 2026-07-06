@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { api } from '@/lib/api-client';
+import { apiClients } from '@/lib/api-client';
 import { notify } from '@/lib/toast';
 import { useAuthStore } from '@/stores/auth.store';
 
@@ -34,11 +34,11 @@ export default function QuoteSettingsPage() {
 
   const cfgQuery = useQuery<{ data: NumberConfig }>({
     queryKey: ['quote-number-config'],
-    queryFn: () => api.get<{ data: NumberConfig }>('/finance/quotes/config/numbering'),
+    queryFn: () => apiClients.finance.get<{ data: NumberConfig }>('/quotes/config/numbering'),
   });
   const tiersQuery = useQuery<{ data: ApprovalTier[] }>({
     queryKey: ['quote-approval-tiers'],
-    queryFn: () => api.get<{ data: ApprovalTier[] }>('/finance/quotes/config/approval-tiers'),
+    queryFn: () => apiClients.finance.get<{ data: ApprovalTier[] }>('/quotes/config/approval-tiers'),
   });
 
   const [cfg, setCfg] = useState<NumberConfig | null>(null);
@@ -47,7 +47,7 @@ export default function QuoteSettingsPage() {
   }, [cfgQuery.data]);
 
   const saveCfg = useMutation({
-    mutationFn: (body: Partial<NumberConfig>) => api.put('/finance/quotes/config/numbering', body),
+    mutationFn: (body: Partial<NumberConfig>) => apiClients.finance.put('/quotes/config/numbering', body),
     onSuccess: () => {
       notify.success('Numbering saved');
       qc.invalidateQueries({ queryKey: ['quote-number-config'] });
@@ -58,7 +58,7 @@ export default function QuoteSettingsPage() {
   const [tierForm, setTierForm] = useState({ name: '', level: 1, minAmount: '', minDiscountPercent: '' });
   const addTier = useMutation({
     mutationFn: () =>
-      api.post('/finance/quotes/config/approval-tiers', {
+      apiClients.finance.post('/quotes/config/approval-tiers', {
         name: tierForm.name,
         level: Number(tierForm.level),
         minAmount: tierForm.minAmount ? Number(tierForm.minAmount) : undefined,
@@ -72,7 +72,7 @@ export default function QuoteSettingsPage() {
     onError: (e: Error) => notify.error('Add failed', e.message),
   });
   const delTier = useMutation({
-    mutationFn: (id: string) => api.delete(`/finance/quotes/config/approval-tiers/${id}`),
+    mutationFn: (id: string) => apiClients.finance.delete(`/quotes/config/approval-tiers/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['quote-approval-tiers'] }),
   });
 

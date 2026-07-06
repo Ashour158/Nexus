@@ -1123,7 +1123,29 @@ services:
     depends_on:
       - prometheus
 
+  # Production TLS reverse proxy. Off by default — only starts under the `prod`
+  # profile once DOMAIN is set and DNS points here:
+  #   DOMAIN=crm.example.com docker compose --profile prod up -d caddy
+  caddy:
+    image: caddy:2-alpine
+    container_name: nexus-caddy
+    profiles: ['prod']
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      DOMAIN: ${DOMAIN:-}
+    volumes:
+      - ./infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
 volumes:
+  caddy_data:
+  caddy_config:
   postgres_data:
   redis_data:
   zookeeper_data:

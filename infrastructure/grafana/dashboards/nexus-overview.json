@@ -1,0 +1,54 @@
+{
+  "uid": "nexus-overview",
+  "title": "Nexus — Service Overview",
+  "tags": ["nexus"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Services Up",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 30 } ] } } },
+      "targets": [ { "expr": "sum(up{job=\"nexus-services\"})", "refId": "A" } ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Total Targets",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "expr": "count(up{job=\"nexus-services\"})", "refId": "A" } ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Services Down",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } } },
+      "targets": [ { "expr": "count(up{job=\"nexus-services\"} == 0) or vector(0)", "refId": "A" } ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Service availability (up)",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "expr": "up{job=\"nexus-services\"}", "legendFormat": "{{instance}}", "refId": "A" } ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Process memory (RSS) per service",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 18 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "targets": [ { "expr": "process_resident_memory_bytes{job=\"nexus-services\"}", "legendFormat": "{{instance}}", "refId": "A" } ]
+    }
+  ]
+}

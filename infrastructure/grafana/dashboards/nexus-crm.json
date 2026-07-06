@@ -1,59 +1,83 @@
 {
-  "dashboard": {
-    "title": "Nexus CRM Overview",
-    "tags": ["nexus", "crm"],
-    "timezone": "UTC",
-    "panels": [
-      {
-        "id": 1,
-        "title": "Request Rate",
-        "type": "stat",
-        "targets": [
-          {
-            "expr": "sum(rate(http_requests_total[5m]))",
-            "legendFormat": "req/s"
-          }
-        ],
-        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 }
-      },
-      {
-        "id": 2,
-        "title": "Error Rate",
-        "type": "stat",
-        "targets": [
-          {
-            "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))",
-            "legendFormat": "error %"
-          }
-        ],
-        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 }
-      },
-      {
-        "id": 3,
-        "title": "Latency P95",
-        "type": "timeseries",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
-            "legendFormat": "p95"
-          }
-        ],
-        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 }
-      },
-      {
-        "id": 4,
-        "title": "Kafka Lag",
-        "type": "timeseries",
-        "targets": [
-          {
-            "expr": "kafka_consumer_group_lag",
-            "legendFormat": "{{topic}}"
-          }
-        ],
-        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 }
+  "title": "Nexus CRM Overview",
+  "tags": [
+    "nexus",
+    "crm"
+  ],
+  "timezone": "UTC",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Request Rate",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total[5m]))",
+          "legendFormat": "req/s"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
       }
-    ],
-    "time": { "from": "now-1h", "to": "now" },
-    "refresh": "30s"
-  }
+    },
+    {
+      "id": 2,
+      "title": "Error Rate",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))",
+          "legendFormat": "error %"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      }
+    },
+    {
+      "id": 3,
+      "title": "Latency P95",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      }
+    },
+    {
+      "id": 4,
+      "title": "Kafka Lag",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "kafka_consumer_group_lag",
+          "legendFormat": "{{topic}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      }
+    }
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "30s"
 }

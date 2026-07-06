@@ -21,6 +21,7 @@ import { startActivityConsumer } from './consumers/activity.consumer.js';
 import { startQuoteConsumer } from './consumers/quote.consumer.js';
 import { startLeadConsumer } from './consumers/lead.consumer.js';
 import { startNoteConsumer } from './consumers/note.consumer.js';
+import { startApprovalConsumer } from './consumers/approval.consumer.js';
 import { registerNotificationsRoutes } from './routes/notifications.routes.js';
 import { registerWhatsAppWebhookRoutes } from './routes/whatsapp-webhook.routes.js';
 import { registerGraphQL } from './graphql/index.js';
@@ -162,6 +163,7 @@ try {
   await startActivityConsumer({ inApp, log: app.log });
   await startQuoteConsumer({ inApp, email, sms, push, whatsapp, log: app.log });
   await startNoteConsumer({ inApp, log: app.log });
+  await startApprovalConsumer({ inApp, log: app.log });
   leadConsumer = await startLeadConsumer({ inApp, email, sms, push, whatsapp, lookupOwner, log: app.log });
 } catch (err) {
   app.log.warn({ err }, 'Kafka consumers failed to start; HTTP-only mode');

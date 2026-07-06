@@ -174,7 +174,9 @@ export default function DealDetailPage() {
   const stageName = String(stageRecord.name ?? deal.stageId);
   const accountName = String(accountRecord.name ?? dealRecord.accountName ?? deal.accountId);
   const ownerRecord = dealRecord.owner && typeof dealRecord.owner === 'object' ? dealRecord.owner as AnyRecord : {};
-  const ownerFromList = (usersQuery.data?.data ?? []).find((u) => u.id === deal.ownerId);
+  const ownerFromList = (usersQuery.data?.data ?? []).find((u) => u.id === deal.ownerId) as
+    | { name?: string; firstName?: string; lastName?: string; email?: string }
+    | undefined;
   const ownerName = String(
     ownerRecord.name ??
       (ownerRecord.firstName ? `${ownerRecord.firstName} ${ownerRecord.lastName ?? ''}`.trim() : undefined) ??

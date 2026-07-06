@@ -174,10 +174,13 @@ export function createRequestsService(prisma: ApprovalPrisma, producer: NexusPro
         return req;
       });
 
+      // Carry the resolved approvers on the event so notification-service can alert
+      // them (NOT-14) without a follow-up call back into this service.
+      const approverIds = Array.from(new Set(resolvedApprovers.filter((a): a is string => Boolean(a))));
       await producer.publish(TOPICS.WORKFLOWS, {
         type: 'approval.request.created',
         tenantId,
-        payload: { requestId: created.id, module, recordId },
+        payload: { requestId: created.id, module, recordId, approverIds },
       });
       return this.getRequest(tenantId, created.id);
     },

@@ -2,6 +2,7 @@ import type { PaginatedResult, TimelineEvent } from '@nexus/shared-types';
 import {
   BusinessRuleError,
   ConflictError,
+  NexusError,
   NotFoundError,
 } from '@nexus/service-utils';
 import type {
@@ -541,8 +542,10 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         if (claim.count === 0) {
           const still = await prisma.deal.findFirst({ where: { id, tenantId }, select: { id: true } });
           if (!still) throw new NotFoundError('Deal', id);
-          throw new ConflictError(
-            'Deal was modified by another user since you loaded it — reload and re-apply your changes'
+          throw new NexusError(
+            'CONFLICT',
+            'Deal was modified by another user since you loaded it — reload and re-apply your changes',
+            409
           );
         }
         // The claim already bumped version; strip the increment from the field

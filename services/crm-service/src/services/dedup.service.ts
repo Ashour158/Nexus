@@ -227,7 +227,7 @@ export function createDedupService(prisma: CrmPrisma) {
 
     // Atomic merge (DI-09): all reparenting + soft-delete happen in one transaction,
     // so a mid-way failure leaves the graph untouched rather than half-merged.
-    await p.$transaction(async (tx) => {
+    await p.$transaction(async (tx: CrmPrisma) => {
       await tx.contact.update({ where: { id: masterId }, data: mergedData });
 
       // Reparent the duplicate's child records to the master (DI-08). Optional-FK

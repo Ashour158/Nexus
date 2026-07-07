@@ -35,17 +35,22 @@ export async function registerDataQualityRoutes(
       const tenantId = jwt.tenantId;
 
       if (entityType === 'account') {
-        const [totalRecords, agg, lowQualityCount, openDuplicateGroups, counts] = await Promise.all([
+        const [totalRecords, agg, lowQualityCount, openDuplicateGroups] = await Promise.all([
           prisma.account.count({ where: { tenantId } }),
           prisma.account.aggregate({ where: { tenantId }, _avg: { dataQualityScore: true } }),
           prisma.account.count({ where: { tenantId, dataQualityScore: { lt: 50 } } }),
           prisma.duplicateGroup.count({ where: { tenantId, entityType: 'account', status: 'pending' } }),
-          Promise.all(
-            ACCOUNT_KEY_FIELDS.map((field) =>
-              prisma.account.count({ where: { tenantId, NOT: { [field]: null } } })
-            )
-          ),
         ]);
+        // Completeness = records where the field is set. `{ not: null }` is the
+        // correct "present" filter for nullable fields; required (non-nullable)
+        // fields reject the filter, so fall back to totalRecords (always present).
+        const counts = await Promise.all(
+          ACCOUNT_KEY_FIELDS.map((field) => {
+            const where: Record<string, unknown> = { tenantId };
+            where[field] = { not: null };
+            return prisma.account.count({ where: where as never }).catch(() => totalRecords);
+          })
+        );
         const fieldCompleteness: Record<string, number> = {};
         ACCOUNT_KEY_FIELDS.forEach((field, i) => {
           fieldCompleteness[field] = totalRecords > 0 ? Math.round((counts[i] / totalRecords) * 100) : 0;
@@ -64,17 +69,19 @@ export async function registerDataQualityRoutes(
       }
 
       // contact
-      const [totalRecords, agg, lowQualityCount, openDuplicateGroups, counts] = await Promise.all([
+      const [totalRecords, agg, lowQualityCount, openDuplicateGroups] = await Promise.all([
         prisma.contact.count({ where: { tenantId } }),
         prisma.contact.aggregate({ where: { tenantId }, _avg: { dataQualityScore: true } }),
         prisma.contact.count({ where: { tenantId, dataQualityScore: { lt: 50 } } }),
         prisma.duplicateGroup.count({ where: { tenantId, entityType: 'contact', status: 'pending' } }),
-        Promise.all(
-          CONTACT_KEY_FIELDS.map((field) =>
-            prisma.contact.count({ where: { tenantId, NOT: { [field]: null } } })
-          )
-        ),
       ]);
+      const counts = await Promise.all(
+        CONTACT_KEY_FIELDS.map((field) => {
+          const where: Record<string, unknown> = { tenantId };
+          where[field] = { not: null };
+          return prisma.contact.count({ where: where as never }).catch(() => totalRecords);
+        })
+      );
       const fieldCompleteness: Record<string, number> = {};
       CONTACT_KEY_FIELDS.forEach((field, i) => {
         fieldCompleteness[field] = totalRecords > 0 ? Math.round((counts[i] / totalRecords) * 100) : 0;

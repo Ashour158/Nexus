@@ -140,7 +140,10 @@ model CommissionRule {
 }
 
 /// The computed commission owed to a rep for a specific won deal. Unique on
-/// [tenantId, dealId] so a replayed `deal.won` event cannot double-write.
+/// [tenantId, dealId, ownerId] so a replayed `deal.won` event cannot
+/// double-write, while still allowing one statement per deal-team member when a
+/// deal is split across multiple reps (revenue/overlay splits). For a plain
+/// single-owner deal this collapses to exactly one statement per (tenant, deal).
 model CommissionStatement {
   id               String                    @id @default(cuid())
   tenantId         String
@@ -148,6 +151,11 @@ model CommissionStatement {
   dealId           String
   planId           String?
   ruleId           String?
+  /// Split attribution. null/REVENUE/OVERLAY. null = legacy single-owner (100%).
+  splitType        String?
+  /// The rep's revenue-split percentage (0-100) for this deal. null for legacy
+  /// single-owner statements (implicit 100%).
+  splitPercent     Decimal?                  @db.Decimal(6, 3)
   baseAmount       Decimal                   @db.Decimal(18, 2)
   ratePercent      Decimal                   @db.Decimal(6, 3)
   commissionAmount Decimal                   @db.Decimal(18, 2)
@@ -160,7 +168,7 @@ model CommissionStatement {
   createdAt        DateTime                  @default(now())
   updatedAt        DateTime                  @updatedAt
 
-  @@unique([tenantId, dealId])
+  @@unique([tenantId, dealId, ownerId])
   @@index([tenantId, ownerId])
   @@index([tenantId, status])
   @@index([tenantId, periodMonth])

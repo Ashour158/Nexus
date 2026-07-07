@@ -69,6 +69,14 @@ export function registerIncentiveConsumers(
       productId?: string;
       ownerRole?: string;
       marginAmount?: number | string;
+      // Deal-team splits emitted by crm-service on won deals. Optional: absent on
+      // legacy events / deals with no team → commission falls back to owner-100%.
+      teamSplits?: Array<{
+        userId?: string;
+        role?: string;
+        splitType?: string;
+        splitPercent?: number | string;
+      }>;
     };
     if (!e.tenantId || !payload.ownerId) return;
     const amount = Number(payload.amount ?? 0);
@@ -106,6 +114,18 @@ export function registerIncentiveConsumers(
         ownerRole: payload.ownerRole,
         marginAmount: payload.marginAmount,
         occurredAt: e.timestamp,
+        // When present with ≥1 valid REVENUE split, commission is credited per
+        // revenue-split member; otherwise the engine falls back to owner-100%.
+        teamSplits: payload.teamSplits
+          ?.filter((s): s is { userId: string; role?: string; splitType?: string; splitPercent?: number | string } =>
+            typeof s?.userId === 'string',
+          )
+          .map((s) => ({
+            userId: s.userId,
+            role: s.role,
+            splitType: s.splitType,
+            splitPercent: s.splitPercent,
+          })),
       });
     });
   });

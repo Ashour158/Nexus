@@ -13,6 +13,68 @@ export interface WonDeal {
   marginAmount?: number | string;
   /** ISO timestamp of the win; used to derive periodMonth. Defaults to now. */
   occurredAt?: string;
+  /**
+   * Deal-team splits emitted by crm-service on `deal.won`. When present with at
+   * least one valid REVENUE split whose percentages are sane (see
+   * normalizeRevenueSplits), commission is credited per revenue-split member on
+   * their proportional slice of the deal amount/margin. When absent, empty, or
+   * malformed, the engine falls back to full credit for `ownerId` at 100%.
+   */
+  teamSplits?: TeamSplit[];
+}
+
+/** A single deal-team split member as emitted by crm-service. */
+export interface TeamSplit {
+  userId: string;
+  role?: string;
+  /** "revenue" | "overlay" (case-insensitive). */
+  splitType?: string;
+  /** 0-100. */
+  splitPercent?: number | string;
+}
+
+/**
+ * Validate + normalize teamSplits into the set of revenue-split members to
+ * credit. Returns null (→ caller falls back to owner-100%) when the array is
+ * absent, has no usable revenue member, or is malformed / under-allocated.
+ *
+ * Rules (fail-safe toward the legacy single-owner behavior):
+ *  - Only REVENUE splits participate in the revenue pool. OVERLAY splits are
+ *    intentionally NOT credited here (see overlay decision in the change note).
+ *  - Every revenue split must have a userId and a finite percent in (0, 100].
+ *  - Revenue percentages must sum to ~100 (±0.5 tolerance). If they sum to
+ *    < ~100 (under-allocated) or the array is malformed, return null so the
+ *    caller credits owner-100% instead of a partial amount.
+ */
+export function normalizeRevenueSplits(
+  splits: TeamSplit[] | undefined,
+): Array<{ userId: string; percent: Decimal }> | null {
+  if (!Array.isArray(splits) || splits.length === 0) return null;
+
+  const revenue: Array<{ userId: string; percent: Decimal }> = [];
+  for (const s of splits) {
+    const type = String(s?.splitType ?? 'revenue').toLowerCase();
+    if (type !== 'revenue') continue; // overlay/other → not part of the revenue pool
+    if (!s?.userId || typeof s.userId !== 'string') return null; // malformed
+    let percent: Decimal;
+    try {
+      percent = new Decimal(String(s.splitPercent));
+    } catch {
+      return null; // malformed percent
+    }
+    if (!percent.isFinite() || percent.lte(0) || percent.gt(100)) return null;
+    revenue.push({ userId: s.userId, percent });
+  }
+
+  if (revenue.length === 0) return null; // no revenue member → fall back to owner
+
+  const sum = revenue.reduce((acc, r) => acc.plus(r.percent), new Decimal(0));
+  // Reject under-allocation and anything outside a small tolerance around 100.
+  // (Over-allocation would over-pay; under-allocation would under-pay — both
+  // are safer handled as owner-100% fallback.)
+  if (sum.minus(100).abs().gt(new Decimal('0.5'))) return null;
+
+  return revenue;
 }
 
 type PlanBasis = 'REVENUE' | 'MARGIN';
@@ -246,23 +308,30 @@ export function createCommissionService(prisma: IncentivePrisma) {
       });
     },
 
-    // ── Rules engine: compute + persist a statement for a won deal ─────────
+    // ── Rules engine: compute + persist statement(s) for a won deal ────────
     /**
      * Given a won deal, find the applicable active plan for the tenant, select
-     * the best matching rule, compute the commission, and create a
-     * CommissionStatement. Idempotent per [tenantId, dealId]: a replayed
-     * deal.won event is a no-op (returns the existing statement).
+     * the best matching rule, compute the commission, and persist a
+     * CommissionStatement per credited rep.
      *
-     * Returns the statement, or null when no active/effective plan+rule applies.
+     * Split-aware credit:
+     *  - When `deal.teamSplits` carries a valid set of REVENUE splits (see
+     *    normalizeRevenueSplits), one statement is created per revenue-split
+     *    member, computed on that member's proportional slice of the base
+     *    amount (e.g. amount 15000, member A 60% → base 9000; member B 40% →
+     *    base 6000). Each member's rule is selected for THAT member (their own
+     *    ownerId/role), so per-rep rate scoping still applies.
+     *  - Otherwise (absent/empty/malformed/under-allocated splits) it falls back
+     *    to the exact legacy behavior: full credit to `ownerId` at 100%.
+     *
+     * OVERLAY splits are intentionally not credited here — see the change note.
+     *
+     * Idempotent per [tenantId, dealId, ownerId]: a replayed deal.won cannot
+     * double-credit any rep. Returns the array of statements created/existing
+     * for this deal (may be empty when no plan/rule applies to any member).
      */
     async computeForWonDeal(tenantId: string, deal: WonDeal) {
       if (!tenantId || !deal.dealId || !deal.ownerId) return null;
-
-      // Idempotency: bail early if already computed for this deal.
-      const already = await prisma.commissionStatement.findUnique({
-        where: { tenantId_dealId: { tenantId, dealId: deal.dealId } },
-      });
-      if (already) return already;
 
       const now = deal.occurredAt ? new Date(deal.occurredAt) : new Date();
       const plans = await prisma.commissionPlan.findMany({
@@ -279,53 +348,98 @@ export function createCommissionService(prisma: IncentivePrisma) {
         orderBy: { createdAt: 'desc' },
       });
 
-      const revenue = new Decimal(String(deal.amount ?? 0));
-      // Evaluate plans in order; first plan with a matching rule wins.
-      for (const plan of plans) {
-        const basis = plan.basis as PlanBasis;
-        const baseAmount =
-          basis === 'MARGIN' && deal.marginAmount !== undefined
-            ? new Decimal(String(deal.marginAmount))
-            : revenue;
-        const rule = selectRule(plan.rules, {
-          ownerId: deal.ownerId,
-          productId: deal.productId,
-          ownerRole: deal.ownerRole,
-          baseAmount,
-        });
-        if (!rule) continue;
+      // Decide the set of reps to credit and each one's revenue weight.
+      // Fallback (null) → owner at 100%, preserving the legacy single-owner path.
+      const revenueSplits = normalizeRevenueSplits(deal.teamSplits);
+      const members: Array<{ ownerId: string; ownerRole?: string; weight: Decimal; splitType: string | null }> =
+        revenueSplits === null
+          ? [{ ownerId: deal.ownerId, ownerRole: deal.ownerRole, weight: new Decimal(100), splitType: null }]
+          : revenueSplits.map((r) => ({
+              ownerId: r.userId,
+              // Role scoping for split members isn't emitted per-member today;
+              // reuse the deal owner's role as the best available signal.
+              ownerRole: deal.ownerRole,
+              weight: r.percent,
+              splitType: 'REVENUE',
+            }));
 
-        const ratePercent = new Decimal(String(rule.ratePercent));
-        const commissionAmount = baseAmount.mul(ratePercent).div(100);
-
-        // Guard the create against a race/replay via the unique constraint.
-        try {
-          return await prisma.commissionStatement.create({
-            data: {
-              tenantId,
-              ownerId: deal.ownerId,
-              dealId: deal.dealId,
-              planId: plan.id,
-              ruleId: rule.id,
-              baseAmount: baseAmount.toFixed(2),
-              ratePercent: ratePercent.toFixed(3),
-              commissionAmount: commissionAmount.toFixed(2),
-              currency: deal.currency ?? 'USD',
-              status: 'PENDING',
-              periodMonth: periodMonthFrom(deal.occurredAt),
-            },
-          });
-        } catch (err) {
-          // Unique-constraint violation → another worker/replay won the race.
-          const existing = await prisma.commissionStatement.findUnique({
-            where: { tenantId_dealId: { tenantId, dealId: deal.dealId } },
-          });
-          if (existing) return existing;
-          throw err;
-        }
+      const results = [];
+      for (const m of members) {
+        const stmt = await computeMemberStatement(prisma, tenantId, deal, plans, m);
+        if (stmt) results.push(stmt);
       }
-
-      return null; // no applicable plan/rule
+      return results;
     },
   };
+}
+
+/**
+ * Compute + persist a single rep's statement for a deal on their revenue slice.
+ * Idempotent per [tenantId, dealId, ownerId]. Returns the statement or null when
+ * no active plan/rule matches this member.
+ */
+async function computeMemberStatement(
+  prisma: IncentivePrisma,
+  tenantId: string,
+  deal: WonDeal,
+  plans: Array<{ id: string; basis: string; rules: Parameters<typeof selectRule>[0] }>,
+  member: { ownerId: string; ownerRole?: string; weight: Decimal; splitType: string | null },
+) {
+  // Idempotency: bail early if this rep is already credited for this deal.
+  const already = await prisma.commissionStatement.findUnique({
+    where: { tenantId_dealId_ownerId: { tenantId, dealId: deal.dealId, ownerId: member.ownerId } },
+  });
+  if (already) return already;
+
+  const weightFraction = member.weight.div(100);
+  const fullRevenue = new Decimal(String(deal.amount ?? 0));
+  const fullMargin = deal.marginAmount !== undefined ? new Decimal(String(deal.marginAmount)) : null;
+
+  for (const plan of plans) {
+    const basis = plan.basis as PlanBasis;
+    const fullBase = basis === 'MARGIN' && fullMargin !== null ? fullMargin : fullRevenue;
+    // The member is credited on their proportional slice of the base amount.
+    const baseAmount = fullBase.mul(weightFraction);
+
+    const rule = selectRule(plan.rules, {
+      ownerId: member.ownerId,
+      productId: deal.productId,
+      ownerRole: member.ownerRole,
+      baseAmount,
+    });
+    if (!rule) continue;
+
+    const ratePercent = new Decimal(String(rule.ratePercent));
+    const commissionAmount = baseAmount.mul(ratePercent).div(100);
+
+    // Guard the create against a race/replay via the unique constraint.
+    try {
+      return await prisma.commissionStatement.create({
+        data: {
+          tenantId,
+          ownerId: member.ownerId,
+          dealId: deal.dealId,
+          planId: plan.id,
+          ruleId: rule.id,
+          splitType: member.splitType,
+          splitPercent: member.splitType === null ? null : member.weight.toFixed(3),
+          baseAmount: baseAmount.toFixed(2),
+          ratePercent: ratePercent.toFixed(3),
+          commissionAmount: commissionAmount.toFixed(2),
+          currency: deal.currency ?? 'USD',
+          status: 'PENDING',
+          periodMonth: periodMonthFrom(deal.occurredAt),
+        },
+      });
+    } catch (err) {
+      // Unique-constraint violation → another worker/replay won the race.
+      const existing = await prisma.commissionStatement.findUnique({
+        where: { tenantId_dealId_ownerId: { tenantId, dealId: deal.dealId, ownerId: member.ownerId } },
+      });
+      if (existing) return existing;
+      throw err;
+    }
+  }
+
+  return null; // no applicable plan/rule for this member
 }

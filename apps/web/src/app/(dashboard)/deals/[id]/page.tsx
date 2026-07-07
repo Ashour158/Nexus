@@ -13,14 +13,31 @@ import { AiPredictionPanel } from '@/components/crm/AiPredictionPanel';
 import { timelineMeta } from '@/lib/timeline-icons';
 import { useDeal, useDealTimeline, useDealScoringInsights } from '@/hooks/use-deals';
 import { useUsers } from '@/hooks/use-users';
+import type { UserRef } from '@/hooks/use-users';
 import type { DealHealth, DealScoringInsights } from '@/hooks/use-deals';
 import { useDealNotes } from '@/hooks/use-notes';
+import {
+  useDealProducts,
+  useAddDealProduct,
+  useUpdateDealProduct,
+  useRemoveDealProduct,
+  type DealProduct,
+} from '@/hooks/use-deal-products';
+import {
+  useDealTeam,
+  useAddDealTeamMember,
+  useUpdateDealTeamMember,
+  useRemoveDealTeamMember,
+  type DealTeamMember,
+  type SplitType,
+} from '@/hooks/use-deal-team';
+import { DealRoomPanel } from '@/components/crm/DealRoomPanel';
 import { api } from '@/lib/api-client';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/auth.store';
 
-type DealTab = 'health' | 'timeline' | 'notes' | 'cpq' | 'orders' | 'documents' | 'stakeholders' | 'governance' | 'competitors';
+type DealTab = 'health' | 'timeline' | 'notes' | 'products' | 'team' | 'dealroom' | 'cpq' | 'orders' | 'documents' | 'stakeholders' | 'governance' | 'competitors';
 type AnyRecord = Record<string, unknown>;
 
 interface Stakeholder {
@@ -160,6 +177,9 @@ export default function DealDetailPage() {
     { id: 'health', label: 'Health' },
     { id: 'timeline', label: 'Timeline' },
     { id: 'notes', label: 'Notes' },
+    { id: 'products', label: 'Products' },
+    { id: 'team', label: 'Team & Splits' },
+    { id: 'dealroom', label: 'Deal Room' },
     { id: 'cpq', label: 'CPQ / Quotes' },
     { id: 'orders', label: 'Orders' },
     { id: 'documents', label: 'Documents' },
@@ -264,6 +284,21 @@ export default function DealDetailPage() {
               error={notesQuery.error}
             />
           )}
+          {tab === 'products' && (
+            <ProductsTab
+              dealId={dealId}
+              currency={deal.currency}
+              canEdit={canUpdate}
+            />
+          )}
+          {tab === 'team' && (
+            <TeamTab
+              dealId={dealId}
+              users={usersQuery.data?.data ?? []}
+              canEdit={canUpdate}
+            />
+          )}
+          {tab === 'dealroom' && <DealRoomPanel dealId={dealId} />}
           {tab === 'cpq' && <CommercialTab title="Quotes" rows={unwrapRows<AnyRecord>(quotesQuery.data)} isLoading={quotesQuery.isLoading} />}
           {tab === 'orders' && <CommercialTab title="Orders" rows={unwrapRows<AnyRecord>(ordersQuery.data)} isLoading={ordersQuery.isLoading} />}
           {tab === 'documents' && (
@@ -611,5 +646,490 @@ function GovernanceList({ title, rows, primary, secondary, dateKey }: { title: s
         ))}
       </div>
     </div>
+  );
+}
+
+// ─── Products tab ────────────────────────────────────────────────────────────
+
+interface PickerProduct {
+  id: string;
+  name: string;
+  currency?: string;
+  price?: number;
+  listPrice?: number | string;
+}
+
+function ProductsTab({ dealId, currency, canEdit }: { dealId: string; currency: string; canEdit: boolean }) {
+  const productsQuery = useDealProducts(dealId);
+  const addProduct = useAddDealProduct(dealId);
+  const updateProduct = useUpdateDealProduct(dealId);
+  const removeProduct = useRemoveDealProduct(dealId);
+  const { accessToken } = useAuthStore.getState();
+
+  const [form, setForm] = useState({ name: '', quantity: '1', unitPrice: '0', discountPercent: '0' });
+  const [productId, setProductId] = useState<string | undefined>(undefined);
+  const [search, setSearch] = useState('');
+
+  // Product picker sourced from the finance pricebook via the /api/products BFF
+  // route (same one ProductLineItems uses). Optional — free entry is the
+  // fallback if the picker is empty or unauthenticated.
+  const pickerQuery = useQuery<PickerProduct[]>({
+    queryKey: ['deal-product-picker', search],
+    queryFn: async () => {
+      const res = await fetch(`/api/products?q=${encodeURIComponent(search)}`, {
+        headers: { Authorization: `Bearer ${accessToken ?? ''}` },
+      });
+      const body = (await res.json()) as { data?: PickerProduct[]; products?: PickerProduct[] };
+      return body.data ?? body.products ?? [];
+    },
+    enabled: search.trim().length > 0,
+    staleTime: 30_000,
+    retry: false,
+  });
+
+  const rows = productsQuery.data ?? [];
+  const summedTotal = rows.reduce((sum, r) => sum + Number(r.lineTotal ?? 0), 0);
+
+  function pickProduct(p: PickerProduct) {
+    setProductId(p.id);
+    setForm((f) => ({
+      ...f,
+      name: p.name,
+      unitPrice: String(p.price ?? p.listPrice ?? f.unitPrice),
+    }));
+    setSearch('');
+  }
+
+  function submit() {
+    const name = form.name.trim();
+    if (!name) return;
+    addProduct.mutate(
+      {
+        name,
+        quantity: Number(form.quantity) || 1,
+        unitPrice: Number(form.unitPrice) || 0,
+        discountPercent: Number(form.discountPercent) || 0,
+        productId,
+      },
+      {
+        onSuccess: () => {
+          setForm({ name: '', quantity: '1', unitPrice: '0', discountPercent: '0' });
+          setProductId(undefined);
+        },
+      }
+    );
+  }
+
+  if (productsQuery.isLoading) return <Skeleton className="h-32" />;
+
+  return (
+    <div className="space-y-4">
+      {productsQuery.isError ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          Product line items are not available yet. You can still work the deal — this connects once the products
+          service is deployed.
+        </div>
+      ) : null}
+
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="flex items-center justify-between border-b border-slate-100 p-4">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Products</h3>
+            <p className="text-xs text-slate-500">The deal amount is derived from these line items.</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs uppercase tracking-wider text-slate-400">Total</p>
+            <p className="text-lg font-semibold text-slate-900">{formatCurrency(summedTotal, currency)}</p>
+          </div>
+        </div>
+
+        {rows.length === 0 && !productsQuery.isError ? (
+          <div className="p-4">
+            <EmptyState icon="table" title="No line items" description="Add products to build the deal value." />
+          </div>
+        ) : rows.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Product</th>
+                  <th className="px-4 py-3">Qty</th>
+                  <th className="px-4 py-3">Unit price</th>
+                  <th className="px-4 py-3">Disc %</th>
+                  <th className="px-4 py-3">Line total</th>
+                  {canEdit ? <th className="px-4 py-3" /> : null}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rows.map((row) => (
+                  <ProductRow
+                    key={row.id}
+                    row={row}
+                    currency={currency}
+                    canEdit={canEdit}
+                    onSave={(data) => updateProduct.mutate({ id: row.id, data })}
+                    onRemove={() => removeProduct.mutate(row.id)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </div>
+
+      {canEdit ? (
+        <div className="space-y-3 rounded-xl border border-dashed border-slate-200 p-4">
+          <h4 className="text-sm font-medium text-slate-700">Add line item</h4>
+          <div className="relative">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search pricebook (optional)…"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+            {search.trim().length > 0 && (pickerQuery.data?.length ?? 0) > 0 ? (
+              <div className="absolute z-10 mt-1 max-h-44 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow">
+                {(pickerQuery.data ?? []).map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => pickProduct(p)}
+                    className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                  >
+                    {p.name} — {p.currency ?? currency} {String(p.price ?? p.listPrice ?? '')}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <input
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="Name"
+              className="min-w-[12rem] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+            <input
+              type="number"
+              min={1}
+              value={form.quantity}
+              onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))}
+              placeholder="Qty"
+              className="w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+            <input
+              type="number"
+              value={form.unitPrice}
+              onChange={(e) => setForm((f) => ({ ...f, unitPrice: e.target.value }))}
+              placeholder="Unit price"
+              className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+            <input
+              type="number"
+              value={form.discountPercent}
+              onChange={(e) => setForm((f) => ({ ...f, discountPercent: e.target.value }))}
+              placeholder="Disc %"
+              className="w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+            <Button onClick={submit} disabled={!form.name.trim() || addProduct.isPending}>
+              {addProduct.isPending ? 'Adding' : 'Add'}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ProductRow({
+  row,
+  currency,
+  canEdit,
+  onSave,
+  onRemove,
+}: {
+  row: DealProduct;
+  currency: string;
+  canEdit: boolean;
+  onSave: (data: { quantity: number; unitPrice: number; discountPercent: number }) => void;
+  onRemove: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({
+    quantity: String(row.quantity),
+    unitPrice: String(row.unitPrice),
+    discountPercent: String(row.discountPercent),
+  });
+
+  if (!editing) {
+    return (
+      <tr>
+        <td className="px-4 py-3 font-medium text-slate-900">{row.name}</td>
+        <td className="px-4 py-3">{row.quantity}</td>
+        <td className="px-4 py-3">{formatCurrency(Number(row.unitPrice), row.currency || currency)}</td>
+        <td className="px-4 py-3">{row.discountPercent}%</td>
+        <td className="px-4 py-3">{formatCurrency(Number(row.lineTotal), row.currency || currency)}</td>
+        {canEdit ? (
+          <td className="px-4 py-3 text-right">
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setEditing(true)} className="text-xs font-medium text-brand-700 hover:underline">Edit</button>
+              <button type="button" onClick={onRemove} className="text-xs font-medium text-red-600 hover:underline">Remove</button>
+            </div>
+          </td>
+        ) : null}
+      </tr>
+    );
+  }
+
+  return (
+    <tr className="bg-slate-50">
+      <td className="px-4 py-3 font-medium text-slate-900">{row.name}</td>
+      <td className="px-4 py-3">
+        <input type="number" min={1} value={draft.quantity} onChange={(e) => setDraft((d) => ({ ...d, quantity: e.target.value }))} className="w-16 rounded border border-slate-300 px-2 py-1 text-sm" />
+      </td>
+      <td className="px-4 py-3">
+        <input type="number" value={draft.unitPrice} onChange={(e) => setDraft((d) => ({ ...d, unitPrice: e.target.value }))} className="w-24 rounded border border-slate-300 px-2 py-1 text-sm" />
+      </td>
+      <td className="px-4 py-3">
+        <input type="number" value={draft.discountPercent} onChange={(e) => setDraft((d) => ({ ...d, discountPercent: e.target.value }))} className="w-16 rounded border border-slate-300 px-2 py-1 text-sm" />
+      </td>
+      <td className="px-4 py-3 text-slate-400">—</td>
+      <td className="px-4 py-3 text-right">
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              onSave({
+                quantity: Number(draft.quantity) || 1,
+                unitPrice: Number(draft.unitPrice) || 0,
+                discountPercent: Number(draft.discountPercent) || 0,
+              });
+              setEditing(false);
+            }}
+            className="text-xs font-medium text-emerald-700 hover:underline"
+          >
+            Save
+          </button>
+          <button type="button" onClick={() => setEditing(false)} className="text-xs font-medium text-slate-500 hover:underline">Cancel</button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ─── Team & splits tab ───────────────────────────────────────────────────────
+
+function userLabel(users: UserRef[], userId: string): string {
+  const u = users.find((x) => x.id === userId);
+  if (!u) return userId;
+  const name = `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim();
+  return name || u.email || userId;
+}
+
+function TeamTab({ dealId, users, canEdit }: { dealId: string; users: UserRef[]; canEdit: boolean }) {
+  const teamQuery = useDealTeam(dealId);
+  const addMember = useAddDealTeamMember(dealId);
+  const updateMember = useUpdateDealTeamMember(dealId);
+  const removeMember = useRemoveDealTeamMember(dealId);
+
+  const [form, setForm] = useState({ userId: '', role: '', splitPercent: '0', splitType: 'revenue' as SplitType });
+
+  const rows = teamQuery.data ?? [];
+  const revenueSplit = rows
+    .filter((r) => r.splitType === 'revenue')
+    .reduce((sum, r) => sum + Number(r.splitPercent ?? 0), 0);
+
+  function submit() {
+    if (!form.userId || !form.role.trim()) return;
+    addMember.mutate(
+      {
+        userId: form.userId,
+        role: form.role.trim(),
+        splitPercent: Number(form.splitPercent) || 0,
+        splitType: form.splitType,
+      },
+      { onSuccess: () => setForm({ userId: '', role: '', splitPercent: '0', splitType: 'revenue' }) }
+    );
+  }
+
+  if (teamQuery.isLoading) return <Skeleton className="h-32" />;
+
+  return (
+    <div className="space-y-4">
+      {teamQuery.isError ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          Deal team & splits are not available yet. This connects once the backend endpoint is deployed.
+        </div>
+      ) : null}
+
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="flex items-center justify-between border-b border-slate-100 p-4">
+          <h3 className="text-sm font-semibold text-slate-900">Team & Splits</h3>
+          <div className="text-right">
+            <p className="text-xs uppercase tracking-wider text-slate-400">Revenue split</p>
+            <p className={cn('text-lg font-semibold', revenueSplit > 100 ? 'text-red-600' : 'text-slate-900')}>{revenueSplit}%</p>
+          </div>
+        </div>
+
+        {revenueSplit > 100 ? (
+          <div className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-800">
+            Total revenue split exceeds 100%.
+          </div>
+        ) : null}
+
+        {rows.length === 0 && !teamQuery.isError ? (
+          <div className="p-4">
+            <EmptyState icon="people" title="No team members" description="Add reps and their revenue splits." />
+          </div>
+        ) : rows.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Member</th>
+                  <th className="px-4 py-3">Role</th>
+                  <th className="px-4 py-3">Split %</th>
+                  <th className="px-4 py-3">Type</th>
+                  {canEdit ? <th className="px-4 py-3" /> : null}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rows.map((row) => (
+                  <TeamRow
+                    key={row.id}
+                    row={row}
+                    users={users}
+                    canEdit={canEdit}
+                    onSave={(data) => updateMember.mutate({ id: row.id, data })}
+                    onRemove={() => removeMember.mutate(row.id)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </div>
+
+      {canEdit ? (
+        <div className="space-y-3 rounded-xl border border-dashed border-slate-200 p-4">
+          <h4 className="text-sm font-medium text-slate-700">Add team member</h4>
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={form.userId}
+              onChange={(e) => setForm((f) => ({ ...f, userId: e.target.value }))}
+              className="min-w-[12rem] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="">Select user…</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>{userLabel(users, u.id)}</option>
+              ))}
+            </select>
+            <input
+              value={form.role}
+              onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+              placeholder="Role"
+              className="w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+            <input
+              type="number"
+              value={form.splitPercent}
+              onChange={(e) => setForm((f) => ({ ...f, splitPercent: e.target.value }))}
+              placeholder="Split %"
+              className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+            <select
+              value={form.splitType}
+              onChange={(e) => setForm((f) => ({ ...f, splitType: e.target.value as SplitType }))}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="revenue">Revenue</option>
+              <option value="overlay">Overlay</option>
+            </select>
+            <Button onClick={submit} disabled={!form.userId || !form.role.trim() || addMember.isPending}>
+              {addMember.isPending ? 'Adding' : 'Add'}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function TeamRow({
+  row,
+  users,
+  canEdit,
+  onSave,
+  onRemove,
+}: {
+  row: DealTeamMember;
+  users: UserRef[];
+  canEdit: boolean;
+  onSave: (data: { role: string; splitPercent: number; splitType: SplitType }) => void;
+  onRemove: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({
+    role: row.role,
+    splitPercent: String(row.splitPercent),
+    splitType: row.splitType,
+  });
+
+  if (!editing) {
+    return (
+      <tr>
+        <td className="px-4 py-3 font-medium text-slate-900">{userLabel(users, row.userId)}</td>
+        <td className="px-4 py-3">{row.role}</td>
+        <td className="px-4 py-3">{row.splitPercent}%</td>
+        <td className="px-4 py-3">
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{row.splitType}</span>
+        </td>
+        {canEdit ? (
+          <td className="px-4 py-3 text-right">
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setEditing(true)} className="text-xs font-medium text-brand-700 hover:underline">Edit</button>
+              <button type="button" onClick={onRemove} className="text-xs font-medium text-red-600 hover:underline">Remove</button>
+            </div>
+          </td>
+        ) : null}
+      </tr>
+    );
+  }
+
+  return (
+    <tr className="bg-slate-50">
+      <td className="px-4 py-3 font-medium text-slate-900">{userLabel(users, row.userId)}</td>
+      <td className="px-4 py-3">
+        <input value={draft.role} onChange={(e) => setDraft((d) => ({ ...d, role: e.target.value }))} className="w-28 rounded border border-slate-300 px-2 py-1 text-sm" />
+      </td>
+      <td className="px-4 py-3">
+        <input type="number" value={draft.splitPercent} onChange={(e) => setDraft((d) => ({ ...d, splitPercent: e.target.value }))} className="w-20 rounded border border-slate-300 px-2 py-1 text-sm" />
+      </td>
+      <td className="px-4 py-3">
+        <select value={draft.splitType} onChange={(e) => setDraft((d) => ({ ...d, splitType: e.target.value as SplitType }))} className="rounded border border-slate-300 px-2 py-1 text-sm">
+          <option value="revenue">Revenue</option>
+          <option value="overlay">Overlay</option>
+        </select>
+      </td>
+      <td className="px-4 py-3 text-right">
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              onSave({
+                role: draft.role.trim() || row.role,
+                splitPercent: Number(draft.splitPercent) || 0,
+                splitType: draft.splitType,
+              });
+              setEditing(false);
+            }}
+            className="text-xs font-medium text-emerald-700 hover:underline"
+          >
+            Save
+          </button>
+          <button type="button" onClick={() => setEditing(false)} className="text-xs font-medium text-slate-500 hover:underline">Cancel</button>
+        </div>
+      </td>
+    </tr>
   );
 }

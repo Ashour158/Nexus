@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { NexusProducer } from '@nexus/kafka';
 import type { CrmPrisma } from '../prisma.js';
 import { registerDealsRoutes } from './deals.routes.js';
+import { registerDealLineItemsRoutes } from './deal-line-items.routes.js';
 import { registerAccountHierarchyRoutes } from './account-hierarchy.routes.js';
 import { registerAccountContactRelationsRoutes } from './account-contact-relations.routes.js';
 import { registerStakeholderRoutes } from './stakeholders.routes.js';
@@ -48,6 +49,7 @@ export async function registerAllRoutes(
   await registerStakeholderRoutes(app, prisma);
   await registerDealRoomRoutes(app, prisma);
   await registerDealsRoutes(app, prisma, producer);
+  await registerDealLineItemsRoutes(app, prisma, producer);
   await registerAccountsRoutes(app, prisma, producer);
   await registerContactsRoutes(app, prisma, producer);
   await registerLeadsRoutes(app, prisma, producer);

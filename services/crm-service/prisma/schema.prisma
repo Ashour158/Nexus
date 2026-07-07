@@ -392,6 +392,8 @@ model Deal {
   quotes            Quote[]
   dealCompetitors   DealCompetitor[]
   stakeholders      DealStakeholder[]
+  products          DealProduct[]
+  team              DealTeam[]
   dealRoom          DealRoom?
   closeReason       String?
   dataQualityScore  Int?
@@ -464,6 +466,48 @@ model DealStakeholder {
   reports   DealStakeholder[] @relation("StakeholderHierarchy")
 
   @@unique([dealId, contactId])
+  @@unique([id, tenantId])
+  @@index([tenantId, dealId])
+}
+
+/// Line item on a deal. Deal.amount rolls up as sum(lineTotal). Products
+/// optionally reference the finance-service pricebook (productId) but a free
+/// name+unitPrice is always accepted so crm-service never hard-depends on it.
+model DealProduct {
+  id              String   @id @default(cuid())
+  tenantId        String
+  dealId          String
+  productId       String?
+  name            String
+  quantity        Decimal  @default(1) @db.Decimal(18, 4)
+  unitPrice       Decimal  @default(0) @db.Decimal(18, 2)
+  discountPercent Decimal  @default(0) @db.Decimal(5, 2)
+  lineTotal       Decimal  @default(0) @db.Decimal(18, 2)
+  currency        String   @default("USD")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@unique([id, tenantId])
+  @@index([tenantId, dealId])
+}
+
+/// Deal split / deal team member. Feeds the incentive-service commission
+/// engine: revenue splits (should sum ≤ 100 per deal) plus overlay credits.
+model DealTeam {
+  id          String   @id @default(cuid())
+  tenantId    String
+  dealId      String
+  userId      String
+  role        String
+  splitPercent Decimal @default(0) @db.Decimal(5, 2)
+  splitType   String   @default("revenue")
+  createdAt   DateTime @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dealId, userId, splitType])
   @@unique([id, tenantId])
   @@index([tenantId, dealId])
 }

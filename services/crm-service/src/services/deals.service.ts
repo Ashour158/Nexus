@@ -780,6 +780,26 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         },
       });
 
+      // Additive: include deal-team splits so incentive-service can credit
+      // revenue/overlay splits on win. Fail-open — never block the win event.
+      let teamSplits: Array<{
+        userId: string;
+        role: string;
+        splitType: string;
+        splitPercent: number;
+      }> = [];
+      try {
+        const rows = await prisma.dealTeam.findMany({ where: { tenantId, dealId: id } });
+        teamSplits = rows.map((r) => ({
+          userId: r.userId,
+          role: r.role,
+          splitType: r.splitType,
+          splitPercent: Number(r.splitPercent.toFixed(2)),
+        }));
+      } catch {
+        teamSplits = [];
+      }
+
       await producer.publish(TOPICS.DEALS, {
         type: 'deal.won',
         tenantId,
@@ -789,6 +809,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           accountId: updated.accountId,
           amount: decimalToNumber(updated.amount),
           currency: updated.currency,
+          teamSplits,
         },
       });
 

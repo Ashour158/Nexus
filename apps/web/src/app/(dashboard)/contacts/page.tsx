@@ -31,6 +31,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { notify } from '@/lib/toast';
 import { contactSchema } from '@/lib/schemas';
 import {
+  contactKeys,
   useContacts,
   useCreateContact,
   useDeleteContact,
@@ -40,6 +41,7 @@ import {
 import { useUsers } from '@/hooks/use-users';
 import { useAccounts } from '@/hooks/use-accounts';
 import { ExportButton } from '@/components/export/ExportButton';
+import { BulkActionBar } from '@/components/crm/BulkActionBar';
 import { CsvImportDialog } from '@/components/import/csv-import-dialog';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import { CRMModuleShell } from '@/components/ui/crm';
@@ -125,6 +127,7 @@ export default function ContactsPage(): ReactElement {
   const [draft, setDraft] = useState<ContactDraft>(EMPTY_DRAFT);
   const [importOpen, setImportOpen] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const contactsQuery = useContacts({
     search,
@@ -504,6 +507,18 @@ export default function ContactsPage(): ReactElement {
             <table className="w-full">
               <thead className="border-b border-slate-100 bg-slate-50">
                 <tr>
+                  <th className="px-6 py-3 text-left w-8">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all"
+                      className="rounded border-slate-300"
+                      checked={contacts.length > 0 && selectedIds.length === contacts.length}
+                      ref={(el) => {
+                        if (el) el.indeterminate = selectedIds.length > 0 && selectedIds.length < contacts.length;
+                      }}
+                      onChange={(e) => setSelectedIds(e.target.checked ? contacts.map((c) => c.id) : [])}
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Customer</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Role</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Owner</th>
@@ -515,6 +530,19 @@ export default function ContactsPage(): ReactElement {
               <tbody className="divide-y divide-slate-100">
                 {contacts.map((contact, index) => (
                   <tr key={contact.id} className="transition-colors hover:bg-slate-50">
+                    <td className="px-6 py-4">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${contact.firstName} ${contact.lastName}`}
+                        className="rounded border-slate-300"
+                        checked={selectedIds.includes(contact.id)}
+                        onChange={(e) =>
+                          setSelectedIds((prev) =>
+                            e.target.checked ? [...prev, contact.id] : prev.filter((id) => id !== contact.id)
+                          )
+                        }
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className={cn('flex h-8 w-8 items-center justify-center rounded text-xs font-bold', ownerColors[index % ownerColors.length])}>
@@ -621,6 +649,13 @@ export default function ContactsPage(): ReactElement {
       ) : null}
 
       {importOpen ? <CsvImportDialog onClose={() => setImportOpen(false)} /> : null}
+      <BulkActionBar
+        entityType="contact"
+        selectedIds={selectedIds}
+        onClear={() => setSelectedIds([])}
+        queryKey={[...contactKeys.lists()]}
+        ownerOptions={users.map((u) => ({ id: u.id, name: `${u.firstName} ${u.lastName}` }))}
+      />
       {ConfirmDialog}
     </CRMModuleShell>
   );

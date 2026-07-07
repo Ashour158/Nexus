@@ -29,9 +29,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { CallButton } from '@/components/crm/call-button';
 import { ComposeEmailButton } from '@/components/communications/ComposeEmailButton';
+import { DetailQuickActions } from '@/components/crm/DetailQuickActions';
 import { timelineMeta } from '@/lib/timeline-icons';
 import { useContact, useContactDeals } from '@/hooks/use-contacts';
-import { useActivities } from '@/hooks/use-activities';
+import { activityKeys, useActivities } from '@/hooks/use-activities';
 import { useUsers } from '@/hooks/use-users';
 import { EnrichmentPanel } from '@/components/crm/EnrichmentPanel';
 import { CustomFieldsSection } from '@/components/crm/CustomFieldsSection';
@@ -262,6 +263,16 @@ export default function ContactDetailPage() {
                 disabled={contact.doNotCall}
                 disabledReason="Contact has opted out of calls"
               />
+              <span className="relative inline-flex items-center gap-2">
+                <DetailQuickActions
+                  contactId={contactId}
+                  accountId={contact.accountId ?? undefined}
+                  invalidateKeys={[
+                    ['contacts', contactId, 'timeline'],
+                    [...activityKeys.all],
+                  ]}
+                />
+              </span>
               <ComposeEmailButton
                 entityType="contact"
                 entityId={contactId}

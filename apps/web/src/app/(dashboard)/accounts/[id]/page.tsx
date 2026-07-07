@@ -34,6 +34,7 @@ import {
   useUpdateAccount,
 } from '@/hooks/use-accounts';
 import { useUsers } from '@/hooks/use-users';
+import { DetailQuickActions } from '@/components/crm/DetailQuickActions';
 import { EnrichmentPanel } from '@/components/crm/EnrichmentPanel';
 import { CustomFieldsSection } from '@/components/crm/CustomFieldsSection';
 import { FieldHistory } from '@/components/crm/FieldHistory';
@@ -206,11 +207,15 @@ export default function AccountDetailPage() {
               Back to accounts
             </button>
             {canUpdate ? (
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex flex-wrap items-center gap-2">
                 <Button variant="secondary" onClick={() => setEditOpen((open) => !open)}>
                   <Edit3 className="h-4 w-4" />
                   Edit Account
                 </Button>
+                <DetailQuickActions
+                  accountId={account.id}
+                  invalidateKeys={[['accounts', accountId, 'timeline']]}
+                />
                 <ComposeEmailButton
                   entityType="account"
                   entityId={account.id}

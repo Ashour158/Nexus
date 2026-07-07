@@ -12,6 +12,7 @@ const AccountMapView = dynamic(() => import('./map-view'), { ssr: false, loading
 import { useAuthStore } from '@/stores/auth.store';
 import { ExportButton } from '@/components/export/ExportButton';
 import {
+  accountKeys,
   useAccounts,
   useUpdateAccount,
   type AccountListFilters,
@@ -22,6 +23,7 @@ import { TableSkeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ColumnChooser, useColumnVisibility } from '@/components/ui/column-chooser';
 import { EditableCell, EditableSelectCell } from '@/components/ui/editable-cell';
+import { BulkActionBar } from '@/components/crm/BulkActionBar';
 
 /**
  * Accounts list page. Mirrors the contacts page: filterable table with a
@@ -65,6 +67,7 @@ export default function AccountsPage(): ReactElement {
   const [tab, setTab] = useState<DetailTab>('info');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [mapAccount, setMapAccount] = useState<AccountWithGeo | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const accountCols = useColumnVisibility('accounts', [
     { key: 'name', label: 'Name' },
@@ -154,6 +157,12 @@ export default function AccountsPage(): ReactElement {
             </div>
             <div className="flex flex-wrap items-center gap-2">
         <ExportButton module="accounts" />
+        <Link
+          href="/accounts/duplicates"
+          className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-xs font-bold text-slate-600 hover:bg-slate-50"
+        >
+          Duplicates
+        </Link>
         <ColumnChooser
           allColumns={accountCols.allColumns}
           visibleKeys={accountCols.visibleKeys}
@@ -293,6 +302,20 @@ export default function AccountsPage(): ReactElement {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-start text-xs uppercase tracking-wider text-slate-500">
               <tr>
+                <th className="px-4 py-2 w-8">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all"
+                    className="rounded border-slate-300"
+                    checked={accounts.length > 0 && selectedIds.length === accounts.length}
+                    ref={(el) => {
+                      if (el) el.indeterminate = selectedIds.length > 0 && selectedIds.length < accounts.length;
+                    }}
+                    onChange={(e) =>
+                      setSelectedIds(e.target.checked ? accounts.map((a) => a.id) : [])
+                    }
+                  />
+                </th>
                 {accountCols.visibleKeys.includes('name') ? <th className="px-4 py-2">Name</th> : null}
                 {accountCols.visibleKeys.includes('industry') ? <th className="px-4 py-2">Industry</th> : null}
                 {accountCols.visibleKeys.includes('arr') ? <th className="px-4 py-2">ARR</th> : null}
@@ -312,6 +335,19 @@ export default function AccountsPage(): ReactElement {
                   }}
                   className="cursor-pointer hover:bg-slate-50"
                 >
+                  <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${a.name}`}
+                      className="rounded border-slate-300"
+                      checked={selectedIds.includes(a.id)}
+                      onChange={(e) =>
+                        setSelectedIds((prev) =>
+                          e.target.checked ? [...prev, a.id] : prev.filter((id) => id !== a.id)
+                        )
+                      }
+                    />
+                  </td>
                   {accountCols.visibleKeys.includes('name') ? (
                     <td className="px-4 py-2 font-medium text-slate-900">
                       <EditableCell value={a.name} onSave={(v) => updateAccount.mutate({ id: a.id, data: { name: v } })} disabled={!canUpdate}>
@@ -535,6 +571,14 @@ export default function AccountsPage(): ReactElement {
           </aside>
         </div>
       ) : null}
+
+      <BulkActionBar
+        entityType="account"
+        selectedIds={selectedIds}
+        onClear={() => setSelectedIds([])}
+        queryKey={[...accountKeys.lists()]}
+        ownerOptions={(users.data?.data ?? []).map((u) => ({ id: u.id, name: `${u.firstName} ${u.lastName}` }))}
+      />
     </div>
   );
 }

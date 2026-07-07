@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DEV_PREVIEW_ENABLED, apiSuccess, paginated } from '@/lib/server/dev-preview-data';
 
-const CONTACTS_SERVICE_URL = process.env.CONTACTS_SERVICE_URL || process.env.CRM_SERVICE_URL || 'http://localhost:3041';
+const CONTACTS_SERVICE_URL = process.env.CRM_SERVICE_URL || process.env.CONTACTS_SERVICE_URL || 'http://localhost:3001';
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = req.headers.get('authorization');

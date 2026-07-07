@@ -7,7 +7,7 @@ import {
   hardenContactRecord,
 } from '@/lib/server/contact-hardening';
 
-const CONTACTS_SERVICE_URL = process.env.CONTACTS_SERVICE_URL || process.env.CRM_SERVICE_URL || 'http://localhost:3041';
+const CONTACTS_SERVICE_URL = process.env.CRM_SERVICE_URL || process.env.CONTACTS_SERVICE_URL || 'http://localhost:3001';
 
 export async function GET(
   req: NextRequest,

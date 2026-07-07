@@ -30,6 +30,7 @@ import { registerGraphQL } from './graphql/index.js';
 import { startTriggerConsumer } from './consumers/trigger.consumer.js';
 import { startGdprConsumer } from './consumers/gdpr.consumer.js';
 import { startSequencePoller } from './lib/sequence.poller.js';
+import { startOutboxPoller } from './lib/outbox.poller.js';
 import './workers/email.worker.js';
 
 startTracing({ serviceName: 'comm-service' });
@@ -117,9 +118,23 @@ try {
   app.log.warn({ err }, 'Sequence poller start failed; continuing');
 }
 
+// Outbox processor poller: flushes QUEUED CommOutbox rows via SMTP/SMS on
+// schedule so queued emails send without a manual trigger. Fail-open — a start
+// failure must never break the service.
+let outboxPoller: ReturnType<typeof startOutboxPoller> | null = null;
+try {
+  outboxPoller = startOutboxPoller(prisma, outbox, app.log);
+  app.log.info('comm-service outbox poller running');
+} catch (err) {
+  app.log.warn({ err }, 'Outbox poller start failed; continuing');
+}
+
 app.addHook('onClose', async () => {
   try {
     sequencePoller?.stop();
+  } catch { /* ignore */ }
+  try {
+    outboxPoller?.stop();
   } catch { /* ignore */ }
   try {
     await triggerConsumer?.disconnect();

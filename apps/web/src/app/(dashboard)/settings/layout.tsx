@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { GitMerge, ShieldCheck } from 'lucide-react';
+import { Gauge, GitMerge, ShieldCheck } from 'lucide-react';
 
 const TABS = [
   { href: '/settings/profile', label: 'Profile' },
@@ -14,6 +14,7 @@ const TABS = [
   { href: '/settings/data-privacy', label: 'Data Privacy' },
   { href: '/settings/gdpr', label: 'GDPR' },
   { href: '/settings/duplicates', label: 'Duplicate Records', icon: GitMerge },
+  { href: '/settings/data-quality', label: 'Data Quality', icon: Gauge },
   { href: '/settings/sso', label: 'Single Sign-On' },
   { href: '/settings/workflows', label: 'Workflows' },
   { href: '/settings/quote-automation', label: 'Quote Automation' },

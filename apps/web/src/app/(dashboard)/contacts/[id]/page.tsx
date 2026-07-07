@@ -30,6 +30,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { CallButton } from '@/components/crm/call-button';
 import { ComposeEmailButton } from '@/components/communications/ComposeEmailButton';
 import { DetailQuickActions } from '@/components/crm/DetailQuickActions';
+import { FollowButton } from '@/components/crm/FollowButton';
 import { timelineMeta } from '@/lib/timeline-icons';
 import { useContact, useContactDeals } from '@/hooks/use-contacts';
 import { useRelatedAccounts, type RelatedAccount } from '@/hooks/use-account-relations';
@@ -248,6 +249,7 @@ export default function ContactDetailPage() {
               Back to contacts
             </button>
             <div className="flex flex-wrap items-center gap-2">
+              <FollowButton entityType="contact" entityId={contactId} />
               {canUpdate ? (
                 <>
                   <Button variant="secondary" onClick={() => setDocumentOpen(true)}>

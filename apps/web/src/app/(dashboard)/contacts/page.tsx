@@ -42,6 +42,7 @@ import { useUsers } from '@/hooks/use-users';
 import { useAccounts } from '@/hooks/use-accounts';
 import { ExportButton } from '@/components/export/ExportButton';
 import { BulkActionBar } from '@/components/crm/BulkActionBar';
+import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
 import { CsvImportDialog } from '@/components/import/csv-import-dialog';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import { CRMModuleShell } from '@/components/ui/crm';
@@ -380,6 +381,18 @@ export default function ContactsPage(): ReactElement {
                 Import
               </button>
               <ExportButton module="contacts" />
+              <SavedViewsControl
+                entityType="contact"
+                currentFilters={{ search, ownerId, sortBy }}
+                onApply={(filters) => {
+                  setPage(1);
+                  setSearch(typeof filters.search === 'string' ? filters.search : '');
+                  setOwnerId(typeof filters.ownerId === 'string' ? filters.ownerId : '');
+                  if (typeof filters.sortBy === 'string') {
+                    setSortBy(filters.sortBy as ContactListFilters['sortBy']);
+                  }
+                }}
+              />
               {canCreate ? (
                 <button
                   type="button"

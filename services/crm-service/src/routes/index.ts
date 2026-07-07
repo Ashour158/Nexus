@@ -30,6 +30,9 @@ import { registerConsentRoutes } from './consent.routes.js';
 import { registerCompaniesRoutes } from './companies.routes.js';
 import { registerMeetingsRoutes } from './meetings.routes.js';
 import { registerTasksRoutes } from './tasks.routes.js';
+import { registerFollowersRoutes } from './followers.routes.js';
+import { registerSavedViewsRoutes } from './saved-views.routes.js';
+import { registerDataQualityRoutes } from './data-quality.routes.js';
 
 /**
  * Registers every CRM HTTP route under `/api/v1` — Section 34.2 + 34.3.
@@ -68,4 +71,7 @@ export async function registerAllRoutes(
   await registerCompaniesRoutes(app, prisma);
   await registerMeetingsRoutes(app, prisma);
   await registerTasksRoutes(app, prisma);
+  await registerFollowersRoutes(app, prisma);
+  await registerSavedViewsRoutes(app, prisma);
+  await registerDataQualityRoutes(app, prisma);
 }

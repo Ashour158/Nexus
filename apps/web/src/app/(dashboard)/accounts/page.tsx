@@ -24,6 +24,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ColumnChooser, useColumnVisibility } from '@/components/ui/column-chooser';
 import { EditableCell, EditableSelectCell } from '@/components/ui/editable-cell';
 import { BulkActionBar } from '@/components/crm/BulkActionBar';
+import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
 
 /**
  * Accounts list page. Mirrors the contacts page: filterable table with a
@@ -157,6 +158,17 @@ export default function AccountsPage(): ReactElement {
             </div>
             <div className="flex flex-wrap items-center gap-2">
         <ExportButton module="accounts" />
+        <SavedViewsControl
+          entityType="account"
+          currentFilters={{ search, industry, tier, ownerId }}
+          onApply={(filters) => {
+            setPage(1);
+            setSearch(typeof filters.search === 'string' ? filters.search : '');
+            setIndustry(typeof filters.industry === 'string' ? filters.industry : '');
+            setTier((filters.tier as AccountListFilters['tier']) ?? '');
+            setOwnerId(typeof filters.ownerId === 'string' ? filters.ownerId : '');
+          }}
+        />
         <Link
           href="/accounts/duplicates"
           className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-xs font-bold text-slate-600 hover:bg-slate-50"

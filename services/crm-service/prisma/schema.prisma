@@ -1223,3 +1223,36 @@ model User {
   @@index([tenantId])
   @@index([isActive])
 }
+
+/// Follow / subscribe: a user follows a record (account | contact | ...) so its
+/// recent activity surfaces in their personal feed. Additive + tenant-scoped.
+model RecordFollower {
+  id         String   @id @default(cuid())
+  tenantId   String
+  userId     String
+  entityType String
+  entityId   String
+  createdAt  DateTime @default(now())
+
+  @@unique([tenantId, userId, entityType, entityId])
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, userId])
+}
+
+/// Saved view / segmentation: a persisted list configuration (filters + columns)
+/// owned by a user, optionally shared with the tenant. Additive + tenant-scoped.
+model SavedView {
+  id         String   @id @default(cuid())
+  tenantId   String
+  ownerId    String
+  entityType String
+  name       String
+  filters    Json     @default("{}")
+  columns    Json?
+  isShared   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([tenantId, ownerId, entityType])
+  @@index([tenantId, entityType, isShared])
+}

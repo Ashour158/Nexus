@@ -35,6 +35,7 @@ import {
 } from '@/hooks/use-accounts';
 import { useUsers } from '@/hooks/use-users';
 import { DetailQuickActions } from '@/components/crm/DetailQuickActions';
+import { FollowButton } from '@/components/crm/FollowButton';
 import { EnrichmentPanel } from '@/components/crm/EnrichmentPanel';
 import { CustomFieldsSection } from '@/components/crm/CustomFieldsSection';
 import { FieldHistory } from '@/components/crm/FieldHistory';
@@ -223,8 +224,10 @@ export default function AccountDetailPage() {
               <ArrowLeft className="h-4 w-4" />
               Back to accounts
             </button>
-            {canUpdate ? (
-              <div className="relative flex flex-wrap items-center gap-2">
+            <div className="relative flex flex-wrap items-center gap-2">
+              <FollowButton entityType="account" entityId={account.id} />
+              {canUpdate ? (
+                <>
                 <Button variant="secondary" onClick={() => setEditOpen((open) => !open)}>
                   <Edit3 className="h-4 w-4" />
                   Edit Account
@@ -249,12 +252,13 @@ export default function AccountDetailPage() {
                   <ShieldCheck className="h-4 w-4" />
                   Mark Reviewed
                 </Button>
-              </div>
-            ) : (
-              <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
-                Editing is restricted by role permissions.
-              </p>
-            )}
+                </>
+              ) : (
+                <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+                  Editing is restricted by role permissions.
+                </p>
+              )}
+            </div>
           </div>
         </div>
 

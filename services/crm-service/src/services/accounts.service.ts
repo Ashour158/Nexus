@@ -19,6 +19,7 @@ import type {
 import type { CrmPrisma } from '../prisma.js';
 import { toPaginatedResult } from '@nexus/shared-types';
 import { updateAccountDataQuality } from '../lib/data-quality.js';
+import { enrichAccount } from '../lib/enrichment.engine.js';
 import {
   recordFieldChanges,
   recordCreateSnapshot,
@@ -290,6 +291,12 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
       );
 
       updateAccountDataQuality(prisma, created.id).catch(() => undefined);
+
+      // Auto-enrichment (fire-and-forget): only when a provider key is configured
+      // so we never churn EnrichmentJob rows or block the create otherwise.
+      if (process.env.CLEARBIT_API_KEY || process.env.APOLLO_API_KEY) {
+        void enrichAccount(prisma, tenantId, created.id, producer).catch(() => undefined);
+      }
 
       return created;
     },

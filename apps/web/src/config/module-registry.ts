@@ -225,6 +225,17 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
         sidebar: true,
       },
       {
+        id: 'feed',
+        label: 'Following',
+        href: '/feed',
+        icon: Inbox,
+        status: 'wired',
+        service: 'crm-service',
+        description: 'Recent activity across the accounts and contacts you follow.',
+        depth: ['followed records', 'activity feed', 'follow/unfollow', 'record links'],
+        sidebar: true,
+      },
+      {
         id: 'activities',
         label: 'Activities',
         href: '/activities',

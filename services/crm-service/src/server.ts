@@ -13,6 +13,7 @@ import { startEngagementTimelineConsumer } from './consumers/engagement-timeline
 import { NexusProducer } from '@nexus/kafka';
 import { startRottenDealsPoller } from './lib/rotten-deals.poller.js';
 import { startAiScoringPoller } from './lib/ai/scoring.poller.js';
+import { startStaleEnrichmentPoller } from './lib/stale-enrichment.poller.js';
 import type { FastifyInstance } from 'fastify';
 
 export async function buildServer(): Promise<{ app: FastifyInstance; prismaHealth: PrismaClient }> {
@@ -105,6 +106,28 @@ export async function buildServer(): Promise<{ app: FastifyInstance; prismaHealt
     app.log.warn({ err }, 'AI scoring poller failed to start; continuing without AI (re)scoring');
   }
 
+  // Scheduled re-enrichment of stale accounts/contacts. Guarded identically;
+  // disabled by setting STALE_ENRICHMENT_INTERVAL_MS=0. The poller itself
+  // no-ops when no enrichment provider key is configured.
+  let staleEnrichmentPoller: ReturnType<typeof startStaleEnrichmentPoller> | null = null;
+  try {
+    const seIntervalRaw = optionalEnv('STALE_ENRICHMENT_INTERVAL_MS', '');
+    const seIntervalMs = seIntervalRaw ? Number(seIntervalRaw) : undefined;
+    const seStaleRaw = optionalEnv('STALE_ENRICHMENT_DAYS', '');
+    const seStaleDays = seStaleRaw ? Number(seStaleRaw) : undefined;
+    if (seIntervalMs !== 0) {
+      staleEnrichmentPoller = startStaleEnrichmentPoller(prisma, producer, {
+        intervalMs:
+          seIntervalMs && Number.isFinite(seIntervalMs) && seIntervalMs > 0 ? seIntervalMs : undefined,
+        staleDays:
+          seStaleDays && Number.isFinite(seStaleDays) && seStaleDays > 0 ? seStaleDays : undefined,
+      });
+      app.log.info('Stale-enrichment poller started');
+    }
+  } catch (err) {
+    app.log.warn({ err }, 'Stale-enrichment poller failed to start; continuing without scheduled enrichment');
+  }
+
   app.addHook('onClose', async () => {
     try { await producer.disconnect(); } catch { /* ignore */ }
     try { await scoringConsumer?.disconnect(); } catch { /* ignore */ }
@@ -114,6 +137,7 @@ export async function buildServer(): Promise<{ app: FastifyInstance; prismaHealt
     try { await quoteProjectionConsumer?.disconnect(); } catch { /* ignore */ }
     try { rottenDealsPoller?.stop(); } catch { /* ignore */ }
     try { aiScoringPoller?.stop(); } catch { /* ignore */ }
+    try { staleEnrichmentPoller?.stop(); } catch { /* ignore */ }
   });
 
   await registerAllRoutes(app, prisma, producer);

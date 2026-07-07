@@ -96,7 +96,18 @@ export async function registerDedupRoutes(
       }
       const { id } = req.params as { id: string };
       const { masterId, fieldSelections } = MergeBodySchema.parse(req.body);
-      const result = await dedupService.mergeContacts(tenantId, id, masterId, fieldSelections, userId);
+      // Branch on the group's entityType so account groups use the account merge path.
+      const group = await (prisma as any).duplicateGroup.findUnique({
+        where: { id },
+        select: { entityType: true, tenantId: true },
+      });
+      if (!group || group.tenantId !== tenantId) {
+        return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Group not found', requestId: req.id } });
+      }
+      const result =
+        group.entityType === 'account'
+          ? await dedupService.mergeAccounts(tenantId, id, masterId, fieldSelections, userId)
+          : await dedupService.mergeContacts(tenantId, id, masterId, fieldSelections, userId);
       return reply.send({ success: true, data: result });
     });
 

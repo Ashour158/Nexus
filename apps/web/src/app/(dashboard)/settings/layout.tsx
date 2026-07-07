@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { GitMerge } from 'lucide-react';
+import { GitMerge, ShieldCheck } from 'lucide-react';
 
 const TABS = [
   { href: '/settings/profile', label: 'Profile' },
@@ -19,6 +19,7 @@ const TABS = [
   { href: '/settings/quote-automation', label: 'Quote Automation' },
   { href: '/settings/scoring-rules', label: 'Scoring Rules' },
   { href: '/settings/custom-fields', label: 'Custom Fields' },
+  { href: '/settings/field-permissions', label: 'Field Permissions', icon: ShieldCheck },
   { href: '/settings/notifications', label: 'Notifications' },
   { href: '/settings/migration', label: 'Migration' },
 ];

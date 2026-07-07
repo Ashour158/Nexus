@@ -19,6 +19,7 @@ import { createDedupService } from '../services/dedup.service.js';
 import { registerScoringRoutes } from './scoring.routes.js';
 import { registerForecastRoutes } from './forecast.routes.js';
 import { registerEnrichmentRoutes } from './enrichment.routes.js';
+import { registerCustomFieldsRoutes } from './custom-fields.routes.js';
 import { registerInternalReportingRoutes } from './internal-reporting.routes.js';
 import { registerCrmInternalRoutes } from './internal.routes.js';
 import { registerWinLossRoutes } from './win-loss.routes.js';
@@ -37,7 +38,7 @@ export async function registerAllRoutes(
   prisma: CrmPrisma,
   producer: NexusProducer
 ): Promise<void> {
-  const dedupService = createDedupService(prisma);
+  const dedupService = createDedupService(prisma, producer);
   await registerAccountHierarchyRoutes(app, prisma);
   await registerStakeholderRoutes(app, prisma);
   await registerDealRoomRoutes(app, prisma);
@@ -48,13 +49,14 @@ export async function registerAllRoutes(
   await registerPipelinesRoutes(app, prisma);
   await registerActivitiesRoutes(app, prisma, producer);
   await registerNotesRoutes(app, prisma);
+  await registerCustomFieldsRoutes(app, prisma);
   await registerEmailThreadsRoutes(app, prisma);
   await registerCrmReportsRoutes(app, prisma);
   await registerBulkRoutes(app, prisma, producer);
   await registerDedupRoutes(app, prisma, dedupService);
   await registerScoringRoutes(app, prisma);
   await registerForecastRoutes(app, prisma);
-  await registerEnrichmentRoutes(app, prisma);
+  await registerEnrichmentRoutes(app, prisma, producer);
   await registerInternalReportingRoutes(app, prisma);
   await registerCrmInternalRoutes(app, prisma, producer);
   await registerWinLossRoutes(app, prisma);

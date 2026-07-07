@@ -33,13 +33,21 @@ import {
   useAccountQuotes,
   useUpdateAccount,
 } from '@/hooks/use-accounts';
+import { useUsers } from '@/hooks/use-users';
+import { EnrichmentPanel } from '@/components/crm/EnrichmentPanel';
+import { CustomFieldsSection } from '@/components/crm/CustomFieldsSection';
+import { FieldHistory } from '@/components/crm/FieldHistory';
 import { api } from '@/lib/api-client';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/auth.store';
 import { useRealtimeAccount } from '@/hooks/use-realtime';
+import { ComposeEmailButton } from '@/components/communications/ComposeEmailButton';
 
 type AccountTab =
+  | 'overview'
+  | 'enrichment'
+  | 'customFields'
   | 'timeline'
   | 'contacts'
   | 'deals'
@@ -48,6 +56,7 @@ type AccountTab =
   | 'documents'
   | 'hierarchy'
   | 'governance'
+  | 'history'
   | 'fieldHistory'
   | 'audit'
   | 'outbox'
@@ -63,7 +72,7 @@ export default function AccountDetailPage() {
   const params = useParams();
   const router = useRouter();
   const accountId = params.id as string;
-  const [tab, setTab] = useState<AccountTab>('quotes');
+  const [tab, setTab] = useState<AccountTab>('overview');
   const [editOpen, setEditOpen] = useState(false);
   const documentInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
@@ -77,6 +86,7 @@ export default function AccountDetailPage() {
   const quotesQuery = useAccountQuotes(accountId);
   const ordersQuery = useAccountOrders(accountId);
   const healthQuery = useAccountHealth(accountId);
+  const usersQuery = useUsers({ limit: 100 });
   const updateAccount = useUpdateAccount();
   useRealtimeAccount(accountId);
 
@@ -158,7 +168,15 @@ export default function AccountDetailPage() {
     );
   }
 
+  const ownerFromList = (usersQuery.data?.data ?? []).find((u) => u.id === account.ownerId);
+  const ownerName = ownerFromList
+    ? `${ownerFromList.firstName ?? ''} ${ownerFromList.lastName ?? ''}`.trim() || ownerFromList.email || account.ownerId
+    : account.ownerId;
+
   const tabs: { id: AccountTab; label: string }[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'enrichment', label: 'Enrichment' },
+    { id: 'customFields', label: 'Custom Fields' },
     { id: 'timeline', label: 'Timeline' },
     { id: 'quotes', label: 'CPQ Quotes' },
     { id: 'orders', label: 'Orders' },
@@ -167,6 +185,7 @@ export default function AccountDetailPage() {
     { id: 'deals', label: 'Deals' },
     { id: 'hierarchy', label: 'Hierarchy' },
     { id: 'governance', label: 'Governance' },
+    { id: 'history', label: 'History' },
     { id: 'fieldHistory', label: 'Field History' },
     { id: 'audit', label: 'Audit' },
     { id: 'outbox', label: 'Outbox' },
@@ -192,6 +211,11 @@ export default function AccountDetailPage() {
                   <Edit3 className="h-4 w-4" />
                   Edit Account
                 </Button>
+                <ComposeEmailButton
+                  entityType="account"
+                  entityId={account.id}
+                  to={(account as { email?: string }).email}
+                />
                 <Button
                   onClick={() =>
                     updateAccount.mutate({
@@ -327,6 +351,25 @@ export default function AccountDetailPage() {
           ))}
         </div>
         <div className="p-6">
+          {tab === 'overview' && <OverviewTab account={account} health={health} ownerName={ownerName} />}
+          {tab === 'enrichment' && (
+            <EnrichmentPanel entityType="account" entityId={account.id} canEnrich={canUpdate} />
+          )}
+          {tab === 'customFields' && (
+            <CustomFieldsSection
+              entityType="account"
+              customFields={account.customFields}
+              canUpdate={canUpdate}
+              isSaving={updateAccount.isPending}
+              onSave={(customFields) => updateAccount.mutate({ id: account.id, data: { customFields } })}
+            />
+          )}
+          {tab === 'history' && (
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="mb-4 text-sm font-bold text-slate-950">Field change history</h3>
+              <FieldHistory objectType="account" objectId={account.id} />
+            </div>
+          )}
           {tab === 'timeline' && (
             <TimelineTab
               data={timelineQuery.data}
@@ -356,6 +399,52 @@ export default function AccountDetailPage() {
           {tab === 'duplicates' && <RecordsTab rows={duplicatesQuery.data ?? []} isLoading={duplicatesQuery.isLoading} title="No duplicate accounts found" icon="DUP" />}
         </div>
       </section>
+    </div>
+  );
+}
+
+function OverviewTab({ account, health, ownerName }: { account: Account; health: AccountHealthInsight | undefined; ownerName: string }) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+      <InfoCard title="Firmographics" icon={<Building2 className="h-4 w-4" />}>
+        <DetailItem label="Industry" value={[account.industry, account.subIndustry].filter(Boolean).join(' / ') || 'Not set'} />
+        <DetailItem label="Annual revenue" value={money(account.annualRevenue, account.currency)} />
+        <DetailItem label="Employees" value={account.employeeCount?.toString() ?? 'Not set'} />
+        <DetailItem label="Founded" value={account.foundedYear?.toString() ?? 'Not set'} />
+        <DetailItem label="Lifecycle" value={account.lifecycleStage ?? 'Not set'} />
+      </InfoCard>
+
+      <InfoCard title="Web presence" icon={<Globe2 className="h-4 w-4" />}>
+        <DetailItem label="Website" value={link(account.website)} />
+        <DetailItem label="LinkedIn" value={link(account.linkedInUrl)} />
+        <DetailItem label="Email" value={account.email ?? 'Not set'} />
+        <DetailItem label="Phone" value={account.phone ?? 'Not set'} />
+      </InfoCard>
+
+      <InfoCard title="Ownership & risk" icon={<ShieldCheck className="h-4 w-4" />}>
+        <DetailItem label="Owner" value={ownerName} />
+        <DetailItem label="Health score" value={(health?.score ?? account.healthScore ?? 0).toString()} />
+        <DetailItem label="Risk level" value={account.riskLevel ?? 'Not set'} />
+        <DetailItem label="Status" value={account.status} />
+        <DetailItem label="Tier" value={account.tier} />
+        <DetailItem label="Last activity" value={account.lastActivityAt ? formatDate(account.lastActivityAt) : 'Not set'} />
+      </InfoCard>
+
+      <InfoCard title="Billing address" icon={<Landmark className="h-4 w-4" />}>
+        <AddressBlock account={account} prefix="billing" />
+      </InfoCard>
+
+      <InfoCard title="Shipping address" icon={<PackageCheck className="h-4 w-4" />}>
+        <AddressBlock account={account} prefix="shipping" />
+      </InfoCard>
+
+      <InfoCard title="Compliance" icon={<FileText className="h-4 w-4" />}>
+        <DetailItem label="Tax ID" value={account.taxId ?? 'Not set'} />
+        <DetailItem label="VAT" value={account.vatNumber ?? 'Not set'} />
+        <DetailItem label="Commercial reg." value={account.commercialRegistrationNumber ?? 'Not set'} />
+        <DetailItem label="SIC" value={account.sicCode ?? 'Not set'} />
+        <DetailItem label="NAICS" value={account.naicsCode ?? 'Not set'} />
+      </InfoCard>
     </div>
   );
 }

@@ -19,7 +19,12 @@ import type {
 import type { CrmPrisma } from '../prisma.js';
 import { toPaginatedResult } from '@nexus/shared-types';
 import { updateAccountDataQuality } from '../lib/data-quality.js';
-import { recordFieldChanges } from '../lib/field-history.js';
+import {
+  recordFieldChanges,
+  recordCreateSnapshot,
+  recordSingleChange,
+} from '../lib/field-history.js';
+import { validateCustomFields } from '../lib/custom-field-validation.js';
 import {
   enforceValidationRules,
   applyFieldPermissions,
@@ -193,6 +198,8 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
       }
       // Enforce active validation rules (fail-open: no rules / eval error => allow).
       await enforceValidationRules(prisma, tenantId, 'account', data as Record<string, unknown>);
+      // Low-code governance: validate customFields against CustomFieldDefinition (422 on violation, fail-open).
+      await validateCustomFields(prisma, tenantId, 'account', data.customFields);
       const created = await prisma.account.create({
         data: {
           tenantId,
@@ -270,6 +277,17 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
           },
         })
         .catch(() => undefined);
+
+      // Full history: initial snapshot on CREATE (oldValue=null per tracked field).
+      await recordCreateSnapshot(
+        prisma,
+        tenantId,
+        'account',
+        created.id,
+        created as unknown as Record<string, unknown>,
+        created.ownerId,
+        'system'
+      );
 
       updateAccountDataQuality(prisma, created.id).catch(() => undefined);
 
@@ -375,6 +393,11 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
         mergeForValidation(existing as Record<string, unknown>, safeUpdate as Record<string, unknown>)
       );
 
+      // Low-code governance: validate incoming customFields (422 on violation, fail-open).
+      if (data.customFields !== undefined) {
+        await validateCustomFields(prisma, tenantId, 'account', data.customFields);
+      }
+
       const updated = await prisma.account.update({ where: { id }, data: safeUpdate });
       if (changedBy) {
         await recordFieldChanges(prisma, tenantId, 'account', id, oldValues, data as Record<string, unknown>, changedBy, changedByName);
@@ -417,6 +440,17 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
         throw new BusinessRuleError('Account cannot be archived while active contacts are linked');
       }
       await prisma.account.update({ where: { id }, data: { deletedAt: new Date() } });
+      await recordSingleChange(
+        prisma,
+        tenantId,
+        'account',
+        id,
+        'status',
+        existing.status,
+        'archived',
+        existing.ownerId,
+        'system'
+      );
       await producer
         .publish(TOPICS.ACCOUNTS, {
           type: 'account.archived',
@@ -437,6 +471,17 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
       });
       if (result.count === 0) throw new NotFoundError('Account', id);
       const restored = await prisma.account.findFirstOrThrow({ where: { id, tenantId } });
+      await recordSingleChange(
+        prisma,
+        tenantId,
+        'account',
+        id,
+        'status',
+        'archived',
+        restored.status,
+        restored.ownerId,
+        'system'
+      );
       await producer
         .publish(TOPICS.ACCOUNTS, {
           type: 'account.restored',

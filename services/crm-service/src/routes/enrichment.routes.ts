@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import type { JwtPayload } from '@nexus/shared-types';
 import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
+import type { NexusProducer } from '@nexus/kafka';
 import type { CrmPrisma } from '../prisma.js';
 import { enrichAccount, enrichContact } from '../lib/enrichment.engine.js';
 
-export async function registerEnrichmentRoutes(app: FastifyInstance, prisma: CrmPrisma): Promise<void> {
+export async function registerEnrichmentRoutes(app: FastifyInstance, prisma: CrmPrisma, producer?: NexusProducer): Promise<void> {
   if (!process.env.CLEARBIT_API_KEY && !process.env.APOLLO_API_KEY) {
     app.log.warn(
       'CLEARBIT_API_KEY/APOLLO_API_KEY not set; enrichment requests will be accepted and marked as skipped'
@@ -17,7 +18,7 @@ export async function registerEnrichmentRoutes(app: FastifyInstance, prisma: Crm
     async (req, reply) => {
       const jwt = (req as any).user as JwtPayload;
       const { id } = req.params as { id: string };
-      void enrichContact(prisma, jwt.tenantId, id).catch(() => null);
+      void enrichContact(prisma, jwt.tenantId, id, producer).catch(() => null);
       return reply.status(202).send({ success: true, data: { message: 'Enrichment queued', contactId: id } });
     }
   );
@@ -28,7 +29,7 @@ export async function registerEnrichmentRoutes(app: FastifyInstance, prisma: Crm
     async (req, reply) => {
       const jwt = (req as any).user as JwtPayload;
       const { id } = req.params as { id: string };
-      void enrichAccount(prisma, jwt.tenantId, id).catch(() => null);
+      void enrichAccount(prisma, jwt.tenantId, id, producer).catch(() => null);
       return reply.status(202).send({ success: true, data: { message: 'Enrichment queued', accountId: id } });
     }
   );

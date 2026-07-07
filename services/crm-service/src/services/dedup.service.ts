@@ -1,4 +1,5 @@
 ﻿import type { CrmPrisma } from '../prisma.js';
+import { NexusProducer, TOPICS } from '@nexus/kafka';
 
 function normalize(s: string | null | undefined): string {
   if (!s) return '';
@@ -63,7 +64,7 @@ export function scoreAccountPair(
   return nameSim * 0.6 + domainSim * 0.25 + phoneSim * 0.15;
 }
 
-export function createDedupService(prisma: CrmPrisma) {
+export function createDedupService(prisma: CrmPrisma, producer?: NexusProducer) {
   const THRESHOLD = 0.75;
   const p = prisma as any;
 
@@ -268,8 +269,109 @@ export function createDedupService(prisma: CrmPrisma) {
       });
     });
 
+    // Nervous system: announce each collapsed duplicate so downstream consumers reconcile.
+    if (producer) {
+      for (const dupId of duplicateIds) {
+        await producer
+          .publish(TOPICS.CONTACTS, {
+            type: 'contact.merged',
+            tenantId,
+            payload: { contactId: masterId, mergedFromId: dupId },
+          })
+          .catch(() => undefined);
+      }
+    }
+
     return { merged: duplicateIds.length, masterId };
   }
 
-  return { runFullScan, scanContacts, scanAccounts, mergeContacts };
+  /**
+   * Account merge — parity with contact merge (DI-08/09). Atomic $transaction:
+   * reparent child relations to the master, collision-safe, then soft-delete the
+   * duplicates (deletedAt). Emits `account.merged` per collapsed duplicate.
+   *
+   * NOTE: the CrmPrisma replica-wrapper requires the interactive-tx callback to be
+   * typed `async (tx: CrmPrisma) => …` (see mergeContacts) so `tx.*` models resolve.
+   */
+  async function mergeAccounts(
+    tenantId: string,
+    groupId: string,
+    masterId: string,
+    fieldSelections: Record<string, { sourceId: string; value?: unknown }>,
+    userId: string
+  ) {
+    const mergedData: Record<string, unknown> = {};
+    for (const [field, selection] of Object.entries(fieldSelections)) mergedData[field] = selection.value;
+
+    const group = await p.duplicateGroup.findUnique({ where: { id: groupId }, include: { records: true } });
+    if (!group || group.tenantId !== tenantId) throw new Error('Group not found');
+
+    const duplicateIds = group.records
+      .map((r: { recordId: string }) => r.recordId)
+      .filter((id: string) => id !== masterId);
+
+    await p.$transaction(async (tx: CrmPrisma) => {
+      await tx.account.update({ where: { id: masterId }, data: mergedData });
+
+      // Reparent optional/plain-FK children — no per-account uniqueness on these,
+      // so bulk updateMany is collision-safe.
+      await tx.contact.updateMany({ where: { tenantId, accountId: { in: duplicateIds } }, data: { accountId: masterId } });
+      await tx.deal.updateMany({ where: { tenantId, accountId: { in: duplicateIds } }, data: { accountId: masterId } });
+      await tx.activity.updateMany({ where: { tenantId, accountId: { in: duplicateIds } }, data: { accountId: masterId } });
+      await tx.note.updateMany({ where: { tenantId, accountId: { in: duplicateIds } }, data: { accountId: masterId } });
+      await tx.emailThread.updateMany({ where: { tenantId, accountId: { in: duplicateIds } }, data: { accountId: masterId } });
+      await tx.quoteProjection.updateMany({ where: { tenantId, accountId: { in: duplicateIds } }, data: { accountId: masterId } });
+
+      // Re-parent the hierarchy: children of a duplicate now hang off the master,
+      // and avoid self-parenting the master.
+      await tx.account.updateMany({
+        where: { tenantId, parentAccountId: { in: duplicateIds }, NOT: { id: masterId } },
+        data: { parentAccountId: masterId },
+      });
+
+      // AccountHealthScore carries a @unique(accountId): moving a duplicate's health
+      // row onto an account that already has one would violate it. Keep the master's
+      // (or a duplicate's if the master has none) and drop the rest — collision-safe.
+      const healthModel = tx.accountHealthScore as unknown as {
+        findMany: (a: unknown) => Promise<Array<{ id: string; accountId: string }>>;
+        update: (a: unknown) => Promise<unknown>;
+        delete: (a: unknown) => Promise<unknown>;
+      };
+      const masterHealth = await healthModel.findMany({ where: { accountId: masterId } });
+      const dupHealth = await healthModel.findMany({ where: { accountId: { in: duplicateIds } } });
+      let masterHasHealth = masterHealth.length > 0;
+      for (const row of dupHealth) {
+        if (masterHasHealth) {
+          await healthModel.delete({ where: { id: row.id } });
+        } else {
+          await healthModel.update({ where: { id: row.id }, data: { accountId: masterId } });
+          masterHasHealth = true;
+        }
+      }
+
+      // Soft-delete duplicates (deletedAt) so they drop out of every list.
+      await tx.account.updateMany({ where: { id: { in: duplicateIds } }, data: { deletedAt: new Date() } });
+      await tx.duplicateGroup.update({
+        where: { id: groupId },
+        data: { status: 'merged', masterRecordId: masterId, resolvedAt: new Date(), resolvedBy: userId },
+      });
+    });
+
+    // Nervous system: announce each collapsed duplicate.
+    if (producer) {
+      for (const dupId of duplicateIds) {
+        await producer
+          .publish(TOPICS.ACCOUNTS, {
+            type: 'account.merged',
+            tenantId,
+            payload: { accountId: masterId, mergedFromId: dupId },
+          })
+          .catch(() => undefined);
+      }
+    }
+
+    return { merged: duplicateIds.length, masterId };
+  }
+
+  return { runFullScan, scanContacts, scanAccounts, mergeContacts, mergeAccounts };
 }

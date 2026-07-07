@@ -1,5 +1,6 @@
 import type { CrmPrisma } from '../prisma.js';
 import { createHttpClient } from '@nexus/service-utils';
+import { NexusProducer, TOPICS } from '@nexus/kafka';
 
 interface EnrichmentResult {
   company?: string;
@@ -18,7 +19,8 @@ interface EnrichmentResult {
 export async function enrichContact(
   prisma: CrmPrisma,
   tenantId: string,
-  contactId: string
+  contactId: string,
+  producer?: NexusProducer
 ): Promise<void> {
   const contact = await prisma.contact.findFirst({
     where: { id: contactId, tenantId },
@@ -26,6 +28,7 @@ export async function enrichContact(
       id: true,
       email: true,
       accountId: true,
+      ownerId: true,
       linkedInUrl: true,
       phone: true,
       city: true,
@@ -85,6 +88,20 @@ export async function enrichContact(
 
     if (Object.keys(updates).length > 0) {
       await prisma.contact.update({ where: { id: contactId }, data: updates });
+      // Nervous system: enrichment filled fields → let search/analytics/timeline learn.
+      if (producer) {
+        await producer
+          .publish(TOPICS.CONTACTS, {
+            type: 'contact.updated',
+            tenantId,
+            payload: {
+              contactId,
+              accountId: contact.accountId ?? undefined,
+              changedFields: Object.keys(updates),
+            },
+          })
+          .catch(() => undefined);
+      }
     }
 
     await prisma.enrichmentJob.update({
@@ -110,13 +127,15 @@ export async function enrichContact(
 export async function enrichAccount(
   prisma: CrmPrisma,
   tenantId: string,
-  accountId: string
+  accountId: string,
+  producer?: NexusProducer
 ): Promise<void> {
   const account = await prisma.account.findFirst({
     where: { id: accountId, tenantId },
     select: {
       id: true,
       name: true,
+      ownerId: true,
       website: true,
       industry: true,
       employeeCount: true,
@@ -164,6 +183,21 @@ export async function enrichAccount(
 
     if (Object.keys(updates).length > 0) {
       await prisma.account.update({ where: { id: accountId }, data: updates });
+      // Nervous system: enrichment filled fields → let search/analytics/timeline learn.
+      if (producer) {
+        await producer
+          .publish(TOPICS.ACCOUNTS, {
+            type: 'account.updated',
+            tenantId,
+            payload: {
+              accountId,
+              name: account.name,
+              ownerId: account.ownerId,
+              changedFields: Object.keys(updates),
+            },
+          })
+          .catch(() => undefined);
+      }
     }
 
     await prisma.enrichmentJob.update({

@@ -28,9 +28,14 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { CallButton } from '@/components/crm/call-button';
+import { ComposeEmailButton } from '@/components/communications/ComposeEmailButton';
 import { timelineMeta } from '@/lib/timeline-icons';
 import { useContact, useContactDeals } from '@/hooks/use-contacts';
 import { useActivities } from '@/hooks/use-activities';
+import { useUsers } from '@/hooks/use-users';
+import { EnrichmentPanel } from '@/components/crm/EnrichmentPanel';
+import { CustomFieldsSection } from '@/components/crm/CustomFieldsSection';
+import { FieldHistory } from '@/components/crm/FieldHistory';
 import { api } from '@/lib/api-client';
 import { formatDate } from '@/lib/format';
 import { cn } from '@/lib/cn';
@@ -39,12 +44,16 @@ import { notify } from '@/lib/toast';
 import { useRealtimeContact } from '@/hooks/use-realtime';
 
 type ContactTab =
+  | 'overview'
+  | 'enrichment'
+  | 'customFields'
   | 'deals'
   | 'activities'
   | 'timeline'
   | 'quotes'
   | 'documents'
   | 'mail'
+  | 'history'
   | 'fieldHistory'
   | 'audit'
   | 'outbox'
@@ -66,7 +75,7 @@ export default function ContactDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const contactId = params.id as string;
-  const [tab, setTab] = useState<ContactTab>('timeline');
+  const [tab, setTab] = useState<ContactTab>('overview');
   const [editOpen, setEditOpen] = useState(false);
   const [documentOpen, setDocumentOpen] = useState(false);
   const hasPermission = useAuthStore((s) => s.hasPermission);
@@ -79,6 +88,7 @@ export default function ContactDetailPage() {
   useRealtimeContact(contactId);
   const dealsQuery = useContactDeals(contactId);
   const activitiesQuery = useActivities({ contactId, limit: 50 });
+  const usersQuery = useUsers({ limit: 100 });
   const quotesQuery = useQuery<Record<string, unknown>>({
     queryKey: ['contacts', contactId, 'quotes'],
     queryFn: () => api.get<Record<string, unknown>>(`/contacts/${contactId}/quotes`, { params: { limit: 50 } }),
@@ -197,13 +207,22 @@ export default function ContactDetailPage() {
   const influenceLevel = customString(contact, 'influenceLevel') || 'Standard';
   const archive = customRecord(contact, 'archive');
 
+  const ownerFromList = (usersQuery.data?.data ?? []).find((u) => u.id === contact.ownerId);
+  const ownerName = ownerFromList
+    ? `${ownerFromList.firstName ?? ''} ${ownerFromList.lastName ?? ''}`.trim() || ownerFromList.email || contact.ownerId
+    : contact.ownerId;
+
   const tabs: { id: ContactTab; label: string }[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'enrichment', label: 'Enrichment' },
+    { id: 'customFields', label: 'Custom Fields' },
     { id: 'timeline', label: 'Timeline' },
     { id: 'quotes', label: 'CPQ Quotes' },
     { id: 'deals', label: 'Deals' },
     { id: 'activities', label: 'Activities' },
     { id: 'documents', label: 'Documents' },
     { id: 'mail', label: 'Mail' },
+    { id: 'history', label: 'History' },
     { id: 'fieldHistory', label: 'Field History' },
     { id: 'audit', label: 'Audit' },
     { id: 'outbox', label: 'Outbox' },
@@ -242,6 +261,13 @@ export default function ContactDetailPage() {
                 defaultNumber={contact.phone ?? contact.mobile}
                 disabled={contact.doNotCall}
                 disabledReason="Contact has opted out of calls"
+              />
+              <ComposeEmailButton
+                entityType="contact"
+                entityId={contactId}
+                to={contact.email}
+                disabled={contact.doNotEmail}
+                disabledReason="Contact has opted out of email"
               />
               <Link href={`/contacts/${contactId}/portal`}>
                 <Button variant="secondary">Portal</Button>
@@ -380,6 +406,35 @@ export default function ContactDetailPage() {
         </div>
 
         <div className="p-6">
+          {tab === 'overview' && (
+            <ContactOverviewTab
+              contact={contact}
+              ownerName={ownerName}
+              whatsapp={whatsapp}
+              secondPhone={secondPhone}
+              lifecycle={lifecycle}
+              buyingCommitteeRole={buyingCommitteeRole}
+              influenceLevel={influenceLevel}
+            />
+          )}
+          {tab === 'enrichment' && (
+            <EnrichmentPanel entityType="contact" entityId={contact.id} canEnrich={canUpdate} />
+          )}
+          {tab === 'customFields' && (
+            <CustomFieldsSection
+              entityType="contact"
+              customFields={contact.customFields}
+              canUpdate={canUpdate}
+              isSaving={updateContact.isPending}
+              onSave={(customFields) => updateContact.mutate({ customFields })}
+            />
+          )}
+          {tab === 'history' && (
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="mb-4 text-sm font-bold text-slate-950">Field change history</h3>
+              <FieldHistory objectType="contact" objectId={contact.id} />
+            </div>
+          )}
           {tab === 'deals' && <DealsTab data={dealsQuery.data} isLoading={dealsQuery.isLoading} />}
           {tab === 'quotes' && (
             <RecordsTab
@@ -439,6 +494,78 @@ export default function ContactDetailPage() {
           onUpload={(payload) => uploadDocument.mutate(payload)}
         />
       ) : null}
+    </div>
+  );
+}
+
+function ContactOverviewTab({
+  contact,
+  ownerName,
+  whatsapp,
+  secondPhone,
+  lifecycle,
+  buyingCommitteeRole,
+  influenceLevel,
+}: {
+  contact: Contact;
+  ownerName: string;
+  whatsapp: string;
+  secondPhone: string;
+  lifecycle: string;
+  buyingCommitteeRole: string;
+  influenceLevel: string;
+}) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+      <InfoCard title="Identity" icon={<UserRound className="h-4 w-4" />}>
+        <DetailItem label="Name" value={`${contact.firstName} ${contact.lastName}`} />
+        <DetailItem label="Job title" value={contact.jobTitle ?? 'Not set'} />
+        <DetailItem label="Department" value={contact.department ?? 'Not set'} />
+        <DetailItem label="Lifecycle" value={lifecycle} />
+        <DetailItem label="Owner" value={ownerName} />
+      </InfoCard>
+
+      <InfoCard title="Communication" icon={<Phone className="h-4 w-4" />}>
+        <DetailItem label="Email" value={contact.email ?? 'Not set'} />
+        <DetailItem label="Phone" value={contact.phone ?? 'Not set'} />
+        <DetailItem label="Mobile" value={contact.mobile ?? 'Not set'} />
+        <DetailItem label="WhatsApp" value={whatsapp || 'Not set'} />
+        <DetailItem label="Second phone" value={secondPhone || 'Not set'} />
+        <DetailItem label="Preferred channel" value={contact.preferredChannel ?? 'Email'} />
+      </InfoCard>
+
+      <InfoCard title="Social & location" icon={<MapPin className="h-4 w-4" />}>
+        <DetailItem
+          label="LinkedIn"
+          value={
+            contact.linkedInUrl ? (
+              <a href={contact.linkedInUrl} target="_blank" rel="noreferrer" className="font-semibold text-blue-700 hover:underline">
+                {contact.linkedInUrl}
+              </a>
+            ) : (
+              'Not set'
+            )
+          }
+        />
+        <DetailItem label="Twitter / X" value={contact.twitterHandle ?? 'Not set'} />
+        <DetailItem label="Address" value={[contact.address, contact.city, contact.country].filter(Boolean).join(', ') || 'Not set'} />
+        <DetailItem label="Timezone" value={contact.timezone ?? 'Not set'} />
+        <DetailItem label="Account" value={contact.accountId ? <Link href={`/accounts/${contact.accountId}`} className="font-semibold text-blue-700 hover:underline">{contact.accountId}</Link> : 'Unassigned'} />
+      </InfoCard>
+
+      <InfoCard title="Consent & controls" icon={<ShieldCheck className="h-4 w-4" />}>
+        <DetailItem label="GDPR consent" value={contact.gdprConsent ? 'Captured' : 'Missing'} />
+        <DetailItem label="Do not email" value={contact.doNotEmail ? 'Yes' : 'No'} />
+        <DetailItem label="Do not call" value={contact.doNotCall ? 'Yes' : 'No'} />
+        <DetailItem label="Created" value={formatDate(contact.createdAt)} />
+        <DetailItem label="Updated" value={formatDate(contact.updatedAt)} />
+      </InfoCard>
+
+      <InfoCard title="Relationship" icon={<Route className="h-4 w-4" />}>
+        <DetailItem label="Buying role" value={buyingCommitteeRole} />
+        <DetailItem label="Influence" value={influenceLevel} />
+        <DetailItem label="Tags" value={contact.tags.length ? contact.tags.join(', ') : 'None'} />
+      </InfoCard>
     </div>
   );
 }

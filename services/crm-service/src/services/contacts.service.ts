@@ -10,7 +10,12 @@ import { Prisma } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { Contact, Deal } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { CrmPrisma } from '../prisma.js';
 import { toPaginatedResult } from '@nexus/shared-types';
-import { recordFieldChanges } from '../lib/field-history.js';
+import {
+  recordFieldChanges,
+  recordCreateSnapshot,
+  recordSingleChange,
+} from '../lib/field-history.js';
+import { validateCustomFields } from '../lib/custom-field-validation.js';
 import { updateContactDataQuality } from '../lib/data-quality.js';
 import {
   enforceValidationRules,
@@ -133,6 +138,8 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
 
       // Enforce active validation rules (fail-open: no rules / eval error => allow).
       await enforceValidationRules(prisma, tenantId, 'contact', data as Record<string, unknown>);
+      // Low-code governance: validate customFields against CustomFieldDefinition (422 on violation, fail-open).
+      await validateCustomFields(prisma, tenantId, 'contact', data.customFields);
 
       const emails = data.emails && data.emails.length > 0 ? data.emails : (data.email ? [{ email: data.email, label: 'work', isPrimary: true }] : []);
       const hasPrimary = emails.some((e) => e.isPrimary);
@@ -179,6 +186,17 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
           },
         })
         .catch(() => undefined);
+
+      // Full history: initial snapshot on CREATE (oldValue=null per tracked field).
+      await recordCreateSnapshot(
+        prisma,
+        tenantId,
+        'contact',
+        created.id,
+        created as unknown as Record<string, unknown>,
+        created.ownerId,
+        'system'
+      );
 
       updateContactDataQuality(prisma, created.id).catch(() => undefined);
 
@@ -273,6 +291,11 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
         mergeForValidation(existing as Record<string, unknown>, safeUpdate as Record<string, unknown>)
       );
 
+      // Low-code governance: validate incoming customFields (422 on violation, fail-open).
+      if (data.customFields !== undefined) {
+        await validateCustomFields(prisma, tenantId, 'contact', data.customFields);
+      }
+
       const updated = await prisma.contact.update({ where: { id }, data: safeUpdate });
       if (changedBy) {
         await recordFieldChanges(prisma, tenantId, 'contact', id, oldValues, data as Record<string, unknown>, changedBy, changedByName);
@@ -318,9 +341,29 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
         prisma.contact.update({ where: { id: primaryId }, data: mergedData }),
         prisma.contact.update({ where: { id: secondaryId }, data: { deletedAt: new Date(), isActive: false } }),
       ]);
-      if (changedBy) {
-        await recordFieldChanges(prisma, tenantId, 'contact', primaryId, {}, { mergedFrom: secondaryId } as Record<string, unknown>, changedBy);
-      }
+      // Full history: mark the merge on the surviving (primary) record.
+      await recordSingleChange(
+        prisma,
+        tenantId,
+        'contact',
+        primaryId,
+        'merged',
+        null,
+        secondaryId,
+        changedBy ?? primary.ownerId,
+        changedBy ? undefined : 'system'
+      );
+      await producer
+        .publish(TOPICS.CONTACTS, {
+          type: 'contact.merged',
+          tenantId,
+          payload: {
+            contactId: primaryId,
+            mergedFromId: secondaryId,
+            accountId: primary.accountId ?? undefined,
+          },
+        })
+        .catch(() => undefined);
       return prisma.contact.findFirstOrThrow({ where: { id: primaryId, tenantId } });
     },
 
@@ -329,6 +372,17 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
       const existing = await loadOrThrow(tenantId, id);
       if (existing.deletedAt) return;
       await prisma.contact.update({ where: { id }, data: { deletedAt: new Date(), isActive: false } });
+      await recordSingleChange(
+        prisma,
+        tenantId,
+        'contact',
+        id,
+        'status',
+        'active',
+        'archived',
+        existing.ownerId,
+        'system'
+      );
       await producer
         .publish(TOPICS.CONTACTS, {
           type: 'contact.archived',
@@ -349,6 +403,17 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
       });
       if (result.count === 0) throw new NotFoundError('Contact', id);
       const restored = await prisma.contact.findFirstOrThrow({ where: { id, tenantId } });
+      await recordSingleChange(
+        prisma,
+        tenantId,
+        'contact',
+        id,
+        'status',
+        'archived',
+        'active',
+        restored.ownerId,
+        'system'
+      );
       await producer
         .publish(TOPICS.CONTACTS, {
           type: 'contact.restored',

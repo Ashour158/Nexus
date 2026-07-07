@@ -38,6 +38,7 @@ import { DetailQuickActions } from '@/components/crm/DetailQuickActions';
 import { EnrichmentPanel } from '@/components/crm/EnrichmentPanel';
 import { CustomFieldsSection } from '@/components/crm/CustomFieldsSection';
 import { FieldHistory } from '@/components/crm/FieldHistory';
+import { BuyingCommittee } from '@/components/crm/BuyingCommittee';
 import { api } from '@/lib/api-client';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/cn';
@@ -51,6 +52,7 @@ type AccountTab =
   | 'customFields'
   | 'timeline'
   | 'contacts'
+  | 'committee'
   | 'deals'
   | 'quotes'
   | 'orders'
@@ -67,6 +69,20 @@ interface HierarchyNode {
   id: string;
   name: string;
   children?: HierarchyNode[];
+}
+
+interface HierarchyRollup {
+  totalRevenue?: number;
+  totalEmployees?: number;
+  contactCount?: number;
+  avgHealth?: number;
+  totalDealValue?: number;
+  openDealCount?: number;
+  wonDealValue?: number;
+}
+
+interface HierarchyResponse extends HierarchyNode {
+  rollup?: HierarchyRollup;
 }
 
 export default function AccountDetailPage() {
@@ -96,9 +112,9 @@ export default function AccountDetailPage() {
     queryFn: () => api.get<PaginatedResult<TimelineEvent>>(`/accounts/${accountId}/timeline`),
     enabled: Boolean(accountId) && tab === 'timeline',
   });
-  const hierarchyQuery = useQuery<HierarchyNode>({
+  const hierarchyQuery = useQuery<HierarchyResponse>({
     queryKey: ['accounts', accountId, 'hierarchy'],
-    queryFn: () => api.get<HierarchyNode>(`/accounts/${accountId}/hierarchy`),
+    queryFn: () => api.get<HierarchyResponse>(`/accounts/${accountId}/hierarchy`),
     enabled: Boolean(accountId) && tab === 'hierarchy',
   });
   const documentsQuery = useQuery<Record<string, unknown>[]>({
@@ -183,6 +199,7 @@ export default function AccountDetailPage() {
     { id: 'orders', label: 'Orders' },
     { id: 'documents', label: 'Documents' },
     { id: 'contacts', label: 'Contacts' },
+    { id: 'committee', label: 'Buying Committee' },
     { id: 'deals', label: 'Deals' },
     { id: 'hierarchy', label: 'Hierarchy' },
     { id: 'governance', label: 'Governance' },
@@ -395,8 +412,9 @@ export default function AccountDetailPage() {
             />
           )}
           {tab === 'contacts' && <ContactsTab data={contactsQuery.data} isLoading={contactsQuery.isLoading} />}
+          {tab === 'committee' && <BuyingCommittee accountId={account.id} canUpdate={canUpdate} />}
           {tab === 'deals' && <DealsTab data={dealsQuery.data} isLoading={dealsQuery.isLoading} />}
-          {tab === 'hierarchy' && <HierarchyTab data={hierarchyQuery.data} isLoading={hierarchyQuery.isLoading} />}
+          {tab === 'hierarchy' && <HierarchyTab data={hierarchyQuery.data} isLoading={hierarchyQuery.isLoading} currency={account.currency} />}
           {tab === 'governance' && <GovernanceTab account={account} />}
           {tab === 'fieldHistory' && <RecordsTab rows={fieldHistoryQuery.data ?? []} isLoading={fieldHistoryQuery.isLoading} title="No field changes" icon="HIST" />}
           {tab === 'audit' && <RecordsTab rows={auditQuery.data ?? []} isLoading={auditQuery.isLoading} title="No audit events" icon="AUD" />}
@@ -614,11 +632,36 @@ function TimelineTab({
   );
 }
 
-function HierarchyTab({ data, isLoading }: { data: HierarchyNode | undefined; isLoading: boolean }) {
+function HierarchyTab({ data, isLoading, currency }: { data: HierarchyResponse | undefined; isLoading: boolean; currency?: string | null }) {
   if (isLoading) return <Skeleton className="h-48" />;
   const root = data;
   if (!root) return <EmptyState icon="🏢" title="No hierarchy" description="This account has no parent or child accounts." />;
-  return <HierarchyNodeItem node={root} depth={0} />;
+  const rollup = root.rollup;
+  return (
+    <div className="space-y-6">
+      {rollup ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <RollupCard label="Total revenue" value={money(rollup.totalRevenue, currency)} />
+          <RollupCard label="Total employees" value={rollup.totalEmployees != null ? rollup.totalEmployees.toLocaleString() : 'Not set'} />
+          <RollupCard label="Contacts" value={rollup.contactCount != null ? rollup.contactCount.toLocaleString() : 'Not set'} />
+          <RollupCard label="Avg. health" value={rollup.avgHealth != null ? `${Math.round(rollup.avgHealth)}` : 'Not set'} />
+        </div>
+      ) : null}
+      <div>
+        <h3 className="mb-3 text-sm font-bold text-slate-950">Account tree</h3>
+        <HierarchyNodeItem node={root} depth={0} />
+      </div>
+    </div>
+  );
+}
+
+function RollupCard({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="mt-1 text-xl font-bold text-slate-950">{value}</p>
+    </div>
+  );
 }
 
 function HierarchyNodeItem({ node, depth }: { node: HierarchyNode; depth: number }) {

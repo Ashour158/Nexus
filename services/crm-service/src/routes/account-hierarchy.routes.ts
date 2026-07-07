@@ -72,7 +72,7 @@ async function rollupValues(prisma: CrmPrisma, tenantId: string, acctId: string)
     }
   }
 
-  const [agg] = await Promise.all([
+  const [agg, accountAgg, contactCount, directResult] = await Promise.all([
     prisma.deal.aggregate({
       where: {
         tenantId,
@@ -82,19 +82,32 @@ async function rollupValues(prisma: CrmPrisma, tenantId: string, acctId: string)
       _sum: { amount: true },
       _count: true,
     }),
+    // Roll up account-level metrics across the whole subtree (self + descendants)
+    prisma.account.aggregate({
+      where: { tenantId, id: { in: allIds } },
+      _sum: { annualRevenue: true, employeeCount: true },
+      _avg: { healthScore: true },
+    }),
+    prisma.contact.count({
+      where: { tenantId, accountId: { in: allIds } },
+    }),
+    prisma.deal.aggregate({
+      where: { tenantId, accountId: acctId, status: { not: 'LOST' } },
+      _sum: { amount: true },
+      _count: true,
+    }),
   ]);
-
-  const directResult = await prisma.deal.aggregate({
-    where: { tenantId, accountId: acctId, status: { not: 'LOST' } },
-    _sum: { amount: true },
-    _count: true,
-  });
 
   return {
     totalValue: (agg._sum.amount?.toNumber() ?? 0),
     dealCount: agg._count,
     directValue: directResult._sum.amount?.toNumber() ?? 0,
     directDealCount: directResult._count,
+    accountCount: allIds.length,
+    totalAnnualRevenue: accountAgg._sum.annualRevenue?.toNumber() ?? 0,
+    totalEmployeeCount: accountAgg._sum.employeeCount ?? 0,
+    totalContactCount: contactCount,
+    avgHealthScore: accountAgg._avg.healthScore ?? null,
   };
 }
 

@@ -3,6 +3,7 @@ import type { NexusProducer } from '@nexus/kafka';
 import type { CrmPrisma } from '../prisma.js';
 import { registerDealsRoutes } from './deals.routes.js';
 import { registerAccountHierarchyRoutes } from './account-hierarchy.routes.js';
+import { registerAccountContactRelationsRoutes } from './account-contact-relations.routes.js';
 import { registerStakeholderRoutes } from './stakeholders.routes.js';
 import { registerDealRoomRoutes } from './deal-room.routes.js';
 import { registerAccountsRoutes } from './accounts.routes.js';
@@ -40,6 +41,7 @@ export async function registerAllRoutes(
 ): Promise<void> {
   const dedupService = createDedupService(prisma, producer);
   await registerAccountHierarchyRoutes(app, prisma);
+  await registerAccountContactRelationsRoutes(app, prisma);
   await registerStakeholderRoutes(app, prisma);
   await registerDealRoomRoutes(app, prisma);
   await registerDealsRoutes(app, prisma, producer);

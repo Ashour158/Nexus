@@ -148,6 +148,7 @@ model Contact {
 
   emails           ContactEmail[]
   addresses        ContactAddress[]
+  accountRelations AccountContactRelation[]
 
   @@unique([tenantId, email])
   @@unique([id, tenantId])
@@ -212,6 +213,33 @@ model ConsentRecord {
   @@unique([id, tenantId])
   @@index([tenantId, contactId])
   @@index([tenantId, status])
+}
+
+/// Account-Contact Relationship (ACR) + account-level buying committee.
+/// Lets a contact relate to many accounts (many-to-many, beyond the scalar
+/// Contact.accountId) AND models the committee (role/influence/sentiment/reportsTo).
+model AccountContactRelation {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  accountId           String
+  contactId           String
+  role                String // Decision Maker | Champion | Influencer | Blocker | Evaluator | ...
+  isPrimary           Boolean  @default(false)
+  isDirect            Boolean  @default(true)
+  influence           String? // HIGH | MEDIUM | LOW
+  sentiment           String? // POSITIVE | NEUTRAL | NEGATIVE
+  reportsToContactId  String? // contactId of the person this contact reports to (no FK)
+  isChampion          Boolean  @default(false)
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, accountId, contactId])
+  @@index([tenantId, accountId])
+  @@index([tenantId, contactId])
 }
 
 model Account {
@@ -290,6 +318,7 @@ model Account {
   emailThreads     EmailThread[]
   healthRecord     AccountHealthScore?
   dataQualityScore Int?
+  contactRelations AccountContactRelation[]
 
   @@unique([id, tenantId])
   @@index([tenantId])

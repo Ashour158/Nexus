@@ -32,6 +32,7 @@ import { ComposeEmailButton } from '@/components/communications/ComposeEmailButt
 import { DetailQuickActions } from '@/components/crm/DetailQuickActions';
 import { timelineMeta } from '@/lib/timeline-icons';
 import { useContact, useContactDeals } from '@/hooks/use-contacts';
+import { useRelatedAccounts, type RelatedAccount } from '@/hooks/use-account-relations';
 import { activityKeys, useActivities } from '@/hooks/use-activities';
 import { useUsers } from '@/hooks/use-users';
 import { EnrichmentPanel } from '@/components/crm/EnrichmentPanel';
@@ -49,6 +50,7 @@ type ContactTab =
   | 'enrichment'
   | 'customFields'
   | 'deals'
+  | 'relatedAccounts'
   | 'activities'
   | 'timeline'
   | 'quotes'
@@ -88,6 +90,7 @@ export default function ContactDetailPage() {
   const contactQuery = useContact(contactId);
   useRealtimeContact(contactId);
   const dealsQuery = useContactDeals(contactId);
+  const relatedAccountsQuery = useRelatedAccounts(contactId);
   const activitiesQuery = useActivities({ contactId, limit: 50 });
   const usersQuery = useUsers({ limit: 100 });
   const quotesQuery = useQuery<Record<string, unknown>>({
@@ -220,6 +223,7 @@ export default function ContactDetailPage() {
     { id: 'timeline', label: 'Timeline' },
     { id: 'quotes', label: 'CPQ Quotes' },
     { id: 'deals', label: 'Deals' },
+    { id: 'relatedAccounts', label: 'Related Accounts' },
     { id: 'activities', label: 'Activities' },
     { id: 'documents', label: 'Documents' },
     { id: 'mail', label: 'Mail' },
@@ -447,6 +451,9 @@ export default function ContactDetailPage() {
             </div>
           )}
           {tab === 'deals' && <DealsTab data={dealsQuery.data} isLoading={dealsQuery.isLoading} />}
+          {tab === 'relatedAccounts' && (
+            <RelatedAccountsTab data={relatedAccountsQuery.data} isLoading={relatedAccountsQuery.isLoading} isError={relatedAccountsQuery.isError} />
+          )}
           {tab === 'quotes' && (
             <RecordsTab
               rows={paginatedRows(quotesQuery.data)}
@@ -1006,6 +1013,70 @@ function DealsTab({ data, isLoading }: { data: { data: Deal[]; total: number } |
             {d.amount} {d.currency}
           </p>
         </div>
+      ))}
+    </div>
+  );
+}
+
+function RelatedAccountsTab({
+  data,
+  isLoading,
+  isError,
+}: {
+  data: RelatedAccount[] | undefined;
+  isLoading: boolean;
+  isError: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[...Array(3)].map((_, i) => (
+          <Skeleton key={i} className="h-16" />
+        ))}
+      </div>
+    );
+  }
+  if (isError) {
+    return (
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        Related accounts could not be loaded right now.
+      </div>
+    );
+  }
+  const relations = data ?? [];
+  if (relations.length === 0) {
+    return (
+      <EmptyState
+        icon="🏢"
+        title="No related accounts"
+        description="This contact is not linked to any account through the buying-committee layer."
+      />
+    );
+  }
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-slate-500">
+        This contact influences {relations.length} account{relations.length === 1 ? '' : 's'} across the buying-committee layer — they are not bound to a single account.
+      </p>
+      {relations.map((r) => (
+        <Link
+          key={r.id}
+          href={`/accounts/${r.accountId}`}
+          className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 hover:border-blue-200 hover:bg-blue-50/30"
+        >
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-slate-900">{r.account.name}</p>
+            <p className="mt-0.5 text-xs text-slate-500">{r.account.industry ?? 'Industry not set'}</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {r.isPrimary ? (
+              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-blue-700">
+                Primary
+              </span>
+            ) : null}
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{r.role}</span>
+          </div>
+        </Link>
       ))}
     </div>
   );

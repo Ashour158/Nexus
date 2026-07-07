@@ -1,5 +1,6 @@
 import type { PaginatedResult } from '@nexus/shared-types';
 import { NotFoundError } from '@nexus/service-utils';
+import { TOPICS, type NexusProducer } from '@nexus/kafka';
 type CommOutbox = any;
 import type { CommPrisma } from '../prisma.js';
 import type { EmailChannel } from '../channels/smtp.channel.js';
@@ -26,7 +27,8 @@ function toPaginated<T>(
 export function createOutboxService(
   prisma: CommPrisma,
   email: EmailChannel,
-  sms: SmsChannel
+  sms: SmsChannel,
+  producer?: NexusProducer
 ) {
   return {
     async queueEmail(
@@ -109,6 +111,30 @@ export function createOutboxService(
               where: { id: row.id },
               data: { status: 'SENT', sentAt: new Date(), errorMessage: null },
             });
+            // Nervous system: emit email.sent so crm's engagement-timeline
+            // consumer logs an Activity on the linked contact/account/deal. Only
+            // for entity-linked EMAILs; fire-and-forget so Kafka never blocks send.
+            if (row.channel === 'EMAIL' && producer && row.entityId) {
+              const et = String(row.entityType ?? '').toUpperCase();
+              const link: Record<string, string> = {};
+              if (et === 'CONTACT') link.contactId = row.entityId;
+              else if (et === 'ACCOUNT') link.accountId = row.entityId;
+              else if (et === 'DEAL') link.dealId = row.entityId;
+              void producer
+                .publish(TOPICS.EMAILS, {
+                  type: 'email.sent',
+                  tenantId,
+                  payload: {
+                    messageId: row.id,
+                    direction: 'OUTBOUND',
+                    subject: row.subject ?? '',
+                    to: row.to,
+                    ...link,
+                    occurredAt: new Date().toISOString(),
+                  },
+                })
+                .catch(() => undefined);
+            }
           })
         );
         for (let r = 0; r < results.length; r++) {

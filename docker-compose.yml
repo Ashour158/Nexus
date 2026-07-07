@@ -270,64 +270,21 @@ services:
       timeout: 10s
       retries: 3
 
-  accounts-service:
-    build:
-      context: .
-      dockerfile: ./services/accounts-service/Dockerfile
-    container_name: nexus-accounts
-    restart: unless-stopped
-    ports:
-      - '3031:3031'
-    environment:
-      PORT: '3031'
-      ACCOUNTS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_accounts
-      KAFKA_BROKERS: kafka:29092
-      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
-      JWT_SECRET: ${JWT_SECRET}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
-      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3031/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # accounts-service DECOMMISSIONED — orphaned duplicate of crm-service (the wired
+  # authority for accounts; web BFF → CRM_SERVICE_URL). It ran a split-brain
+  # account-health.consumer writing a duplicate AccountHealthScore into nexus_accounts
+  # while crm-service owns the real one. Removed to end the split-brain.
+  # See services/accounts-service/DEPRECATED.md.
 
   # leads-service DECOMMISSIONED — orphaned duplicate of crm-service (the wired
   # authority for leads). Nothing routed to it (BFF → crm-service:3001), it ran no
   # Kafka consumers, and its lead.* outbox duplicated crm-service. Removed to end
   # the split-brain. See services/leads-service/DEPRECATED.md.
 
-  contacts-service:
-    build:
-      context: .
-      dockerfile: ./services/contacts-service/Dockerfile
-    container_name: nexus-contacts
-    restart: unless-stopped
-    ports:
-      - '3041:3041'
-    environment:
-      PORT: '3041'
-      CONTACTS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_contacts
-      KAFKA_BROKERS: kafka:29092
-      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
-      JWT_SECRET: ${JWT_SECRET}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
-      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3041/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # contacts-service DECOMMISSIONED — orphaned duplicate of crm-service (the wired
+  # authority for contacts; web BFF → CRM_SERVICE_URL). Nothing routed to it and its
+  # contact.* outbox duplicated crm-service. Removed to end the split-brain.
+  # See services/contacts-service/DEPRECATED.md.
 
   # deals-service DECOMMISSIONED — orphaned duplicate of crm-service (the wired deal
   # authority). Deal CRUD was served by crm-service; its only remaining live feature,

@@ -117,7 +117,7 @@ export function createCrmPrisma() {
   if (encryptionKey && encryptionKey.length >= 32) {
     withFieldEncryption(base as any, encryptionKey, [
       { model: 'Contact', fields: ['email', 'phone', 'mobile', 'address'] },
-      { model: 'Account', fields: ['billingAddressLine1', 'billingAddressLine2', 'shippingAddressLine1', 'shippingAddressLine2'] },
+      { model: 'Account', fields: ['email', 'phone', 'billingAddressLine1', 'billingAddressLine2', 'shippingAddressLine1', 'shippingAddressLine2'] },
       { model: 'Note', fields: ['content'] },
       { model: 'Lead', fields: ['email', 'phone', 'address'] },
     ]);

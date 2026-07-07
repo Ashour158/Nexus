@@ -92,7 +92,7 @@ try {
   telephonyProducer = null;
 }
 const templates = createTemplatesService(prisma);
-const outbox = createOutboxService(prisma, smtp, sms);
+const outbox = createOutboxService(prisma, smtp, sms, telephonyProducer ?? undefined);
 const sequences = createSequencesService(prisma, smtp, templates);
 
 let triggerConsumer: Awaited<ReturnType<typeof startTriggerConsumer>> | null = null;

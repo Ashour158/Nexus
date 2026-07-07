@@ -17,7 +17,7 @@ const svc = {
   "blueprint-service":3013,"approval-service":3014,"data-service":3015,"document-service":3016,
   "chatbot-service":3017,"cadence-service":3018,"territory-service":3019,"planning-service":3020,
   "reporting-service":3021,"portal-service":3022,"knowledge-service":3023,"incentive-service":3024,
-  "email-sync-service":3026,"accounts-service":3031,"notes-service":3032,"contacts-service":3041,
+  "email-sync-service":3026,"notes-service":3032,
   "activities-service":3043
 };
 (async () => {

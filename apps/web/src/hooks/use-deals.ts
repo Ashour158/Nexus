@@ -120,6 +120,10 @@ export interface DealListFilters {
   accountId?: string;
   status?: Deal['status'];
   search?: string;
+  /** Narrow to renewal deals (`?isRenewal=true`). */
+  isRenewal?: boolean;
+  /** ISO cutoff — deals whose contract ends before this (`?contractEndBefore=`). */
+  contractEndBefore?: string;
   sortBy?: 'createdAt' | 'updatedAt' | 'amount' | 'expectedCloseDate';
   sortDir?: 'asc' | 'desc';
 }
@@ -154,6 +158,8 @@ export function useDeals(filters: DealListFilters = {}) {
     accountId: filters.accountId,
     status: filters.status,
     search: filters.search?.trim() || undefined,
+    isRenewal: filters.isRenewal ? 'true' : undefined,
+    contractEndBefore: filters.contractEndBefore,
     sortBy: filters.sortBy,
     sortDir: filters.sortDir,
   };
@@ -227,6 +233,89 @@ export function useUpdateDeal() {
     },
     onError: (err) => {
       notify.error('Failed to update deal', err.message);
+    },
+  });
+}
+
+/**
+ * Optimistic in-place deal patch — the driving mutation for the Kanban
+ * card quick-edit (amount / expectedCloseDate / probability, etc.).
+ *
+ * Mirrors {@link useMoveDeal}: it snapshots every cached deals query, patches
+ * the target row across all of them for instant feedback, and rolls the whole
+ * snapshot back on error. It is intentionally quiet on success (no toast) since
+ * it fires on blur/Enter during inline editing; errors surface via the api
+ * client's global error toast plus a rollback. Invalidates on settle to
+ * reconcile with the server (e.g. amount recompute from line items).
+ */
+export function useQuickUpdateDeal() {
+  const qc = useQueryClient();
+
+  interface QuickUpdateVars {
+    id: string;
+    data: UpdateDealInput;
+  }
+  interface QuickUpdateContext {
+    previous: Array<[QueryKey, DealListResponse | undefined]>;
+  }
+
+  return useMutation<Deal, Error, QuickUpdateVars, QuickUpdateContext>({
+    mutationFn: ({ id, data }) => apiClients.deals.patch<Deal>(`/deals/${id}`, data),
+    onMutate: async ({ id, data }) => {
+      await qc.cancelQueries({ queryKey: dealKeys.all });
+
+      const previous = qc.getQueriesData<DealListResponse>({
+        queryKey: dealKeys.all,
+      });
+
+      qc.setQueriesData<DealListResponse>({ queryKey: dealKeys.all }, (old) => {
+        if (!old || !Array.isArray(old.data)) return old;
+        return {
+          ...old,
+          data: old.data.map((d) =>
+            d.id === id ? ({ ...d, ...data } as Deal) : d
+          ),
+        };
+      });
+
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      ctx?.previous.forEach(([key, data]) => {
+        if (data !== undefined) qc.setQueryData(key, data);
+      });
+      // The api client already surfaces a global error toast.
+    },
+    onSettled: (_d, _e, { id }) => {
+      qc.invalidateQueries({ queryKey: dealKeys.detail(id) });
+      qc.invalidateQueries({ queryKey: dealKeys.all });
+    },
+  });
+}
+
+/**
+ * Converts a deal into a renewal, spinning off a new renewal deal linked back
+ * to the source via `renewedFromDealId`. Returns the newly-created renewal.
+ */
+export function useConvertDealToRenewal() {
+  const qc = useQueryClient();
+  return useMutation<
+    Deal,
+    Error,
+    { id: string; contractEndDate?: string; renewalProbability?: number }
+  >({
+    mutationFn: ({ id, contractEndDate, renewalProbability }) =>
+      api.post<Deal>(`/deals/${id}/convert-to-renewal`, {
+        ...(contractEndDate ? { contractEndDate } : {}),
+        ...(renewalProbability != null ? { renewalProbability } : {}),
+      }),
+    onSuccess: (_deal, { id }) => {
+      qc.invalidateQueries({ queryKey: dealKeys.detail(id) });
+      qc.invalidateQueries({ queryKey: dealKeys.all });
+      notify.success('Renewal created');
+    },
+    onError: (err) => {
+      notify.error('Failed to create renewal', err.message);
     },
   });
 }

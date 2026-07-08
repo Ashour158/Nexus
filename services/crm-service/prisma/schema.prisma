@@ -408,6 +408,21 @@ model Deal {
   // When the AI prediction was last computed.
   aiScoredAt        DateTime?
 
+  // ─── Renewal / recurring-revenue layer (additive, nullable, no data loss) ──
+  // Contract end date for the current subscription/term — drives renewal surfacing.
+  contractEndDate    DateTime?
+  // Likelihood (0-100) this deal renews. Distinct from win `probability`.
+  renewalProbability Int?
+  // True when this deal was created as the renewal of an earlier deal.
+  isRenewal          Boolean   @default(false)
+  // The source deal this renewal was spun off from. Stored as a plain indexed
+  // string (NOT a Prisma self-relation) to keep the migration low-risk.
+  renewedFromDealId  String?
+  // Monthly / annual recurring revenue. Nullable; arr auto-derives from mrr
+  // (and vice-versa) on create/update when only one side is supplied.
+  mrr                Decimal?  @db.Decimal(18, 2)
+  arr                Decimal?  @db.Decimal(18, 2)
+
   @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, pipelineId, stageId])
@@ -415,6 +430,9 @@ model Deal {
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
   @@index([tenantId, updatedAt])
+  @@index([tenantId, isRenewal])
+  @@index([tenantId, contractEndDate])
+  @@index([tenantId, renewedFromDealId])
 }
 
 enum DealStatus {

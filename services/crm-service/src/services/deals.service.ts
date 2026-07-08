@@ -57,6 +57,10 @@ export interface DealListFilters {
   search?: string;
   minAmount?: number;
   maxAmount?: number;
+  /** When true, narrows to renewal deals; when false, excludes them. */
+  isRenewal?: boolean;
+  /** ISO date — narrows to deals whose contract ends before this cutoff. */
+  contractEndBefore?: string;
   /** When true, soft-deleted (DORMANT) deals are included. Default false. */
   includeDeleted?: boolean;
 }
@@ -104,6 +108,10 @@ function buildDealListWhere(
   if (filters.stageId) where.stageId = filters.stageId;
   if (filters.ownerId) where.ownerId = filters.ownerId;
   if (filters.accountId) where.accountId = filters.accountId;
+  if (filters.isRenewal !== undefined) where.isRenewal = filters.isRenewal;
+  if (filters.contractEndBefore) {
+    where.contractEndDate = { lte: new Date(filters.contractEndBefore) };
+  }
 
   if (filters.search?.trim()) {
     where.name = { contains: filters.search.trim(), mode: 'insensitive' };
@@ -135,6 +143,36 @@ function resolveSortField(
 
 function decimalToNumber(value: Prisma.Decimal): number {
   return Number(value.toFixed(2));
+}
+
+/**
+ * Derives the missing side of the mrr/arr pair (arr = mrr * 12) when a write
+ * supplies exactly one of them. Fail-open: if both or neither are provided, the
+ * provided values pass through unchanged (never fabricated). Returns only the
+ * keys that should be written so callers can spread it into a Prisma patch.
+ */
+function deriveRecurringRevenue(
+  mrrIn: number | null | undefined,
+  arrIn: number | null | undefined
+): { mrr?: Prisma.Decimal | null; arr?: Prisma.Decimal | null } {
+  const hasMrr = mrrIn !== undefined && mrrIn !== null;
+  const hasArr = arrIn !== undefined && arrIn !== null;
+  if (hasMrr && !hasArr) {
+    return {
+      mrr: new Prisma.Decimal(mrrIn as number),
+      arr: new Prisma.Decimal((mrrIn as number) * 12),
+    };
+  }
+  if (hasArr && !hasMrr) {
+    return {
+      arr: new Prisma.Decimal(arrIn as number),
+      mrr: new Prisma.Decimal((arrIn as number) / 12),
+    };
+  }
+  const out: { mrr?: Prisma.Decimal | null; arr?: Prisma.Decimal | null } = {};
+  if (mrrIn !== undefined) out.mrr = mrrIn === null ? null : new Prisma.Decimal(mrrIn);
+  if (arrIn !== undefined) out.arr = arrIn === null ? null : new Prisma.Decimal(arrIn);
+  return out;
 }
 
 function dealSnapshotForHistory(d: Deal): Record<string, unknown> {
@@ -333,6 +371,13 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
 
       const probability = data.probability ?? stage.probability;
 
+      // arr = mrr * 12 (and vice-versa) when only one side is supplied. Schema
+      // may not expose these on create today; guarded so it works if it does.
+      const createRecurring = deriveRecurringRevenue(
+        (data as { mrr?: number | null }).mrr,
+        (data as { arr?: number | null }).arr
+      );
+
       // Enforce active validation rules (fail-open: no rules / eval error => allow).
       await enforceValidationRules(prisma, tenantId, 'deal', data as Record<string, unknown>);
 
@@ -347,6 +392,8 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           amount: new Prisma.Decimal(data.amount ?? 0),
           currency: data.currency ?? 'USD',
           probability,
+          ...(createRecurring.mrr !== undefined ? { mrr: createRecurring.mrr } : {}),
+          ...(createRecurring.arr !== undefined ? { arr: createRecurring.arr } : {}),
           expectedCloseDate: data.expectedCloseDate
             ? new Date(data.expectedCloseDate)
             : null,
@@ -372,7 +419,122 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         type: 'deal.created',
         tenantId,
         payload: {
+          // `id` is the primary key the search-service indexer keys on;
+          // `dealId` is retained for back-compat with existing consumers.
+          id: created.id,
           dealId: created.id,
+          name: created.name,
+          ownerId: created.ownerId,
+          accountId: created.accountId,
+          amount: decimalToNumber(created.amount),
+          currency: created.currency,
+          pipelineId: created.pipelineId,
+          stageId: created.stageId,
+        },
+      });
+
+      updateDealDataQuality(prisma, created.id).catch(() => undefined);
+
+      return created;
+    },
+
+    /**
+     * Creates a NEW deal that is the renewal of an existing (source) deal.
+     * Copies account/owner/amount/currency (plus products + team) from the
+     * source, flags the new deal `isRenewal=true` with `renewedFromDealId`
+     * pointing at the source, and opens it at the first stage of a `renewal`-type
+     * pipeline if one exists (else the source deal's own pipeline/stage).
+     * Publishes an enriched `deal.created` so search picks the renewal up.
+     */
+    async convertDealToRenewal(
+      tenantId: string,
+      sourceId: string,
+      input: { contractEndDate?: string | null; renewalProbability?: number | null }
+    ): Promise<Deal> {
+      const source = await loadDealOrThrow(tenantId, sourceId);
+
+      // Prefer the first stage of a renewal-type pipeline; fall back to source's.
+      let targetPipelineId = source.pipelineId;
+      let targetStageId = source.stageId;
+      const renewalPipeline = await prisma.pipeline.findFirst({
+        where: { tenantId, type: 'renewal', isActive: true, deletedAt: null },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (renewalPipeline) {
+        const firstStage = await prisma.stage.findFirst({
+          where: { tenantId, pipelineId: renewalPipeline.id, deletedAt: null },
+          orderBy: { order: 'asc' },
+        });
+        if (firstStage) {
+          targetPipelineId = renewalPipeline.id;
+          targetStageId = firstStage.id;
+        }
+      }
+
+      const created = await prisma.$transaction(async (tx) => {
+        const [products, team] = await Promise.all([
+          tx.dealProduct.findMany({ where: { tenantId, dealId: sourceId } }),
+          tx.dealTeam.findMany({ where: { tenantId, dealId: sourceId } }),
+        ]);
+        return tx.deal.create({
+          data: {
+            tenantId,
+            ownerId: source.ownerId,
+            accountId: source.accountId,
+            pipelineId: targetPipelineId,
+            stageId: targetStageId,
+            name: `${source.name} (Renewal)`,
+            amount: source.amount,
+            currency: source.currency,
+            status: 'OPEN',
+            isRenewal: true,
+            renewedFromDealId: source.id,
+            contractEndDate: input.contractEndDate
+              ? new Date(input.contractEndDate)
+              : source.contractEndDate,
+            renewalProbability: input.renewalProbability ?? source.renewalProbability,
+            mrr: source.mrr,
+            arr: source.arr,
+            ...(products.length > 0
+              ? {
+                  products: {
+                    create: products.map((p) => ({
+                      tenantId,
+                      productId: p.productId,
+                      name: p.name,
+                      quantity: p.quantity,
+                      unitPrice: p.unitPrice,
+                      discountPercent: p.discountPercent,
+                      lineTotal: p.lineTotal,
+                      currency: p.currency,
+                    })),
+                  },
+                }
+              : {}),
+            ...(team.length > 0
+              ? {
+                  team: {
+                    create: team.map((t) => ({
+                      tenantId,
+                      userId: t.userId,
+                      role: t.role,
+                      splitPercent: t.splitPercent,
+                      splitType: t.splitType,
+                    })),
+                  },
+                }
+              : {}),
+          },
+        });
+      });
+
+      await producer.publish(TOPICS.DEALS, {
+        type: 'deal.created',
+        tenantId,
+        payload: {
+          id: created.id,
+          dealId: created.id,
+          name: created.name,
           ownerId: created.ownerId,
           accountId: created.accountId,
           amount: decimalToNumber(created.amount),
@@ -481,6 +643,25 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         updateData.customFields = data.customFields as Prisma.InputJsonValue;
       }
       if (data.tags !== undefined) updateData.tags = data.tags;
+      // ─── Renewal / recurring-revenue fields (additive; schema already exposes) ─
+      if (data.contractEndDate !== undefined) {
+        updateData.contractEndDate = data.contractEndDate
+          ? new Date(data.contractEndDate)
+          : null;
+      }
+      if (data.renewalProbability !== undefined) {
+        updateData.renewalProbability = data.renewalProbability;
+      }
+      if (data.isRenewal !== undefined) updateData.isRenewal = data.isRenewal;
+      if (data.renewedFromDealId !== undefined) {
+        updateData.renewedFromDealId = data.renewedFromDealId;
+      }
+      // arr = mrr * 12 (and vice-versa) when only one side is supplied. Fail-open.
+      if (data.mrr !== undefined || data.arr !== undefined) {
+        const recurring = deriveRecurringRevenue(data.mrr, data.arr);
+        if (recurring.mrr !== undefined) updateData.mrr = recurring.mrr;
+        if (recurring.arr !== undefined) updateData.arr = recurring.arr;
+      }
       if (data.status !== undefined) updateData.status = data.status;
       if (data.lostReason !== undefined) updateData.lostReason = data.lostReason;
       if (data.closeReason !== undefined) updateData.closeReason = data.closeReason;
@@ -576,7 +757,9 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         type: 'deal.updated',
         tenantId,
         payload: {
+          id: updated.id,
           dealId: updated.id,
+          name: updated.name,
           ownerId: updated.ownerId,
           accountId: updated.accountId,
           pipelineId: updated.pipelineId,

@@ -56,6 +56,10 @@ const AttachmentIdParamSchema = z.object({
   id: z.string().cuid(),
   attachmentId: z.string().cuid(),
 });
+const ConvertToRenewalSchema = z.object({
+  contractEndDate: z.string().datetime().nullable().optional(),
+  renewalProbability: z.number().int().min(0).max(100).nullable().optional(),
+});
 
 // ─── Registration ───────────────────────────────────────────────────────────
 
@@ -150,6 +154,8 @@ export async function registerDealsRoutes(
             search: q.search,
             minAmount: q.minAmount,
             maxAmount: q.maxAmount,
+            isRenewal: q.isRenewal,
+            contractEndBefore: q.contractEndBefore,
             includeDeleted: q.includeDeleted,
           }, {
             page: q.page,
@@ -590,6 +596,22 @@ export async function registerDealsRoutes(
           }
           const jwt = request.user as JwtPayload;
           const deal = await deals.cloneDeal(jwt.tenantId, id, parsed.data.name);
+          return reply.code(201).send({ success: true, data: deal });
+        }
+      );
+
+      // ─── CONVERT TO RENEWAL ─────────────────────────────────────────────
+      r.post(
+        '/deals/:id/convert-to-renewal',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.CREATE) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const parsed = ConvertToRenewalSchema.safeParse(request.body ?? {});
+          if (!parsed.success) {
+            throw new ValidationError('Invalid body', parsed.error.flatten());
+          }
+          const jwt = request.user as JwtPayload;
+          const deal = await deals.convertDealToRenewal(jwt.tenantId, id, parsed.data);
           return reply.code(201).send({ success: true, data: deal });
         }
       );

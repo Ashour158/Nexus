@@ -669,6 +669,19 @@ export interface Deal {
   campaignId: string | null;
   customFields: Record<string, unknown>;
   tags: string[];
+  // ─── Renewal / recurring-revenue fields (may be null on non-renewal deals) ──
+  /** ISO date the underlying contract ends. Drives renewal / expiry filters. */
+  contractEndDate?: string | null;
+  /** 0–100 likelihood the renewal closes. */
+  renewalProbability?: number | null;
+  /** True when this deal represents a renewal of a prior won deal. */
+  isRenewal?: boolean | null;
+  /** The originating deal this renewal was spun off from. */
+  renewedFromDealId?: string | null;
+  /** Monthly recurring revenue. */
+  mrr?: string | number | null;
+  /** Annual recurring revenue. */
+  arr?: string | number | null;
   version: number;
   createdAt: string;
   updatedAt: string;

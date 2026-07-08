@@ -107,6 +107,13 @@ export const UpdateDealSchema = CreateDealSchema.partial().extend({
     .enum(['PIPELINE', 'BEST_CASE', 'COMMIT', 'CLOSED', 'OMITTED'])
     .optional(),
   meddicicData: z.record(z.unknown()).optional(),
+  // ─── Renewal / recurring-revenue fields (additive; all optional) ───────────
+  contractEndDate: z.string().datetime().nullable().optional(),
+  renewalProbability: z.number().int().min(0).max(100).nullable().optional(),
+  isRenewal: z.boolean().optional(),
+  renewedFromDealId: z.string().cuid().nullable().optional(),
+  mrr: z.number().min(0).nullable().optional(),
+  arr: z.number().min(0).nullable().optional(),
   // Optimistic-concurrency token (DI-26). When supplied, the update only applies
   // if the stored row is still at this version; otherwise it 409s. Optional so
   // existing callers keep last-write-wins.
@@ -141,6 +148,13 @@ export const DealListQuerySchema = PaginationSchema.extend({
   search: z.string().optional(),
   minAmount: z.coerce.number().min(0).optional(),
   maxAmount: z.coerce.number().min(0).optional(),
+  // Renewal filters (additive). `isRenewal=true` narrows to renewal deals;
+  // `contractEndBefore=<iso>` surfaces contracts expiring before a cutoff.
+  isRenewal: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === 'true')),
+  contractEndBefore: z.string().datetime().optional(),
   includeDeleted: z
     .enum(['true', 'false'])
     .optional()

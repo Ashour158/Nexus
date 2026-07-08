@@ -4,14 +4,21 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Note, PaginatedResult, TimelineEvent } from '@nexus/shared-types';
+import type { Deal, Note, PaginatedResult, TimelineEvent } from '@nexus/shared-types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { CallButton } from '@/components/crm/call-button';
+import { FollowButton } from '@/components/crm/FollowButton';
 import { AiPredictionPanel } from '@/components/crm/AiPredictionPanel';
 import { timelineMeta } from '@/lib/timeline-icons';
-import { useDeal, useDealTimeline, useDealScoringInsights } from '@/hooks/use-deals';
+import {
+  useDeal,
+  useDealTimeline,
+  useDealScoringInsights,
+  useUpdateDeal,
+  useConvertDealToRenewal,
+} from '@/hooks/use-deals';
 import { useUsers } from '@/hooks/use-users';
 import type { UserRef } from '@/hooks/use-users';
 import type { DealHealth, DealScoringInsights } from '@/hooks/use-deals';
@@ -214,9 +221,13 @@ export default function DealDetailPage() {
             {deal.status} | {stageName} | {formatCurrency(deal.amount, deal.currency)}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" onClick={() => router.push('/deals')}>Back</Button>
+          <FollowButton entityType="deal" entityId={dealId} />
           <CallButton dealId={dealId} accountId={deal.accountId ?? undefined} />
+          {canUpdate && !deal.isRenewal ? (
+            <ConvertToRenewalButton dealId={dealId} />
+          ) : null}
           {canUpdate && <Button onClick={() => router.push(`/deals/${dealId}/edit`)}>Edit</Button>}
         </div>
       </div>
@@ -239,6 +250,7 @@ export default function DealDetailPage() {
               <DetailItem label="Created" value={formatDate(deal.createdAt)} />
             </dl>
           </div>
+          <RenewalPanel deal={deal} canEdit={canUpdate} />
           <div className="rounded-xl border border-slate-200 bg-white p-5">
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-500">Stage Hardening</h2>
             <div className="space-y-3 text-sm">
@@ -341,6 +353,167 @@ function DetailItem({ label, value }: { label: string; value: React.ReactNode })
     <div className="flex items-start gap-2">
       <dt className="w-28 shrink-0 text-xs uppercase tracking-wider text-slate-400">{label}</dt>
       <dd className="flex-1 text-slate-700">{value}</dd>
+    </div>
+  );
+}
+
+function ConvertToRenewalButton({ dealId }: { dealId: string }) {
+  const router = useRouter();
+  const convert = useConvertDealToRenewal();
+  return (
+    <Button
+      variant="secondary"
+      isLoading={convert.isPending}
+      onClick={() =>
+        convert.mutate(
+          { id: dealId },
+          {
+            onSuccess: (renewal) => {
+              if (renewal?.id) router.push(`/deals/${renewal.id}`);
+            },
+          }
+        )
+      }
+    >
+      Convert to Renewal
+    </Button>
+  );
+}
+
+function toDateInputValue(value: string | null | undefined): string {
+  if (!value) return '';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+}
+
+/**
+ * Renewal / recurring-revenue surface on the deal detail. Read-only display of
+ * contract end, renewal probability, MRR and ARR, each editable inline through
+ * {@link useUpdateDeal}. When the deal is itself a renewal it shows a badge and
+ * links back to the originating deal. Renewal fields may be null (backend still
+ * rolling out); the panel degrades to em-dashes rather than hiding.
+ */
+function RenewalPanel({ deal, canEdit }: { deal: Deal; canEdit: boolean }) {
+  const updateDeal = useUpdateDeal();
+  const [field, setField] = useState<null | 'contractEndDate' | 'renewalProbability' | 'mrr' | 'arr'>(null);
+  const [draft, setDraft] = useState('');
+
+  const begin = (
+    key: 'contractEndDate' | 'renewalProbability' | 'mrr' | 'arr',
+    current: string
+  ) => {
+    if (!canEdit) return;
+    setField(key);
+    setDraft(current);
+  };
+
+  const commit = () => {
+    if (!field) return;
+    const data: Record<string, unknown> = {};
+    if (field === 'contractEndDate') {
+      data.contractEndDate = draft ? new Date(draft).toISOString() : null;
+    } else {
+      const num = Number(draft);
+      data[field] = draft.trim() === '' || Number.isNaN(num) ? null : num;
+    }
+    updateDeal.mutate({ id: deal.id, data });
+    setField(null);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setField(null);
+    }
+  };
+
+  const rows: Array<{
+    key: 'contractEndDate' | 'renewalProbability' | 'mrr' | 'arr';
+    label: string;
+    type: 'date' | 'number';
+    display: string;
+    editValue: string;
+  }> = [
+    {
+      key: 'contractEndDate',
+      label: 'Contract end',
+      type: 'date',
+      display: deal.contractEndDate ? formatDate(deal.contractEndDate) : '—',
+      editValue: toDateInputValue(deal.contractEndDate),
+    },
+    {
+      key: 'renewalProbability',
+      label: 'Renewal prob.',
+      type: 'number',
+      display: deal.renewalProbability != null ? `${deal.renewalProbability}%` : '—',
+      editValue: deal.renewalProbability != null ? String(deal.renewalProbability) : '',
+    },
+    {
+      key: 'mrr',
+      label: 'MRR',
+      type: 'number',
+      display: deal.mrr != null ? formatCurrency(deal.mrr, deal.currency) : '—',
+      editValue: deal.mrr != null ? String(deal.mrr) : '',
+    },
+    {
+      key: 'arr',
+      label: 'ARR',
+      type: 'number',
+      display: deal.arr != null ? formatCurrency(deal.arr, deal.currency) : '—',
+      editValue: deal.arr != null ? String(deal.arr) : '',
+    },
+  ];
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Renewal</h2>
+        {deal.isRenewal ? (
+          <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700">Renewal</span>
+        ) : null}
+      </div>
+
+      {deal.isRenewal && deal.renewedFromDealId ? (
+        <p className="mb-3 text-xs text-slate-500">
+          Renewed from{' '}
+          <Link href={`/deals/${deal.renewedFromDealId}`} className="text-brand-700 hover:underline">
+            original deal
+          </Link>
+        </p>
+      ) : null}
+
+      <dl className="space-y-2 text-sm">
+        {rows.map((row) => (
+          <div key={row.key} className="flex items-start gap-2">
+            <dt className="w-28 shrink-0 text-xs uppercase tracking-wider text-slate-400">{row.label}</dt>
+            <dd className="flex-1 text-slate-700">
+              {field === row.key ? (
+                <input
+                  autoFocus
+                  type={row.type}
+                  min={row.type === 'number' ? 0 : undefined}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onBlur={commit}
+                  onKeyDown={onKeyDown}
+                  className="w-full rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-primary"
+                />
+              ) : (
+                <span
+                  onClick={() => begin(row.key, row.editValue)}
+                  className={cn(canEdit && 'cursor-text rounded px-1 py-0.5 hover:bg-slate-50')}
+                  title={canEdit ? 'Click to edit' : undefined}
+                >
+                  {row.display}
+                </span>
+              )}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }

@@ -271,8 +271,11 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
           type: 'account.created',
           tenantId,
           payload: {
+            id: created.id,
             accountId: created.id,
             name: created.name,
+            industry: created.industry ?? undefined,
+            website: created.website ?? undefined,
             email: created.email ?? undefined,
             ownerId: created.ownerId,
           },
@@ -414,8 +417,11 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
           type: 'account.updated',
           tenantId,
           payload: {
+            id: updated.id,
             accountId: updated.id,
             name: updated.name,
+            industry: updated.industry ?? undefined,
+            website: updated.website ?? undefined,
             ownerId: updated.ownerId,
             changedFields: Object.keys(oldValues),
           },

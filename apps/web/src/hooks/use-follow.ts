@@ -13,7 +13,7 @@ import { api } from '@/lib/api-client';
  * arrays rather than throwing so the UI never crashes.
  */
 
-export type FollowEntityType = 'account' | 'contact';
+export type FollowEntityType = 'account' | 'contact' | 'deal';
 
 export interface Follower {
   userId: string;
@@ -43,7 +43,15 @@ export interface FeedActivity {
 }
 
 function pluralize(entityType: FollowEntityType): string {
-  return entityType === 'account' ? 'accounts' : 'contacts';
+  switch (entityType) {
+    case 'account':
+      return 'accounts';
+    case 'deal':
+      return 'deals';
+    case 'contact':
+    default:
+      return 'contacts';
+  }
 }
 
 export const followKeys = {

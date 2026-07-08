@@ -181,9 +181,13 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
           type: 'contact.created',
           tenantId,
           payload: {
+            id: created.id,
             contactId: created.id,
+            firstName: created.firstName,
+            lastName: created.lastName,
             email: created.email ?? undefined,
             accountId: created.accountId ?? undefined,
+            ownerId: created.ownerId,
           },
         })
         .catch(() => undefined);
@@ -312,8 +316,13 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
           type: 'contact.updated',
           tenantId,
           payload: {
+            id: updated.id,
             contactId: updated.id,
+            firstName: updated.firstName,
+            lastName: updated.lastName,
+            email: updated.email ?? undefined,
             accountId: updated.accountId ?? undefined,
+            ownerId: updated.ownerId,
             changedFields: Object.keys(oldValues),
           },
         })

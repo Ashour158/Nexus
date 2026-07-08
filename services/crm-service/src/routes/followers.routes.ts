@@ -6,7 +6,7 @@ import { IdParamSchema } from '@nexus/validation';
 import type { CrmPrisma } from '../prisma.js';
 
 const FollowingQuerySchema = z.object({
-  entityType: z.enum(['account', 'contact']).optional(),
+  entityType: z.enum(['account', 'contact', 'deal']).optional(),
 });
 const FeedQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -36,6 +36,10 @@ export async function registerFollowersRoutes(
   async function assertContactExists(tenantId: string, id: string): Promise<void> {
     const row = await prisma.contact.findFirst({ where: { id, tenantId }, select: { id: true } });
     if (!row) throw new NotFoundError('Contact', id);
+  }
+  async function assertDealExists(tenantId: string, id: string): Promise<void> {
+    const row = await prisma.deal.findFirst({ where: { id, tenantId }, select: { id: true } });
+    if (!row) throw new NotFoundError('Deal', id);
   }
 
   async function follow(tenantId: string, userId: string, entityType: string, entityId: string) {
@@ -132,6 +136,41 @@ export async function registerFollowersRoutes(
         }
       );
 
+      // ─── DEALS follow trio ──────────────────────────────────────────────
+      r.post(
+        '/deals/:id/follow',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.READ) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          await assertDealExists(jwt.tenantId, id);
+          const data = await follow(jwt.tenantId, jwt.sub, 'deal', id);
+          return reply.code(201).send({ success: true, data: { following: true, follower: data } });
+        }
+      );
+
+      r.delete(
+        '/deals/:id/follow',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.READ) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          await unfollow(jwt.tenantId, jwt.sub, 'deal', id);
+          return reply.send({ success: true, data: { following: false } });
+        }
+      );
+
+      r.get(
+        '/deals/:id/followers',
+        { preHandler: requirePermission(PERMISSIONS.DEALS.READ) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const data = await listFollowers(jwt.tenantId, 'deal', id);
+          return reply.send({ success: true, data });
+        }
+      );
+
       // ─── ME: records I follow ───────────────────────────────────────────
       r.get(
         '/me/following',
@@ -148,16 +187,21 @@ export async function registerFollowersRoutes(
           // Join a minimal record label so the UI can render the list.
           const accountIds = follows.filter((f) => f.entityType === 'account').map((f) => f.entityId);
           const contactIds = follows.filter((f) => f.entityType === 'contact').map((f) => f.entityId);
-          const [accounts, contacts] = await Promise.all([
+          const dealIds = follows.filter((f) => f.entityType === 'deal').map((f) => f.entityId);
+          const [accounts, contacts, deals] = await Promise.all([
             accountIds.length
               ? prisma.account.findMany({ where: { tenantId: jwt.tenantId, id: { in: accountIds } }, select: { id: true, name: true } })
               : Promise.resolve([]),
             contactIds.length
               ? prisma.contact.findMany({ where: { tenantId: jwt.tenantId, id: { in: contactIds } }, select: { id: true, firstName: true, lastName: true } })
               : Promise.resolve([]),
+            dealIds.length
+              ? prisma.deal.findMany({ where: { tenantId: jwt.tenantId, id: { in: dealIds } }, select: { id: true, name: true } })
+              : Promise.resolve([]),
           ]);
           const accountLabel = new Map(accounts.map((a) => [a.id, a.name]));
           const contactLabel = new Map(contacts.map((c) => [c.id, `${c.firstName} ${c.lastName}`.trim()]));
+          const dealLabel = new Map(deals.map((d) => [d.id, d.name]));
 
           const data = follows.map((f) => ({
             id: f.id,
@@ -168,7 +212,9 @@ export async function registerFollowersRoutes(
                 ? accountLabel.get(f.entityId) ?? null
                 : f.entityType === 'contact'
                   ? contactLabel.get(f.entityId) ?? null
-                  : null,
+                  : f.entityType === 'deal'
+                    ? dealLabel.get(f.entityId) ?? null
+                    : null,
             createdAt: f.createdAt,
           }));
           return reply.send({ success: true, data });
@@ -192,10 +238,12 @@ export async function registerFollowersRoutes(
 
           const accountIds = follows.filter((f) => f.entityType === 'account').map((f) => f.entityId);
           const contactIds = follows.filter((f) => f.entityType === 'contact').map((f) => f.entityId);
+          const dealIds = follows.filter((f) => f.entityType === 'deal').map((f) => f.entityId);
 
           const orClauses: Array<Record<string, unknown>> = [];
           if (accountIds.length) orClauses.push({ accountId: { in: accountIds } });
           if (contactIds.length) orClauses.push({ contactId: { in: contactIds } });
+          if (dealIds.length) orClauses.push({ dealId: { in: dealIds } });
           if (orClauses.length === 0) return reply.send({ success: true, data: [] });
 
           const activities = await prisma.activity.findMany({
@@ -207,16 +255,21 @@ export async function registerFollowersRoutes(
           // Minimal record labels for the feed rows.
           const feedAccountIds = [...new Set(activities.map((a) => a.accountId).filter((v): v is string => !!v))];
           const feedContactIds = [...new Set(activities.map((a) => a.contactId).filter((v): v is string => !!v))];
-          const [accounts, contacts] = await Promise.all([
+          const feedDealIds = [...new Set(activities.map((a) => a.dealId).filter((v): v is string => !!v))];
+          const [accounts, contacts, deals] = await Promise.all([
             feedAccountIds.length
               ? prisma.account.findMany({ where: { tenantId: jwt.tenantId, id: { in: feedAccountIds } }, select: { id: true, name: true } })
               : Promise.resolve([]),
             feedContactIds.length
               ? prisma.contact.findMany({ where: { tenantId: jwt.tenantId, id: { in: feedContactIds } }, select: { id: true, firstName: true, lastName: true } })
               : Promise.resolve([]),
+            feedDealIds.length
+              ? prisma.deal.findMany({ where: { tenantId: jwt.tenantId, id: { in: feedDealIds } }, select: { id: true, name: true } })
+              : Promise.resolve([]),
           ]);
           const accountLabel = new Map(accounts.map((a) => [a.id, a.name]));
           const contactLabel = new Map(contacts.map((c) => [c.id, `${c.firstName} ${c.lastName}`.trim()]));
+          const dealLabel = new Map(deals.map((d) => [d.id, d.name]));
 
           const data = activities.map((a) => ({
             id: a.id,
@@ -228,12 +281,14 @@ export async function registerFollowersRoutes(
             accountId: a.accountId,
             contactId: a.contactId,
             dealId: a.dealId,
-            recordType: a.accountId ? 'account' : a.contactId ? 'contact' : null,
+            recordType: a.accountId ? 'account' : a.contactId ? 'contact' : a.dealId ? 'deal' : null,
             recordLabel: a.accountId
               ? accountLabel.get(a.accountId) ?? null
               : a.contactId
                 ? contactLabel.get(a.contactId) ?? null
-                : null,
+                : a.dealId
+                  ? dealLabel.get(a.dealId) ?? null
+                  : null,
             createdAt: a.createdAt,
           }));
           return reply.send({ success: true, data });

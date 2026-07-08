@@ -37,6 +37,8 @@ export default function DealsPage() {
   const [stageFilter, setStageFilter] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [renewalsOnly, setRenewalsOnly] = useState(false);
+  const [expiringSoon, setExpiringSoon] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
 
@@ -71,11 +73,21 @@ export default function DealsPage() {
   const stagesQuery = useStages(resolvedPipelineId);
   const stages: Stage[] = stagesQuery.data ?? [];
 
+  // "Expiring soon" = contracts ending within the next 90 days. Memoized so
+  // the ISO cutoff is stable across renders (it would otherwise change the
+  // query key every render and refetch continuously).
+  const contractEndBefore = useMemo(() => {
+    if (!expiringSoon) return undefined;
+    return new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+  }, [expiringSoon]);
+
   const dealsQuery = useDeals({
     pipelineId: resolvedPipelineId ?? undefined,
     stageId: stageFilter || undefined,
     ownerId: ownerFilter || undefined,
     search: search || undefined,
+    isRenewal: renewalsOnly || undefined,
+    contractEndBefore,
     page,
     limit: 25,
     sortBy: 'updatedAt',
@@ -183,6 +195,21 @@ export default function DealsPage() {
               },
             ]}
           />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <FilterChip
+              active={renewalsOnly}
+              onClick={() => { setRenewalsOnly((v) => !v); setPage(1); }}
+            >
+              Renewals
+            </FilterChip>
+            <FilterChip
+              active={expiringSoon}
+              onClick={() => { setExpiringSoon((v) => !v); setPage(1); }}
+            >
+              Expiring in 90 days
+            </FilterChip>
+          </div>
 
           <DataTable
             data={dealsQuery.data?.data ?? []}
@@ -387,6 +414,32 @@ export default function DealsPage() {
       )}
       {ConfirmDialog}
     </main>
+  );
+}
+
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition',
+        active
+          ? 'border-primary bg-primary-light text-primary'
+          : 'border-[var(--border-color)] text-gray-500 hover:text-gray-700'
+      )}
+    >
+      {children}
+    </button>
   );
 }
 

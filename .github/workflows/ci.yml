@@ -212,10 +212,10 @@ jobs:
             image: analytics-service
           - context: services/metadata-service
             image: metadata-service
-          - context: services/quotes-service
-            image: quotes-service
           - context: services/audit-consumer
             image: audit-consumer
+          - context: services/outbox-relay
+            image: outbox-relay
           - context: services/router-coprocessor
             image: router-coprocessor
     steps:

@@ -271,10 +271,13 @@ services:
       kafka:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3011/health"]
+      # node is guaranteed present (node:20-alpine); exits on response headers so it
+      # can't hang on Fastify keep-alive, and 127.0.0.1 avoids localhost->::1 (Fastify binds 0.0.0.0).
+      test: ["CMD", "node", "-e", "const r=require('http').get('http://127.0.0.1:3011/health',s=>process.exit(s.statusCode<400?0:1));r.on('error',()=>process.exit(1));r.setTimeout(5000,()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 45s
 
   # accounts-service DECOMMISSIONED — orphaned duplicate of crm-service (the wired
   # authority for accounts; web BFF → CRM_SERVICE_URL). It ran a split-brain
@@ -321,10 +324,13 @@ services:
       kafka:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3043/health"]
+      # node is guaranteed present (node:20-alpine); exits on response headers so it
+      # can't hang on Fastify keep-alive, and 127.0.0.1 avoids localhost->::1 (Fastify binds 0.0.0.0).
+      test: ["CMD", "node", "-e", "const r=require('http').get('http://127.0.0.1:3043/health',s=>process.exit(s.statusCode<400?0:1));r.on('error',()=>process.exit(1));r.setTimeout(5000,()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 45s
 
   notes-service:
     build:
@@ -348,10 +354,13 @@ services:
       kafka:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3032/health"]
+      # node is guaranteed present (node:20-alpine); exits on response headers so it
+      # can't hang on Fastify keep-alive, and 127.0.0.1 avoids localhost->::1 (Fastify binds 0.0.0.0).
+      test: ["CMD", "node", "-e", "const r=require('http').get('http://127.0.0.1:3032/health',s=>process.exit(s.statusCode<400?0:1));r.on('error',()=>process.exit(1));r.setTimeout(5000,()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 45s
 
   # quotes-service DECOMMISSIONED — per its own DEPRECATED.md, quote authority moved
   # to finance-service (the wired backend: BFF → finance-service:3002). It ran no
@@ -1056,6 +1065,7 @@ services:
       - '127.0.0.1:9090:9090'
     volumes:
       - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'

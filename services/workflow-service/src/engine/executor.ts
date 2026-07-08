@@ -281,7 +281,7 @@ export class WorkflowExecutor {
       case 'CONDITION':
         return handleConditionNode(node, context, edges);
       case 'WAIT':
-        return handleWaitNode(node, context);
+        return handleWaitNode(node, context, edges);
       case 'ACTION':
         return handleActionNode(node, context);
       case 'EMAIL':

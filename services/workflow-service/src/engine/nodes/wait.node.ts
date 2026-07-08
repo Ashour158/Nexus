@@ -1,8 +1,9 @@
-import type { ExecutionContext, NodeResult, WorkflowNode } from '../types.js';
+import type { ExecutionContext, NodeResult, WorkflowEdge, WorkflowNode } from '../types.js';
 
 export async function handleWaitNode(
   node: WorkflowNode,
-  _context: ExecutionContext
+  _context: ExecutionContext,
+  edges: WorkflowEdge[]
 ): Promise<NodeResult> {
   const cfg = (node.config ?? {}) as {
     amount?: number;
@@ -10,6 +11,25 @@ export async function handleWaitNode(
     delayDays?: number;
     delayHours?: number;
   };
+
+  // Resolve the node to continue from once the delay elapses: the WAIT node's
+  // outgoing edge target (prefer an unconditional edge, else the first edge).
+  // The execution is persisted with THIS as its currentNodeId while paused, so
+  // on resume the executor re-enters the node AFTER the wait — not the wait
+  // node itself (which would re-arm the timer and stall forever).
+  const outgoing = edges.filter((e) => e.from === node.id);
+  const nextNodeId = (outgoing.find((e) => !e.condition) ?? outgoing[0])?.to ?? null;
+
+  // No onward edge — a terminal WAIT has nothing to wait for. Complete now
+  // rather than pausing (pausing with a null target would park the execution
+  // back on the wait node and stall). Returning null + no pauseUntil lets the
+  // executor follow its normal "no next node" path to COMPLETED.
+  if (!nextNodeId) {
+    return {
+      nextNodeId: null,
+      output: { status: 'COMPLETED', reason: 'WAIT node has no outgoing edge' },
+    };
+  }
 
   let pauseUntil: Date;
   let resumeAtIso: string;
@@ -44,6 +64,9 @@ export async function handleWaitNode(
   }
 
   return {
+    // Persisted as the execution's currentNodeId while paused, so the resume
+    // poller continues FROM the node after the wait instead of re-entering it.
+    nextNodeId,
     pauseUntil,
     output: outputMeta,
   };

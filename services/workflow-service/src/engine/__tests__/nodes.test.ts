@@ -101,9 +101,11 @@ describe('handleWaitNode', () => {
     const before = Date.now();
     const res = await handleWaitNode(
       { id: 'w', type: 'WAIT', config: { delayDays: 2 } },
-      ctx
+      ctx,
+      [{ from: 'w', to: 'next' }]
     );
     expect(res.pauseUntil).toBeDefined();
+    expect(res.nextNodeId).toBe('next');
     expect(res.output?.status).toBe('PAUSED');
     const resume = new Date(String(res.output?.resumeAt)).getTime();
     expect(resume).toBeGreaterThanOrEqual(before + 2 * 86400_000 - 1000);
@@ -113,7 +115,8 @@ describe('handleWaitNode', () => {
     const before = Date.now();
     const res = await handleWaitNode(
       { id: 'w', type: 'WAIT', config: { delayDays: 5, delayHours: 1 } },
-      ctx
+      ctx,
+      [{ from: 'w', to: 'next' }]
     );
     const resume = new Date(String(res.output?.resumeAt)).getTime();
     expect(resume - before).toBeLessThan(5 * 86400_000);

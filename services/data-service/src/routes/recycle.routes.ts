@@ -39,9 +39,16 @@ export async function registerRecycleRoutes(app: FastifyInstance, prisma: DataPr
   app.post('/api/v1/recycle/:id/restore', { preHandler: requirePermission(PERMISSIONS.DATA.READ) }, async (request, reply) => {
     const { id } = IdParams.parse(request.params);
     const user = (request as any).user as { tenantId: string };
-    const data = await service.restore(user.tenantId, id);
-    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found', requestId: request.id } });
-    return reply.send({ success: true, data });
+    // Forward the caller's JWT: the owning-service restore route is RBAC-gated.
+    const result = await service.restore(user.tenantId, id, request.headers.authorization);
+    if (!result.ok) {
+      // NOT_FOUND → 404; unsupported entity type → 422; owning-service failure
+      // → 502. In every failure case the bin row is preserved (see service),
+      // so the record stays recoverable and the user sees the restore failed.
+      const status = result.code === 'NOT_FOUND' ? 404 : result.code === 'UNSUPPORTED_MODULE' ? 422 : 502;
+      return reply.code(status).send({ success: false, error: { code: result.code, message: result.message, requestId: request.id } });
+    }
+    return reply.send({ success: true, data: result.data });
   });
 
   app.delete('/api/v1/recycle/:id', { preHandler: requirePermission(PERMISSIONS.DATA.ADMIN) }, async (request, reply) => {

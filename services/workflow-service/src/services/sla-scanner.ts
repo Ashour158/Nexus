@@ -1,4 +1,5 @@
 import type { WorkflowPrisma } from '../prisma.js';
+import type { NexusProducer } from '@nexus/kafka';
 import { createSlaService } from './sla.service.js';
 
 /**
@@ -20,9 +21,12 @@ import { createSlaService } from './sla.service.js';
 export function startSlaScanner(
   prisma: WorkflowPrisma,
   logger: { warn: (obj: unknown, msg?: string) => void; info?: (obj: unknown, msg?: string) => void },
-  intervalMs = 60_000
+  intervalMs = 60_000,
+  producer?: NexusProducer
 ): NodeJS.Timeout {
-  const sla = createSlaService(prisma);
+  // Producer is threaded through so a newly-recorded breach emits `sla.breached`
+  // (NOT-03). Optional so existing callers/tests keep working without one.
+  const sla = createSlaService(prisma, producer);
 
   const handle = setInterval(async () => {
     try {

@@ -84,7 +84,7 @@ const catalog = createCatalogService(prisma);
 const sync = createSyncService(prisma, producer, crypto);
 const oauth = createOauthService(prisma, crypto);
 const calendar = createGoogleCalendarService(prisma, crypto);
-const gmail = createGoogleGmailService(prisma, crypto);
+const gmail = createGoogleGmailService(prisma, crypto, oauth);
 const geocoding = createGeocodingService(prisma);
 
 let eventsConsumer: Awaited<ReturnType<typeof startIntegrationEventsConsumer>> | null = null;

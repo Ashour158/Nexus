@@ -2,7 +2,6 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
 import type { createOauthService } from '../services/oauth.service.js';
-import crypto from 'node:crypto';
 
 const Provider = z.enum(['google', 'microsoft', 'slack']);
 
@@ -16,8 +15,9 @@ export async function registerOauthRoutes(
     async (request, reply) => {
       const { provider } = z.object({ provider: Provider }).parse(request.params);
       const user = (request as unknown as { user: { tenantId: string; sub: string } }).user;
-      void user;
-      const state = crypto.randomBytes(32).toString('hex');
+      // Carry tenant + user in a signed, time-bounded state so the unauthenticated
+      // callback can recover them (and reject forged/expired state).
+      const state = oauth.signState({ tenantId: user.tenantId, userId: user.sub });
       (reply as any).setCookie('oauth_state', state, {
         path: '/',
         httpOnly: true,
@@ -46,15 +46,20 @@ export async function registerOauthRoutes(
       if (!cookie.valid || cookie.value !== query.state) {
         return reply.code(403).send({ success: false, error: { code: 'INVALID_STATE', message: 'OAuth state mismatch — possible CSRF attack.' } });
       }
-      const user = (request as unknown as { user: { tenantId: string; sub: string } }).user;
+      // Recover tenant + user from the HMAC-signed state (the callback is
+      // unauthenticated, so request.user is not available here).
+      const decoded = oauth.verifyState(query.state);
+      if (!decoded) {
+        return reply.code(403).send({ success: false, error: { code: 'INVALID_STATE', message: 'OAuth state invalid or expired.' } });
+      }
       const tokens = await oauth.exchangeCode(provider, query.code);
       let email: string | null = null;
       if (provider === 'slack' && tokens.access_token) {
         email = await oauth.getSlackUserInfo(tokens.access_token);
       }
       await oauth.saveConnection({
-        tenantId: user.tenantId,
-        userId: user.sub,
+        tenantId: decoded.tenantId,
+        userId: decoded.userId,
         provider,
         scope: tokens.scope ?? (provider === 'slack' ? 'chat:write,users:read' : 'calendar,email'),
         accessToken: tokens.access_token,

@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createHttpClient } from '@nexus/service-utils';
 import type { IntegrationPrisma } from '../prisma.js';
 import type { createFieldCrypto } from '../lib/crypto.js';
@@ -56,11 +56,149 @@ function getBase(provider: OAuthProvider) {
   };
 }
 
+function tokenClient(provider: OAuthProvider) {
+  if (provider === 'google') return googleClient;
+  if (provider === 'slack') return slackClient;
+  return microsoftClient;
+}
+
+/* ── Signed OAuth state ───────────────────────────────────────────────────────
+ * The provider callback is UNAUTHENTICATED, so tenant + user must be carried in
+ * the OAuth `state` parameter. State is `<base64url(payload)>.<base64url(hmac)>`,
+ * HMAC-SHA256-signed with JWT_SECRET so it cannot be forged, and time-bounded.
+ */
+const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes — matches the oauth_state cookie maxAge
+
+function stateHmac(data: string): string {
+  const secret = process.env.JWT_SECRET ?? '';
+  return createHmac('sha256', secret).update(data).digest('base64url');
+}
+
+export function signOAuthState(payload: { tenantId: string; userId: string }): string {
+  const body = { t: payload.tenantId, u: payload.userId, n: randomBytes(8).toString('hex'), iat: Date.now() };
+  const json = Buffer.from(JSON.stringify(body)).toString('base64url');
+  return `${json}.${stateHmac(json)}`;
+}
+
+export function verifyOAuthState(state: string): { tenantId: string; userId: string } | null {
+  const dot = state.lastIndexOf('.');
+  if (dot <= 0) return null;
+  const json = state.slice(0, dot);
+  const sig = state.slice(dot + 1);
+  const expected = stateHmac(json);
+  const sigBuf = Buffer.from(sig);
+  const expBuf = Buffer.from(expected);
+  if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) return null;
+  try {
+    const body = JSON.parse(Buffer.from(json, 'base64url').toString('utf8')) as {
+      t?: string;
+      u?: string;
+      iat?: number;
+    };
+    if (!body.t || !body.u || !body.iat) return null;
+    if (Date.now() - body.iat > STATE_TTL_MS) return null; // expired
+    return { tenantId: body.t, userId: body.u };
+  } catch {
+    return null;
+  }
+}
+
 export function createOauthService(prisma: IntegrationPrisma, crypto: FieldCrypto) {
+  async function markNeedsReauth(id: string, reason: string) {
+    try {
+      await prisma.oAuthConnection.update({
+        where: { id },
+        data: { syncStatus: 'FAILED', lastSyncError: `NEEDS_REAUTH: ${reason}`.slice(0, 500) },
+      });
+    } catch {
+      // best-effort — never let a status write crash the caller
+    }
+  }
+
   return {
-    buildConnectUrl(provider: OAuthProvider, scope: string, stateSeed: string) {
+    signState: signOAuthState,
+    verifyState: verifyOAuthState,
+
+    /**
+     * Use the stored (encrypted) refresh_token to mint a fresh access_token,
+     * persist it encrypted, clear the error state, and return the new decrypted
+     * access token. On any failure the connection is marked NEEDS_REAUTH and
+     * null is returned — never throws.
+     */
+    async refreshAccessToken(
+      tenantId: string,
+      userId: string,
+      provider: OAuthProvider
+    ): Promise<string | null> {
+      const conn = await prisma.oAuthConnection.findFirst({
+        where: { tenantId, userId, provider },
+      });
+      if (!conn) return null;
+      if (!conn.refreshToken) {
+        await markNeedsReauth(conn.id, 'no refresh token on file');
+        return null;
+      }
+      let refreshToken: string;
+      try {
+        refreshToken = crypto.decrypt(conn.refreshToken);
+      } catch {
+        refreshToken = conn.refreshToken; // back-compat: stored as plaintext
+      }
       const base = getBase(provider);
-      const state = `${stateSeed}:${randomBytes(8).toString('hex')}`;
+      const form = new URLSearchParams({
+        client_id: base.clientId,
+        client_secret: base.clientSecret,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      });
+      try {
+        let accessToken: string | undefined;
+        let expiresIn: number | undefined;
+        let newRefresh: string | undefined;
+        if (provider === 'slack') {
+          const r = (await tokenClient('slack').post('/oauth.v2.access', form.toString(), {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          })) as {
+            ok: boolean;
+            access_token?: string;
+            refresh_token?: string;
+            expires_in?: number;
+            error?: string;
+            authed_user?: { access_token?: string };
+          };
+          if (!r.ok) throw new Error(r.error ?? 'slack refresh failed');
+          accessToken = r.authed_user?.access_token ?? r.access_token;
+          expiresIn = r.expires_in;
+          newRefresh = r.refresh_token;
+        } else {
+          const r = (await tokenClient(provider).post('/token', form.toString(), {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          })) as { access_token?: string; refresh_token?: string; expires_in?: number };
+          accessToken = r.access_token;
+          expiresIn = r.expires_in;
+          newRefresh = r.refresh_token;
+        }
+        if (!accessToken) throw new Error('no access_token in refresh response');
+        const expiresAt = expiresIn && expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000) : null;
+        await prisma.oAuthConnection.update({
+          where: { id: conn.id },
+          data: {
+            accessToken: crypto.encrypt(accessToken),
+            ...(newRefresh ? { refreshToken: crypto.encrypt(newRefresh) } : {}),
+            expiresAt,
+            syncStatus: 'PENDING',
+            lastSyncError: null,
+          },
+        });
+        return accessToken;
+      } catch (err) {
+        await markNeedsReauth(conn.id, err instanceof Error ? err.message : 'refresh failed');
+        return null;
+      }
+    },
+
+    buildConnectUrl(provider: OAuthProvider, scope: string, state: string) {
+      const base = getBase(provider);
       const params = new URLSearchParams({
         client_id: base.clientId,
         redirect_uri: base.redirectUri,

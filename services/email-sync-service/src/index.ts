@@ -7,6 +7,7 @@ import { PrismaClient } from '../../../node_modules/.prisma/email-sync-client/in
 import { buildDatabaseUrl } from '@nexus/service-utils/db';
 import { NexusProducer } from '@nexus/kafka';
 import { enrichMessage, extractEmailAddress } from './lib/enrich.js';
+import { createFieldCrypto } from './lib/crypto.js';
 
 startTracing({ serviceName: 'email-sync-service' });
 const port = parseInt(process.env.PORT ?? '3026', 10);
@@ -36,6 +37,41 @@ const prisma = new PrismaClient({
 });
 
 registerHealthRoutes(app, 'email-sync-service', [() => checkDatabase(prisma)]);
+
+/* ── OAuth token encryption ──────────────────────────────────────────────────
+ * Encrypt Gmail access/refresh tokens at rest (AES-256-GCM), reusing the same
+ * platform master key + mechanism as integration-service. Gated: if no valid
+ * 32-byte key is configured, encryption is disabled (tokens stored as-is) so
+ * the service still boots. Reads are decrypt-through — existing plaintext rows
+ * pass straight through, so this is fully backward-compatible.
+ */
+const encKey = process.env.INTEGRATION_ENCRYPTION_KEY ?? process.env.INTEGRATION_SECRET_KEY;
+let fieldCrypto: ReturnType<typeof createFieldCrypto> | null = null;
+if (encKey && encKey.length >= 32) {
+  try {
+    fieldCrypto = createFieldCrypto(encKey);
+    app.log.info('OAuth token encryption enabled (AES-256-GCM)');
+  } catch (err: any) {
+    app.log.warn({ err: err?.message }, 'OAuth token encryption disabled: INTEGRATION_ENCRYPTION_KEY must be exactly 32 bytes');
+  }
+} else {
+  app.log.warn('OAuth token encryption disabled: set INTEGRATION_ENCRYPTION_KEY (>=32 chars) to encrypt Gmail tokens at rest');
+}
+
+function encToken(v: string | null | undefined): string | null | undefined {
+  if (!v || !fieldCrypto) return v;
+  return fieldCrypto.encrypt(v);
+}
+
+function decToken(v: string | null | undefined): string | null | undefined {
+  if (!v || !fieldCrypto) return v;
+  // Back-compat: existing plaintext rows are not valid ciphertext → return as-is.
+  try {
+    return fieldCrypto.decrypt(v);
+  } catch {
+    return v;
+  }
+}
 
 // Kafka producer for emitting timeline/comm events. Fail-open: if the broker is
 // unavailable the connect is best-effort and enrichment simply skips emission.
@@ -98,8 +134,8 @@ app.get('/oauth/gmail/callback', async (req, reply) => {
     await prisma.emailConnection.upsert({
       where: { userId },
       update: {
-        accessToken: tokens.access_token ?? '',
-        refreshToken: tokens.refresh_token ?? undefined,
+        accessToken: encToken(tokens.access_token ?? '') ?? '',
+        refreshToken: tokens.refresh_token ? encToken(tokens.refresh_token) : undefined,
         tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
         email,
         provider: 'gmail',
@@ -109,8 +145,8 @@ app.get('/oauth/gmail/callback', async (req, reply) => {
         userId,
         provider: 'gmail',
         email,
-        accessToken: tokens.access_token ?? '',
-        refreshToken: tokens.refresh_token ?? undefined,
+        accessToken: encToken(tokens.access_token ?? '') ?? '',
+        refreshToken: tokens.refresh_token ? encToken(tokens.refresh_token) : undefined,
         tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
       },
     });
@@ -225,8 +261,8 @@ function buildOauth2Client(conn: { accessToken: string; refreshToken?: string | 
     process.env.GOOGLE_REDIRECT_URI,
   );
   client.setCredentials({
-    access_token: conn.accessToken,
-    refresh_token: conn.refreshToken ?? undefined,
+    access_token: decToken(conn.accessToken) ?? undefined,
+    refresh_token: conn.refreshToken ? decToken(conn.refreshToken) ?? undefined : undefined,
     expiry_date: conn.tokenExpiry?.getTime() ?? undefined,
   });
   return client;

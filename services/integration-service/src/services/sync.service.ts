@@ -6,6 +6,7 @@ import type { IntegrationPrisma } from '../prisma.js';
 import type { createFieldCrypto } from '../lib/crypto.js';
 import { createGoogleGmailService } from './google-gmail.service.js';
 import { createGoogleCalendarService } from './google-calendar.service.js';
+import { createOauthService } from './oauth.service.js';
 
 type FieldCrypto = ReturnType<typeof createFieldCrypto>;
 
@@ -99,7 +100,7 @@ async function runSyncJob(
     let processedRecords = 0;
 
     if (job.connection.provider === 'google' && job.jobType === 'GMAIL_SYNC') {
-      const gmail = createGoogleGmailService(prisma, crypto);
+      const gmail = createGoogleGmailService(prisma, crypto, createOauthService(prisma, crypto));
       const result = await gmail.syncGmailThreads(tenantId, job.connection.userId);
       processedRecords = result.synced;
     } else if (job.connection.provider === 'google' && job.jobType === 'CALENDAR_SYNC') {

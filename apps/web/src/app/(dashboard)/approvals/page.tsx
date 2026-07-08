@@ -1,8 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { usePrompt } from '@/hooks/use-confirm';
+import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
   CheckCircle2,
@@ -13,77 +12,63 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  SlidersHorizontal,
   TimerReset,
-  XCircle,
 } from 'lucide-react';
-import { apiClients } from '@/lib/api-client';
+import { useAuthStore } from '@/stores/auth.store';
+import {
+  approvalKeys,
+  useApprovalRequests,
+  useMyApprovals,
+  type ApprovalRequest,
+  type ApprovalStatus,
+} from '@/hooks/use-approvals';
+import { ApprovalDetailDrawer } from '@/components/approvals/ApprovalDetailDrawer';
+import { PolicyAdmin } from '@/components/approvals/PolicyAdmin';
 import { cn } from '@/lib/cn';
 
-type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'ESCALATED' | 'CANCELLED';
+type Scope = 'MINE' | 'ALL' | ApprovalStatus;
+type View = 'inbox' | 'policies';
 
-type ApprovalRequest = {
-  id: string;
-  module: string;
-  recordId: string;
-  data?: Record<string, unknown>;
-  status: ApprovalStatus;
-  createdAt: string;
-  requestedBy?: string;
-  currentApproverId?: string;
-};
-
-type ApprovalListResult = { data: ApprovalRequest[]; total: number; page: number; limit: number };
 type DiscountReason = { code: string; label: string };
 type QuoteOption = { id: string; quoteNumber?: string; name: string; total?: string; currency?: string };
 
-const FILTERS: Array<{ value: 'ALL' | ApprovalStatus; label: string }> = [
+const SCOPES: Array<{ value: Scope; label: string }> = [
+  { value: 'MINE', label: 'My Pending' },
+  { value: 'ALL', label: 'All' },
   { value: 'PENDING', label: 'Pending' },
   { value: 'ESCALATED', label: 'Escalated' },
   { value: 'APPROVED', label: 'Approved' },
   { value: 'REJECTED', label: 'Rejected' },
-  { value: 'ALL', label: 'All' },
 ];
 
+// Dev-only fallback so the shell renders when approval-service 404s in mock mode.
 const PREVIEW_APPROVALS: ApprovalRequest[] = [
   {
     id: 'approval-preview-001',
+    tenantId: 'preview',
+    policyId: 'policy-preview',
     module: 'Quote',
     recordId: 'QUO-2026-000148',
-    status: 'PENDING',
-    createdAt: new Date(Date.now() - 1000 * 60 * 42).toISOString(),
     requestedBy: 'Sara Manager',
-    currentApproverId: 'Finance Director',
+    status: 'PENDING',
+    currentStep: 1,
     data: { dealValue: 185000, requestedDiscountPercent: 18 },
+    createdAt: new Date(Date.now() - 1000 * 60 * 42).toISOString(),
+    updatedAt: new Date().toISOString(),
   },
   {
     id: 'approval-preview-002',
+    tenantId: 'preview',
+    policyId: 'policy-preview',
     module: 'Deal',
     recordId: 'OPP-2026-000093',
-    status: 'ESCALATED',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
     requestedBy: 'Sales Rep',
-    currentApproverId: 'Regional VP',
+    status: 'ESCALATED',
+    currentStep: 2,
     data: { dealValue: 76000, requestedDiscountPercent: 22 },
-  },
-  {
-    id: 'approval-preview-003',
-    module: 'Contract',
-    recordId: 'CONTRACT-2026-000021',
-    status: 'APPROVED',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
-    requestedBy: 'Jordan Smith',
-    currentApproverId: 'Legal Lead',
-    data: { dealValue: 132000, requestedDiscountPercent: 10 },
-  },
-  {
-    id: 'approval-preview-004',
-    module: 'Quote',
-    recordId: 'QUO-2026-000151',
-    status: 'REJECTED',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 35).toISOString(),
-    requestedBy: 'Maria Garcia',
-    currentApproverId: 'Finance Director',
-    data: { dealValue: 54000, requestedDiscountPercent: 28 },
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
+    updatedAt: new Date().toISOString(),
   },
 ];
 
@@ -95,32 +80,22 @@ function statusClass(status: ApprovalStatus): string {
   return 'bg-rose-100 text-rose-700 ring-rose-200';
 }
 
-function statusIcon(status: ApprovalStatus) {
-  if (status === 'APPROVED') return CheckCircle2;
-  if (status === 'REJECTED' || status === 'CANCELLED') return XCircle;
-  if (status === 'ESCALATED') return AlertCircle;
-  return Clock3;
-}
-
 function money(value: unknown): string {
   const amount = Number(value ?? 0);
-  return `$${amount.toLocaleString()}`;
+  return amount ? `$${amount.toLocaleString()}` : '—';
 }
-
 function discount(value: unknown): string {
-  return `${Number(value ?? 0).toLocaleString()}%`;
+  const v = Number(value ?? 0);
+  return v ? `${v.toLocaleString()}%` : '—';
 }
-
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat('en', {
     month: 'short',
     day: 'numeric',
-    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value));
 }
-
 function initials(value: string | undefined): string {
   return (value ?? 'Approval')
     .split(/[\s-_]+/)
@@ -132,153 +107,60 @@ function initials(value: string | undefined): string {
 
 export default function ApprovalsPage() {
   const qc = useQueryClient();
-  const { prompt, PromptDialog } = usePrompt();
-  const [filter, setFilter] = useState<'ALL' | ApprovalStatus>('PENDING');
+  const userId = useAuthStore((s) => s.userId);
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const roles = useAuthStore((s) => s.roles);
+  const isAdmin = roles.some((r) => r.toLowerCase() === 'admin') || hasPermission('settings:update');
+
+  const [view, setView] = useState<View>('inbox');
+  const [scope, setScope] = useState<Scope>('MINE');
   const [query, setQuery] = useState('');
-  const [drqForm, setDrqForm] = useState({
-    quoteId: 'quote-nova-cpq-v1',
-    requestedDiscountPercent: '12',
-    reasonCode: 'STRATEGIC_ACCOUNT',
-    winningProbabilityIfApproved: '72',
-    reasonNotes: '',
-    level1: 'Finance Manager',
-    level2: 'Sales Director',
-    level3: '',
-  });
+  const [openId, setOpenId] = useState<string | null>(null);
 
-  const inbox = useQuery({
-    queryKey: ['approval-inbox', filter],
-    queryFn: () =>
-      apiClients.workflow.get<ApprovalListResult>('/approval/requests', {
-        params: { status: filter === 'ALL' ? undefined : filter, page: 1, limit: 50 },
-      }),
-    retry: 1,
-  });
+  const allQuery = useApprovalRequests({ limit: 100 });
+  const mineQuery = useMyApprovals();
 
-  const mine = useQuery({
-    queryKey: ['approval-mine'],
-    queryFn: () =>
-      apiClients.workflow.get<ApprovalListResult>('/approval/requests/mine', {
-        params: { page: 1, limit: 20 },
-      }),
-    retry: 1,
-  });
+  const isDev = process.env.NODE_ENV === 'development';
+  const allError = allQuery.isError && !allQuery.data;
+  const usingPreview = allError && isDev;
 
-  const quoteOptions = useQuery({
-    queryKey: ['drq-quote-options'],
-    queryFn: async () => {
-      const res = await fetch('/api/quotes?limit=50', { cache: 'no-store' });
-      const json = await res.json();
-      const data = json.data?.data ?? json.data ?? [];
-      return data as QuoteOption[];
-    },
-    retry: 1,
-  });
-
-  const discountReasons = useQuery({
-    queryKey: ['drq-reasons'],
-    queryFn: async () => {
-      const res = await fetch('/api/finance/discount-requests/reasons', { cache: 'no-store' });
-      const json = await res.json();
-      return (json.data ?? []) as DiscountReason[];
-    },
-    retry: 1,
-  });
-
-  const approve = useMutation({
-    mutationFn: ({ id, comment }: { id: string; comment?: string }) =>
-      apiClients.workflow.post(`/approval/requests/${id}/approve`, { comment }),
-    onSuccess: async () => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['approval-inbox'] }),
-        qc.invalidateQueries({ queryKey: ['approval-mine'] }),
-      ]);
-    },
-  });
-
-  const reject = useMutation({
-    mutationFn: ({ id, comment }: { id: string; comment: string }) =>
-      apiClients.workflow.post(`/approval/requests/${id}/reject`, { comment }),
-    onSuccess: async () => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['approval-inbox'] }),
-        qc.invalidateQueries({ queryKey: ['approval-mine'] }),
-      ]);
-    },
-  });
-
-  const createDrq = useMutation({
-    mutationFn: async () => {
-      const hierarchy = [drqForm.level1, drqForm.level2, drqForm.level3]
-        .map((approver, index) => ({ level: index + 1, approver: approver.trim() }))
-        .filter((item) => item.approver);
-      const res = await fetch('/api/finance/discount-requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          quoteId: drqForm.quoteId,
-          requestedDiscountPercent: Number(drqForm.requestedDiscountPercent),
-          reasonCode: drqForm.reasonCode,
-          reasonNotes: drqForm.reasonNotes,
-          businessImpact: drqForm.reasonNotes,
-          winningProbabilityIfApproved: Number(drqForm.winningProbabilityIfApproved),
-          approverHierarchy: hierarchy,
-          customFields: { approverHierarchy: hierarchy, workflow: 'DRQ_STANDARD_HIERARCHY' },
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        const details = json.details ? ` ${Object.values(json.details).join(' ')}` : '';
-        throw new Error(`${json.error?.message ?? 'DRQ validation failed'}${details}`);
-      }
-      return json.data;
-    },
-    onSuccess: async () => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['approval-inbox'] }),
-        qc.invalidateQueries({ queryKey: ['approval-mine'] }),
-        qc.invalidateQueries({ queryKey: ['drq-quote-options'] }),
-      ]);
-      setDrqForm((s) => ({ ...s, reasonNotes: '' }));
-    },
-  });
-
-  const usingPreviewData = inbox.isError && process.env.NODE_ENV === 'development';
-  const rows = useMemo(
-    () => inbox.data?.data ?? (usingPreviewData ? PREVIEW_APPROVALS : []),
-    [inbox.data?.data, usingPreviewData]
+  const allRows = useMemo(
+    () => allQuery.data?.data ?? (usingPreview ? PREVIEW_APPROVALS : []),
+    [allQuery.data?.data, usingPreview]
   );
-  const filteredRows = useMemo(() => {
+  const mineRows = useMemo(
+    () => mineQuery.data?.data ?? (mineQuery.isError && isDev ? PREVIEW_APPROVALS.slice(0, 1) : []),
+    [mineQuery.data?.data, mineQuery.isError, isDev]
+  );
+
+  const scopedRows = useMemo(() => {
+    if (scope === 'MINE') return mineRows;
+    if (scope === 'ALL') return allRows;
+    return allRows.filter((r) => r.status === scope);
+  }, [scope, allRows, mineRows]);
+
+  const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    const statusFiltered = filter === 'ALL' ? rows : rows.filter((row) => row.status === filter);
-    if (!needle) return statusFiltered;
-    return statusFiltered.filter((row) =>
-      [row.module, row.recordId, row.requestedBy, row.currentApproverId, row.status]
+    if (!needle) return scopedRows;
+    return scopedRows.filter((r) =>
+      [r.module, r.recordId, r.requestedBy, r.status]
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(needle))
+        .some((v) => String(v).toLowerCase().includes(needle))
     );
-  }, [filter, query, rows]);
+  }, [scopedRows, query]);
 
-  const myRows = useMemo(
-    () =>
-      mine.data?.data ??
-      (mine.isError && process.env.NODE_ENV === 'development' ? PREVIEW_APPROVALS.slice(0, 2) : []),
-    [mine.data?.data, mine.isError]
+  const stats = useMemo(
+    () => ({
+      all: allRows.length,
+      pending: allRows.filter((r) => r.status === 'PENDING').length,
+      escalated: allRows.filter((r) => r.status === 'ESCALATED').length,
+      approved: allRows.filter((r) => r.status === 'APPROVED').length,
+    }),
+    [allRows]
   );
-  const pendingMine = useMemo(
-    () => myRows.filter((r) => r.status === 'PENDING' || r.status === 'ESCALATED'),
-    [myRows]
-  );
 
-  const stats = useMemo(() => {
-    const all = rows.length;
-    const pending = rows.filter((r) => r.status === 'PENDING').length;
-    const escalated = rows.filter((r) => r.status === 'ESCALATED').length;
-    const approved = rows.filter((r) => r.status === 'APPROVED').length;
-    return { all, pending, escalated, approved };
-  }, [rows]);
-
-  const isActing = approve.isPending || reject.isPending;
+  const refresh = () => qc.invalidateQueries({ queryKey: approvalKeys.all });
+  const listLoading = scope === 'MINE' ? mineQuery.isLoading : allQuery.isLoading;
 
   return (
     <div className="space-y-8">
@@ -291,7 +173,7 @@ export default function ApprovalsPage() {
                 Governance Queue
               </span>
               <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
-                SLA monitored
+                Approval engine
               </span>
             </div>
             <div className="mt-5 max-w-3xl">
@@ -299,8 +181,20 @@ export default function ApprovalsPage() {
                 Approval command center
               </h1>
               <p className="mt-3 text-sm leading-6 text-slate-500 sm:text-base">
-                Review discount exceptions, quote approvals, workflow gates, and escalation trails from one controlled queue.
+                Review multi-level approval requests across every module, act on your queue, and govern
+                the routing policies behind them.
               </p>
+            </div>
+            <div className="mt-5 flex gap-2">
+              <ViewTab active={view === 'inbox'} onClick={() => setView('inbox')} icon={FileCheck2} label="Inbox" />
+              {isAdmin ? (
+                <ViewTab
+                  active={view === 'policies'}
+                  onClick={() => setView('policies')}
+                  icon={SlidersHorizontal}
+                  label="Policies"
+                />
+              ) : null}
             </div>
           </div>
           <div className="border-t border-slate-100 bg-slate-50 p-6 lg:border-l lg:border-t-0">
@@ -314,327 +208,418 @@ export default function ApprovalsPage() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="min-w-0 space-y-6">
-          <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex flex-wrap gap-2">
-                {FILTERS.map((item) => (
-                  <button
-                    key={item.value}
-                    type="button"
-                    onClick={() => setFilter(item.value)}
-                    className={cn(
-                      'rounded-lg px-4 py-2 text-sm font-bold transition',
-                      filter === item.value
-                        ? 'bg-[#137fec] text-white shadow-sm'
-                        : 'border border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-[#005baf]'
-                    )}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <label className="relative block min-w-0 sm:w-72">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
-                    placeholder="Search approvals..."
-                    type="search"
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void qc.invalidateQueries({ queryKey: ['approval-inbox'] });
-                    void qc.invalidateQueries({ queryKey: ['approval-mine'] });
-                  }}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Refresh
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <section className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-              <div>
-                <h2 className="text-lg font-bold text-slate-950">Decision inbox</h2>
-                <p className="text-sm text-slate-500">
-                  {inbox.isLoading ? 'Loading approvals...' : `${filteredRows.length} records ready for review`}
-                </p>
-              </div>
-              <span className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-                <Filter className="h-4 w-4" />
-                {filter}
-              </span>
-            </div>
-
-            {usingPreviewData ? (
-              <div className="border-b border-amber-100 bg-amber-50 px-5 py-3 text-sm font-medium text-amber-800">
-                Approval service is offline, showing development preview records.
-              </div>
-            ) : null}
-
-            {inbox.isError && !usingPreviewData ? (
-              <StatePanel
-                icon={AlertCircle}
-                title="Approval service is unavailable"
-                body="The queue could not be loaded. The page shell is stable, and you can retry once the approval service is back online."
-              />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[980px] text-left text-sm">
-                  <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500">
-                    <tr>
-                      <th className="px-5 py-3">Request</th>
-                      <th className="px-5 py-3">Commercial impact</th>
-                      <th className="px-5 py-3">Owner</th>
-                      <th className="px-5 py-3">Requested</th>
-                      <th className="px-5 py-3">Status</th>
-                      <th className="px-5 py-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredRows.map((row) => {
-                      const data = row.data ?? {};
-                      const StatusIcon = statusIcon(row.status);
-                      const canAct = row.status === 'PENDING' || row.status === 'ESCALATED';
-                      return (
-                        <tr key={row.id} className="transition hover:bg-slate-50/80">
-                          <td className="px-5 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-xs font-black text-[#005baf]">
-                                {initials(row.module)}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="truncate font-bold text-slate-950">{row.module}</p>
-                                <p className="mt-0.5 font-mono text-xs text-slate-500">{row.recordId}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-5 py-4">
-                            <p className="font-bold text-slate-950">{money(data.dealValue)}</p>
-                            <p className="text-xs text-slate-500">Discount request {discount(data.requestedDiscountPercent)}</p>
-                          </td>
-                          <td className="px-5 py-4">
-                            <p className="font-medium text-slate-700">{row.requestedBy ?? 'System request'}</p>
-                            <p className="text-xs text-slate-500">Approver {row.currentApproverId ?? 'Routing'}</p>
-                          </td>
-                          <td className="px-5 py-4 text-slate-600">{formatDate(row.createdAt)}</td>
-                          <td className="px-5 py-4">
-                            <span className={cn('inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-bold ring-1', statusClass(row.status))}>
-                              <StatusIcon className="h-3.5 w-3.5" />
-                              {row.status}
-                            </span>
-                          </td>
-                          <td className="px-5 py-4 text-right">
-                            <div className="inline-flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => approve.mutate({ id: row.id, comment: 'Approved from inbox' })}
-                                className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
-                                disabled={isActing || !canAct || usingPreviewData}
-                              >
-                                Approve
-                              </button>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  const note = await prompt('Reject reason (required)', 'Reject Approval');
-                                  if (!note) return;
-                                  reject.mutate({ id: row.id, comment: note });
-                                }}
-                                className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                disabled={isActing || !canAct || usingPreviewData}
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {filteredRows.length === 0 ? (
-                      <tr>
-                        <td className="px-5 py-12" colSpan={6}>
-                          <StatePanel
-                            icon={inbox.isLoading ? TimerReset : FileCheck2}
-                            title={inbox.isLoading ? 'Loading approval queue' : 'No approvals match this view'}
-                            body={inbox.isLoading ? 'Fetching request status, approvers, and commercial impact.' : 'Try another status filter or search term.'}
-                          />
-                        </td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        </div>
-
-        <aside className="space-y-6">
-          <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-bold text-slate-950">Create DRQ</h2>
-                <p className="text-sm text-slate-500">Validated discount request with approval hierarchy.</p>
-              </div>
-              <ShieldCheck className="h-5 w-5 text-[#005baf]" />
-            </div>
-            <div className="mt-4 space-y-3">
-              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
-                Quote
-                <select
-                  value={drqForm.quoteId}
-                  onChange={(event) => setDrqForm((s) => ({ ...s, quoteId: event.target.value }))}
-                  className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium normal-case text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                >
-                  {(quoteOptions.data ?? []).map((quote) => (
-                    <option key={quote.id} value={quote.id}>
-                      {quote.quoteNumber ?? quote.id} · {quote.name}
-                    </option>
+      {view === 'policies' && isAdmin ? (
+        <PolicyAdmin />
+      ) : (
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0 space-y-6">
+            <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div className="flex flex-wrap gap-2">
+                  {SCOPES.map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setScope(item.value)}
+                      className={cn(
+                        'rounded-lg px-4 py-2 text-sm font-bold transition',
+                        scope === item.value
+                          ? 'bg-[#137fec] text-white shadow-sm'
+                          : 'border border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-[#005baf]'
+                      )}
+                    >
+                      {item.label}
+                    </button>
                   ))}
-                  {quoteOptions.isError ? <option value="quote-nova-cpq-v1">Q-2026-000003 · Nova Retail</option> : null}
-                </select>
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Discount %
-                  <input
-                    value={drqForm.requestedDiscountPercent}
-                    min="0.01"
-                    max="80"
-                    type="number"
-                    onChange={(event) => setDrqForm((s) => ({ ...s, requestedDiscountPercent: event.target.value }))}
-                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm normal-case"
-                  />
-                </label>
-                <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Win %
-                  <input
-                    value={drqForm.winningProbabilityIfApproved}
-                    min="1"
-                    max="100"
-                    type="number"
-                    onChange={(event) => setDrqForm((s) => ({ ...s, winningProbabilityIfApproved: event.target.value }))}
-                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm normal-case"
-                  />
-                </label>
-              </div>
-              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
-                Prevalidated reason
-                <select
-                  value={drqForm.reasonCode}
-                  onChange={(event) => setDrqForm((s) => ({ ...s, reasonCode: event.target.value }))}
-                  className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium normal-case text-slate-700"
-                >
-                  {(discountReasons.data ?? []).map((reason) => (
-                    <option key={reason.code} value={reason.code}>{reason.label}</option>
-                  ))}
-                </select>
-              </label>
-              <textarea
-                value={drqForm.reasonNotes}
-                onChange={(event) => setDrqForm((s) => ({ ...s, reasonNotes: event.target.value }))}
-                rows={3}
-                placeholder="Business reason, customer context, competitive pressure..."
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-              />
-              <div className="grid gap-2">
-                {[1, 2, 3].map((level) => (
-                  <input
-                    key={level}
-                    value={drqForm[`level${level}` as 'level1']}
-                    onChange={(event) => setDrqForm((s) => ({ ...s, [`level${level}`]: event.target.value }))}
-                    placeholder={`Approval level ${level}${level === 3 ? ' (optional)' : ''}`}
-                    className="h-9 rounded-lg border border-slate-200 px-3 text-sm"
-                  />
-                ))}
-              </div>
-              {createDrq.isError ? (
-                <p className="rounded-lg bg-rose-50 p-2 text-xs font-semibold text-rose-700">{createDrq.error.message}</p>
-              ) : null}
-              {createDrq.isSuccess ? (
-                <p className="rounded-lg bg-emerald-50 p-2 text-xs font-semibold text-emerald-700">DRQ created and routed to approval workflow.</p>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => createDrq.mutate()}
-                disabled={createDrq.isPending}
-                className="w-full rounded-lg bg-[#137fec] px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-60"
-              >
-                {createDrq.isPending ? 'Validating...' : 'Create DRQ workflow'}
-              </button>
-            </div>
-          </section>
-
-          <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-bold text-slate-950">My pending approvals</h2>
-                <p className="text-sm text-slate-500">Submitted records waiting on review.</p>
-              </div>
-              <GitBranch className="h-5 w-5 text-[#005baf]" />
-            </div>
-            <div className="mt-5 space-y-3">
-              {mine.isError && !usingPreviewData ? (
-                <StatePanel
-                  icon={AlertCircle}
-                  title="Could not load your queue"
-                  body="Retry when the workflow service is reachable."
-                  compact
-                />
-              ) : null}
-              {pendingMine.map((row) => (
-                <div key={`mine-${row.id}`} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-bold text-slate-950">{row.module}</p>
-                      <p className="mt-1 text-xs text-slate-500">Reviewer {row.currentApproverId ?? 'routing'} · {new Date(row.createdAt).toLocaleDateString()}</p>
-                    </div>
-                    <span className={cn('rounded px-2 py-1 text-[10px] font-bold ring-1', statusClass(row.status))}>
-                      {row.status}
-                    </span>
-                  </div>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <label className="relative block min-w-0 sm:w-72">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                      placeholder="Search approvals..."
+                      type="search"
+                    />
+                  </label>
                   <button
                     type="button"
-                    className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100"
-                    onClick={() => qc.invalidateQueries({ queryKey: ['approval-mine'] })}
+                    onClick={refresh}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
                   >
-                    Send reminder
+                    <RefreshCw className="h-4 w-4" />
+                    Refresh
                   </button>
                 </div>
-              ))}
-              {!mine.isError && pendingMine.length === 0 ? (
-                <StatePanel
-                  icon={CheckCircle2}
-                  title={mine.isLoading ? 'Loading your approvals' : 'Nothing waiting on you'}
-                  body={mine.isLoading ? 'Checking submitted approval requests.' : 'Your submitted approval queue is clear.'}
-                  compact
-                />
-              ) : null}
+              </div>
             </div>
-          </section>
 
-          <section className="rounded-xl bg-slate-950 p-5 text-white shadow-sm">
-            <h2 className="text-lg font-bold">Approval controls</h2>
-            <div className="mt-4 space-y-4 text-sm text-slate-300">
-              <ControlLine label="Routing engine" value="Policy + hierarchy" />
-              <ControlLine label="Audit trail" value="Immutable events" />
-              <ControlLine label="SLA handling" value="Escalation ready" />
-              <ControlLine label="Decision lock" value="Single approver action" />
-            </div>
-          </section>
-        </aside>
-      </section>
-      {PromptDialog}
+            <section className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-950">Decision inbox</h2>
+                  <p className="text-sm text-slate-500">
+                    {listLoading ? 'Loading approvals...' : `${rows.length} records in view`}
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                  <Filter className="h-4 w-4" />
+                  {scope}
+                </span>
+              </div>
+
+              {usingPreview ? (
+                <div className="border-b border-amber-100 bg-amber-50 px-5 py-3 text-sm font-medium text-amber-800">
+                  Approval service is offline — showing development preview records.
+                </div>
+              ) : null}
+
+              {allError && !usingPreview && scope !== 'MINE' ? (
+                <StatePanel
+                  icon={AlertCircle}
+                  title="Approval service is unavailable"
+                  body="The queue could not be loaded. The page shell is stable; retry once the approval service is back online."
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[900px] text-left text-sm">
+                    <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500">
+                      <tr>
+                        <th className="px-5 py-3">Request</th>
+                        <th className="px-5 py-3">Commercial impact</th>
+                        <th className="px-5 py-3">Requester</th>
+                        <th className="px-5 py-3">Level</th>
+                        <th className="px-5 py-3">Opened</th>
+                        <th className="px-5 py-3">Status</th>
+                        <th className="px-5 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {rows.map((row) => {
+                        const data = row.data ?? {};
+                        return (
+                          <tr key={row.id} className="transition hover:bg-slate-50/80">
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-xs font-black text-[#005baf]">
+                                  {initials(row.module)}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="truncate font-bold text-slate-950">{row.module}</p>
+                                  <p className="mt-0.5 font-mono text-xs text-slate-500">{row.recordId}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4">
+                              <p className="font-bold text-slate-950">{money(data.dealValue)}</p>
+                              <p className="text-xs text-slate-500">Discount {discount(data.requestedDiscountPercent)}</p>
+                            </td>
+                            <td className="px-5 py-4 font-medium text-slate-700">{row.requestedBy}</td>
+                            <td className="px-5 py-4 text-slate-600">L{row.currentStep}</td>
+                            <td className="px-5 py-4 text-slate-600">{formatDate(row.createdAt)}</td>
+                            <td className="px-5 py-4">
+                              <span className={cn('inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-bold ring-1', statusClass(row.status))}>
+                                {row.status}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setOpenId(row.id)}
+                                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-[#005baf] transition hover:bg-blue-50"
+                              >
+                                Review
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {rows.length === 0 ? (
+                        <tr>
+                          <td className="px-5 py-12" colSpan={7}>
+                            <StatePanel
+                              icon={listLoading ? TimerReset : FileCheck2}
+                              title={listLoading ? 'Loading approval queue' : 'No approvals match this view'}
+                              body={
+                                listLoading
+                                  ? 'Fetching request status, approvers, and commercial impact.'
+                                  : 'Try another scope or search term.'
+                              }
+                            />
+                          </td>
+                        </tr>
+                      ) : null}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </div>
+
+          <aside className="space-y-6">
+            <DiscountRequestCard onCreated={refresh} />
+
+            <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-950">Awaiting my decision</h2>
+                  <p className="text-sm text-slate-500">Requests routed to you right now.</p>
+                </div>
+                <GitBranch className="h-5 w-5 text-[#005baf]" />
+              </div>
+              <div className="mt-5 space-y-3">
+                {mineQuery.isError && !isDev ? (
+                  <StatePanel icon={AlertCircle} title="Could not load your queue" body="Retry when the approval service is reachable." compact />
+                ) : null}
+                {mineRows.map((row) => (
+                  <button
+                    key={`mine-${row.id}`}
+                    type="button"
+                    onClick={() => setOpenId(row.id)}
+                    className="block w-full rounded-lg border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-blue-200 hover:bg-blue-50"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-bold text-slate-950">{row.module}</p>
+                        <p className="mt-1 truncate font-mono text-xs text-slate-500">{row.recordId}</p>
+                      </div>
+                      <span className={cn('shrink-0 rounded px-2 py-1 text-[10px] font-bold ring-1', statusClass(row.status))}>
+                        {row.status}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+                {!mineQuery.isError && mineRows.length === 0 ? (
+                  <StatePanel
+                    icon={CheckCircle2}
+                    title={mineQuery.isLoading ? 'Loading your approvals' : 'Nothing waiting on you'}
+                    body={mineQuery.isLoading ? 'Checking requests routed to you.' : 'Your approval queue is clear.'}
+                    compact
+                  />
+                ) : null}
+              </div>
+            </section>
+
+            <section className="rounded-xl bg-slate-950 p-5 text-white shadow-sm">
+              <h2 className="text-lg font-bold">Approval controls</h2>
+              <div className="mt-4 space-y-4 text-sm text-slate-300">
+                <ControlLine label="Routing engine" value="Policy + hierarchy" />
+                <ControlLine label="Quorum" value="ALL / ANY / N-of-M" />
+                <ControlLine label="Audit trail" value="Immutable events" />
+                <ControlLine label="Delegation" value="Per-step delegable" />
+              </div>
+            </section>
+          </aside>
+        </section>
+      )}
+
+      {openId ? (
+        <ApprovalDetailDrawer
+          requestId={openId}
+          onClose={() => setOpenId(null)}
+          currentUserId={userId}
+          isAdmin={isAdmin}
+        />
+      ) : null}
     </div>
+  );
+}
+
+// ─── Discount request (finance) — the pre-existing DRQ origination path ─────────
+
+function DiscountRequestCard({ onCreated }: { onCreated: () => void }) {
+  const [form, setForm] = useState({
+    quoteId: 'quote-nova-cpq-v1',
+    requestedDiscountPercent: '12',
+    reasonCode: 'STRATEGIC_ACCOUNT',
+    winningProbabilityIfApproved: '72',
+    reasonNotes: '',
+    level1: 'Finance Manager',
+    level2: 'Sales Director',
+    level3: '',
+  });
+
+  const [quoteOptions, setQuoteOptions] = useState<QuoteOption[]>([]);
+  const [reasons, setReasons] = useState<DiscountReason[]>([]);
+
+  // Best-effort option loads; failures degrade to free-text defaults.
+  useEffect(() => {
+    void fetch('/api/quotes?limit=50', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => setQuoteOptions((j.data?.data ?? j.data ?? []) as QuoteOption[]))
+      .catch(() => setQuoteOptions([]));
+    void fetch('/api/finance/discount-requests/reasons', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => setReasons((j.data ?? []) as DiscountReason[]))
+      .catch(() => setReasons([]));
+  }, []);
+
+  const createDrq = useMutation({
+    mutationFn: async () => {
+      const hierarchy = [form.level1, form.level2, form.level3]
+        .map((approver, index) => ({ level: index + 1, approver: approver.trim() }))
+        .filter((item) => item.approver);
+      const res = await fetch('/api/finance/discount-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quoteId: form.quoteId,
+          requestedDiscountPercent: Number(form.requestedDiscountPercent),
+          reasonCode: form.reasonCode,
+          reasonNotes: form.reasonNotes,
+          businessImpact: form.reasonNotes,
+          winningProbabilityIfApproved: Number(form.winningProbabilityIfApproved),
+          approverHierarchy: hierarchy,
+          customFields: { approverHierarchy: hierarchy, workflow: 'DRQ_STANDARD_HIERARCHY' },
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        const details = json.details ? ` ${Object.values(json.details).join(' ')}` : '';
+        throw new Error(`${json.error?.message ?? 'DRQ validation failed'}${details}`);
+      }
+      return json.data;
+    },
+    onSuccess: () => {
+      onCreated();
+      setForm((s) => ({ ...s, reasonNotes: '' }));
+    },
+  });
+
+  return (
+    <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-slate-950">Create DRQ</h2>
+          <p className="text-sm text-slate-500">Validated discount request with approval hierarchy.</p>
+        </div>
+        <ShieldCheck className="h-5 w-5 text-[#005baf]" />
+      </div>
+      <div className="mt-4 space-y-3">
+        <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+          Quote
+          <select
+            value={form.quoteId}
+            onChange={(e) => setForm((s) => ({ ...s, quoteId: e.target.value }))}
+            className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium normal-case text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          >
+            {quoteOptions.map((quote) => (
+              <option key={quote.id} value={quote.id}>
+                {quote.quoteNumber ?? quote.id} · {quote.name}
+              </option>
+            ))}
+            {quoteOptions.length === 0 ? (
+              <option value="quote-nova-cpq-v1">Q-2026-000003 · Nova Retail</option>
+            ) : null}
+          </select>
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+            Discount %
+            <input
+              value={form.requestedDiscountPercent}
+              min="0.01"
+              max="80"
+              type="number"
+              onChange={(e) => setForm((s) => ({ ...s, requestedDiscountPercent: e.target.value }))}
+              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm normal-case"
+            />
+          </label>
+          <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+            Win %
+            <input
+              value={form.winningProbabilityIfApproved}
+              min="1"
+              max="100"
+              type="number"
+              onChange={(e) => setForm((s) => ({ ...s, winningProbabilityIfApproved: e.target.value }))}
+              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm normal-case"
+            />
+          </label>
+        </div>
+        <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+          Prevalidated reason
+          <select
+            value={form.reasonCode}
+            onChange={(e) => setForm((s) => ({ ...s, reasonCode: e.target.value }))}
+            className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium normal-case text-slate-700"
+          >
+            {reasons.length > 0 ? (
+              reasons.map((reason) => (
+                <option key={reason.code} value={reason.code}>
+                  {reason.label}
+                </option>
+              ))
+            ) : (
+              <option value="STRATEGIC_ACCOUNT">Strategic account</option>
+            )}
+          </select>
+        </label>
+        <textarea
+          value={form.reasonNotes}
+          onChange={(e) => setForm((s) => ({ ...s, reasonNotes: e.target.value }))}
+          rows={3}
+          placeholder="Business reason, customer context, competitive pressure..."
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+        />
+        <div className="grid gap-2">
+          {[1, 2, 3].map((level) => (
+            <input
+              key={level}
+              value={form[`level${level}` as 'level1']}
+              onChange={(e) => setForm((s) => ({ ...s, [`level${level}`]: e.target.value }))}
+              placeholder={`Approval level ${level}${level === 3 ? ' (optional)' : ''}`}
+              className="h-9 rounded-lg border border-slate-200 px-3 text-sm"
+            />
+          ))}
+        </div>
+        {createDrq.isError ? (
+          <p className="rounded-lg bg-rose-50 p-2 text-xs font-semibold text-rose-700">{createDrq.error.message}</p>
+        ) : null}
+        {createDrq.isSuccess ? (
+          <p className="rounded-lg bg-emerald-50 p-2 text-xs font-semibold text-emerald-700">
+            DRQ created and routed to the approval workflow.
+          </p>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => createDrq.mutate()}
+          disabled={createDrq.isPending}
+          className="w-full rounded-lg bg-[#137fec] px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-60"
+        >
+          {createDrq.isPending ? 'Validating...' : 'Create DRQ workflow'}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function ViewTab({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition',
+        active
+          ? 'bg-slate-950 text-white'
+          : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+      )}
+    >
+      <Icon className="h-4 w-4" />
+      {label}
+    </button>
   );
 }
 

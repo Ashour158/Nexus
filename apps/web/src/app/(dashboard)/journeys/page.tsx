@@ -1,30 +1,52 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
+import { ArrowRight, Play, Archive, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/hooks/use-confirm';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { notify } from '@/lib/toast';
+import { useAuthStore } from '@/stores/auth.store';
 import {
   useJourneys,
   useActivateJourney,
-  usePauseJourney,
   useArchiveJourney,
   useDeleteJourney,
   type Journey,
-} from '@/hooks/use-journeys';
-import { notify } from '@/lib/toast';
-import { useAuthStore } from '@/stores/auth.store';
+  type JourneyStatus,
+} from '@/hooks/use-command-center';
+
+/**
+ * Journeys — customer/record lifecycle orchestration.
+ *
+ * Wired to the workflow-service CommandCenter command-journey contract
+ * (`/api/v1/command-center/journeys`) via `use-command-center` — the engine
+ * with a live stepping scheduler + dev-preview mock. Rows link to the journey
+ * detail at `/journeys/[id]`; "New" opens the create surface at `/journeys/new`.
+ */
+
+const STATUS_STYLES: Record<JourneyStatus, string> = {
+  DRAFT: 'bg-slate-100 text-slate-700',
+  ACTIVE: 'bg-emerald-100 text-emerald-800',
+  ARCHIVED: 'bg-amber-100 text-amber-800',
+};
+
+/** The list endpoint returns a bare array in dev-mock and `{ items }` from the
+ *  live service — normalize both (and defend against 404/empty). */
+function toArray<T>(v: T[] | undefined): T[] {
+  if (Array.isArray(v)) return v;
+  const o = v as unknown as { items?: T[]; data?: T[] } | undefined;
+  return o?.items ?? o?.data ?? [];
+}
 
 export default function JourneysPage() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canRead = hasPermission('workflows:read');
   const { confirm, ConfirmDialog } = useConfirm();
-  const [page, setPage] = useState(1);
-  const query = useJourneys({ page, limit: 25 });
+
+  const query = useJourneys();
   const activate = useActivateJourney();
-  const pause = usePauseJourney();
   const archive = useArchiveJourney();
   const remove = useDeleteJourney();
 
@@ -38,23 +60,27 @@ export default function JourneysPage() {
     );
   }
 
-  const rows = query.data?.data ?? [];
-  const total = query.data?.total ?? 0;
-  const totalPages = query.data?.totalPages ?? 1;
+  const rows = toArray<Journey>(query.data);
 
-  function toggleStatus(journey: Journey) {
-    if (journey.status === 'ACTIVE') {
-      pause.mutate(journey.id, {
-        onSuccess: () => notify.success('Journey paused'),
-        onError: (err) => notify.error('Failed to pause journey', err.message),
-      });
-    } else if (journey.status === 'PAUSED' || journey.status === 'DRAFT') {
-      activate.mutate(journey.id, {
-        onSuccess: () => notify.success('Journey activated'),
-        onError: (err) => notify.error('Failed to activate journey', err.message),
-      });
-    }
-  }
+  const handleActivate = (id: string) => {
+    activate.mutate(id, {
+      onSuccess: () => notify.success('Journey activated'),
+      onError: (err) => notify.error('Failed to activate journey', err instanceof Error ? err.message : undefined),
+    });
+  };
+  const handleArchive = (id: string) => {
+    archive.mutate(id, {
+      onSuccess: () => notify.success('Journey archived'),
+      onError: (err) => notify.error('Failed to archive journey', err instanceof Error ? err.message : undefined),
+    });
+  };
+  const handleDelete = async (id: string, name: string) => {
+    if (!(await confirm(`Delete journey "${name}" and its enrollments?`, 'Delete Journey'))) return;
+    remove.mutate(id, {
+      onSuccess: () => notify.success('Journey deleted'),
+      onError: (err) => notify.error('Delete failed', err instanceof Error ? err.message : undefined),
+    });
+  };
 
   return (
     <main className="space-y-4 p-6">
@@ -65,14 +91,14 @@ export default function JourneysPage() {
             Customer journey automation and orchestration.
           </p>
         </div>
-        <Link href="/workflows/new">
+        <Link href="/journeys/new">
           <Button type="button">New Journey</Button>
         </Link>
       </header>
 
       <section className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         {query.isLoading ? (
-          <TableSkeleton rows={8} cols={6} />
+          <TableSkeleton rows={8} cols={5} />
         ) : query.isError ? (
           <div className="p-4 text-sm text-red-600">Failed to load journeys.</div>
         ) : rows.length === 0 ? (
@@ -80,18 +106,19 @@ export default function JourneysPage() {
             <EmptyState
               icon="🛤️"
               title="No journeys yet"
-              description="Create your first customer journey to automate engagement."
+              description="Create your first journey to automate a record lifecycle."
+              cta={{ label: 'New Journey', href: '/journeys/new' }}
             />
           </div>
         ) : (
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50 text-start text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Entry Trigger</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-end">Enrolled</th>
-                <th className="px-4 py-3 text-end">Conversion</th>
+                <th className="px-4 py-3 text-start">Name</th>
+                <th className="px-4 py-3 text-start">Entity</th>
+                <th className="px-4 py-3 text-start">Entry Trigger</th>
+                <th className="px-4 py-3 text-start">Status</th>
+                <th className="px-4 py-3 text-end">Steps</th>
                 <th className="px-4 py-3 text-end">Actions</th>
               </tr>
             </thead>
@@ -109,68 +136,72 @@ export default function JourneysPage() {
                       <p className="text-xs text-slate-500">{j.description}</p>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{j.entryTrigger}</td>
-                  <td className="px-4 py-3">
-                    <StatusPill status={j.status} />
-                  </td>
-                  <td className="px-4 py-3 text-end tabular-nums">
-                    {j.enrolledCount ?? 0}
-                  </td>
-                  <td className="px-4 py-3 text-end tabular-nums">
-                    {j.conversionRate != null
-                      ? `${(j.conversionRate * 100).toFixed(1)}%`
-                      : '—'}
+                  <td className="px-4 py-3 capitalize text-slate-600">{j.entityType}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {j.entryTrigger?.event ? (
+                      <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
+                        {j.entryTrigger.event}
+                      </code>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex justify-end gap-1">
-                      {(j.status === 'DRAFT' || j.status === 'PAUSED') && (
-                        <Button
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        STATUS_STYLES[j.status] ?? 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      {j.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-end tabular-nums text-slate-600">
+                    {j.steps?.length ?? 0}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      {j.status !== 'ACTIVE' && (
+                        <button
                           type="button"
-                          variant="secondary"
-                          onClick={() => toggleStatus(j)}
-                          disabled={activate.isPending || pause.isPending}
+                          onClick={() => handleActivate(j.id)}
+                          disabled={activate.isPending}
+                          className="rounded p-1.5 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 disabled:opacity-40"
+                          aria-label="Activate"
+                          title="Activate"
                         >
-                          Activate
-                        </Button>
+                          <Play className="h-4 w-4" />
+                        </button>
                       )}
-                      {j.status === 'ACTIVE' && (
-                        <Button
+                      {j.status !== 'ARCHIVED' && (
+                        <button
                           type="button"
-                          variant="secondary"
-                          onClick={() => toggleStatus(j)}
-                          disabled={activate.isPending || pause.isPending}
+                          onClick={() => handleArchive(j.id)}
+                          disabled={archive.isPending}
+                          className="rounded p-1.5 text-slate-400 hover:bg-amber-50 hover:text-amber-600 disabled:opacity-40"
+                          aria-label="Archive"
+                          title="Archive"
                         >
-                          Pause
-                        </Button>
+                          <Archive className="h-4 w-4" />
+                        </button>
                       )}
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() =>
-                          archive.mutate(j.id, {
-                            onSuccess: () => notify.success('Journey archived'),
-                            onError: (err) => notify.error('Archive failed', err.message),
-                          })
-                        }
-                        disabled={archive.isPending}
+                      <Link
+                        href={`/journeys/${j.id}`}
+                        className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                        aria-label="Open journey"
+                        title="Open"
                       >
-                        Archive
-                      </Button>
-                      <Button
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                      <button
                         type="button"
-                        variant="destructive"
-                        onClick={async () => {
-                          if (await confirm(`Delete journey "${j.name}"?`, 'Delete Journey')) {
-                            remove.mutate(j.id, {
-                              onSuccess: () => notify.success('Journey deleted'),
-                              onError: (err) => notify.error('Delete failed', err.message),
-                            });
-                          }
-                        }}
+                        onClick={() => handleDelete(j.id, j.name)}
                         disabled={remove.isPending}
+                        className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                        aria-label="Delete"
+                        title="Delete"
                       >
-                        Delete
-                      </Button>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -179,54 +210,7 @@ export default function JourneysPage() {
           </table>
         )}
       </section>
-
-      {totalPages > 1 && (
-        <footer className="flex items-center justify-between text-sm">
-          <p className="text-slate-500">
-            {rows.length} shown / {total} total
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              Previous
-            </Button>
-            <span className="text-slate-600">
-              Page {page} / {totalPages}
-            </span>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </Button>
-          </div>
-        </footer>
-      )}
       {ConfirmDialog}
     </main>
-  );
-}
-
-function StatusPill({ status }: { status: Journey['status'] }) {
-  const cls: Record<string, string> = {
-    DRAFT: 'bg-slate-100 text-slate-700',
-    ACTIVE: 'bg-emerald-100 text-emerald-800',
-    PAUSED: 'bg-amber-100 text-amber-800',
-    ARCHIVED: 'bg-slate-200 text-slate-700',
-  };
-  return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-        cls[status] ?? 'bg-slate-100 text-slate-700'
-      }`}
-    >
-      {status}
-    </span>
   );
 }

@@ -144,6 +144,66 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
     return row;
   }
 
+  /**
+   * BL-03: validate a proposed `parentAccountId` before it is set/changed so the
+   * account hierarchy can never form a cycle (which would cause the hierarchy
+   * BFS roll-ups and buying-committee/org features to recurse forever).
+   *
+   * Rejects when:
+   *  - the parent does not exist in this tenant (existence check),
+   *  - the parent is the account itself (self-parent — `selfId` supplied),
+   *  - the parent is a descendant of the account. Descendants are the transitive
+   *    closure of `parentAccountId` (childAccounts), so we walk UP from the
+   *    proposed parent via `parentAccountId`; if that ancestor chain reaches
+   *    `selfId`, the parent sits below the account and the link would cycle.
+   *
+   * The walk is bounded by a visited-set and a max-depth guard so an already
+   * corrupt (pre-existing cyclic) chain can never spin forever.
+   */
+  async function assertValidParent(
+    tenantId: string,
+    parentAccountId: string,
+    selfId: string | null
+  ): Promise<void> {
+    if (selfId && parentAccountId === selfId) {
+      throw new BusinessRuleError(
+        'An account cannot be its own parent'
+      );
+    }
+    const MAX_DEPTH = 100;
+    const visited = new Set<string>();
+    let cursor: string | null = parentAccountId;
+    let existenceChecked = false;
+    for (let depth = 0; cursor && depth < MAX_DEPTH; depth++) {
+      if (visited.has(cursor)) {
+        // Pre-existing corrupt cycle upstream of the proposed parent; stop.
+        break;
+      }
+      visited.add(cursor);
+      const node: { id: string; parentAccountId: string | null } | null =
+        await prisma.account.findFirst({
+          where: { id: cursor, tenantId },
+          select: { id: true, parentAccountId: true },
+        });
+      if (!node) {
+        // The first node in the walk IS the proposed parent — if it is missing
+        // the parent doesn't exist / is in another tenant. Deeper nulls just
+        // terminate the walk (a broken ancestor ref is not this update's fault).
+        if (!existenceChecked) {
+          throw new NotFoundError('Account', parentAccountId);
+        }
+        break;
+      }
+      existenceChecked = true;
+      if (selfId && node.parentAccountId === selfId) {
+        throw new BusinessRuleError(
+          'Cannot set parent account: the selected parent is a descendant of this account, which would create a circular hierarchy'
+        );
+      }
+      cursor = node.parentAccountId;
+    }
+  }
+
   return {
     async listAccounts(
       tenantId: string,
@@ -192,10 +252,8 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
 
     async createAccount(tenantId: string, data: CreateAccountInput): Promise<Account> {
       if (data.parentAccountId) {
-        const parent = await prisma.account.findFirst({
-          where: { id: data.parentAccountId, tenantId },
-        });
-        if (!parent) throw new NotFoundError('Account', data.parentAccountId);
+        // BL-03: existence + cycle guard. No self yet on create, so selfId=null.
+        await assertValidParent(tenantId, data.parentAccountId, null);
       }
       // Enforce active validation rules (fail-open: no rules / eval error => allow).
       await enforceValidationRules(prisma, tenantId, 'account', data as Record<string, unknown>);
@@ -319,6 +377,12 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
       if (data.name !== undefined) { update.name = data.name; oldValues.name = existing.name; }
       if (data.ownerId !== undefined) { update.ownerId = data.ownerId; oldValues.ownerId = existing.ownerId; }
       if (data.parentAccountId !== undefined) {
+        if (data.parentAccountId) {
+          // BL-03: reject self-parent and any parent that is a descendant of
+          // this account (would create a circular hierarchy), plus keep the
+          // existing existence/tenant check.
+          await assertValidParent(tenantId, data.parentAccountId, id);
+        }
         update.parentAccount = data.parentAccountId
           ? { connect: { id: data.parentAccountId } }
           : { disconnect: true };

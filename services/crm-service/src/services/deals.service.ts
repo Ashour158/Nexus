@@ -912,13 +912,56 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         activities: safeActivities.map(a => ({ type: a.type, completed: a.status === 'COMPLETED' })),
       });
 
+      // BL-05: stage↔status reconciliation. The destination stage's won/lost
+      // flags drive the deal status so a card dragged into a Won/Lost column is
+      // actually closed (and its close side-effects/events fire), and a deal
+      // dragged back out of a closed column reopens. Order/required-field gating
+      // stays with the blueprint above — pipelines with no blueprint remain
+      // fail-open for ordinary open→open moves; only the close/reopen status
+      // transition is enforced here.
+      const stageData: Prisma.DealUncheckedUpdateInput = {
+        stageId,
+        probability: stage.probability,
+        version: { increment: 1 },
+      };
+
+      // 'won' | 'lost' | 'reopen' | null — which close-lifecycle event to emit.
+      let statusTransition: 'won' | 'lost' | 'reopen' | null = null;
+
+      if (stage.isWon) {
+        // Mirror markDealWon side-effects so downstream stays consistent.
+        stageData.status = 'WON';
+        stageData.actualCloseDate = new Date();
+        stageData.probability = 100;
+        stageData.forecastCategory = 'CLOSED';
+        if (existing.status !== 'WON') statusTransition = 'won';
+      } else if (stage.isLost) {
+        // Mirror markDealLost side-effects. No reason is supplied on a drag, so
+        // default one when the deal doesn't already carry a lost reason.
+        stageData.status = 'LOST';
+        stageData.actualCloseDate = new Date();
+        stageData.probability = 0;
+        stageData.forecastCategory = 'OMITTED';
+        if (!existing.lostReason) {
+          stageData.lostReason = 'Moved to lost stage';
+          stageData.closeReason = 'Moved to lost stage';
+        }
+        if (existing.status !== 'LOST') statusTransition = 'lost';
+      } else if (existing.status === 'WON' || existing.status === 'LOST') {
+        // Moved OUT of a closed stage back into an open one: reopen the deal and
+        // clear the close side-effects (probability follows the open stage).
+        stageData.status = 'OPEN';
+        stageData.actualCloseDate = null;
+        stageData.forecastCategory = 'PIPELINE';
+        stageData.lostReason = null;
+        stageData.lostDetail = null;
+        stageData.closeReason = null;
+        statusTransition = 'reopen';
+      }
+
       const updated = await prisma.deal.update({
         where: { id },
-        data: {
-          stageId,
-          probability: stage.probability,
-          version: { increment: 1 },
-        },
+        data: stageData,
       });
 
       await producer.publish(TOPICS.DEALS, {
@@ -934,6 +977,63 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           stageChangedAt: new Date().toISOString(),
         },
       });
+
+      // Emit the same close-lifecycle events as markDealWon/markDealLost so
+      // finance/analytics/notifications react identically to a stage-driven close.
+      if (statusTransition === 'won') {
+        // Include deal-team splits, mirroring markDealWon's payload. Fail-open.
+        let teamSplits: Array<{
+          userId: string;
+          role: string;
+          splitType: string;
+          splitPercent: number;
+        }> = [];
+        try {
+          const rows = await prisma.dealTeam.findMany({ where: { tenantId, dealId: id } });
+          teamSplits = rows.map((r) => ({
+            userId: r.userId,
+            role: r.role,
+            splitType: r.splitType,
+            splitPercent: Number(r.splitPercent.toFixed(2)),
+          }));
+        } catch {
+          teamSplits = [];
+        }
+        await producer.publish(TOPICS.DEALS, {
+          type: 'deal.won',
+          tenantId,
+          payload: {
+            dealId: updated.id,
+            ownerId: updated.ownerId,
+            accountId: updated.accountId,
+            amount: decimalToNumber(updated.amount),
+            currency: updated.currency,
+            teamSplits,
+          },
+        });
+      } else if (statusTransition === 'lost') {
+        await producer.publish(TOPICS.DEALS, {
+          type: 'deal.lost',
+          tenantId,
+          payload: {
+            dealId: updated.id,
+            ownerId: updated.ownerId,
+            reason: updated.lostReason ?? 'Moved to lost stage',
+            amount: decimalToNumber(updated.amount),
+          },
+        });
+      } else if (statusTransition === 'reopen') {
+        await producer.publish(TOPICS.DEALS, {
+          type: 'deal.reopened',
+          tenantId,
+          payload: {
+            dealId: updated.id,
+            ownerId: updated.ownerId,
+            accountId: updated.accountId,
+            status: updated.status,
+          },
+        });
+      }
 
       return updated;
     },

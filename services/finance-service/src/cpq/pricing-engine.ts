@@ -330,10 +330,16 @@ export class CpqPricingEngine {
           .minus(tierPrice)
           .div(listPrice)
           .times(100);
-        discountPercent = discountPercent.plus(volDiscount);
-        appliedRules.push(
-          `Volume tier (qty ${qty}): -${volDiscount.toFixed(2)}%`
-        );
+        // COM-03: the volume tier is an absolute price floor/replacement, not an
+        // additive discount. Stacking it on top of the customer-tier discount
+        // double-discounts the customer. Take whichever yields the better (lower)
+        // price — i.e. the deeper discount — instead of summing both percentages.
+        if (volDiscount.gt(discountPercent)) {
+          discountPercent = volDiscount;
+          appliedRules.push(
+            `Volume tier (qty ${qty}): -${volDiscount.toFixed(2)}%`
+          );
+        }
       }
 
       // ── Rule 4: Bundle Discount ───────────────────────────────────────────
@@ -380,10 +386,17 @@ export class CpqPricingEngine {
         }
       }
 
+      // COM-01: cap the cumulative discount at 100% so stacked discounts can
+      // never invert the price. All arithmetic stays in Decimal (decimal.js).
+      if (discountPercent.gt(100)) discountPercent = new Decimal(100);
+      if (discountPercent.lt(0)) discountPercent = new Decimal(0);
+
       // Apply accumulated discount to obtain the post-rules-1..6 working price.
       let workingPrice = listPrice.times(
         new Decimal(1).minus(discountPercent.div(100))
       );
+      // COM-01: floor the resulting unit price at >= 0 as a final safety net.
+      if (workingPrice.lt(0)) workingPrice = new Decimal(0);
 
       // ── Rule 7: Floor Price Enforcement ───────────────────────────────────
       const floorPrice = this.getFloorPrice(product, accountCtx.tier);

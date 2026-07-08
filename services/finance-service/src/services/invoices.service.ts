@@ -308,10 +308,35 @@ export function createInvoicesService(
         const allPayments = await tx.payment.findMany({
           where: { invoiceId, tenantId, status: 'COMPLETED' },
         });
-        const totalPaid = allPayments.reduce(
-          (acc, cur) => acc.plus(new Decimal(cur.amount.toString())),
-          new Decimal(0)
+        // COM-02: payments made in a currency other than the invoice's must NOT
+        // be summed 1:1 against the invoice total — doing so mis-computes the
+        // paid / partial / paid state. No FX rate is threaded into this path, so
+        // only same-currency payments count toward the paid total; any
+        // mismatched-currency payments are excluded and flagged for follow-up.
+        const invoiceCurrency = invoice.currency;
+        const mismatchedPayments = allPayments.filter(
+          (pmt) => pmt.currency !== invoiceCurrency
         );
+        if (mismatchedPayments.length > 0) {
+          console.warn(
+            '[invoices.service] Excluding foreign-currency payments from paid-total (no FX conversion available)',
+            {
+              invoiceId,
+              invoiceCurrency,
+              mismatched: mismatchedPayments.map((pmt) => ({
+                id: pmt.id,
+                currency: pmt.currency,
+                amount: pmt.amount.toString(),
+              })),
+            }
+          );
+        }
+        const totalPaid = allPayments
+          .filter((pmt) => pmt.currency === invoiceCurrency)
+          .reduce(
+            (acc, cur) => acc.plus(new Decimal(cur.amount.toString())),
+            new Decimal(0)
+          );
         const invoiceTotal = new Decimal(invoice.total.toString());
 
         let newStatus: Prisma.InvoiceUpdateInput['status'];

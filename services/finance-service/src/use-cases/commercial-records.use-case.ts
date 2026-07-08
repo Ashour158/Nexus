@@ -330,8 +330,23 @@ function hasApprovalPathMetadata(customFields: Record<string, unknown>) {
   return hasText(customFields.approvalPathId) || hasText(customFields.approvalPolicyId) || hasText(customFields.approverId);
 }
 
-function isSystemMigration(customFields: Record<string, unknown>) {
-  return customFields.systemMigration === true || customFields.source === 'system_migration';
+// BL-01: "system migration mode" must be derived from a trusted, server-set
+// signal on the request context — NOT from the client-supplied request body.
+// The old client-body escape hatch (customFields.systemMigration) let any caller
+// mint a quote with no RFQ and skip the approval gate simply by POSTing
+// `{ customFields: { systemMigration: true } }`.
+//
+// Trusted signals available on EngineContext (all set server-side, never from the
+// request body): `ctx.audit.source` is hard-coded per entrypoint — HTTP routes set
+// 'api', internal consumers/jobs set 'system' | 'worker' | 'import' | 'automation';
+// and `ctx.audit.actor.roles` comes from the verified JWT / service token.
+const SYSTEM_MIGRATION_ROLES = new Set(['SYSTEM', 'SERVICE', 'service-role', 'MIGRATION']);
+function isSystemMigrationContext(ctx: EngineContext): boolean {
+  const source = ctx.audit.source;
+  // Anything other than an external 'api' call is an internal/service path.
+  if (source && source !== 'api') return true;
+  const roles = actor(ctx).roles ?? [];
+  return roles.some((role) => SYSTEM_MIGRATION_ROLES.has(role));
 }
 
 function quoteRevisionSnapshot(quote: Record<string, unknown>, overrides: Record<string, unknown>) {
@@ -1668,7 +1683,8 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
     async createQuote(ctx: EngineContext, data: CreateQuoteInput) {
       const tenantId = actor(ctx).tenantId;
       const customFields = customFieldsOf(data.customFields);
-      if (!data.rfqId && !isSystemMigration(customFields)) {
+      const systemMigration = isSystemMigrationContext(ctx);
+      if (!data.rfqId && !systemMigration) {
         throw new BusinessRuleError('Quote creation must originate from an RFQ');
       }
       if (!hasText(data.dealId) || !hasText(data.accountId) || !hasText(data.ownerId)) {
@@ -1677,7 +1693,7 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
       if (!Array.isArray(data.items) || data.items.length === 0) {
         throw new BusinessRuleError('Quote creation requires at least one line item');
       }
-      if (!hasApprovalPathMetadata(customFields) && !isSystemMigration(customFields)) {
+      if (!hasApprovalPathMetadata(customFields) && !systemMigration) {
         throw new BusinessRuleError('Quote creation requires approval path metadata or a resolvable approval policy');
       }
       if (data.rfqId) {

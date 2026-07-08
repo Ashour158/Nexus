@@ -231,39 +231,43 @@ async function persistQuoteArtifacts(
   createdById?: string,
   pricingResult?: CpqPricingResult
 ) {
-  const db = prisma as unknown as {
-    quoteLine?: { deleteMany: Function; createMany: Function };
-    quoteRevision?: { create: Function };
-  };
+  // DI-01: the quote line-items and the initial revision must be persisted
+  // atomically. Previously these ran as separate awaits — a failed revision
+  // write left a quote with no revision, which makes CONVERT_TO_ORDER / EXPIRE
+  // throw "revision stale/missing" forever. Wrap all writes in one transaction.
+  await prisma.$transaction(async (tx) => {
+    const db = tx as unknown as {
+      quoteLine?: { deleteMany: Function; createMany: Function };
+      quoteRevision?: { createMany: Function };
+    };
 
-  if (pricingResult && db.quoteLine) {
-    await db.quoteLine.deleteMany({ where: { tenantId, quoteId: quote.id } });
-    await db.quoteLine.createMany({
-      data: normalizeQuoteLines(tenantId, quote.id, pricingResult),
-    });
-  }
+    if (pricingResult && db.quoteLine) {
+      await db.quoteLine.deleteMany({ where: { tenantId, quoteId: quote.id } });
+      await db.quoteLine.createMany({
+        data: normalizeQuoteLines(tenantId, quote.id, pricingResult),
+      });
+    }
 
-  if (db.quoteRevision) {
-    await db.quoteRevision.create({
-      data: {
-        tenantId,
-        quoteId: quote.id,
-        version: quote.version,
-        reason,
-        status: quote.status,
-        snapshot: quoteSnapshot(quote),
-        createdById: createdById ?? null,
-      },
-    }).catch((err: unknown) => {
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
-      ) {
-        return undefined;
-      }
-      throw err;
-    });
-  }
+    if (db.quoteRevision) {
+      // createMany + skipDuplicates preserves the previous P2002 tolerance
+      // (duplicate (tenant, quote, version) revision) without a failed INSERT
+      // poisoning the surrounding interactive transaction.
+      await db.quoteRevision.createMany({
+        data: [
+          {
+            tenantId,
+            quoteId: quote.id,
+            version: quote.version,
+            reason,
+            status: quote.status,
+            snapshot: quoteSnapshot(quote),
+            createdById: createdById ?? null,
+          },
+        ],
+        skipDuplicates: true,
+      });
+    }
+  });
 }
 
 // ─── Service Factory ────────────────────────────────────────────────────────

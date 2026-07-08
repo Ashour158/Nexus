@@ -36,10 +36,19 @@ model Subscription {
   customerId         String
   planId             String
   plan               Plan      @relation(fields: [planId], references: [id])
+  // Lifecycle status: TRIALING | ACTIVE | PAST_DUE | CANCELLED | EXPIRED | PAUSED
   status             String    @default("ACTIVE")
   currentPeriodStart DateTime
   currentPeriodEnd   DateTime
   trialEnd           DateTime?
+  // Renewal + dunning control (COM-05)
+  autoRenew          Boolean   @default(true)
+  cancelAtPeriodEnd  Boolean   @default(false)
+  // Dunning bookkeeping — when a subscription entered PAST_DUE and how many
+  // retry cycles have fired. Used by the poller to schedule day 1/3/5/7 retries.
+  pastDueSince       DateTime?
+  dunningAttempts    Int       @default(0)
+  lastDunningAt      DateTime?
   cancelledAt        DateTime?
   stripeSubId        String?
   metadata           Json      @default("{}")
@@ -47,10 +56,12 @@ model Subscription {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   invoices           Invoice[]
+  usageRecords       UsageRecord[]
 
   @@index([tenantId])
   @@index([tenantId, customerId])
   @@index([tenantId, status])
+  @@index([status, currentPeriodEnd])
   @@unique([id, tenantId])
 }
 
@@ -72,6 +83,7 @@ model Invoice {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   payments        Payment[]
+  creditNotes     CreditNote[]
 
   @@unique([tenantId, number])
   @@index([tenantId])
@@ -99,6 +111,57 @@ model Payment {
   @@index([tenantId])
   @@index([tenantId, invoiceId])
   @@index([tenantId, status])
+  @@unique([id, tenantId])
+}
+
+// ─── Usage metering (COM-05) ──────────────────────────────────────────────────
+// A single metered-usage datapoint for a subscription. Aggregated per-metric
+// over the billing period and folded into the renewal invoice. `billedInvoiceId`
+// marks the record as already invoiced so a period is never double-charged.
+model UsageRecord {
+  id              String       @id @default(cuid())
+  tenantId        String
+  subscriptionId  String
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id])
+  metric          String
+  quantity        Decimal      @db.Decimal(18, 4)
+  // Optional per-unit price override; when null the plan feature/metadata rate
+  // (or 0) is used at aggregation time.
+  unitPrice       Decimal?     @db.Decimal(18, 6)
+  ts              DateTime     @default(now())
+  billedInvoiceId String?
+  billedAt        DateTime?
+  metadata        Json         @default("{}")
+  createdAt       DateTime     @default(now())
+
+  @@index([tenantId])
+  @@index([tenantId, subscriptionId])
+  @@index([subscriptionId, metric, billedInvoiceId])
+  @@unique([id, tenantId])
+}
+
+// ─── Credit notes / refunds (COM-06) ──────────────────────────────────────────
+// A credit issued against an invoice. Reduces the invoice's outstanding balance
+// (see invoice outstanding calc). Decimal-safe; never mutates the invoice amount.
+model CreditNote {
+  id        String   @id @default(cuid())
+  tenantId  String
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  customerId String?
+  number    String
+  amount    Decimal  @db.Decimal(18, 2)
+  currency  String   @default("USD")
+  reason    String
+  // ISSUED | VOID
+  status    String   @default("ISSUED")
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+  @@index([tenantId, invoiceId])
   @@unique([id, tenantId])
 }
 

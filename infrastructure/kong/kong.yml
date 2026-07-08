@@ -292,3 +292,19 @@ services:
         paths:
           - /notes-ms
         strip_path: false
+
+  - name: ticket-service
+    url: http://ticket-service:3029
+    routes:
+      - name: ticket
+        paths:
+          - /tickets
+        strip_path: false
+
+  - name: campaign-service
+    url: http://campaign-service:3025
+    routes:
+      - name: campaign
+        paths:
+          - /campaign
+        strip_path: false

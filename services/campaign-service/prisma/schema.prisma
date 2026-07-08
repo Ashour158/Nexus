@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/campaign-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("CAMPAIGN_DATABASE_URL")
+}
+
+model Campaign {
+  id           String           @id @default(cuid())
+  tenantId     String
+  name         String
+  type         CampaignType     @default(EMAIL)
+  status       CampaignStatus   @default(DRAFT)
+  subject      String?
+  fromName     String?
+  fromEmail    String?
+  contentHtml  String?
+  templateId   String?
+  scheduledAt  DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  budget       Decimal?         @db.Decimal(14, 2)
+  ownerId      String
+  tags         String[]
+  customFields Json             @default("{}")
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  deletedAt    DateTime?
+  members      CampaignMember[]
+  events       CampaignEvent[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, ownerId])
+  @@index([tenantId, type])
+  @@unique([id, tenantId])
+}
+
+model CampaignMember {
+  id              String         @id @default(cuid())
+  tenantId        String
+  campaignId      String
+  campaign        Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  entityType      MemberEntity
+  entityId        String
+  email           String
+  status          MemberStatus   @default(PENDING)
+  sentAt          DateTime?
+  openedAt        DateTime?
+  clickedAt       DateTime?
+  bouncedAt       DateTime?
+  unsubscribedAt  DateTime?
+  convertedAt     DateTime?
+  convertedDealId String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  events          CampaignEvent[]
+
+  @@unique([tenantId, campaignId, entityType, entityId])
+  @@index([tenantId, campaignId])
+  @@index([tenantId, campaignId, status])
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, email])
+}
+
+model CampaignEvent {
+  id         String          @id @default(cuid())
+  tenantId   String
+  campaignId String
+  campaign   Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  memberId   String?
+  member     CampaignMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  type       String
+  data       Json            @default("{}")
+  createdAt  DateTime        @default(now())
+
+  @@index([tenantId, campaignId])
+  @@index([tenantId, memberId])
+  @@index([tenantId, type])
+}
+
+enum CampaignType {
+  EMAIL
+  SOCIAL
+  EVENT
+  WEBINAR
+  PAID
+  OTHER
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum MemberEntity {
+  LEAD
+  CONTACT
+}
+
+enum MemberStatus {
+  PENDING
+  SENT
+  OPENED
+  CLICKED
+  BOUNCED
+  UNSUBSCRIBED
+  CONVERTED
+}
+
+model OutboxMessage {
+  id            String    @id @default(cuid())
+  topic         String
+  tenantId      String?
+  key           String?
+  payload       Json
+  aggregateId   String?
+  eventType     String?
+  correlationId String?
+  headers       Json      @default("{}")
+  status        String    @default("PENDING")
+  error         String?
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
+}

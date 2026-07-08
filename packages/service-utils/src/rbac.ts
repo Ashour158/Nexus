@@ -55,6 +55,13 @@ export const PERMISSIONS = {
     READ: 'notifications:read',
     UPDATE: 'notifications:update',
   },
+  TICKETS: {
+    READ: 'tickets:read',
+    CREATE: 'tickets:create',
+    UPDATE: 'tickets:update',
+    DELETE: 'tickets:delete',
+    ASSIGN: 'tickets:assign',
+  },
   PRODUCTS: {
     READ: 'products:read',
     CREATE: 'products:create',
@@ -66,6 +73,12 @@ export const PERMISSIONS = {
     CREATE: 'invoices:create',
     UPDATE: 'invoices:update',
     VOID: 'invoices:void',
+  },
+  BILLING: {
+    READ: 'billing:read',
+    MANAGE: 'billing:manage',
+    USAGE: 'billing:usage',
+    CREDIT: 'billing:credit',
   },
   CONTRACTS: { READ: 'contracts:read', CREATE: 'contracts:create', UPDATE: 'contracts:update', DELETE: 'contracts:delete', SIGN: 'contracts:sign' },
   COMMISSION: { READ: 'commission:read', MANAGE: 'commission:manage', APPROVE: 'commission:approve' },
@@ -96,6 +109,13 @@ export const PERMISSIONS = {
     UPDATE: 'data:update',
     ADMIN: 'data:admin',
   },
+  CAMPAIGNS: {
+    READ: 'campaigns:read',
+    CREATE: 'campaigns:create',
+    UPDATE: 'campaigns:update',
+    DELETE: 'campaigns:delete',
+    SEND: 'campaigns:send',
+  },
 } as const;
 
 // Roles may use scoped permissions to bound record visibility. Examples:
@@ -124,6 +144,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'activities:*',
     'products:*',
     'invoices:*',
+    'billing:*',
     'contracts:*',
     'commission:*',
     'workflows:*',
@@ -131,6 +152,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'blueprints:*',
     'documents:*',
     'data:*',
+    'tickets:*',
+    'campaigns:*',
   ],
   SALES_MANAGER: [
     // Read scope for the core sales objects is bounded to the manager's team.
@@ -198,6 +221,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
   FINANCE: [
     'invoices:*',
+    'billing:*',
     'contracts:*',
     'commission:read',
     'commission:approve',
@@ -215,6 +239,11 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'deals:read',
     'activities:*',
     'analytics:read',
+    'tickets:read',
+    'tickets:create',
+    'tickets:update',
+    'tickets:delete',
+    'tickets:assign',
   ],
   MARKETING: [
     'leads:read',
@@ -223,6 +252,11 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'contacts:read',
     'accounts:read',
     'analytics:read',
+    'campaigns:read',
+    'campaigns:create',
+    'campaigns:update',
+    'campaigns:delete',
+    'campaigns:send',
   ],
   READ_ONLY: [
     'leads:read',
@@ -232,6 +266,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'quotes:read',
     'activities:read',
     'analytics:read',
+    'campaigns:read',
   ],
 };
 

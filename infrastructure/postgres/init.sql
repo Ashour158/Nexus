@@ -167,3 +167,15 @@ CREATE DATABASE nexus_quotes;
 GRANT ALL PRIVILEGES ON DATABASE nexus_quotes TO nexus;
 \c nexus_quotes;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+\c postgres;
+CREATE DATABASE nexus_ticket;
+GRANT ALL PRIVILEGES ON DATABASE nexus_ticket TO nexus;
+\c nexus_ticket;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+\c postgres;
+CREATE DATABASE nexus_campaign;
+GRANT ALL PRIVILEGES ON DATABASE nexus_campaign TO nexus;
+\c nexus_campaign;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

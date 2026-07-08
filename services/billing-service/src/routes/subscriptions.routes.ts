@@ -13,15 +13,19 @@ const CreateSubscriptionSchema = z.object({
   currentPeriodStart: z.string().datetime(),
   currentPeriodEnd: z.string().datetime(),
   trialEnd: z.string().datetime().optional(),
+  autoRenew: z.boolean().default(true),
+  cancelAtPeriodEnd: z.boolean().default(false),
   stripeSubId: z.string().optional(),
   metadata: z.record(z.unknown()).default({}),
 });
 
 const UpdateSubscriptionSchema = z.object({
-  status: z.enum(['ACTIVE', 'PAUSED', 'CANCELLED', 'PAST_DUE', 'TRIALING']).optional(),
+  status: z.enum(['ACTIVE', 'PAUSED', 'CANCELLED', 'PAST_DUE', 'TRIALING', 'EXPIRED']).optional(),
   currentPeriodStart: z.string().datetime().optional(),
   currentPeriodEnd: z.string().datetime().optional(),
   trialEnd: z.string().datetime().optional(),
+  autoRenew: z.boolean().optional(),
+  cancelAtPeriodEnd: z.boolean().optional(),
   metadata: z.record(z.unknown()).optional(),
 });
 
@@ -120,22 +124,39 @@ export async function registerSubscriptionsRoutes(
         }
       );
 
-      // ─── CANCEL ──────────────────────────────────────────────────────────
+      // ─── CANCEL (immediate, or scheduled at period end) ──────────────────
       r.post(
         '/subscriptions/:id/cancel',
         { preHandler: requirePermission(PERMISSIONS.INVOICES.UPDATE) },
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
+          const body = z
+            .object({ atPeriodEnd: z.boolean().default(false) })
+            .safeParse(request.body ?? {});
+          const atPeriodEnd = body.success ? body.data.atPeriodEnd : false;
           const jwt = request.user as JwtPayload;
           const existing = await prisma.subscription.findFirst({
             where: { id, tenantId: jwt.tenantId, deletedAt: null },
           });
           if (!existing) throw new NotFoundError('Subscription not found');
+
+          // Scheduled cancellation: flag it and let the poller flip status when
+          // the current period ends (keeps entitlements until then).
+          if (atPeriodEnd) {
+            const sub = await prisma.subscription.update({
+              where: { id },
+              data: { cancelAtPeriodEnd: true, autoRenew: false },
+            });
+            return reply.send({ success: true, data: sub });
+          }
+
           const sub = await prisma.subscription.update({
             where: { id },
             data: {
               status: 'CANCELLED',
               cancelledAt: new Date(),
+              cancelAtPeriodEnd: false,
+              autoRenew: false,
             },
           });
           try {
@@ -143,6 +164,7 @@ export async function registerSubscriptionsRoutes(
               type: 'subscription.cancelled',
               tenantId: jwt.tenantId,
               subscriptionId: id,
+              payload: { subscriptionId: id, reason: 'manual' },
             });
           } catch (err) {
             app.log.warn({ err }, 'Failed to publish subscription.cancelled event');

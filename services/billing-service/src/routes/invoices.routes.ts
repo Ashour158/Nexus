@@ -9,6 +9,7 @@ import {
   BusinessRuleError,
 } from '@nexus/service-utils';
 import type { BillingPrisma } from '../prisma.js';
+import { computeInvoiceBalance } from '../lib/billing-math.js';
 
 const IdParamSchema = z.object({ id: z.string().cuid() });
 
@@ -82,10 +83,11 @@ export async function registerInvoicesRoutes(
           const jwt = request.user as JwtPayload;
           const invoice = await prisma.invoice.findFirst({
             where: { id, tenantId: jwt.tenantId, deletedAt: null },
-            include: { payments: true },
+            include: { payments: true, creditNotes: true },
           });
           if (!invoice) throw new NotFoundError('Invoice not found');
-          return reply.send({ success: true, data: invoice });
+          const balance = computeInvoiceBalance(invoice);
+          return reply.send({ success: true, data: { ...invoice, balance } });
         }
       );
 

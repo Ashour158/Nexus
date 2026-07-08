@@ -5,6 +5,7 @@ import {
   requireEnv,
   optionalEnv,
   checkDatabase,
+  setEntitlementResolver,
 } from '@nexus/service-utils';
 import { PrismaClient } from '../../../node_modules/.prisma/billing-client/index.js';
 import { NexusProducer } from '@nexus/kafka';
@@ -12,6 +13,8 @@ import type { FastifyInstance } from 'fastify';
 import { createBillingPrisma } from './prisma.js';
 import { registerAllBillingRoutes } from './routes/index.js';
 import { startFinanceSubscriptionConsumer } from './consumers/finance-subscription.consumer.js';
+import { createLocalEntitlementResolver } from './lib/entitlements.js';
+import { startSubscriptionPoller } from './lib/subscription.poller.js';
 
 export async function buildServer(): Promise<{
   app: FastifyInstance;
@@ -25,6 +28,12 @@ export async function buildServer(): Promise<{
   const prisma = createBillingPrisma();
   const env = requireEnv(['BILLING_DATABASE_URL', 'JWT_SECRET']);
   const jwtSecret = env.JWT_SECRET;
+
+  // Entitlement enforcement (COM-04): billing resolves its own tenants'
+  // entitlements in-process (no HTTP self-call). Registering it as the process
+  // default also lets any guard added here fall back to it automatically.
+  const entitlementResolver = createLocalEntitlementResolver(prisma);
+  setEntitlementResolver(entitlementResolver);
 
   const app = await createService({
     name: 'billing-service',
@@ -58,7 +67,22 @@ export async function buildServer(): Promise<{
     app.log.warn({ err }, 'Finance subscription consumer failed to start; continuing without SoR mirroring');
   }
 
+  // Subscription lifecycle poller (COM-05): renewals + dunning. Fail-safe —
+  // a start failure must never break the service.
+  let subscriptionPoller: ReturnType<typeof startSubscriptionPoller> | null = null;
+  try {
+    subscriptionPoller = startSubscriptionPoller(prisma, producer, { log: app.log });
+    app.log.info('Subscription renewal/dunning poller started');
+  } catch (err) {
+    app.log.warn({ err }, 'Subscription poller failed to start; continuing without renewals/dunning');
+  }
+
   app.addHook('onClose', async () => {
+    try {
+      subscriptionPoller?.stop();
+    } catch {
+      /* ignore */
+    }
     try {
       await producer.disconnect();
     } catch {
@@ -71,7 +95,7 @@ export async function buildServer(): Promise<{
     }
   });
 
-  await registerAllBillingRoutes(app, prisma, producer);
+  await registerAllBillingRoutes(app, prisma, producer, entitlementResolver);
 
   return { app, prismaHealth };
 }

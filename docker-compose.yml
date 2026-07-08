@@ -1104,6 +1104,52 @@ services:
     depends_on:
       - prometheus
 
+  ticket-service:
+    build:
+      context: .
+      dockerfile: ./services/ticket-service/Dockerfile
+    container_name: nexus-ticket
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:3029:3029'
+    environment:
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      PORT: '3029'
+      TICKET_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_ticket
+      KAFKA_BROKERS: kafka:29092
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  campaign-service:
+    build:
+      context: .
+      dockerfile: ./services/campaign-service/Dockerfile
+    container_name: nexus-campaign
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:3025:3025'
+    environment:
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      PORT: '3025'
+      CAMPAIGN_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_campaign
+      KAFKA_BROKERS: kafka:29092
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
   # Production TLS reverse proxy. Off by default — only starts under the `prod`
   # profile once DOMAIN is set and DNS points here:
   #   DOMAIN=crm.example.com docker compose --profile prod up -d caddy

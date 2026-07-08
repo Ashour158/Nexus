@@ -1,0 +1,144 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/ticket-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("TICKET_DATABASE_URL")
+}
+
+enum TicketStatus {
+  NEW
+  OPEN
+  PENDING
+  ON_HOLD
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketChannel {
+  EMAIL
+  WEB
+  PHONE
+  CHAT
+  API
+}
+
+model Ticket {
+  id                 String          @id @default(cuid())
+  tenantId           String
+  number             String
+  subject            String
+  description        String?
+  status             TicketStatus    @default(NEW)
+  priority           TicketPriority  @default(MEDIUM)
+  type               String?
+  channel            TicketChannel   @default(WEB)
+  requesterContactId String?
+  requesterEmail     String?
+  accountId          String?
+  assigneeId         String?
+  teamId             String?
+  slaPolicyId        String?
+  firstResponseDueAt DateTime?
+  resolutionDueAt    DateTime?
+  firstRespondedAt   DateTime?
+  resolvedAt         DateTime?
+  closedAt           DateTime?
+  slaBreached        Boolean         @default(false)
+  reopenCount        Int             @default(0)
+  tags               String[]
+  customFields       Json            @default("{}")
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  deletedAt          DateTime?
+
+  comments TicketComment[]
+  events   TicketEvent[]
+
+  @@unique([tenantId, number])
+  @@unique([id, tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, assigneeId])
+  @@index([tenantId, accountId])
+  @@index([tenantId, number])
+}
+
+model TicketComment {
+  id         String   @id @default(cuid())
+  tenantId   String
+  ticketId   String
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId   String
+  body       String
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, ticketId])
+}
+
+model TicketEvent {
+  id        String   @id @default(cuid())
+  tenantId  String
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  type      String
+  actorId   String?
+  data      Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, ticketId])
+}
+
+model SlaPolicy {
+  id                String         @id @default(cuid())
+  tenantId          String
+  name              String
+  priority          TicketPriority?
+  firstResponseMins Int
+  resolutionMins    Int
+  businessHoursOnly Boolean        @default(false)
+  isDefault         Boolean        @default(false)
+  active            Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([tenantId, active])
+  @@unique([id, tenantId])
+}
+
+/// Atomic per-tenant sequence source for gapless ticket numbers.
+model TicketCounter {
+  tenantId   String   @id
+  lastNumber Int      @default(0)
+  updatedAt  DateTime @updatedAt
+}
+
+model OutboxMessage {
+  id            String    @id @default(cuid())
+  topic         String
+  tenantId      String?
+  key           String?
+  payload       Json
+  aggregateId   String?
+  eventType     String?
+  correlationId String?
+  headers       Json      @default("{}")
+  status        String    @default("PENDING")
+  error         String?
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
+}

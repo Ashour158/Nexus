@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Bookmark, BookmarkPlus, Clock, Command, FileText, Search, TrendingUp, Trash2, User, X } from 'lucide-react';
+import { Bookmark, BookmarkPlus, Building2, Clock, Command, FileText, Search, TrendingUp, Trash2, User, X } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import {
   useCreateSavedSearch,
@@ -13,7 +13,7 @@ import {
 
 interface SearchResult {
   id: string;
-  type: 'contact' | 'deal' | 'lead' | 'note';
+  type: 'contact' | 'deal' | 'lead' | 'account' | 'note';
   title: string;
   subtitle: string;
   href: string;
@@ -23,6 +23,7 @@ const TYPE_CONFIG = {
   contact: { icon: User, label: 'Contact', color: 'text-blue-600', bg: 'bg-blue-50' },
   deal: { icon: TrendingUp, label: 'Deal', color: 'text-green-600', bg: 'bg-green-50' },
   lead: { icon: User, label: 'Lead', color: 'text-purple-600', bg: 'bg-purple-50' },
+  account: { icon: Building2, label: 'Account', color: 'text-indigo-600', bg: 'bg-indigo-50' },
   note: { icon: FileText, label: 'Note', color: 'text-gray-600', bg: 'bg-gray-50' },
 } as const;
 
@@ -40,18 +41,28 @@ async function searchAll(q: string): Promise<SearchResult[]> {
   const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&limit=10`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const data = (await res.json().catch(() => ({ hits: [] }))) as { hits?: Array<{ id: string; type?: string; title?: string; subtitle?: string }> };
+  // The `/api/search` proxy flattens the backend's keyed entity arrays into a
+  // single tagged `hits` array with a canonical `type` + ready-made `href`.
+  const data = (await res.json().catch(() => ({ hits: [] }))) as {
+    hits?: Array<{ id: string; type?: string; title?: string; subtitle?: string; href?: string }>;
+  };
   return (data.hits ?? []).map((hit) => {
     const t = hit.type ?? 'contact';
+    const type: SearchResult['type'] =
+      t === 'deal' ? 'deal' :
+      t === 'lead' ? 'lead' :
+      t === 'account' ? 'account' :
+      t === 'contact' ? 'contact' :
+      'note';
     const href =
-      t === 'deal' ? `/deals/${hit.id}` :
-      t === 'company' ? `/accounts/${hit.id}` :
-      t === 'document' ? `/documents/${hit.id}` :
-      t === 'activity' ? '/activities' :
-      `/contacts/${hit.id}`;
+      hit.href ??
+      (type === 'deal' ? `/deals/${hit.id}` :
+        type === 'account' ? `/accounts/${hit.id}` :
+        type === 'lead' ? `/leads/${hit.id}` :
+        `/contacts/${hit.id}`);
     return {
       id: hit.id,
-      type: (t === 'company' || t === 'document' || t === 'activity' ? 'note' : t) as SearchResult['type'],
+      type,
       title: hit.title ?? 'Untitled',
       subtitle: hit.subtitle ?? '',
       href,

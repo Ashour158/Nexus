@@ -13,13 +13,68 @@ interface SearchResult {
   subtitle?: string;
 }
 
+// Backend `/api/v1/search` (default request) returns the four primary entities
+// as keyed arrays of raw Meili documents — NOT a flat `hits` array. The typed
+// api-client already unwraps the `{ success, data }` envelope, so this is the
+// `data` shape.
+type SearchDoc = Record<string, any> & { id?: string };
+
 interface SearchResponse {
-  hits: Array<{
-    id: string;
-    type: string;
-    title: string;
-    subtitle?: string;
-  }>;
+  deals?: SearchDoc[];
+  contacts?: SearchDoc[];
+  accounts?: SearchDoc[];
+  leads?: SearchDoc[];
+  total?: number;
+}
+
+function docId(doc: SearchDoc, legacyKey: string): string {
+  return String(doc.id ?? doc[legacyKey] ?? '');
+}
+
+function fullName(doc: SearchDoc): string {
+  return [doc.firstName, doc.lastName].filter(Boolean).join(' ').trim();
+}
+
+function flattenResults(data: SearchResponse | undefined): SearchResult[] {
+  if (!data) return [];
+  return [
+    ...(data.deals ?? []).map((d): SearchResult => {
+      const id = docId(d, 'dealId');
+      return {
+        id,
+        type: 'deal',
+        title: d.name ?? `Deal ${id}`,
+        subtitle: typeof d.amount === 'number' ? `$${d.amount.toLocaleString()}` : d.stageId,
+      };
+    }),
+    ...(data.contacts ?? []).map((c): SearchResult => {
+      const id = docId(c, 'contactId');
+      return {
+        id,
+        type: 'contact',
+        title: fullName(c) || c.email || `Contact ${id}`,
+        subtitle: c.email,
+      };
+    }),
+    ...(data.accounts ?? []).map((a): SearchResult => {
+      const id = docId(a, 'accountId');
+      return {
+        id,
+        type: 'account',
+        title: a.name ?? `Account ${id}`,
+        subtitle: a.industry ?? a.website,
+      };
+    }),
+    ...(data.leads ?? []).map((l): SearchResult => {
+      const id = docId(l, 'leadId');
+      return {
+        id,
+        type: 'lead',
+        title: fullName(l) || l.company || l.email || `Lead ${id}`,
+        subtitle: l.company ?? l.email,
+      };
+    }),
+  ];
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -62,12 +117,7 @@ export function CommandPalette({ open, onClose }: Props): JSX.Element | null {
     staleTime: 5000,
   });
 
-  const results: SearchResult[] = (searchQuery.data?.hits ?? []).map((h) => ({
-    id: h.id,
-    type: h.type as SearchResult['type'],
-    title: h.title,
-    subtitle: h.subtitle,
-  }));
+  const results: SearchResult[] = flattenResults(searchQuery.data);
 
   const shortcuts = [
     { label: 'New Deal', href: '/deals/new' },

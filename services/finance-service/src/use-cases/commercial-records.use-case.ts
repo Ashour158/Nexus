@@ -23,6 +23,7 @@ import { buildQuoteDocxBuffer } from '../lib/docx-generator.js';
 import { generatePDF } from '../lib/pdf-generator.js';
 import type { DiscountRequestsService } from '../services/discount-requests.service.js';
 import type { QuotesService } from '../services/quotes.service.js';
+import { allocateDocumentNumber, type SqlRunner } from '../lib/document-sequence.js';
 
 type PricingEngine = {
   calculate(input: CpqPricingRequestEx): Promise<CpqPricingResultEx>;
@@ -430,19 +431,19 @@ function transitionMetadata(meta: CpqTransitionMeta, transitionLedgerId?: string
   });
 }
 
-async function generateOrderNumber(prisma: FinancePrisma, tenantId: string): Promise<string> {
+// BL-04: allocate Order/RFQ numbers via the atomic DocumentSequence counter
+// (race-free, gapless) instead of the old count()+1 read-then-write. Accepts any
+// SqlRunner (base client or a $transaction client) so callers allocate inside the
+// same transaction as the record insert.
+async function generateOrderNumber(client: SqlRunner, tenantId: string): Promise<string> {
   const year = new Date().getUTCFullYear();
-  const yearStart = new Date(Date.UTC(year, 0, 1));
-  const yearEnd = new Date(Date.UTC(year + 1, 0, 1));
-  const count = await prisma.salesOrder.count({
-    where: { tenantId, createdAt: { gte: yearStart, lt: yearEnd } },
-  });
-  return `ORD-${year}-${String(count + 1).padStart(5, '0')}`;
+  const seq = await allocateDocumentNumber(client, tenantId, 'order', String(year));
+  return `ORD-${year}-${String(seq).padStart(5, '0')}`;
 }
 
-async function generateRfqNumber(prisma: FinancePrisma, tenantId: string): Promise<string> {
-  const count = await prisma.rFQ.count({ where: { tenantId } });
-  return `RFQ-${String(count + 1).padStart(6, '0')}`;
+async function generateRfqNumber(client: SqlRunner, tenantId: string): Promise<string> {
+  const seq = await allocateDocumentNumber(client, tenantId, 'rfq', 'ALL');
+  return `RFQ-${String(seq).padStart(6, '0')}`;
 }
 
 function quoteApprovalMessage(check: Awaited<ReturnType<DiscountApprovalCheck>>) {
@@ -2306,21 +2307,25 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
         throw new BusinessRuleError('RFQ creation requires tenantId and actorId');
       }
       assertRfqCreateAuthority(data);
-      const rfqNumber = await generateRfqNumber(prisma, tenantId);
-      const rfq = await prisma.rFQ.create({
-        data: {
-          tenantId,
-          rfqNumber,
-          title: data.title,
-          dealId: data.dealId,
-          accountId: data.accountId,
-          contactId: data.contactId,
-          ownerId: actor(ctx).userId,
-          currency: data.currency ?? 'USD',
-          requiredByDate: data.requiredByDate,
-          lineItems: (data.lineItems ?? []) as Prisma.InputJsonValue,
-          internalNotes: data.internalNotes,
-        },
+      // BL-04: allocate the RFQ number and insert atomically so a failed insert
+      // never burns a number and concurrent creates never collide.
+      const rfq = await prisma.$transaction(async (tx) => {
+        const rfqNumber = await generateRfqNumber(tx, tenantId);
+        return tx.rFQ.create({
+          data: {
+            tenantId,
+            rfqNumber,
+            title: data.title,
+            dealId: data.dealId,
+            accountId: data.accountId,
+            contactId: data.contactId,
+            ownerId: actor(ctx).userId,
+            currency: data.currency ?? 'USD',
+            requiredByDate: data.requiredByDate,
+            lineItems: (data.lineItems ?? []) as Prisma.InputJsonValue,
+            internalNotes: data.internalNotes,
+          },
+        });
       });
       await emitCommercialEvent(ctx, {
         type: 'rfq.created',
@@ -2503,28 +2508,31 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
       if (sourceType !== 'MANUAL') {
         throw new BusinessRuleError('Manual order creation requires sourceType=MANUAL');
       }
-      const orderNumber = await generateOrderNumber(prisma, tenantId);
-      const order = await prisma.salesOrder.create({
-        data: {
-          tenantId,
-          accountId: data.accountId,
-          contactId: data.contactId ?? null,
-          dealId: data.dealId ?? null,
-          quoteId: data.quoteId ?? null,
-          ownerId: data.ownerId,
-          orderNumber,
-          name: data.name,
-          status: data.status,
-          currency: data.currency,
-          subtotal: new Prisma.Decimal(data.subtotal),
-          taxAmount: new Prisma.Decimal(data.taxAmount),
-          discountAmount: new Prisma.Decimal(data.discountAmount),
-          total: new Prisma.Decimal(data.total),
-          orderedAt: data.orderedAt ? new Date(data.orderedAt) : null,
-          expectedFulfillmentAt: data.expectedFulfillmentAt ? new Date(data.expectedFulfillmentAt) : null,
-          lineItems: data.lineItems as Prisma.InputJsonValue,
-          customFields: { ...data.customFields, sourceType: 'MANUAL' } as Prisma.InputJsonValue,
-        },
+      // BL-04: allocate the order number and insert atomically (race-free/gapless).
+      const order = await prisma.$transaction(async (tx) => {
+        const orderNumber = await generateOrderNumber(tx, tenantId);
+        return tx.salesOrder.create({
+          data: {
+            tenantId,
+            accountId: data.accountId,
+            contactId: data.contactId ?? null,
+            dealId: data.dealId ?? null,
+            quoteId: data.quoteId ?? null,
+            ownerId: data.ownerId,
+            orderNumber,
+            name: data.name,
+            status: data.status,
+            currency: data.currency,
+            subtotal: new Prisma.Decimal(data.subtotal),
+            taxAmount: new Prisma.Decimal(data.taxAmount),
+            discountAmount: new Prisma.Decimal(data.discountAmount),
+            total: new Prisma.Decimal(data.total),
+            orderedAt: data.orderedAt ? new Date(data.orderedAt) : null,
+            expectedFulfillmentAt: data.expectedFulfillmentAt ? new Date(data.expectedFulfillmentAt) : null,
+            lineItems: data.lineItems as Prisma.InputJsonValue,
+            customFields: { ...data.customFields, sourceType: 'MANUAL' } as Prisma.InputJsonValue,
+          },
+        });
       });
 
       await emitCommercialEvent(ctx, {
@@ -2573,8 +2581,10 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
         throw new BusinessRuleError('Quote has an open signature envelope; complete or void it before order conversion');
       }
 
-      const orderNumber = await generateOrderNumber(prisma, tenantId);
       const order = await prisma.$transaction(async (tx) => {
+        // BL-04: allocate inside the conversion transaction so a rolled-back
+        // conversion never burns an order number.
+        const orderNumber = await generateOrderNumber(tx, tenantId);
         const created = await tx.salesOrder.create({
           data: {
             tenantId,

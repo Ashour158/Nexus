@@ -219,6 +219,24 @@ model QuoteNumberConfig {
   updatedAt    DateTime @updatedAt
 }
 
+/// BL-04: atomic, gapless document-number sequence shared by Order / Invoice /
+/// RFQ numbering. One row per (tenant, entity, period) — `period` is the year
+/// for yearly-reset series (Order/Invoice) or a constant ("ALL") for continuous
+/// series (RFQ). Numbers are allocated with a single `INSERT … ON CONFLICT DO
+/// UPDATE SET nextSequence = nextSequence + 1 RETURNING` statement executed
+/// INSIDE the record-insert transaction, so concurrent creates can never mint
+/// the same number and a rolled-back insert never burns/gaps a number. This
+/// replaces the race-prone `count()+1` / `findFirst desc + slice + 1` schemes.
+model DocumentSequence {
+  tenantId     String
+  entity       String
+  period       String
+  nextSequence Int      @default(1)
+  updatedAt    DateTime @updatedAt
+
+  @@id([tenantId, entity, period])
+}
+
 /// Multi-level quote approval policy. A quote requires the highest `level` of any
 /// active tier whose threshold it crosses (by total amount and/or discount %).
 model QuoteApprovalTier {
@@ -380,6 +398,7 @@ model SalesOrder {
   customFields          Json             @default("{}")
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
+  invoices              Invoice[]
 
   @@unique([tenantId, orderNumber])
   @@index([tenantId, accountId])
@@ -493,6 +512,14 @@ model Invoice {
   subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
   contractId     String?
   contract       Contract?     @relation(fields: [contractId], references: [id])
+  // BL-02: origin links for the won-deal → order → invoice handoff. `orderId`
+  // ties an invoice back to the SalesOrder it was derived from (totals/tax/
+  // currency copied server-side). `quoteId` records the upstream accepted quote
+  // when the order originated from one. SetNull (never Cascade) so deleting an
+  // order never destroys its financial invoices.
+  orderId        String?
+  order          SalesOrder?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  quoteId        String?
   invoiceNumber  String
   status         InvoiceStatus @default(DRAFT)
   currency       String        @default("USD")
@@ -513,6 +540,7 @@ model Invoice {
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, accountId])
   @@index([tenantId, status])
+  @@index([tenantId, orderId])
   @@unique([id, tenantId])
 }
 

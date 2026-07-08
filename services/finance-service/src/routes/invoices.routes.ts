@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import type { JwtPayload } from '@nexus/shared-types';
 import {
   PERMISSIONS,
@@ -61,6 +62,33 @@ export async function registerInvoicesRoutes(
           }
           const jwt = request.user as JwtPayload;
           const invoice = await invoices.createInvoice(jwt.tenantId, parsed.data);
+          return reply.code(201).send({ success: true, data: invoice });
+        }
+      );
+
+      // BL-02: create an invoice FROM a confirmed order. Totals/tax/currency are
+      // derived server-side from the SalesOrder; the body only carries optional
+      // invoicing metadata (due date / notes) — never money.
+      r.post(
+        '/orders/:id/invoice',
+        { preHandler: requirePermission(PERMISSIONS.INVOICES.CREATE) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const parsed = z
+            .object({
+              dueDate: z.string().datetime().optional(),
+              notes: z.string().max(2000).optional(),
+            })
+            .safeParse(request.body ?? {});
+          if (!parsed.success) {
+            throw new ValidationError('Invalid body', parsed.error.flatten());
+          }
+          const jwt = request.user as JwtPayload;
+          const invoice = await invoices.createInvoiceFromOrder(
+            jwt.tenantId,
+            id,
+            parsed.data
+          );
           return reply.code(201).send({ success: true, data: invoice });
         }
       );

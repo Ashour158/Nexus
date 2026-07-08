@@ -20,6 +20,7 @@ import type {
 } from '../../../../node_modules/.prisma/finance-client/index.js';
 import type { FinancePrisma } from '../prisma.js';
 import { toPaginatedResult } from '@nexus/shared-types';
+import { allocateDocumentNumber, type SqlRunner } from '../lib/document-sequence.js';
 
 type InvoiceListFilters = Omit<
   InvoiceListQuery,
@@ -69,20 +70,18 @@ function toPrismaDecimal(d: Decimal): Prisma.Decimal {
   return new Prisma.Decimal(d.toFixed(2));
 }
 
+// BL-04: allocate invoice numbers via the atomic DocumentSequence counter
+// (race-free, gapless) instead of the old `findFirst desc + slice + 1`, which
+// let concurrent creates read the same last number and collide on the unique
+// constraint. Accepts any SqlRunner so the caller can allocate inside the same
+// transaction as the invoice insert.
 async function generateInvoiceNumber(
-  prisma: FinancePrisma,
+  client: SqlRunner,
   tenantId: string
 ): Promise<string> {
   const year = new Date().getFullYear();
-  const prefix = `INV-${year}-`;
-  const lastInvoice = await prisma.invoice.findFirst({
-    where: { tenantId, invoiceNumber: { startsWith: prefix } },
-    orderBy: { createdAt: 'desc' },
-  });
-  const seq = lastInvoice
-    ? Number(lastInvoice.invoiceNumber.slice(prefix.length)) + 1
-    : 1;
-  return `${prefix}${String(seq).padStart(6, '0')}`;
+  const seq = await allocateDocumentNumber(client, tenantId, 'invoice', String(year));
+  return `INV-${year}-${String(seq).padStart(6, '0')}`;
 }
 
 function buildWhere(
@@ -148,26 +147,30 @@ export function createInvoicesService(
         throw new BusinessRuleError('Invoice must have at least one line item');
       }
       const totals = computeTotals(data.lineItems);
-      const invoiceNumber = await generateInvoiceNumber(prisma, tenantId);
 
-      const created = await prisma.invoice.create({
-        data: {
-          tenantId,
-          accountId: data.accountId,
-          subscriptionId: data.subscriptionId ?? null,
-          contractId: data.contractId ?? null,
-          invoiceNumber,
-          status: 'DRAFT',
-          currency: data.currency,
-          subtotal: toPrismaDecimal(totals.subtotal),
-          discountAmount: toPrismaDecimal(totals.discountAmount),
-          taxAmount: toPrismaDecimal(totals.taxAmount),
-          total: toPrismaDecimal(totals.total),
-          dueDate: data.dueDate ? new Date(data.dueDate) : null,
-          lineItems: data.lineItems as unknown as Prisma.InputJsonValue,
-          notes: data.notes ?? null,
-          customFields: data.customFields as Prisma.InputJsonValue,
-        },
+      // BL-04: allocate the invoice number and insert atomically so concurrent
+      // creates never collide and a failed insert never burns a number.
+      const created = await prisma.$transaction(async (tx) => {
+        const invoiceNumber = await generateInvoiceNumber(tx, tenantId);
+        return tx.invoice.create({
+          data: {
+            tenantId,
+            accountId: data.accountId,
+            subscriptionId: data.subscriptionId ?? null,
+            contractId: data.contractId ?? null,
+            invoiceNumber,
+            status: 'DRAFT',
+            currency: data.currency,
+            subtotal: toPrismaDecimal(totals.subtotal),
+            discountAmount: toPrismaDecimal(totals.discountAmount),
+            taxAmount: toPrismaDecimal(totals.taxAmount),
+            total: toPrismaDecimal(totals.total),
+            dueDate: data.dueDate ? new Date(data.dueDate) : null,
+            lineItems: data.lineItems as unknown as Prisma.InputJsonValue,
+            notes: data.notes ?? null,
+            customFields: data.customFields as Prisma.InputJsonValue,
+          },
+        });
       });
 
       await producer
@@ -177,7 +180,79 @@ export function createInvoicesService(
           payload: {
             invoiceId: created.id,
             accountId: created.accountId,
+            orderId: created.orderId ?? null,
             total: Number(created.total.toFixed(2)),
+            dueDate: (created.dueDate ?? created.createdAt).toISOString(),
+          },
+        })
+        .catch(() => undefined);
+
+      return created;
+    },
+
+    /**
+     * BL-02: create an invoice FROM a confirmed SalesOrder. The money is derived
+     * server-side from the order (subtotal / tax / discount / total / currency /
+     * line items are copied verbatim) — the client cannot supply totals here — and
+     * `invoice.orderId` (plus the upstream `quoteId`, if any) is set so the
+     * won-deal → order → invoice chain is linked end-to-end. Idempotent per order:
+     * if a non-void invoice already exists for the order it is returned unchanged.
+     */
+    async createInvoiceFromOrder(
+      tenantId: string,
+      orderId: string,
+      opts: { dueDate?: string; notes?: string } = {}
+    ): Promise<Invoice> {
+      const order = await prisma.salesOrder.findFirst({
+        where: { id: orderId, tenantId },
+      });
+      if (!order) throw new NotFoundError('SalesOrder', orderId);
+
+      // Idempotency: don't re-invoice an order that already has a live invoice.
+      const existing = await prisma.invoice.findFirst({
+        where: { tenantId, orderId, status: { not: 'VOID' } },
+      });
+      if (existing) return existing;
+
+      const created = await prisma.$transaction(async (tx) => {
+        const invoiceNumber = await generateInvoiceNumber(tx, tenantId);
+        return tx.invoice.create({
+          data: {
+            tenantId,
+            accountId: order.accountId,
+            orderId: order.id,
+            quoteId: order.quoteId ?? null,
+            invoiceNumber,
+            status: 'DRAFT',
+            // Server-derived money — copied from the order, never from the client.
+            currency: order.currency,
+            subtotal: order.subtotal,
+            discountAmount: order.discountAmount,
+            taxAmount: order.taxAmount,
+            total: order.total,
+            dueDate: opts.dueDate ? new Date(opts.dueDate) : null,
+            lineItems: order.lineItems as Prisma.InputJsonValue,
+            notes: opts.notes ?? null,
+            customFields: {
+              sourceOrderId: order.id,
+              sourceOrderNumber: order.orderNumber,
+              sourceQuoteId: order.quoteId ?? null,
+            } as Prisma.InputJsonValue,
+          },
+        });
+      });
+
+      await producer
+        .publish(TOPICS.INVOICES, {
+          type: 'invoice.created',
+          tenantId,
+          payload: {
+            invoiceId: created.id,
+            accountId: created.accountId,
+            orderId: created.orderId ?? null,
+            quoteId: created.quoteId ?? null,
+            total: Number(created.total.toFixed(2)),
+            currency: created.currency,
             dueDate: (created.dueDate ?? created.createdAt).toISOString(),
           },
         })

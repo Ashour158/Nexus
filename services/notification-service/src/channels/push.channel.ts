@@ -25,6 +25,8 @@ export interface PushEnvelope {
 }
 
 export interface PushChannel {
+  /** Whether FCM / web-push is configured. When false, `send` is a logged no-op that never throws. */
+  isConfigured(): boolean;
   send(envelope: PushEnvelope): Promise<void>;
 }
 
@@ -50,6 +52,7 @@ export function createPushChannel(log: Logger): PushChannel {
       'FCM_SERVER_KEY / WEB_PUSH_KEY not configured — push not configured; push channel will skip sending.'
     );
     return {
+      isConfigured: () => false,
       async send(envelope) {
         log.info(
           { to: envelope.to },
@@ -60,6 +63,7 @@ export function createPushChannel(log: Logger): PushChannel {
   }
 
   return {
+    isConfigured: () => true,
     async send(envelope) {
       if (!envelope.to?.trim()) {
         log.info('[push-channel] skipped (no device token)');
@@ -98,11 +102,16 @@ export function createPushChannel(log: Logger): PushChannel {
             { to: envelope.to, status: res.status, detail },
             'push send failed'
           );
-          return;
+          // NOT-05: propagate a real delivery failure so the consumer retries / DLQs.
+          throw new Error(`push send failed with status ${res.status}`);
         }
         log.info({ to: envelope.to }, 'push sent');
       } catch (err) {
+        // NOT-05: rethrow genuine send errors. The unconfigured no-op and the
+        // "no device token" guard above return early and never reach here, so
+        // neither is treated as a delivery failure.
         log.error({ err, to: envelope.to }, 'push send failed');
+        throw err;
       }
     },
   };

@@ -771,6 +771,24 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         },
       });
 
+      // Ownership handoff (NOT-02): when the owner actually changed, emit a
+      // dedicated `deal.assigned` so notification-service can alert the new owner.
+      // Compared against the persisted row (not the raw patch) so a FieldPermission
+      // strip of `ownerId` never produces a false assignment event.
+      if (updated.ownerId && updated.ownerId !== existing.ownerId) {
+        await producer.publish(TOPICS.DEALS, {
+          type: 'deal.assigned',
+          tenantId,
+          payload: {
+            dealId: updated.id,
+            tenantId,
+            newOwnerId: updated.ownerId,
+            previousOwnerId: existing.ownerId ?? null,
+            dealName: updated.name,
+          },
+        });
+      }
+
       updateDealDataQuality(prisma, id).catch(() => undefined);
 
       return updated;

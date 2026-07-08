@@ -140,7 +140,7 @@ setInterval(async () => {
 }, 30_000);
 
 // Scan active SLA definitions for breaches (poll every 60 s)
-startSlaScanner(prisma, app.log, 60_000);
+startSlaScanner(prisma, app.log, 60_000, producer);
 
 // Fire schedule-triggered workflows (trigger === 'schedule') on a timer.
 // Tick interval configurable via WORKFLOW_SCHEDULE_TICK_MS (default 60 s).

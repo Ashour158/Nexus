@@ -15,6 +15,8 @@ export interface SmsEnvelope {
 }
 
 export interface SmsChannel {
+  /** Whether Twilio is configured. When false, `send` is a logged no-op that never throws. */
+  isConfigured(): boolean;
   send(envelope: SmsEnvelope): Promise<void>;
 }
 
@@ -34,6 +36,7 @@ export function createSmsChannel(log: Logger): SmsChannel {
       'TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_FROM not configured — SMS not configured; SMS channel will skip sending.'
     );
     return {
+      isConfigured: () => false,
       async send(envelope) {
         log.info(
           { to: envelope.to },
@@ -50,6 +53,7 @@ export function createSmsChannel(log: Logger): SmsChannel {
     'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
 
   return {
+    isConfigured: () => true,
     async send(envelope) {
       if (!envelope.to?.trim()) {
         log.info('[sms-channel] skipped (no destination number)');
@@ -82,11 +86,16 @@ export function createSmsChannel(log: Logger): SmsChannel {
             { to: envelope.to, status: res.status, detail },
             'SMS send failed'
           );
-          return;
+          // NOT-05: propagate a real delivery failure so the consumer retries / DLQs.
+          throw new Error(`SMS send failed with status ${res.status}`);
         }
         log.info({ to: envelope.to }, 'SMS sent');
       } catch (err) {
+        // NOT-05: rethrow genuine send errors (network/abort/non-2xx). The
+        // unconfigured no-op and the "no destination number" guard above return
+        // early and never reach here, so neither is treated as a failure.
         log.error({ err, to: envelope.to }, 'SMS send failed');
+        throw err;
       }
     },
   };

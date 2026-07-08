@@ -283,6 +283,8 @@ export function createRequestsService(prisma: ApprovalPrisma, producer: NexusPro
           tenantId,
           payload: {
             requestId,
+            // requester userId — lets notification-service alert who raised it (NOT-01).
+            requestedBy: req.requestedBy,
             module: req.module,
             recordId: req.recordId,
             entityType: (req.data as Record<string, unknown>)?.entityType,
@@ -307,6 +309,8 @@ export function createRequestsService(prisma: ApprovalPrisma, producer: NexusPro
           tenantId,
           payload: {
             requestId,
+            // requester userId — lets notification-service alert who raised it (NOT-01).
+            requestedBy: req.requestedBy,
             module: req.module,
             recordId: req.recordId,
             entityType: (req.data as Record<string, unknown>)?.entityType,
@@ -391,6 +395,8 @@ export function createRequestsService(prisma: ApprovalPrisma, producer: NexusPro
         tenantId,
         payload: {
           requestId,
+          // requester userId — lets notification-service alert who raised it (NOT-01).
+          requestedBy: req.requestedBy,
           module: req.module,
           recordId: req.recordId,
           entityType: (req.data as Record<string, unknown>)?.entityType,

@@ -146,13 +146,64 @@ interface DealAtRiskPayload {
 }
 
 /**
+ * Payload shape of the `deal.assigned` event emitted by crm-service's updateDeal
+ * when a deal's owner changes (see services/crm-service/src/services/deals.service.ts).
+ * Not part of the shared `NexusKafkaEvent` union, so we read it defensively.
+ */
+interface DealAssignedPayload {
+  dealId?: string;
+  newOwnerId?: string;
+  previousOwnerId?: string | null;
+  dealName?: string;
+}
+
+/**
  * Deal events → notifications. Handles deal.won / deal.lost /
  * deal.stage_changed (with rotten-deal detection against the CRM service),
- * deal.rotten (emitted asynchronously by the crm-service rotten-deals poller)
- * and deal.at_risk (emitted by the crm-service AI at-risk detector).
+ * deal.rotten (emitted asynchronously by the crm-service rotten-deals poller),
+ * deal.at_risk (emitted by the crm-service AI at-risk detector) and
+ * deal.assigned (owner handoff — notifies the new owner, NOT-02).
  */
 export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusConsumer> {
   const consumer = new NexusConsumer('notification-service.deals');
+
+  // `deal.assigned` → notify the NEW owner they now own the deal (NOT-02). Guard on
+  // required fields so a malformed event can never throw and stall the loop. The
+  // NexusConsumer dedupes by eventId so a reassignment is announced once.
+  consumer.on('deal.assigned', async (event) => {
+    const evt = event as { tenantId: string; payload?: unknown };
+    const payload = (evt.payload ?? {}) as DealAssignedPayload;
+    if (!payload.dealId || !payload.newOwnerId) return;
+    const dealLabel = payload.dealName ? `"${payload.dealName}"` : payload.dealId;
+    const title = 'Deal assigned to you';
+    const body = `You are now the owner of deal ${dealLabel}.`;
+    const actionUrl = `/deals/${payload.dealId}`;
+    await deps.inApp.send({
+      tenantId: evt.tenantId,
+      userId: payload.newOwnerId,
+      type: 'DEAL_ASSIGNED',
+      title,
+      body,
+      entityType: 'deal',
+      entityId: payload.dealId,
+      actionUrl,
+      metadata: {
+        dealName: payload.dealName,
+        previousOwnerId: payload.previousOwnerId ?? undefined,
+      },
+    });
+    const owner = await deps.lookupOwner(evt.tenantId, payload.newOwnerId);
+    await sendEmailIfEnabled(
+      deps,
+      { tenantId: evt.tenantId, userId: payload.newOwnerId, email: owner.email },
+      { subject: title, heading: title, body, actionLabel: 'View deal', actionUrl }
+    );
+    await fanOutSmsPush(
+      deps,
+      { tenantId: evt.tenantId, userId: payload.newOwnerId, ...owner },
+      { title, body, actionUrl }
+    );
+  });
 
   consumer.on('deal.won', async (event) => {
     if (event.type !== 'deal.won') return;

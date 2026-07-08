@@ -36,6 +36,8 @@ export interface EmailEnvelope {
 }
 
 export interface EmailChannel {
+  /** Whether SMTP is configured. When false, `send` is a logged no-op that never throws. */
+  isConfigured(): boolean;
   send(envelope: EmailEnvelope): Promise<void>;
 }
 
@@ -57,6 +59,7 @@ export function createEmailChannel(log: {
       'SMTP_HOST not configured — email channel will skip sending (dev mode).'
     );
     return {
+      isConfigured: () => false,
       async send(envelope) {
         log.info(
           { to: envelope.to, subject: envelope.subject },
@@ -82,6 +85,7 @@ export function createEmailChannel(log: {
       'nodemailer not installed — email channel will skip sending'
     );
     return {
+      isConfigured: () => false,
       async send(envelope) {
         log.info(
           { to: envelope.to, subject: envelope.subject },
@@ -92,6 +96,7 @@ export function createEmailChannel(log: {
   }
 
   return {
+    isConfigured: () => true,
     async send(envelope) {
       try {
         await transporter.sendMail({
@@ -106,7 +111,11 @@ export function createEmailChannel(log: {
           'email sent'
         );
       } catch (err) {
+        // NOT-05: a genuine SMTP failure must propagate so the Kafka consumer's
+        // retry/backoff/DLQ path fires. (The unconfigured no-ops above never
+        // reach here, so "no creds" is never treated as a delivery failure.)
         log.error({ err, to: envelope.to }, 'email send failed');
+        throw err;
       }
     },
   };

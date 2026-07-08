@@ -1,4 +1,5 @@
 import { NotFoundError } from '@nexus/service-utils';
+import { TOPICS, type NexusProducer } from '@nexus/kafka';
 import type { WorkflowPrisma } from '../prisma.js';
 
 interface SlaCheckResult {
@@ -84,7 +85,24 @@ function entityIdFromPayload(payload: Record<string, unknown>, entityType: strin
   return null;
 }
 
-export function createSlaService(prisma: WorkflowPrisma) {
+/**
+ * Best-effort owner extraction from a trigger payload so `sla.breached` can name
+ * the person to nudge. Checks common owner keys then a nested entity object.
+ */
+function ownerIdFromPayload(payload: Record<string, unknown>, entityType: string): string | null {
+  for (const key of ['ownerId', 'assigneeId', 'assignedTo', 'userId']) {
+    const v = payload[key];
+    if (typeof v === 'string' && v.length > 0) return v;
+  }
+  const nested = payload[entityType];
+  if (nested && typeof nested === 'object') {
+    const o = (nested as Record<string, unknown>).ownerId;
+    if (typeof o === 'string' && o.length > 0) return o;
+  }
+  return null;
+}
+
+export function createSlaService(prisma: WorkflowPrisma, producer?: NexusProducer) {
   return {
     async listDefinitions(tenantId: string) {
       return prisma.slaDefinition.findMany({
@@ -252,6 +270,29 @@ export function createSlaService(prisma: WorkflowPrisma) {
                 },
               });
               created++;
+              // Emit `sla.breached` so notification-service can alert the owner
+              // (NOT-03). The row previously landed silently. Fail-open: a Kafka
+              // hiccup must never abort the scan or lose the recorded breach.
+              if (producer) {
+                await producer
+                  .publish(TOPICS.WORKFLOWS, {
+                    type: 'sla.breached',
+                    tenantId: def.tenantId,
+                    payload: {
+                      tenantId: def.tenantId,
+                      slaId: def.id,
+                      slaName: def.name,
+                      entityType,
+                      entityId,
+                      ownerId: ownerIdFromPayload(payload, entityType) ?? undefined,
+                      hoursElapsed: Math.round(hoursElapsed * 100) / 100,
+                      hoursAllowed: def.timeLimitHours,
+                      executionId: exec.id,
+                      detectedAt: now.toISOString(),
+                    },
+                  })
+                  .catch(() => undefined);
+              }
               continue;
             }
 

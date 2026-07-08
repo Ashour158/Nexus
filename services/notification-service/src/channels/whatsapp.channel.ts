@@ -170,11 +170,15 @@ export function createWhatsAppChannel(log: Logger): WhatsAppChannel {
               { to: envelope.to, status: res.status, detail },
               'WhatsApp send failed'
             );
-            return;
+            // NOT-05: propagate a real delivery failure so the consumer retries / DLQs.
+            throw new Error(`WhatsApp send failed with status ${res.status}`);
           }
           log.info({ to: envelope.to, provider: 'twilio' }, 'WhatsApp sent');
         } catch (err) {
+          // NOT-05: rethrow genuine send errors. The unconfigured no-op and the
+          // no-destination / empty-body guards return early and never reach here.
           log.error({ err, to: envelope.to }, 'WhatsApp send failed');
+          throw err;
         }
       },
     };
@@ -248,11 +252,15 @@ export function createWhatsAppChannel(log: Logger): WhatsAppChannel {
             { to: envelope.to, status: res.status, detail },
             'WhatsApp send failed'
           );
-          return;
+          // NOT-05: propagate a real delivery failure so the consumer retries / DLQs.
+          throw new Error(`WhatsApp send failed with status ${res.status}`);
         }
         log.info({ to: envelope.to, provider: 'cloud' }, 'WhatsApp sent');
       } catch (err) {
+        // NOT-05: rethrow genuine send errors. The unconfigured no-op and the
+        // no-destination / empty-body guards return early and never reach here.
         log.error({ err, to: envelope.to }, 'WhatsApp send failed');
+        throw err;
       }
     },
   };

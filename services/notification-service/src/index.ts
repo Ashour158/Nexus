@@ -22,6 +22,7 @@ import { startQuoteConsumer } from './consumers/quote.consumer.js';
 import { startLeadConsumer } from './consumers/lead.consumer.js';
 import { startNoteConsumer } from './consumers/note.consumer.js';
 import { startApprovalConsumer } from './consumers/approval.consumer.js';
+import { startSlaConsumer } from './consumers/sla.consumer.js';
 import { registerNotificationsRoutes } from './routes/notifications.routes.js';
 import { registerPreferencesRoutes } from './routes/preferences.routes.js';
 import { createPreferencesService } from './services/preferences.service.js';
@@ -101,6 +102,21 @@ const push = createPushChannel(app.log);
 // guarded no-op when unconfigured; never throws.
 const whatsapp = createWhatsAppChannel(app.log);
 
+// NOT-04: each channel factory already logs a WARN on startup when its provider
+// creds are missing (see the *.channel.ts files). Additionally surface a
+// per-channel `configured` boolean so a mis-provisioned prod is observable at a
+// glance — a `false` means the channel is a silent no-op. Public: the path is
+// under /health, so it skips JWT + rate-limiting like the other probes.
+app.get('/health/channels', async () => ({
+  service: 'notification-service',
+  channels: {
+    email: email.isConfigured(),
+    sms: sms.isConfigured(),
+    push: push.isConfigured(),
+    whatsapp: whatsapp.isConfigured(),
+  },
+}));
+
 // Kafka producer for real-time push via NOTIFICATIONS topic
 let kafkaProducer: NexusProducer | undefined;
 try {
@@ -170,6 +186,7 @@ try {
   await startQuoteConsumer({ inApp, email, sms, push, whatsapp, prefs, log: app.log });
   await startNoteConsumer({ inApp, log: app.log });
   await startApprovalConsumer({ inApp, log: app.log });
+  await startSlaConsumer({ inApp, email, sms, push, whatsapp, prefs, lookupOwner, log: app.log });
   leadConsumer = await startLeadConsumer({ inApp, email, sms, push, whatsapp, prefs, lookupOwner, log: app.log });
 } catch (err) {
   app.log.warn({ err }, 'Kafka consumers failed to start; HTTP-only mode');

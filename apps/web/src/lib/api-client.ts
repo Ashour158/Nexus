@@ -42,6 +42,10 @@ const BASE_URLS: Record<string, string> = {
     process.env.NEXT_PUBLIC_STORAGE_URL ?? 'http://localhost:3010/api/v1/storage',
   integration:
     process.env.NEXT_PUBLIC_INTEGRATION_URL ?? 'http://localhost:3012/api/v1',
+  tickets:
+    process.env.NEXT_PUBLIC_TICKET_URL ?? 'http://localhost:3029/api/v1',
+  campaigns:
+    process.env.NEXT_PUBLIC_CAMPAIGN_URL ?? 'http://localhost:3025/api/v1',
   // All CRM entities now route through crm-service
   leads:
     DEV_BFF_URL ?? process.env.NEXT_PUBLIC_CRM_URL ?? 'http://localhost:3001/api/v1',
@@ -252,6 +256,8 @@ export const apiClients = {
   search: makeTypedClient(createApiClient(BASE_URLS.search)),
   storage: makeTypedClient(createApiClient(BASE_URLS.storage)),
   integration: makeTypedClient(createApiClient(BASE_URLS.integration)),
+  campaigns: makeTypedClient(createApiClient(BASE_URLS.campaigns)),
+  tickets: makeTypedClient(createApiClient(BASE_URLS.tickets)),
   leads: makeTypedClient(createApiClient(BASE_URLS.leads)),
   accounts: makeTypedClient(createApiClient(BASE_URLS.accounts)),
   notes: makeTypedClient(createApiClient(BASE_URLS.notes)),

@@ -23,7 +23,9 @@ ENV NEXT_PUBLIC_AUTH_URL=/bff/auth \
     NEXT_PUBLIC_SEARCH_URL=/bff/search \
     NEXT_PUBLIC_STORAGE_URL=/bff/storage \
     NEXT_PUBLIC_ANALYTICS_URL=/bff/analytics \
-    NEXT_PUBLIC_INTEGRATION_URL=/bff/integration
+    NEXT_PUBLIC_INTEGRATION_URL=/bff/integration \
+    NEXT_PUBLIC_TICKET_URL=/bff/tickets \
+    NEXT_PUBLIC_CAMPAIGN_URL=/bff/campaign
 # Build workspace packages FIRST. apps/web imports @nexus/validation as a value
 # (zod schemas), so its dist/ must exist before `next build` resolves it. The
 # recursive `./apps/web...` selector did not reliably build deps, so build all

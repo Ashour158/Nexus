@@ -53,6 +53,8 @@ const nextConfig = {
       { source: '/bff/storage/:path*', destination: 'http://storage-service:3010/api/v1/:path*' },
       { source: '/bff/analytics/:path*', destination: 'http://analytics-service:3008/api/v1/analytics/:path*' },
       { source: '/bff/integration/:path*', destination: 'http://integration-service:3012/api/v1/:path*' },
+      { source: '/bff/tickets/:path*', destination: 'http://ticket-service:3029/api/v1/:path*' },
+      { source: '/bff/campaign/:path*', destination: 'http://campaign-service:3025/api/v1/:path*' },
     ];
   },
   async headers() {

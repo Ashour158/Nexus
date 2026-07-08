@@ -1,11 +1,17 @@
 import type { FastifyInstance } from 'fastify';
+import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
 import type { JwtPayload } from '@nexus/shared-types';
 import type { ReportingPrisma } from '../prisma.js';
 import { buildFunnelReport } from '../lib/funnel-engine.js';
 import { takeSnapshotNow } from '../lib/snapshot.job.js';
 
+// AUTHZ: match sibling bi.routes.ts — ANALYTICS.READ for reads, ANALYTICS.EXPORT
+// for the snapshot-take write. Layers on top of the global jwtVerify preHandler.
+const READ = { preHandler: requirePermission(PERMISSIONS.ANALYTICS.READ) };
+const WRITE = { preHandler: requirePermission(PERMISSIONS.ANALYTICS.EXPORT) };
+
 export async function registerFunnelRoutes(app: FastifyInstance, prisma: ReportingPrisma): Promise<void> {
-  app.get('/api/v1/analytics/funnel', async (req, reply) => {
+  app.get('/api/v1/analytics/funnel', READ, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { from, to, pipelineId } = req.query as { from?: string; to?: string; pipelineId?: string };
     const fromDate = from ? new Date(from) : new Date(Date.now() - 90 * 86400000);
@@ -23,7 +29,7 @@ export async function registerFunnelRoutes(app: FastifyInstance, prisma: Reporti
   // Pipeline analytics page (/pipeline/analytics) reads funnel + stageDays from
   // this endpoint. Reuses the funnel engine; there was no route here before, so
   // the web /api/reports/pipeline proxy 404'd.
-  app.get('/api/v1/reports/pipeline', async (req, reply) => {
+  app.get('/api/v1/reports/pipeline', READ, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { from, to, pipelineId } = req.query as { from?: string; to?: string; pipelineId?: string };
     const fromDate = from ? new Date(from) : new Date(Date.now() - 90 * 86400000);
@@ -53,7 +59,7 @@ export async function registerFunnelRoutes(app: FastifyInstance, prisma: Reporti
     }
   });
 
-  app.get('/api/v1/analytics/snapshots', async (req, reply) => {
+  app.get('/api/v1/analytics/snapshots', READ, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { from, to, pipelineId } = req.query as { from?: string; to?: string; pipelineId?: string };
     const fromDate = from ? new Date(from) : new Date(Date.now() - 90 * 86400000);
@@ -70,14 +76,14 @@ export async function registerFunnelRoutes(app: FastifyInstance, prisma: Reporti
     return reply.send({ success: true, data: snapshots });
   });
 
-  app.post('/api/v1/analytics/snapshots/take', async (req, reply) => {
+  app.post('/api/v1/analytics/snapshots/take', WRITE, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { pipelineId } = (req.body as { pipelineId?: string }) ?? {};
     await takeSnapshotNow(prisma, jwt.tenantId, pipelineId);
     return reply.send({ success: true, message: 'Snapshot taken' });
   });
 
-  app.get('/api/v1/analytics/cohort', async (req, reply) => {
+  app.get('/api/v1/analytics/cohort', READ, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { groupBy = 'ownerId', from, to } = req.query as { groupBy?: string; from?: string; to?: string };
 

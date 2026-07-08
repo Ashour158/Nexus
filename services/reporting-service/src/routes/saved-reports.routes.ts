@@ -1,13 +1,19 @@
 import type { FastifyInstance } from 'fastify';
+import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
 import type { JwtPayload } from '@nexus/shared-types';
 import { Prisma } from '../../../../node_modules/.prisma/reporting-client/index.js';
 import type { ReportingPrisma } from '../prisma.js';
 import { executeReport, exportToCsv } from '../lib/report-engine.js';
 import { createReportAuditLogger } from '../lib/audit-logger.js';
 
+// AUTHZ: match sibling reports.routes.ts — SETTINGS.READ for reads/run/export,
+// SETTINGS.UPDATE for mutations. Layers on top of the global jwtVerify preHandler.
+const READ = { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) };
+const WRITE = { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) };
+
 export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: ReportingPrisma): Promise<void> {
   const audit = createReportAuditLogger(prisma);
-  app.get('/api/v1/saved-reports', async (req, reply) => {
+  app.get('/api/v1/saved-reports', READ, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { folderId, isShared } = req.query as { folderId?: string; isShared?: string };
     const reports = await prisma.savedReport.findMany({
@@ -21,7 +27,7 @@ export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: R
     return reply.send({ success: true, data: reports });
   });
 
-  app.get('/api/v1/saved-reports/:id', async (req, reply) => {
+  app.get('/api/v1/saved-reports/:id', READ, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { id } = req.params as { id: string };
     const report = await prisma.savedReport.findFirst({ where: { id, tenantId: jwt.tenantId } });
@@ -29,7 +35,7 @@ export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: R
     return reply.send({ success: true, data: report });
   });
 
-  app.post('/api/v1/saved-reports', async (req, reply) => {
+  app.post('/api/v1/saved-reports', WRITE, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const body = req.body as {
       name: string;
@@ -63,7 +69,7 @@ export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: R
     return reply.code(201).send({ success: true, data: report });
   });
 
-  app.patch('/api/v1/saved-reports/:id', async (req, reply) => {
+  app.patch('/api/v1/saved-reports/:id', WRITE, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { id } = req.params as { id: string };
     const body = req.body as {
@@ -96,7 +102,7 @@ export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: R
     return reply.send({ success: true, data: report });
   });
 
-  app.delete('/api/v1/saved-reports/:id', async (req, reply) => {
+  app.delete('/api/v1/saved-reports/:id', WRITE, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { id } = req.params as { id: string };
     const existing = await prisma.savedReport.findFirst({ where: { id, tenantId: jwt.tenantId } });
@@ -109,7 +115,7 @@ export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: R
     return reply.send({ success: true });
   });
 
-  app.post('/api/v1/saved-reports/:id/run', async (req, reply) => {
+  app.post('/api/v1/saved-reports/:id/run', READ, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const auth = req.headers.authorization ?? '';
     const { id } = req.params as { id: string };
@@ -136,7 +142,7 @@ export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: R
     return reply.send({ success: true, data: { rows: result.rows, total: result.total } });
   });
 
-  app.get('/api/v1/saved-reports/:id/export', async (req, reply) => {
+  app.get('/api/v1/saved-reports/:id/export', READ, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const auth = req.headers.authorization ?? '';
     const { id } = req.params as { id: string };
@@ -162,7 +168,7 @@ export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: R
     return reply.send(csv);
   });
 
-  app.post('/api/v1/saved-reports/run', async (req, reply) => {
+  app.post('/api/v1/saved-reports/run', READ, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const auth = req.headers.authorization ?? '';
     const body = req.body as {
@@ -188,7 +194,7 @@ export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: R
     return reply.send({ success: true, data: { rows: result.rows, total: result.total } });
   });
 
-  app.get('/api/v1/report-folders', async (req, reply) => {
+  app.get('/api/v1/report-folders', READ, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const folders = await prisma.reportFolder.findMany({
       where: { tenantId: jwt.tenantId },
@@ -197,7 +203,7 @@ export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: R
     return reply.send({ success: true, data: folders });
   });
 
-  app.post('/api/v1/report-folders', async (req, reply) => {
+  app.post('/api/v1/report-folders', WRITE, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { name } = req.body as { name: string };
     const folder = await prisma.reportFolder.create({
@@ -206,7 +212,7 @@ export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: R
     return reply.code(201).send({ success: true, data: folder });
   });
 
-  app.get('/api/v1/saved-reports/:id/schedules', async (req, reply) => {
+  app.get('/api/v1/saved-reports/:id/schedules', READ, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { id } = req.params as { id: string };
     const found = await prisma.savedReport.findFirst({
@@ -218,7 +224,7 @@ export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: R
     return reply.send({ success: true, data: schedules });
   });
 
-  app.post('/api/v1/saved-reports/:id/schedules', async (req, reply) => {
+  app.post('/api/v1/saved-reports/:id/schedules', WRITE, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { id } = req.params as { id: string };
     const existing = await prisma.savedReport.findFirst({
@@ -247,7 +253,7 @@ export async function registerSavedReportsRoutes(app: FastifyInstance, prisma: R
     return reply.code(201).send({ success: true, data: schedule });
   });
 
-  app.delete('/api/v1/saved-reports/schedules/:scheduleId', async (req, reply) => {
+  app.delete('/api/v1/saved-reports/schedules/:scheduleId', WRITE, async (req, reply) => {
     const jwt = (req as any).user as JwtPayload;
     const { scheduleId } = req.params as { scheduleId: string };
     await prisma.reportSchedule.deleteMany({

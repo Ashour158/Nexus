@@ -30,9 +30,15 @@ export interface SwaggerOptions {
   routePrefix?: string;
 }
 
-/** Returns false when swagger is disabled via `ENABLE_SWAGGER=false`. */
+/**
+ * Opt-IN: swagger mounts only when `ENABLE_SWAGGER=true`.
+ * Default OFF because the installed `@fastify/swagger` targets Fastify 5 while
+ * services run Fastify 4 — mounting it throws `FST_ERR_PLUGIN_VERSION_MISMATCH`
+ * during avvio's async boot (the error escapes the try/catch → process crash).
+ * Re-enable once a Fastify-4-compatible `@fastify/swagger` (v8.x) is pinned.
+ */
 export function isSwaggerEnabled(): boolean {
-  return (process.env.ENABLE_SWAGGER ?? 'true').toLowerCase() !== 'false';
+  return (process.env.ENABLE_SWAGGER ?? 'false').toLowerCase() === 'true';
 }
 
 export async function registerSwagger(

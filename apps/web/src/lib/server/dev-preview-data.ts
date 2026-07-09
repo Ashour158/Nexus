@@ -2039,8 +2039,11 @@ export function apiError(message: string, code = 'DEV_PREVIEW_ERROR') {
 }
 
 export function paginated<T>(rows: T[], searchParams?: URLSearchParams) {
-  const page = Number(searchParams?.get('page') ?? 1);
-  const limit = Number(searchParams?.get('limit') ?? (rows.length || 1));
+  // Clamp/normalize: invalid or out-of-range page/limit must never serialize
+  // NaN/negative values into the response (RR-010).
+  const page = Math.max(1, Math.floor(Number(searchParams?.get('page')) || 1));
+  const rawLimit = Math.floor(Number(searchParams?.get('limit')) || (rows.length || 1));
+  const limit = Math.min(Math.max(rawLimit, 1), 500);
   const total = rows.length;
   const totalPages = Math.max(1, Math.ceil(total / Math.max(limit, 1)));
 

@@ -35,7 +35,7 @@ const STATUS_VARIANT: Record<ConnectorStatus, StatusVariant> = {
 const STATUS_LABEL: Record<ConnectorStatus, string> = {
   available: 'Available',
   beta: 'Beta',
-  planned: 'Coming soon',
+  planned: 'Roadmap',
 };
 
 /** Connectors that have a dedicated managed subpage. */
@@ -122,8 +122,8 @@ function ConnectorCard({
           ) : null}
 
           {isPlanned ? (
-            <Button size="sm" variant="secondary" disabled>
-              Coming soon
+            <Button size="sm" variant="secondary" disabled title="On the roadmap — not yet available">
+              Roadmap
             </Button>
           ) : connector.connected ? (
             <div className="flex items-center gap-2">

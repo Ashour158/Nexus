@@ -286,10 +286,12 @@ export function useRestoreTicket() {
 
 export function useAssignTicket() {
   const qc = useQueryClient();
-  return useMutation<Ticket, Error, { id: string; assigneeId?: string; teamId?: string }>({
+  return useMutation<Ticket, Error, { id: string; assigneeId?: string | null; teamId?: string }>({
     mutationFn: ({ id, assigneeId, teamId }) =>
       apiClients.tickets.post<Ticket>(`/tickets/${id}/assign`, {
-        ...(assigneeId ? { assigneeId } : {}),
+        // Send the key whenever the caller provided it (even '' → null) so
+        // "Unassigned" clears the assignee; omit only when undefined.
+        ...(assigneeId !== undefined ? { assigneeId: assigneeId || null } : {}),
         ...(teamId ? { teamId } : {}),
       }),
     onSuccess: (_t, { id }) => {

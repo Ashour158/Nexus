@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { formatCurrency } from '@/lib/currency';
 
 interface Commission {
   id: string;
@@ -12,6 +13,7 @@ interface Commission {
   dealAmount: number;
   rate: number;
   commissionAmount: number;
+  currency?: string;
   status: string;
   paidAt?: string;
   createdAt: string;
@@ -36,7 +38,9 @@ export default function CommissionsPage() {
     .filter((c) => c.status === 'PAID')
     .reduce((s, c) => s + c.commissionAmount, 0);
   const pending = total - paid;
-  const fmt = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+  // Totals are summed per the rows' currency; fall back to the first row's code.
+  const displayCurrency = commissions[0]?.currency ?? 'USD';
+  const fmt = (n: number, currency: string = displayCurrency) => formatCurrency(n, currency);
 
   return (
     <div className="p-6">
@@ -70,9 +74,9 @@ export default function CommissionsPage() {
                 <tr key={c.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{c.repName}</td>
                   <td className="px-4 py-3 text-gray-600">{c.dealName}</td>
-                  <td className="px-4 py-3 text-end text-gray-700">{fmt(c.dealAmount)}</td>
+                  <td className="px-4 py-3 text-end text-gray-700">{fmt(c.dealAmount, c.currency ?? displayCurrency)}</td>
                   <td className="px-4 py-3 text-end text-gray-500">{c.rate}%</td>
-                  <td className="px-4 py-3 text-end font-semibold text-gray-900">{fmt(c.commissionAmount)}</td>
+                  <td className="px-4 py-3 text-end font-semibold text-gray-900">{fmt(c.commissionAmount, c.currency ?? displayCurrency)}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${c.status === 'PAID' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
                       {c.status}

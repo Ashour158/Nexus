@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { ADMIN_GROUPS } from '@/config/admin-registry';
 
@@ -22,6 +22,15 @@ export function AdminSidebar() {
   }, [pathname]);
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>(initialExpanded);
+
+  useEffect(() => {
+    const active = ADMIN_GROUPS.find((group) =>
+      group.features.some((f) => pathname === f.href || pathname.startsWith(`${f.href}/`))
+    );
+    if (active) {
+      setExpanded((prev) => (prev[active.id] ? prev : { ...prev, [active.id]: true }));
+    }
+  }, [pathname]);
 
   const toggle = (id: string) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
 

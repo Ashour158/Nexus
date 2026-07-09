@@ -12,7 +12,6 @@ import type { NextRequest } from 'next/server';
 
 const PUBLIC_PATHS = [
   '/login',
-  '/api',
   '/bff',
   '/_next',
   '/favicon.ico',
@@ -41,7 +40,7 @@ export function middleware(request: NextRequest) {
   // token (the token lives in client sessionStorage). Inject it here from the
   // nexus_token cookie so those handlers authenticate — otherwise every
   // reporting/analytics/finance/etc call 401s.
-  if (pathname.startsWith('/api')) {
+  if (pathname === '/api' || pathname.startsWith('/api/')) {
     const token = request.cookies.get('nexus_token')?.value;
     if (token) {
       const headers = new Headers(request.headers);

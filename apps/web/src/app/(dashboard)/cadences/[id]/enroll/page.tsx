@@ -59,9 +59,25 @@ export default function EnrollPage() {
     setEnrolling(true);
     let success = 0;
     let failed = 0;
-    for (const contactId of selectedIds) {
+    // Cadence enrollment contract (cadence-service /enrollments):
+    // { cadenceId, objectType, objectId, ownerId }. Resolve ownerId from the
+    // loaded record; skip any selection missing an owner.
+    const byId = new Map(
+      items.map((i) => [i.id, i as { id: string; ownerId?: string | null }])
+    );
+    for (const objectId of selectedIds) {
+      const ownerId = byId.get(objectId)?.ownerId ?? undefined;
+      if (!ownerId) {
+        failed++;
+        continue;
+      }
       try {
-        await apiClients.workflow.post(`/journeys/${id}/enroll`, { contactId });
+        await apiClients.cadence.post(`/enrollments`, {
+          cadenceId: id,
+          objectType: entityType,
+          objectId,
+          ownerId,
+        });
         success++;
       } catch {
         failed++;

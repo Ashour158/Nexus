@@ -310,7 +310,13 @@ export async function getInsights(
   const grain: TimeGrain = opts.grain ?? 'month';
   const measure = opts.measure ?? meta.defaultMeasure;
   const sigma = opts.sigma ?? 2;
+  if (!Number.isFinite(sigma) || sigma <= 0) {
+    throw new SpecError(`sigma must be a finite number > 0, got ${JSON.stringify(opts.sigma)}`);
+  }
   const topN = opts.topN ?? 5;
+  if (!Number.isInteger(topN) || topN <= 0) {
+    throw new SpecError(`topN must be an integer > 0, got ${JSON.stringify(opts.topN)}`);
+  }
   const metricLabel = measure.agg === 'count' ? 'count' : `${measure.agg}(${measure.field})`;
 
   if (!meta.timeField) {

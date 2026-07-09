@@ -57,6 +57,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function Banner({ kind, text }: { kind: 'ok' | 'err'; text: string }) {
   return (
     <div
+      role={kind === 'err' ? 'alert' : 'status'}
+      aria-live={kind === 'err' ? 'assertive' : 'polite'}
       className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
         kind === 'ok'
           ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
@@ -114,10 +116,23 @@ export default function OnboardingPage() {
     setStepIndex((i) => Math.max(i - 1, 0));
   }
 
-  function completeOnboarding() {
-    persist({ completed: true, steps: { done: true } });
+  async function completeOnboarding() {
+    // Persist completion server-side BEFORE dropping the cookie / navigating,
+    // otherwise a slow or failed update leaves the tenant marked incomplete.
+    try {
+      await updateOnboarding.mutateAsync({ completed: true, steps: { done: true } });
+    } catch {
+      // Best-effort: still let the user into the app if persistence fails.
+    }
     document.cookie = 'nexus_onboarded=1; path=/; max-age=31536000; samesite=lax';
     router.push('/dashboard');
+  }
+
+  // A step is reachable if it's the current/prior step, or both required steps
+  // (company profile + first pipeline) are already done.
+  const requiredStepsDone = Boolean(doneSteps.profile) && Boolean(doneSteps.pipeline);
+  function canNavigateTo(i: number) {
+    return i <= stepIndex || requiredStepsDone;
   }
 
   return (
@@ -134,14 +149,16 @@ export default function OnboardingPage() {
         <ol className="mb-8 flex items-center justify-between">
           {STEPS.map((s, i) => {
             const isActive = i === stepIndex;
-            const isComplete = doneSteps[s.id] || i < stepIndex;
+            const isComplete = Boolean(doneSteps[s.id]);
+            const reachable = canNavigateTo(i);
             const Icon = s.icon;
             return (
               <li key={s.id} className="flex flex-1 flex-col items-center">
                 <button
                   type="button"
-                  onClick={() => setStepIndex(i)}
-                  className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors ${
+                  disabled={!reachable}
+                  onClick={() => { if (reachable) setStepIndex(i); }}
+                  className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors disabled:cursor-not-allowed ${
                     isActive
                       ? 'border-[#137fec] bg-[#137fec] text-white'
                       : isComplete
@@ -287,8 +304,12 @@ function PipelineStep({ onCreated, onBack }: { onCreated: () => void; onBack: ()
       return;
     }
     setBanner(null);
+    // Normalise + validate the ISO-4217-style code; fall back to USD when the
+    // input isn't exactly three letters so we never send a malformed currency.
+    const normalizedCurrency = currency.trim().toUpperCase();
+    const safeCurrency = /^[A-Z]{3}$/.test(normalizedCurrency) ? normalizedCurrency : 'USD';
     try {
-      await createPipeline.mutateAsync({ name: name.trim(), currency: currency.trim() || 'USD' });
+      await createPipeline.mutateAsync({ name: name.trim(), currency: safeCurrency });
       onCreated();
     } catch (err) {
       setBanner({ kind: 'err', text: err instanceof Error ? err.message : 'Could not create pipeline.' });

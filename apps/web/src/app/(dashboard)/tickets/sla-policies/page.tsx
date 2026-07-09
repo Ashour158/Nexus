@@ -33,7 +33,8 @@ function formatMins(mins: number): string {
 
 export default function SlaPoliciesPage() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
-  const isDevPreview = process.env.NODE_ENV === 'development';
+  const isDevPreview =
+    process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS !== 'false';
   const canManage = isDevPreview || hasPermission('tickets:update') || hasPermission('tickets:*');
   const canDelete = isDevPreview || hasPermission('tickets:delete') || hasPermission('tickets:*');
 

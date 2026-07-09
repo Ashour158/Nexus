@@ -52,6 +52,10 @@ export async function registerForecastRollupRoutes(
           scope: z.enum(['owner', 'team']).default('team'),
           ownerId: z.string().optional(),
         })
+        .refine((q) => q.scope !== 'owner' || Boolean(q.ownerId && q.ownerId.length > 0), {
+          message: 'ownerId is required when scope is "owner"',
+          path: ['ownerId'],
+        })
         .parse(request.query);
       return reply.send({
         success: true,

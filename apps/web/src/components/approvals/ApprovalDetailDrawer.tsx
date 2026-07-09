@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
@@ -64,6 +64,14 @@ export function ApprovalDetailDrawer({ requestId, onClose, currentUserId, isAdmi
   const [comment, setComment] = useState('');
   const [delegateTo, setDelegateTo] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   const request = detail.data;
   const steps = request?.steps ?? [];

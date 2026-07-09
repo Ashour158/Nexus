@@ -53,7 +53,7 @@ export async function PATCH(
   }
 
   try {
-    const res = await fetch(`${process.env.FINANCE_SERVICE_URL}/api/v1/products/${id}`, {
+    const res = await fetch(`${process.env.FINANCE_SERVICE_URL}/api/v1/products/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: auth },
       body: JSON.stringify(payload),
@@ -85,7 +85,7 @@ export async function DELETE(
   }
 
   try {
-    const res = await fetch(`${process.env.FINANCE_SERVICE_URL}/api/v1/products/${id}`, {
+    const res = await fetch(`${process.env.FINANCE_SERVICE_URL}/api/v1/products/${encodeURIComponent(id)}`, {
       method: 'DELETE',
       headers: { Authorization: auth },
     });

@@ -4,6 +4,8 @@ import type { JwtPayload } from '@nexus/shared-types';
 import { Prisma } from '../../../../node_modules/.prisma/planning-client/index.js';
 import type { PlanningPrisma } from '../prisma.js';
 
+const FETCH_TIMEOUT_MS = 5_000;
+
 export async function registerForecastOverrideRoutes(app: FastifyInstance, prisma: PlanningPrisma): Promise<void> {
   app.get('/api/v1/forecast-overrides', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
     const jwt = (request as any).user as JwtPayload;
@@ -127,14 +129,18 @@ export async function registerForecastOverrideRoutes(app: FastifyInstance, prism
       totalValue: number;
       weightedValue: number;
     }> = [];
+    const crmController = new AbortController();
+    const crmTimer = setTimeout(() => crmController.abort(), FETCH_TIMEOUT_MS);
     try {
       // Guard the whole cross-service call: a transport failure (e.g. CRM_SERVICE_URL
-      // unset -> localhost refused) must degrade to empty reps, not 500 the endpoint.
+      // unset -> localhost refused) or a hung peer must degrade to empty reps, not
+      // hang/500 the endpoint.
       const crmRes = await fetch(`${crmBase}/api/v1/forecast/rep-summary?${qs}`, {
         headers: {
           authorization: request.headers.authorization ?? '',
           'x-tenant-id': jwt.tenantId,
         },
+        signal: crmController.signal,
       });
       const crmBody = (await crmRes.json()) as {
         success?: boolean;
@@ -143,6 +149,8 @@ export async function registerForecastOverrideRoutes(app: FastifyInstance, prism
       repForecasts = crmBody.data ?? [];
     } catch {
       repForecasts = [];
+    } finally {
+      clearTimeout(crmTimer);
     }
 
     const overrides = await prisma.forecastOverride.findMany({
@@ -153,8 +161,16 @@ export async function registerForecastOverrideRoutes(app: FastifyInstance, prism
     // Quota attainment inputs: actuals (analytics closed-won by rep) vs quota
     // (planning QuotaTarget) for this period. Both fail-open to empty maps so a
     // downstream outage degrades attainment to 0, never 500s the endpoint.
-    const { year, quarter } = periodKeyToYearQuarter(periodKey);
+    let year: number;
+    let quarter: number | undefined;
+    try {
+      ({ year, quarter } = periodKeyToYearQuarter(periodKey));
+    } catch {
+      return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: `Unsupported periodKey: ${periodKey}`, requestId: request.id } });
+    }
     const actualByRep = new Map<string, number>();
+    const aController = new AbortController();
+    const aTimer = setTimeout(() => aController.abort(), FETCH_TIMEOUT_MS);
     try {
       const analyticsBase = process.env.ANALYTICS_SERVICE_URL ?? 'http://localhost:3008';
       const aQs = new URLSearchParams({ year: String(year) });
@@ -165,6 +181,7 @@ export async function registerForecastOverrideRoutes(app: FastifyInstance, prism
           'x-tenant-id': jwt.tenantId,
           'x-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '',
         },
+        signal: aController.signal,
       });
       const aBody = (await aRes.json()) as {
         data?: Array<{ ownerId: string; totalRevenue: number | string }>;
@@ -172,6 +189,8 @@ export async function registerForecastOverrideRoutes(app: FastifyInstance, prism
       for (const row of aBody.data ?? []) actualByRep.set(row.ownerId, Number(row.totalRevenue ?? 0));
     } catch {
       /* fail-open: no actuals */
+    } finally {
+      clearTimeout(aTimer);
     }
 
     const quotaByRep = new Map<string, number>();
@@ -224,19 +243,25 @@ export async function registerForecastOverrideRoutes(app: FastifyInstance, prism
   });
 }
 
-/** Map a period key ("2026-Q2" | "this_quarter" | "this_year" | …) to year+quarter. */
+/** Map a period key ("2026-Q2" | "this_quarter" | "this_year" | …) to year+quarter.
+ *  Throws on unsupported keys so a typo (e.g. "2026Q2") can't silently resolve to
+ *  the current year and return misleading attainment. */
 function periodKeyToYearQuarter(periodKey: string): { year: number; quarter?: number } {
-  const q = /^Q([1-4])-(\d{4})$/.exec(periodKey.trim());
+  const key = periodKey.trim();
+  const q = /^Q([1-4])-(\d{4})$/.exec(key);
   if (q) return { year: Number(q[2]), quarter: Number(q[1]) };
-  const q2 = /^(\d{4})-Q([1-4])$/.exec(periodKey.trim());
+  const q2 = /^(\d{4})-Q([1-4])$/.exec(key);
   if (q2) return { year: Number(q2[1]), quarter: Number(q2[2]) };
+  const year4 = /^(\d{4})$/.exec(key);
+  if (year4) return { year: Number(year4[1]) };
   const now = new Date();
   const year = now.getUTCFullYear();
-  if (periodKey === 'this_quarter') return { year, quarter: Math.floor(now.getUTCMonth() / 3) + 1 };
-  if (periodKey === 'next_quarter') {
+  if (key === 'this_quarter') return { year, quarter: Math.floor(now.getUTCMonth() / 3) + 1 };
+  if (key === 'next_quarter') {
     const nq = Math.floor(now.getUTCMonth() / 3) + 2;
     return nq > 4 ? { year: year + 1, quarter: nq - 4 } : { year, quarter: nq };
   }
-  if (periodKey === 'this_month') return { year, quarter: Math.floor(now.getUTCMonth() / 3) + 1 };
-  return { year };
+  if (key === 'this_month') return { year, quarter: Math.floor(now.getUTCMonth() / 3) + 1 };
+  if (key === 'this_year') return { year };
+  throw new Error(`Unsupported periodKey: ${JSON.stringify(periodKey)}`);
 }

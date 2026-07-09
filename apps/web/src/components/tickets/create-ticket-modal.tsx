@@ -192,7 +192,14 @@ export function CreateTicketModal({ open, onClose, navigateOnCreate = true }: Cr
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              reset();
+              onClose();
+            }}
+          >
             Cancel
           </Button>
           <Button type="submit" isLoading={createTicket.isPending} disabled={!subject.trim()}>

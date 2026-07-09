@@ -290,7 +290,10 @@ export function PolicyAdmin() {
                         <button
                           type="button"
                           onClick={() =>
-                            editLevel(li, { approvers: level.approvers.filter((_, j) => j !== ai) })
+                            editLevel(li, {
+                              approvers: level.approvers.filter((_, j) => j !== ai),
+                              quorumSize: Math.min(level.quorumSize, level.approvers.length - 1),
+                            })
                           }
                           className="rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-rose-600"
                           aria-label="Remove approver"

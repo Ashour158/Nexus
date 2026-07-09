@@ -119,8 +119,8 @@ export default function AccountDetailPage() {
     enabled: Boolean(accountId) && tab === 'hierarchy',
   });
   const documentsQuery = useQuery<Record<string, unknown>[]>({
-    queryKey: ['accounts', accountId, 'documents'],
-    queryFn: () => api.get<Record<string, unknown>[]>(`/accounts/${accountId}/documents`),
+    queryKey: ['accounts', accountId, 'attachments'],
+    queryFn: () => api.get<Record<string, unknown>[]>(`/accounts/${accountId}/attachments`),
     enabled: Boolean(accountId) && tab === 'documents',
   });
   const fieldHistoryQuery = useQuery<Record<string, unknown>[]>({
@@ -144,14 +144,16 @@ export default function AccountDetailPage() {
     enabled: Boolean(accountId) && tab === 'duplicates',
   });
   const uploadDocument = useMutation({
-    mutationFn: (file: File) =>
-      api.post<Record<string, unknown>[]>(`/accounts/${accountId}/documents`, {
+    mutationFn: async (file: File) => {
+      const contentBase64 = await fileToBase64(file);
+      return api.post(`/accounts/${accountId}/attachments`, {
         fileName: file.name,
         fileSize: file.size,
         mimeType: file.type || 'application/octet-stream',
-        category: 'account',
-      }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['accounts', accountId, 'documents'] }),
+        contentBase64,
+      });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['accounts', accountId, 'attachments'] }),
   });
 
   const account = accountQuery.data;
@@ -964,6 +966,19 @@ function formatFileSize(value: unknown) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function text(form: FormData, name: string) {

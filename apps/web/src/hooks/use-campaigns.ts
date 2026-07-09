@@ -128,8 +128,9 @@ export const campaignKeys = {
   list: (f: CampaignListFilters) => [...campaignKeys.lists(), f] as const,
   details: () => [...campaignKeys.all, 'detail'] as const,
   detail: (id: string) => [...campaignKeys.details(), id] as const,
+  membersList: (id: string) => [...campaignKeys.detail(id), 'members'] as const,
   members: (id: string, status?: string) =>
-    [...campaignKeys.detail(id), 'members', status ?? 'all'] as const,
+    [...campaignKeys.membersList(id), status ?? 'all'] as const,
   metrics: (id: string) => [...campaignKeys.detail(id), 'metrics'] as const,
 };
 
@@ -273,7 +274,7 @@ export function useAddCampaignMembers() {
         { members }
       ),
     onSuccess: (res, { id }) => {
-      qc.invalidateQueries({ queryKey: campaignKeys.members(id) });
+      qc.invalidateQueries({ queryKey: campaignKeys.membersList(id) });
       qc.invalidateQueries({ queryKey: campaignKeys.metrics(id) });
       qc.invalidateQueries({ queryKey: campaignKeys.detail(id) });
       notify.success(`${res.added} member(s) added`);
@@ -294,7 +295,7 @@ export function useRemoveCampaignMember() {
         `/campaigns/${id}/members/${memberId}`
       ),
     onSuccess: (_d, { id }) => {
-      qc.invalidateQueries({ queryKey: campaignKeys.members(id) });
+      qc.invalidateQueries({ queryKey: campaignKeys.membersList(id) });
       qc.invalidateQueries({ queryKey: campaignKeys.metrics(id) });
       qc.invalidateQueries({ queryKey: campaignKeys.detail(id) });
       notify.success('Member removed');

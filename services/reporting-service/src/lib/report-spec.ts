@@ -239,6 +239,12 @@ export function validateReportSpec(input: unknown): ValidationResult {
   // The only hard requirement beyond a known dataset is structural validity,
   // already checked above. (measures non-empty OR raw table both pass.)
 
+  // A spec with neither a measure nor a dimension has nothing to project and is
+  // rejected downstream by the compiler — reject it here so validation matches.
+  if (measures.length === 0 && dimensions.length === 0) {
+    errors.push('spec must include at least one measure or dimension');
+  }
+
   if (errors.length > 0) {
     return { valid: false, errors };
   }

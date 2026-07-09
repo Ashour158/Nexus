@@ -122,6 +122,12 @@ export default function AccountsPage(): ReactElement {
     setIsHydrated(true);
   }, []);
 
+  // Clear bulk selection whenever the visible result set changes, so bulk
+  // actions never target rows from a previous page/filter.
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [page, search, industry, tier, ownerId]);
+
   if (!isHydrated) {
     return (
       <div className="rounded-lg border border-slate-200 bg-white p-4">

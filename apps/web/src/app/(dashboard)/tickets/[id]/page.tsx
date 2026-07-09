@@ -148,7 +148,8 @@ export default function TicketDetailPage() {
                 disabled={assign.isPending}
                 onChange={(e) => {
                   const assigneeId = e.target.value;
-                  if (assigneeId) assign.mutate({ id: ticket.id, assigneeId });
+                  if (assigneeId === (ticket.assigneeId ?? '')) return;
+                  assign.mutate({ id: ticket.id, assigneeId });
                 }}
               >
                 <option value="">Unassigned</option>

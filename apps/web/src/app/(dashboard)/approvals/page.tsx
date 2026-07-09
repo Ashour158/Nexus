@@ -447,11 +447,23 @@ function DiscountRequestCard({ onCreated }: { onCreated: () => void }) {
   useEffect(() => {
     void fetch('/api/quotes?limit=50', { cache: 'no-store' })
       .then((r) => r.json())
-      .then((j) => setQuoteOptions((j.data?.data ?? j.data ?? []) as QuoteOption[]))
+      .then((j) => {
+        const list = (j.data?.data ?? j.data ?? []) as QuoteOption[];
+        setQuoteOptions(list);
+        if (list.length > 0) {
+          setForm((s) => (list.some((q) => q.id === s.quoteId) ? s : { ...s, quoteId: list[0].id }));
+        }
+      })
       .catch(() => setQuoteOptions([]));
     void fetch('/api/finance/discount-requests/reasons', { cache: 'no-store' })
       .then((r) => r.json())
-      .then((j) => setReasons((j.data ?? []) as DiscountReason[]))
+      .then((j) => {
+        const list = (j.data ?? []) as DiscountReason[];
+        setReasons(list);
+        if (list.length > 0) {
+          setForm((s) => (list.some((r) => r.code === s.reasonCode) ? s : { ...s, reasonCode: list[0].code }));
+        }
+      })
       .catch(() => setReasons([]));
   }, []);
 

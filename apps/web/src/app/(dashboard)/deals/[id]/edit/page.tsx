@@ -183,7 +183,13 @@ export default function DealEditPage() {
             <label className="block text-xs font-medium text-slate-600">Pipeline</label>
             <select
               value={pipelineId}
-              onChange={(e) => setPipelineId(e.target.value)}
+              onChange={(e) => {
+                const nextPipelineId = e.target.value;
+                setPipelineId(nextPipelineId);
+                // The current stage belongs to the old pipeline; clear it so a
+                // stale stageId can't be submitted against the new pipeline.
+                setStageId('');
+              }}
               className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm"
             >
               {pipelines.map((p) => (

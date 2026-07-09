@@ -250,10 +250,17 @@ export function createMailAccountsService(prisma: CommPrisma, crypto: FieldCrypt
             from: composeFrom(row.fromEmail, row.fromName),
           });
         }
+      } else if (!row.oauthAccessTokenEnc) {
+        result = { ok: false, error: `${row.provider} account is not connected (no OAuth token).` };
+      } else if (row.oauthExpiresAt && new Date(row.oauthExpiresAt).getTime() <= Date.now()) {
+        // A stored token that has already expired must NOT count as verified —
+        // no refresh is performed here, so leave the account unverified.
+        result = {
+          ok: false,
+          error: `${row.provider} OAuth token has expired — reconnect the account.`,
+        };
       } else {
-        result = row.oauthAccessTokenEnc
-          ? { ok: true }
-          : { ok: false, error: `${row.provider} account is not connected (no OAuth token).` };
+        result = { ok: true };
       }
       const updated = await db().update({
         where: { id: row.id },

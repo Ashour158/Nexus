@@ -2,7 +2,13 @@ import type { ReportingPrisma } from '../prisma.js';
 import { executeReport, exportToCsv, type ReportObjectType } from './report-engine.js';
 
 export function startScheduleRunner(prisma: ReportingPrisma): NodeJS.Timeout {
+  // Reentrancy guard: a slow tick must not overlap the next interval fire,
+  // which would double-run due schedules.
+  let running = false;
   return setInterval(async () => {
+    if (running) return;
+    running = true;
+    try {
     const now = new Date();
     const due = await prisma.reportSchedule.findMany({
       where: { isActive: true, nextRunAt: { lte: now } },
@@ -37,7 +43,7 @@ export function startScheduleRunner(prisma: ReportingPrisma): NodeJS.Timeout {
           <pre style="white-space:pre-wrap;font-size:11px">${escapeHtml(csv)}</pre>
           <p><small>Generated: ${now.toISOString()} — ${result.rows.length} row(s)</small></p>`;
 
-        await fetch(`${comm}/api/v1/internal/outbox/email-broadcast`, {
+        const res = await fetch(`${comm}/api/v1/internal/outbox/email-broadcast`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -50,6 +56,13 @@ export function startScheduleRunner(prisma: ReportingPrisma): NodeJS.Timeout {
             htmlBody,
           }),
         });
+        // A non-2xx broadcast means the report email never went out — surface it
+        // (it still advances nextRunAt in finally, so no hot-loop) instead of
+        // silently treating the run as a success.
+        if (!res.ok) {
+          const bodyText = await res.text().catch(() => '');
+          throw new Error(`email-broadcast failed: ${res.status} ${bodyText.slice(0, 500)}`);
+        }
       } catch (err) {
         console.error(`Schedule ${schedule.id} failed:`, err);
       } finally {
@@ -64,6 +77,9 @@ export function startScheduleRunner(prisma: ReportingPrisma): NodeJS.Timeout {
           console.error(`Schedule ${schedule.id} nextRunAt advance failed:`, err);
         }
       }
+    }
+    } finally {
+      running = false;
     }
   }, 60 * 1000);
 }

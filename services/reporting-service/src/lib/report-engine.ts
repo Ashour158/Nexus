@@ -6,8 +6,25 @@ export type ReportFilter = {
   value?: unknown;
 };
 
+export type ReportObjectType =
+  | 'deals'
+  | 'contacts'
+  | 'activities'
+  | 'leads'
+  | 'accounts'
+  | 'orders'
+  | 'invoices'
+  | 'tickets'
+  | 'campaigns'
+  | 'subscriptions'
+  | 'commissions'
+  | 'revenue'
+  | 'quotes'
+  | 'pipeline_analytics'
+  | 'revenue_analytics';
+
 export type ReportQuery = {
-  objectType: 'deals' | 'contacts' | 'activities' | 'leads' | 'accounts' | 'pipeline_analytics' | 'revenue_analytics';
+  objectType: ReportObjectType;
   columns: string[];
   filters: ReportFilter[];
   groupBy?: string;
@@ -203,9 +220,15 @@ async function executeReportViaServiceToken(
   limit: number,
   offset: number,
   serviceToken: string
-): Promise<{ rows: Record<string, unknown>[]; total: number }> {
+): Promise<{ rows: Record<string, unknown>[]; total: number; degraded?: boolean }> {
+  // Scheduled (background) runs have no end-user JWT, so they can only pull from
+  // CRM's internal reporting endpoint, which currently exposes deals. For every
+  // OTHER dataset we FAIL OPEN — return an empty result flagged `degraded`
+  // instead of throwing, so the schedule still delivers and advances its
+  // nextRunAt rather than throwing every 60s. (analytics datasets are routed
+  // earlier in executeReport.)
   if (query.objectType !== 'deals') {
-    throw new Error('Scheduled export currently supports deals only');
+    return { rows: [], total: 0, degraded: true };
   }
 
   const u = new URL(`${crm}/api/v1/internal/reporting/deals`);

@@ -19,6 +19,7 @@ import { registerAdminRoutes } from './routes/admin.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 import { startAnalyticsConsumer } from './consumers/events.consumer.js';
 import { ensureCurrencyColumns } from './ddl/ensure-currency-columns.js';
+import { ensureReadModelTables } from './ddl/ensure-read-model-tables.js';
 
 startTracing({ serviceName: 'analytics-service' });
 const env = requireEnv(['CLICKHOUSE_URL', 'JWT_SECRET']);
@@ -58,6 +59,12 @@ registerHealthRoutes(app, 'analytics-service', [
     }
   },
 ]);
+try {
+  await ensureReadModelTables(clickhouse);
+  app.log.info('Analytics read-model tables ensured');
+} catch (err) {
+  app.log.warn({ err }, 'ensureReadModelTables failed; continuing (consumer degrades until tables land)');
+}
 try {
   await ensureCurrencyColumns(clickhouse);
   app.log.info('Analytics base-currency columns ensured');

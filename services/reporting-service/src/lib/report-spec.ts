@@ -6,7 +6,20 @@
  * analytics-service's query endpoint.
  */
 
-export type Dataset = 'deals' | 'leads' | 'activities' | 'revenue' | 'quotes';
+export type Dataset =
+  | 'deals'
+  | 'leads'
+  | 'activities'
+  | 'revenue'
+  | 'quotes'
+  | 'contacts'
+  | 'accounts'
+  | 'orders'
+  | 'invoices'
+  | 'tickets'
+  | 'campaigns'
+  | 'subscriptions'
+  | 'commissions';
 export type Aggregation = 'sum' | 'count' | 'count_distinct' | 'avg' | 'min' | 'max';
 export type TimeGrain = 'day' | 'week' | 'month' | 'quarter' | 'year';
 export type FilterOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'contains';
@@ -44,7 +57,21 @@ export interface ReportSpec {
   limit?: number;
 }
 
-const DATASETS: readonly Dataset[] = ['deals', 'leads', 'activities', 'revenue', 'quotes'];
+const DATASETS: readonly Dataset[] = [
+  'deals',
+  'leads',
+  'activities',
+  'revenue',
+  'quotes',
+  'contacts',
+  'accounts',
+  'orders',
+  'invoices',
+  'tickets',
+  'campaigns',
+  'subscriptions',
+  'commissions',
+];
 const AGGS: readonly Aggregation[] = ['sum', 'count', 'count_distinct', 'avg', 'min', 'max'];
 const TIME_GRAINS: readonly TimeGrain[] = ['day', 'week', 'month', 'quarter', 'year'];
 const FILTER_OPS: readonly FilterOp[] = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'contains'];

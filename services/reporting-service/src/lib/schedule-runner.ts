@@ -1,5 +1,5 @@
 import type { ReportingPrisma } from '../prisma.js';
-import { executeReport, exportToCsv } from './report-engine.js';
+import { executeReport, exportToCsv, type ReportObjectType } from './report-engine.js';
 
 export function startScheduleRunner(prisma: ReportingPrisma): NodeJS.Timeout {
   return setInterval(async () => {
@@ -15,8 +15,11 @@ export function startScheduleRunner(prisma: ReportingPrisma): NodeJS.Timeout {
 
     for (const schedule of due) {
       try {
+        // Run the saved report of ANY dataset (was hard-cast to 'deals'). Datasets
+        // the background path can't source degrade to an empty result rather than
+        // throwing — see report-engine.executeReportViaServiceToken.
         const result = await executeReport(prisma, schedule.tenantId, {
-          objectType: schedule.report.objectType as 'deals',
+          objectType: (schedule.report.objectType as ReportObjectType) ?? 'deals',
           columns: schedule.report.columns as string[],
           filters: (schedule.report.filters as never) ?? [],
           groupBy: schedule.report.groupBy ?? undefined,
@@ -32,7 +35,7 @@ export function startScheduleRunner(prisma: ReportingPrisma): NodeJS.Timeout {
         const htmlBody = `
           <p>Your scheduled report <strong>${schedule.report.name}</strong> (${schedule.format}).</p>
           <pre style="white-space:pre-wrap;font-size:11px">${escapeHtml(csv)}</pre>
-          <p><small>Generated: ${now.toISOString()}</small></p>`;
+          <p><small>Generated: ${now.toISOString()} — ${result.rows.length} row(s)</small></p>`;
 
         await fetch(`${comm}/api/v1/internal/outbox/email-broadcast`, {
           method: 'POST',
@@ -47,14 +50,19 @@ export function startScheduleRunner(prisma: ReportingPrisma): NodeJS.Timeout {
             htmlBody,
           }),
         });
-
-        const nextRunAt = computeNextRun(schedule.cron, now);
-        await prisma.reportSchedule.update({
-          where: { id: schedule.id },
-          data: { lastRunAt: now, nextRunAt },
-        });
       } catch (err) {
         console.error(`Schedule ${schedule.id} failed:`, err);
+      } finally {
+        // ALWAYS advance nextRunAt — even on failure — so a broken report can
+        // never re-run every 60s in a hot loop. (This was the audit's dead path.)
+        try {
+          await prisma.reportSchedule.update({
+            where: { id: schedule.id },
+            data: { lastRunAt: now, nextRunAt: computeNextRun(schedule.cron, now) },
+          });
+        } catch (err) {
+          console.error(`Schedule ${schedule.id} nextRunAt advance failed:`, err);
+        }
       }
     }
   }, 60 * 1000);

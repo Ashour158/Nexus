@@ -14,7 +14,20 @@
 
 // ── Contract (accepted EXACTLY; mirrors reporting-service) ──────────────────
 
-export type Dataset = 'deals' | 'leads' | 'activities' | 'revenue' | 'quotes';
+export type Dataset =
+  | 'deals'
+  | 'leads'
+  | 'activities'
+  | 'revenue'
+  | 'quotes'
+  | 'contacts'
+  | 'accounts'
+  | 'orders'
+  | 'invoices'
+  | 'tickets'
+  | 'campaigns'
+  | 'subscriptions'
+  | 'commissions';
 export type Agg = 'sum' | 'count' | 'count_distinct' | 'avg' | 'min' | 'max';
 export type TimeGrain = 'day' | 'week' | 'month' | 'quarter' | 'year';
 export type FilterOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'contains';
@@ -90,6 +103,10 @@ function money(amountCol: string, baseCol: string): string {
 
 const DEAL_MONEY = money('amount', 'base_amount');
 const QUOTE_MONEY = money('total', 'base_amount');
+const ORDER_MONEY = money('total', 'base_amount');
+const INVOICE_MONEY = money('total', 'base_amount');
+const SUB_MONEY = money('mrr', 'base_amount');
+const COMMISSION_MONEY = money('amount', 'base_amount');
 
 const CATALOG: Record<Dataset, DatasetDef> = {
   deals: {
@@ -107,20 +124,116 @@ const CATALOG: Record<Dataset, DatasetDef> = {
       occurred_at: { expr: 'occurred_at', label: 'Occurred At', type: 'datetime', dimensionable: true, filterable: true, time: true },
     },
   },
-  // No dedicated lead read-model exists; `deal.created` events are the closest
-  // real signal (deal/lead intake). Scoped to that event type so counts are honest.
+  // Real lead read-model (lead_events), populated from nexus.crm.leads events.
   leads: {
-    table: 'deal_events',
-    baseWhere: `event_type = 'deal.created'`,
+    table: 'lead_events',
     fields: {
-      deal_id: { expr: 'deal_id', label: 'Lead', type: 'string', measurable: true, dimensionable: true, filterable: true },
+      lead_id: { expr: 'lead_id', label: 'Lead', type: 'string', measurable: true, dimensionable: true, filterable: true },
       owner_id: { expr: 'owner_id', label: 'Owner', type: 'string', dimensionable: true, filterable: true },
-      account_id: { expr: 'account_id', label: 'Account', type: 'string', dimensionable: true, filterable: true },
-      pipeline_id: { expr: 'pipeline_id', label: 'Pipeline', type: 'string', dimensionable: true, filterable: true },
-      stage_id: { expr: 'stage_id', label: 'Stage', type: 'string', dimensionable: true, filterable: true },
-      currency: { expr: 'currency', label: 'Currency', type: 'string', dimensionable: true, filterable: true },
-      amount: { expr: DEAL_MONEY, label: 'Amount', type: 'money', measurable: true, filterable: true },
+      status: { expr: 'status', label: 'Status', type: 'string', dimensionable: true, filterable: true },
+      source: { expr: 'source', label: 'Source', type: 'string', dimensionable: true, filterable: true },
+      company: { expr: 'company', label: 'Company', type: 'string', dimensionable: true, filterable: true },
+      event_type: { expr: 'event_type', label: 'Event Type', type: 'string', dimensionable: true, filterable: true },
       occurred_at: { expr: 'occurred_at', label: 'Created At', type: 'datetime', dimensionable: true, filterable: true, time: true },
+    },
+  },
+  contacts: {
+    table: 'contact_events',
+    fields: {
+      contact_id: { expr: 'contact_id', label: 'Contact', type: 'string', measurable: true, dimensionable: true, filterable: true },
+      account_id: { expr: 'account_id', label: 'Account', type: 'string', dimensionable: true, filterable: true },
+      owner_id: { expr: 'owner_id', label: 'Owner', type: 'string', dimensionable: true, filterable: true },
+      event_type: { expr: 'event_type', label: 'Event Type', type: 'string', dimensionable: true, filterable: true },
+      occurred_at: { expr: 'occurred_at', label: 'Occurred At', type: 'datetime', dimensionable: true, filterable: true, time: true },
+    },
+  },
+  accounts: {
+    table: 'account_events',
+    fields: {
+      account_id: { expr: 'account_id', label: 'Account', type: 'string', measurable: true, dimensionable: true, filterable: true },
+      owner_id: { expr: 'owner_id', label: 'Owner', type: 'string', dimensionable: true, filterable: true },
+      industry: { expr: 'industry', label: 'Industry', type: 'string', dimensionable: true, filterable: true },
+      name: { expr: 'name', label: 'Name', type: 'string', dimensionable: true, filterable: true },
+      event_type: { expr: 'event_type', label: 'Event Type', type: 'string', dimensionable: true, filterable: true },
+      occurred_at: { expr: 'occurred_at', label: 'Occurred At', type: 'datetime', dimensionable: true, filterable: true, time: true },
+    },
+  },
+  orders: {
+    table: 'order_events',
+    fields: {
+      order_id: { expr: 'order_id', label: 'Order', type: 'string', measurable: true, dimensionable: true, filterable: true },
+      account_id: { expr: 'account_id', label: 'Account', type: 'string', dimensionable: true, filterable: true },
+      deal_id: { expr: 'deal_id', label: 'Deal', type: 'string', dimensionable: true, filterable: true },
+      quote_id: { expr: 'quote_id', label: 'Quote', type: 'string', dimensionable: true, filterable: true },
+      status: { expr: 'status', label: 'Status', type: 'string', dimensionable: true, filterable: true },
+      event_type: { expr: 'event_type', label: 'Event Type', type: 'string', dimensionable: true, filterable: true },
+      currency: { expr: 'currency', label: 'Currency', type: 'string', dimensionable: true, filterable: true },
+      total: { expr: ORDER_MONEY, label: 'Order Value', type: 'money', measurable: true, filterable: true },
+      occurred_at: { expr: 'occurred_at', label: 'Ordered At', type: 'datetime', dimensionable: true, filterable: true, time: true },
+    },
+  },
+  invoices: {
+    table: 'invoice_events',
+    fields: {
+      invoice_id: { expr: 'invoice_id', label: 'Invoice', type: 'string', measurable: true, dimensionable: true, filterable: true },
+      account_id: { expr: 'account_id', label: 'Account', type: 'string', dimensionable: true, filterable: true },
+      status: { expr: 'status', label: 'Status', type: 'string', dimensionable: true, filterable: true },
+      event_type: { expr: 'event_type', label: 'Event Type', type: 'string', dimensionable: true, filterable: true },
+      currency: { expr: 'currency', label: 'Currency', type: 'string', dimensionable: true, filterable: true },
+      total: { expr: INVOICE_MONEY, label: 'Invoice Amount', type: 'money', measurable: true, filterable: true },
+      occurred_at: { expr: 'occurred_at', label: 'Occurred At', type: 'datetime', dimensionable: true, filterable: true, time: true },
+    },
+  },
+  tickets: {
+    table: 'ticket_events',
+    fields: {
+      ticket_id: { expr: 'ticket_id', label: 'Ticket', type: 'string', measurable: true, dimensionable: true, filterable: true },
+      account_id: { expr: 'account_id', label: 'Account', type: 'string', dimensionable: true, filterable: true },
+      assignee_id: { expr: 'assignee_id', label: 'Assignee', type: 'string', dimensionable: true, filterable: true },
+      priority: { expr: 'priority', label: 'Priority', type: 'string', dimensionable: true, filterable: true },
+      status: { expr: 'status', label: 'Status', type: 'string', dimensionable: true, filterable: true },
+      event_type: { expr: 'event_type', label: 'Event Type', type: 'string', dimensionable: true, filterable: true },
+      occurred_at: { expr: 'occurred_at', label: 'Occurred At', type: 'datetime', dimensionable: true, filterable: true, time: true },
+    },
+  },
+  campaigns: {
+    table: 'campaign_events',
+    fields: {
+      campaign_id: { expr: 'campaign_id', label: 'Campaign', type: 'string', measurable: true, dimensionable: true, filterable: true },
+      owner_id: { expr: 'owner_id', label: 'Owner', type: 'string', dimensionable: true, filterable: true },
+      type: { expr: 'type', label: 'Type', type: 'string', dimensionable: true, filterable: true },
+      status: { expr: 'status', label: 'Status', type: 'string', dimensionable: true, filterable: true },
+      event_type: { expr: 'event_type', label: 'Event Type', type: 'string', dimensionable: true, filterable: true },
+      budget: { expr: 'budget', label: 'Budget', type: 'money', measurable: true, filterable: true },
+      occurred_at: { expr: 'occurred_at', label: 'Occurred At', type: 'datetime', dimensionable: true, filterable: true, time: true },
+    },
+  },
+  subscriptions: {
+    table: 'subscription_events',
+    fields: {
+      subscription_id: { expr: 'subscription_id', label: 'Subscription', type: 'string', measurable: true, dimensionable: true, filterable: true },
+      account_id: { expr: 'account_id', label: 'Account', type: 'string', dimensionable: true, filterable: true },
+      product_id: { expr: 'product_id', label: 'Product', type: 'string', dimensionable: true, filterable: true },
+      plan_name: { expr: 'plan_name', label: 'Plan', type: 'string', dimensionable: true, filterable: true },
+      status: { expr: 'status', label: 'Status', type: 'string', dimensionable: true, filterable: true },
+      event_type: { expr: 'event_type', label: 'Event Type', type: 'string', dimensionable: true, filterable: true },
+      currency: { expr: 'currency', label: 'Currency', type: 'string', dimensionable: true, filterable: true },
+      mrr: { expr: SUB_MONEY, label: 'MRR', type: 'money', measurable: true, filterable: true },
+      arr: { expr: 'arr', label: 'ARR', type: 'money', measurable: true, filterable: true },
+      occurred_at: { expr: 'occurred_at', label: 'Started At', type: 'datetime', dimensionable: true, filterable: true, time: true },
+    },
+  },
+  commissions: {
+    table: 'commission_events',
+    fields: {
+      commission_id: { expr: 'commission_id', label: 'Commission', type: 'string', measurable: true, dimensionable: true, filterable: true },
+      user_id: { expr: 'user_id', label: 'Rep', type: 'string', dimensionable: true, filterable: true },
+      deal_id: { expr: 'deal_id', label: 'Deal', type: 'string', dimensionable: true, filterable: true },
+      status: { expr: 'status', label: 'Status', type: 'string', dimensionable: true, filterable: true },
+      event_type: { expr: 'event_type', label: 'Event Type', type: 'string', dimensionable: true, filterable: true },
+      currency: { expr: 'currency', label: 'Currency', type: 'string', dimensionable: true, filterable: true },
+      amount: { expr: COMMISSION_MONEY, label: 'Commission', type: 'money', measurable: true, filterable: true },
+      occurred_at: { expr: 'occurred_at', label: 'Occurred At', type: 'datetime', dimensionable: true, filterable: true, time: true },
     },
   },
   activities: {
@@ -198,6 +311,8 @@ export interface DatasetFields {
   measures: FieldMeta[];
   dimensions: FieldMeta[];
   filters: FieldMeta[];
+  /** Datetime field keys that support timeGrain bucketing / period comparisons. */
+  timeFields: string[];
 }
 
 export function isDataset(v: unknown): v is Dataset {
@@ -209,12 +324,63 @@ export function describeDataset(dataset: Dataset): DatasetFields {
   const measures: FieldMeta[] = [];
   const dimensions: FieldMeta[] = [];
   const filters: FieldMeta[] = [];
+  const timeFields: string[] = [];
   for (const [key, f] of Object.entries(def.fields)) {
     if (f.measurable) measures.push({ key, label: f.label, type: f.type });
     if (f.dimensionable) dimensions.push({ key, label: f.label, type: f.type });
     if (f.filterable) filters.push({ key, label: f.label, type: f.type });
+    if (f.time) timeFields.push(key);
   }
-  return { dataset, table: def.table, measures, dimensions, filters };
+  return { dataset, table: def.table, measures, dimensions, filters, timeFields };
+}
+
+/** All registered dataset keys. */
+export function listDatasets(): Dataset[] {
+  return Object.keys(CATALOG) as Dataset[];
+}
+
+/** Full catalog for the report-builder UI — every dataset + its fields. */
+export function describeAllDatasets(): DatasetFields[] {
+  return listDatasets().map(describeDataset);
+}
+
+export interface DatasetSmartMeta {
+  dataset: Dataset;
+  table: string;
+  /** Primary time (datetime) field key, if the dataset has one. */
+  timeField?: string;
+  /** A sensible default measure for insights/time-series: prefer a money field, else count. */
+  defaultMeasure: Measure;
+  /** All money/number measure field keys (for insight sweeps). */
+  numericMeasures: string[];
+  /** Low-cardinality string dimensions useful for "top movers" breakdowns. */
+  breakdownDimensions: string[];
+}
+
+/**
+ * Smart-feature metadata for a dataset: the time field to bucket on, a default
+ * measure, and candidate breakdown dimensions. Deterministic — derived from the
+ * same whitelist the compiler enforces, so nothing here can widen the SQL surface.
+ */
+export function getDatasetSmartMeta(dataset: Dataset): DatasetSmartMeta {
+  const def = CATALOG[dataset];
+  let timeField: string | undefined;
+  const numericMeasures: string[] = [];
+  const breakdownDimensions: string[] = [];
+  let moneyMeasure: string | undefined;
+  for (const [key, f] of Object.entries(def.fields)) {
+    if (f.time && !timeField) timeField = key;
+    if (f.measurable && (f.type === 'money' || f.type === 'number')) {
+      numericMeasures.push(key);
+      if (f.type === 'money' && !moneyMeasure) moneyMeasure = key;
+    }
+    // Event-type + status + owner-like columns make good MoM breakdowns.
+    if (f.dimensionable && f.type === 'string' && key !== timeField) breakdownDimensions.push(key);
+  }
+  const defaultMeasure: Measure = moneyMeasure
+    ? { field: moneyMeasure, agg: 'sum' }
+    : { field: '*', agg: 'count' };
+  return { dataset, table: def.table, timeField, defaultMeasure, numericMeasures, breakdownDimensions };
 }
 
 // ── Compilation ─────────────────────────────────────────────────────────────

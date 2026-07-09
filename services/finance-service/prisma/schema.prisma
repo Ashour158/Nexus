@@ -262,6 +262,32 @@ model QuoteApprovalTier {
   @@unique([id, tenantId])
 }
 
+/// B2 — Approval matrix for quotes, beyond the single discount gate. A rule
+/// matches on a JSON `condition` (any of: `discountPctGt`, `marginPctLt`,
+/// `amountGt`, `currency`) evaluated on submit-for-approval. Matching rules
+/// contribute an approval step; `approverChain` (ordered role/user list) or the
+/// single `approverRole` names who signs off. `level` orders the chain so the
+/// quote's `requiredApprovalLevel` = count of matched steps. Money math for the
+/// margin/discount evaluation stays in decimal.js in the use-case.
+model ApprovalMatrixRule {
+  id            String   @id @default(cuid())
+  tenantId      String
+  object        String   @default("quote")
+  name          String
+  level         Int      @default(1)
+  /// e.g. { "discountPctGt": 15 } or { "marginPctLt": 20, "amountGt": 50000 }.
+  condition     Json     @default("{}")
+  /// Ordered approver steps (role names or user ids). Falls back to approverRole.
+  approverChain Json     @default("[]")
+  approverRole  String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId, object, isActive])
+  @@unique([id, tenantId])
+}
+
 enum QuoteStatus {
   DRAFT
   PENDING_APPROVAL
@@ -406,6 +432,7 @@ model SalesOrder {
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
   invoices              Invoice[]
+  fulfillments          OrderFulfillment[]
 
   @@unique([tenantId, orderNumber])
   @@index([tenantId, accountId])
@@ -423,6 +450,42 @@ enum SalesOrderStatus {
   FULFILLED
   CANCELLED
   CLOSED
+}
+
+// ─── Sales-Order fulfillment / delivery status (B1) ─────────────────────────
+// CRM-level delivery tracking only (partial + %-delivered). Explicitly NOT a
+// warehouse/bin/WMS system: `deliveredQtyByLine` is a JSON map of the order's
+// line identifier → delivered quantity so the use-case can derive
+// `percentDelivered`. `percentBilled` is derived separately from the invoices
+// linked to the order (Invoice.orderId). Each fulfillment is one delivery event
+// against the order; the order's own status advances as fulfillments progress.
+model OrderFulfillment {
+  id                 String                 @id @default(cuid())
+  tenantId           String
+  orderId            String
+  order              SalesOrder             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status             OrderFulfillmentStatus @default(PENDING)
+  /// { [lineId|productId]: deliveredQty } — additive per delivery event.
+  deliveredQtyByLine Json                   @default("{}")
+  reference          String?
+  carrier            String?
+  trackingNumber     String?
+  notes              String?
+  deliveredAt        DateTime?
+  createdById        String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([tenantId, orderId])
+  @@index([tenantId, status])
+  @@unique([id, tenantId])
+}
+
+enum OrderFulfillmentStatus {
+  PENDING
+  PARTIAL
+  FULFILLED
+  CANCELLED
 }
 
 // ─── Contracts & Subscriptions ──────────────────────────────────────────────

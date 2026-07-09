@@ -74,6 +74,7 @@ type OrderListQuery = {
   dealId?: string;
   quoteId?: string;
   status?: 'DRAFT' | 'PENDING_APPROVAL' | 'CONFIRMED' | 'FULFILLING' | 'FULFILLED' | 'CANCELLED' | 'CLOSED';
+  fulfillmentStatus?: 'PENDING' | 'PARTIAL' | 'FULFILLED' | 'CANCELLED';
   sortDir: 'asc' | 'desc';
 };
 
@@ -2668,6 +2669,11 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
         dealId: q.dealId,
         quoteId: q.quoteId,
         status: q.status,
+        // B1: filter to orders that have at least one fulfillment in the given
+        // delivery status.
+        ...(q.fulfillmentStatus
+          ? { fulfillments: { some: { status: q.fulfillmentStatus as never } } }
+          : {}),
       };
       const [total, rows] = await Promise.all([
         prisma.salesOrder.count({ where }),

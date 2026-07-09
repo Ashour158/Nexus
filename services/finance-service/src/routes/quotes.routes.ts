@@ -22,9 +22,14 @@ import { createQuotesService } from '../services/quotes.service.js';
 import { createDiscountRequestsService } from '../services/discount-requests.service.js';
 import { CpqPricingEngine } from '../cpq/pricing-engine.js';
 import { createCommercialRecordsUseCase } from '../use-cases/commercial-records.use-case.js';
+import { createQuoteVersioningService } from '../services/quote-versioning.service.js';
 
 const DealParamsSchema = z.object({ dealId: z.string().cuid() });
 const QuoteIdParamSchema = z.object({ id: z.string().min(1) });
+const VersionParamSchema = z.object({ id: z.string().min(1), v: z.coerce.number().int().min(1) });
+const SnapshotBodySchema = z.object({ reason: z.string().min(1).optional() });
+const DiffQuerySchema = z.object({ against: z.coerce.number().int().min(1) });
+const SubmitForApprovalBodySchema = z.object({ quoteReference: z.string().min(1).optional() }).default({});
 
 export async function registerQuotesRoutes(
   app: FastifyInstance,
@@ -42,6 +47,7 @@ export async function registerQuotesRoutes(
     pricingEngine: engine,
     checkDiscountApproval,
   });
+  const versioning = createQuoteVersioningService(prisma, producer);
 
   function engineContextFromJwt(requestId: string, jwt: JwtPayload, correlationId?: string): EngineContext {
     return {
@@ -137,6 +143,44 @@ export async function registerQuotesRoutes(
         const jwt = request.user as JwtPayload;
         const { id } = request.params as { id: string };
         await prisma.quoteApprovalTier.deleteMany({ where: { id, tenantId: jwt.tenantId } });
+        return reply.send({ success: true });
+      });
+
+      // ─── B2 ADMIN: approval matrix rules (discount%/margin%/amount) ──────
+      r.get('/quotes/config/approval-matrix', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
+        const jwt = request.user as JwtPayload;
+        const rules = await prisma.approvalMatrixRule.findMany({
+          where: { tenantId: jwt.tenantId, object: 'quote' },
+          orderBy: { level: 'asc' },
+        });
+        return reply.send({ success: true, data: rules });
+      });
+      r.post('/quotes/config/approval-matrix', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+        const jwt = request.user as JwtPayload;
+        const b = (request.body ?? {}) as Record<string, unknown>;
+        const name = String(b.name ?? '').trim();
+        const condition = b.condition && typeof b.condition === 'object' && !Array.isArray(b.condition) ? (b.condition as Record<string, unknown>) : {};
+        if (!name || Object.keys(condition).length === 0) {
+          return reply.code(422).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'name and a non-empty condition are required', requestId: request.id } });
+        }
+        const rule = await prisma.approvalMatrixRule.create({
+          data: {
+            tenantId: jwt.tenantId,
+            object: 'quote',
+            name,
+            level: Number.isFinite(Number(b.level)) && Number(b.level) >= 1 ? Math.floor(Number(b.level)) : 1,
+            condition: condition as never,
+            approverChain: Array.isArray(b.approverChain) ? (b.approverChain as never) : ([] as never),
+            approverRole: b.approverRole != null ? String(b.approverRole) : null,
+            isActive: b.isActive != null ? Boolean(b.isActive) : true,
+          },
+        });
+        return reply.code(201).send({ success: true, data: rule });
+      });
+      r.delete('/quotes/config/approval-matrix/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+        const jwt = request.user as JwtPayload;
+        const { id } = request.params as { id: string };
+        await prisma.approvalMatrixRule.deleteMany({ where: { id, tenantId: jwt.tenantId } });
         return reply.send({ success: true });
       });
 
@@ -319,6 +363,73 @@ export async function registerQuotesRoutes(
           const meta = transitionMeta(request);
           const quote = await commercial.voidQuote(engineContextFromJwt(request.id, jwt, meta.correlationId), id, parsed.data.reason, meta);
           return reply.send({ success: true, data: quote });
+        }
+      );
+
+      // ─── B2: VERSIONS (immutable snapshots via QuoteRevision) ───────────
+      r.get(
+        '/quotes/:id/versions',
+        { preHandler: requirePermission(PERMISSIONS.QUOTES.READ) },
+        async (request, reply) => {
+          const { id } = QuoteIdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const rows = await versioning.listVersions(engineContextFromJwt(request.id, jwt), id);
+          return reply.send({ success: true, data: rows });
+        }
+      );
+
+      r.post(
+        '/quotes/:id/versions',
+        { preHandler: requirePermission(PERMISSIONS.QUOTES.UPDATE) },
+        async (request, reply) => {
+          const { id } = QuoteIdParamSchema.parse(request.params);
+          const body = SnapshotBodySchema.parse(request.body ?? {});
+          const jwt = request.user as JwtPayload;
+          const revision = await versioning.snapshotVersion(engineContextFromJwt(request.id, jwt), id, body.reason ?? 'manual.snapshot');
+          return reply.code(201).send({ success: true, data: revision });
+        }
+      );
+
+      // Diff must be registered before `/versions/:v` so `/versions/:v/diff`
+      // isn't shadowed (Fastify matches static segments fine, but keep explicit).
+      r.get(
+        '/quotes/:id/versions/:v/diff',
+        { preHandler: requirePermission(PERMISSIONS.QUOTES.READ) },
+        async (request, reply) => {
+          const { id, v } = VersionParamSchema.parse(request.params);
+          const { against } = DiffQuerySchema.parse(request.query);
+          const jwt = request.user as JwtPayload;
+          const diff = await versioning.diffVersions(engineContextFromJwt(request.id, jwt), id, v, against);
+          return reply.send({ success: true, data: diff });
+        }
+      );
+
+      r.get(
+        '/quotes/:id/versions/:v',
+        { preHandler: requirePermission(PERMISSIONS.QUOTES.READ) },
+        async (request, reply) => {
+          const { id, v } = VersionParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const revision = await versioning.getVersion(engineContextFromJwt(request.id, jwt), id, v);
+          return reply.send({ success: true, data: revision });
+        }
+      );
+
+      // ─── B2: SUBMIT FOR APPROVAL (matrix-driven) ────────────────────────
+      r.post(
+        '/quotes/:id/submit-for-approval',
+        { preHandler: requirePermission(PERMISSIONS.QUOTES.UPDATE) },
+        async (request, reply) => {
+          const { id } = QuoteIdParamSchema.parse(request.params);
+          const body = SubmitForApprovalBodySchema.parse(request.body ?? {});
+          const jwt = request.user as JwtPayload;
+          const result = await versioning.submitForApprovalMatrix(engineContextFromJwt(request.id, jwt), id, body.quoteReference);
+          const code = result.requiresApproval ? 202 : 200;
+          return reply.code(code).send({
+            success: true,
+            meta: { requiresApproval: result.requiresApproval },
+            data: result,
+          });
         }
       );
 

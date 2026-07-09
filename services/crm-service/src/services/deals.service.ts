@@ -30,6 +30,25 @@ import {
   mergeForValidation,
 } from '../lib/write-guards.js';
 
+// ─── Forecast category derivation (B7) ────────────────────────────────────────
+
+/**
+ * Maps a stage win-probability to a forecast category for OPEN deals. Closed
+ * stages are handled separately (won→CLOSED, lost→OMITTED). Thresholds:
+ *   ≥90 → COMMIT · ≥50 → BEST_CASE · else PIPELINE.
+ * A manual override always wins over this derivation.
+ */
+export function deriveForecastCategory(
+  stageProbability: number | null | undefined
+): 'PIPELINE' | 'BEST_CASE' | 'COMMIT' {
+  const p = typeof stageProbability === 'number' && Number.isFinite(stageProbability)
+    ? stageProbability
+    : 0;
+  if (p >= 90) return 'COMMIT';
+  if (p >= 50) return 'BEST_CASE';
+  return 'PIPELINE';
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 /** Full deal read-shape for detail views (Section 34.2 `GET /deals/:id`). */
@@ -371,6 +390,16 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
 
       const probability = data.probability ?? stage.probability;
 
+      // B7: forecast category — honor a manual override, else derive from the
+      // destination stage's probability (won/lost stages force CLOSED/OMITTED).
+      const forecastCategory = data.forecastCategory
+        ? data.forecastCategory
+        : stage.isWon
+          ? 'CLOSED'
+          : stage.isLost
+            ? 'OMITTED'
+            : deriveForecastCategory(stage.probability);
+
       // arr = mrr * 12 (and vice-versa) when only one side is supplied. Schema
       // may not expose these on create today; guarded so it works if it does.
       const createRecurring = deriveRecurringRevenue(
@@ -392,6 +421,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           amount: new Prisma.Decimal(data.amount ?? 0),
           currency: data.currency ?? 'USD',
           probability,
+          forecastCategory,
           ...(createRecurring.mrr !== undefined ? { mrr: createRecurring.mrr } : {}),
           ...(createRecurring.arr !== undefined ? { arr: createRecurring.arr } : {}),
           expectedCloseDate: data.expectedCloseDate
@@ -433,6 +463,9 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           // Forecast fields (RR-C4 follow-up): let analytics bucket by close date.
           expectedCloseDate: created.expectedCloseDate?.toISOString() ?? null,
           probability: created.probability,
+          // B7: forecast category (PIPELINE|BEST_CASE|COMMIT|CLOSED|OMITTED) so
+          // analytics can group the forecast by category.
+          forecastCategory: created.forecastCategory,
         },
       });
 
@@ -546,6 +579,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           stageId: created.stageId,
           expectedCloseDate: created.expectedCloseDate?.toISOString() ?? null,
           probability: created.probability,
+          forecastCategory: created.forecastCategory,
         },
       });
 
@@ -774,6 +808,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           currency: updated.currency,
           expectedCloseDate: updated.expectedCloseDate?.toISOString() ?? null,
           probability: updated.probability,
+          forecastCategory: updated.forecastCategory,
           changedFields: Object.keys(updateData).filter((field) => field !== 'version'),
         },
       });
@@ -977,11 +1012,15 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         // clear the close side-effects (probability follows the open stage).
         stageData.status = 'OPEN';
         stageData.actualCloseDate = null;
-        stageData.forecastCategory = 'PIPELINE';
+        stageData.forecastCategory = deriveForecastCategory(stage.probability);
         stageData.lostReason = null;
         stageData.lostDetail = null;
         stageData.closeReason = null;
         statusTransition = 'reopen';
+      } else {
+        // B7: ordinary open→open move — re-derive the forecast category from the
+        // destination stage's probability (COMMIT/BEST_CASE/PIPELINE).
+        stageData.forecastCategory = deriveForecastCategory(stage.probability);
       }
 
       const updated = await prisma.deal.update({
@@ -1002,6 +1041,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           stageChangedAt: new Date().toISOString(),
           expectedCloseDate: updated.expectedCloseDate?.toISOString() ?? null,
           probability: updated.probability,
+          forecastCategory: updated.forecastCategory,
         },
       });
 

@@ -92,6 +92,10 @@ export const CreateDealSchema = z.object({
   currency: z.string().length(3).default('USD'),
   probability: z.number().int().min(0).max(100).optional(),
   expectedCloseDate: z.string().datetime().optional(),
+  // Optional manual override; otherwise auto-derived from the stage on create.
+  forecastCategory: z
+    .enum(['PIPELINE', 'BEST_CASE', 'COMMIT', 'CLOSED', 'OMITTED'])
+    .optional(),
   source: z.string().optional(),
   campaignId: z.string().cuid().optional(),
   contactIds: z.array(z.string().cuid()).default([]),
@@ -686,6 +690,45 @@ const ActivityStatusEnum = z.enum([
 
 const ActivityPriorityEnum = z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']);
 
+/**
+ * Non-CRM "money object" entity types that Activities / Notes can attach to via
+ * the polymorphic `entityType`+`entityId` pair (A1). Native CRM parents
+ * (deal/contact/lead/account) keep using their typed id fields.
+ */
+export const TimelineEntityTypeEnum = z.enum([
+  'QUOTE',
+  'INVOICE',
+  'ORDER',
+  'CONTRACT',
+  'CAMPAIGN',
+]);
+export type TimelineEntityType = z.infer<typeof TimelineEntityTypeEnum>;
+
+/** Native + money entity types accepted by the unified timeline endpoint. */
+export const TimelineLookupEntityTypeEnum = z.enum([
+  'DEAL',
+  'CONTACT',
+  'LEAD',
+  'ACCOUNT',
+  'QUOTE',
+  'INVOICE',
+  'ORDER',
+  'CONTRACT',
+  'CAMPAIGN',
+]);
+export type TimelineLookupEntityType = z.infer<
+  typeof TimelineLookupEntityTypeEnum
+>;
+
+// Task/Meeting first-class fields (B5), shared by create/update.
+const ActivitySchedulingFields = {
+  location: z.string().max(500).optional(),
+  videoLink: z.string().url().max(2000).optional(),
+  recurrence: z.string().max(1000).optional(),
+  attendees: z.array(z.string().max(320)).max(500).optional(),
+  reminderMinutes: z.number().int().min(0).max(43_200).optional(),
+};
+
 export const CreateActivitySchema = z
   .object({
     type: ActivityTypeEnum,
@@ -701,14 +744,22 @@ export const CreateActivitySchema = z
     contactId: z.string().cuid().optional(),
     leadId: z.string().cuid().optional(),
     accountId: z.string().cuid().optional(),
+    entityType: TimelineEntityTypeEnum.optional(),
+    entityId: z.string().min(1).max(64).optional(),
+    ...ActivitySchedulingFields,
     customFields: z.record(z.unknown()).default({}),
+  })
+  .refine((v) => (v.entityType ? Boolean(v.entityId) : true), {
+    message: 'entityId is required when entityType is set',
+    path: ['entityId'],
   })
   .refine(
     (v) =>
       Boolean(v.dealId) ||
       Boolean(v.contactId) ||
       Boolean(v.leadId) ||
-      Boolean(v.accountId),
+      Boolean(v.accountId) ||
+      (Boolean(v.entityType) && Boolean(v.entityId)),
     { message: 'Activity must be linked to at least one entity' }
   );
 
@@ -727,6 +778,11 @@ export const UpdateActivitySchema = z.object({
   contactId: z.string().cuid().nullable().optional(),
   leadId: z.string().cuid().nullable().optional(),
   accountId: z.string().cuid().nullable().optional(),
+  location: z.string().max(500).nullable().optional(),
+  videoLink: z.string().url().max(2000).nullable().optional(),
+  recurrence: z.string().max(1000).nullable().optional(),
+  attendees: z.array(z.string().max(320)).max(500).optional(),
+  reminderMinutes: z.number().int().min(0).max(43_200).nullable().optional(),
   customFields: z.record(z.unknown()).optional(),
 });
 
@@ -743,6 +799,8 @@ export const ActivityListQuerySchema = PaginationSchema.extend({
   contactId: z.string().cuid().optional(),
   leadId: z.string().cuid().optional(),
   accountId: z.string().cuid().optional(),
+  entityType: TimelineEntityTypeEnum.optional(),
+  entityId: z.string().min(1).max(64).optional(),
   ownerId: z.string().cuid().optional(),
   type: ActivityTypeEnum.optional(),
   status: ActivityStatusEnum.optional(),
@@ -772,15 +830,22 @@ export const CreateNoteSchema = z
     contactId: z.string().cuid().optional(),
     leadId: z.string().cuid().optional(),
     accountId: z.string().cuid().optional(),
+    entityType: TimelineEntityTypeEnum.optional(),
+    entityId: z.string().min(1).max(64).optional(),
     isPinned: z.boolean().default(false),
     mentions: z.array(z.string().cuid()).default([]),
+  })
+  .refine((v) => (v.entityType ? Boolean(v.entityId) : true), {
+    message: 'entityId is required when entityType is set',
+    path: ['entityId'],
   })
   .refine(
     (v) =>
       Boolean(v.dealId) ||
       Boolean(v.contactId) ||
       Boolean(v.leadId) ||
-      Boolean(v.accountId),
+      Boolean(v.accountId) ||
+      (Boolean(v.entityType) && Boolean(v.entityId)),
     { message: 'Note must reference at least one entity' }
   );
 
@@ -795,9 +860,18 @@ export const NoteListQuerySchema = PaginationSchema.extend({
   contactId: z.string().cuid().optional(),
   leadId: z.string().cuid().optional(),
   accountId: z.string().cuid().optional(),
+  entityType: TimelineEntityTypeEnum.optional(),
+  entityId: z.string().min(1).max(64).optional(),
   authorId: z.string().cuid().optional(),
   isPinned: z.coerce.boolean().optional(),
 });
+
+/** Query for the unified timeline endpoint (GET /api/v1/timeline). */
+export const TimelineQuerySchema = PaginationSchema.extend({
+  entityType: TimelineLookupEntityTypeEnum,
+  entityId: z.string().min(1).max(64),
+});
+export type TimelineQuery = z.infer<typeof TimelineQuerySchema>;
 
 export type CreateNoteInput = z.infer<typeof CreateNoteSchema>;
 export type UpdateNoteInput = z.infer<typeof UpdateNoteSchema>;

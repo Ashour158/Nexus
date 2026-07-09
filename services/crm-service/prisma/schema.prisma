@@ -456,6 +456,29 @@ enum ForecastCategory {
   OMITTED
 }
 
+/// Sales quota / target for a rep, team, or territory over a named period
+/// (e.g. "2026-Q3", "2026-07"). Exactly one scope field is typically set;
+/// attainment (GET /forecast/attainment) compares realized closed-won vs target.
+model Quota {
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String?
+  teamId      String?
+  territoryId String?
+  period      String
+  target      Decimal  @default(0) @db.Decimal(18, 2)
+  currency    String   @default("USD")
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, period])
+  @@index([tenantId, userId, period])
+  @@index([tenantId, teamId, period])
+  @@index([tenantId, territoryId, period])
+}
+
 model DealContact {
   id        String  @id @default(cuid())
   tenantId  String
@@ -725,6 +748,23 @@ model Activity {
   account      Account?         @relation(fields: [accountId], references: [id])
   dealId       String?
   deal         Deal?            @relation(fields: [dealId], references: [id])
+  // ─── Polymorphic link to non-CRM money objects (A1) ─────────────────────
+  // Native CRM parents use the typed FKs above; commercial objects that live
+  // in finance-service (QUOTE|INVOICE|ORDER|CONTRACT|CAMPAIGN) attach via this
+  // string-keyed pair. Exactly one of {typed FK, entityType+entityId} is set.
+  entityType   String?
+  entityId     String?
+  // ─── Task / Meeting first-class fields (B5) ─────────────────────────────
+  location                 String?
+  videoLink                String?
+  // iCal RRULE string for recurring tasks/meetings (e.g. FREQ=WEEKLY;BYDAY=MO).
+  recurrence               String?
+  attendees                String[] @default([])
+  // Minutes-before-start reminder offset (null = no reminder).
+  reminderMinutes          Int?
+  // External calendar linkage (Google/Microsoft) populated by /meetings/:id/sync.
+  externalCalendarEventId  String?
+  externalCalendarProvider String?
   customFields Json             @default("{}")
   deletedAt    DateTime?
   createdAt    DateTime         @default(now())
@@ -736,6 +776,7 @@ model Activity {
   @@index([tenantId, dealId])
   @@index([tenantId, contactId])
   @@index([tenantId, accountId])
+  @@index([tenantId, entityType, entityId])
   @@index([tenantId, type])
   @@index([tenantId, status])
   @@index([tenantId, dueDate])
@@ -787,6 +828,9 @@ model Note {
   account   Account?  @relation(fields: [accountId], references: [id])
   dealId    String?
   deal      Deal?     @relation(fields: [dealId], references: [id])
+  // Polymorphic link to non-CRM money objects (A1); see Activity.entityType.
+  entityType String?
+  entityId   String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -796,6 +840,7 @@ model Note {
   @@index([tenantId, contactId])
   @@index([tenantId, accountId])
   @@index([tenantId, leadId])
+  @@index([tenantId, entityType, entityId])
   @@index([tenantId, authorId])
   @@index([tenantId, createdAt])
 }

@@ -63,7 +63,9 @@ function getPeriodDates(period: string): { start: Date; end: Date } {
 
 /** Accepts shorthand like `this_quarter` or quarter keys `Q2-2026`. */
 export function resolveForecastWindow(periodKey: string): { start: Date; end: Date } {
-  const trimmed = periodKey.trim();
+  // Normalize `YYYY-Qn` (quota period convention) → `Qn-YYYY`.
+  const alt = /^(\d{4})-Q([1-4])$/.exec(periodKey.trim());
+  const trimmed = alt ? `Q${alt[2]}-${alt[1]}` : periodKey.trim();
   const qr = /^Q([1-4])-(\d{4})$/.exec(trimmed);
   if (qr) {
     const qi = parseInt(qr[1], 10) - 1;
@@ -385,6 +387,68 @@ export async function registerForecastRoutes(app: FastifyInstance, prisma: CrmPr
             weighted: scenarioView.weighted - baseView.weighted,
             aiWeighted: scenarioView.aiWeighted - baseView.aiWeighted,
             closed: scenarioView.closed - baseView.closed,
+          },
+        },
+      });
+    });
+
+    // Quota attainment: realized closed-won vs quota target per rep, for a
+    // period, with open-pipeline forecast-category coverage (commit/best_case/
+    // pipeline) so leadership sees gap-to-quota. `period` is both the quota
+    // lookup key and the forecast window (accepts `2026-Q3`, `Q3-2026`, or
+    // shorthand like `this_quarter`).
+    r.get('/forecast/attainment', async (req, reply) => {
+      const jwt = (req as any).user as { tenantId: string };
+      const tenantId = jwt.tenantId;
+      if (!tenantId) return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'tenant is required', requestId: req.id } });
+      const { period = 'this_quarter', userId } = req.query as { period?: string; userId?: string };
+      const { start, end } = resolveForecastWindow(period);
+      const { rowsById } = await computeRepRows(prisma, tenantId, start, end);
+
+      const quotaWhere: { tenantId: string; period: string; userId?: string } = { tenantId, period };
+      if (userId) quotaWhere.userId = userId;
+      const quotas = await prisma.quota.findMany({ where: quotaWhere });
+
+      const attainment = quotas.map((quota) => {
+        const target = Number(quota.target);
+        const rep = quota.userId ? rowsById.get(quota.userId) : undefined;
+        const actual = rep?.closed ?? 0;
+        const commit = rep?.commitTotal ?? 0;
+        const bestCase = rep?.bestCaseTotal ?? 0;
+        const pipeline = rep?.pipelineTotal ?? 0;
+        return {
+          quotaId: quota.id,
+          userId: quota.userId,
+          teamId: quota.teamId,
+          territoryId: quota.territoryId,
+          period: quota.period,
+          currency: quota.currency,
+          target,
+          actual,
+          attainmentPct: target > 0 ? Math.round((actual / target) * 10000) / 100 : null,
+          gap: Math.round((target - actual) * 100) / 100,
+          coverage: { commit, bestCase, pipeline },
+          projectedAttainmentPct: target > 0 ? Math.round(((actual + commit) / target) * 10000) / 100 : null,
+        };
+      });
+
+      const totals = attainment.reduce(
+        (acc, a) => {
+          acc.target += a.target;
+          acc.actual += a.actual;
+          return acc;
+        },
+        { target: 0, actual: 0 }
+      );
+
+      return reply.send({
+        success: true,
+        data: {
+          period,
+          quotas: attainment,
+          totals: {
+            ...totals,
+            attainmentPct: totals.target > 0 ? Math.round((totals.actual / totals.target) * 10000) / 100 : null,
           },
         },
       });

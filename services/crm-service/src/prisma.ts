@@ -15,6 +15,7 @@ const softDeleteModels = new Set([
   'CustomFieldDefinition', 'Attachment', 'WinLossReason', 'FieldPermission',
   'ValidationRule', 'DuplicateGroup', 'ConsentRecord', 'DealRoom',
   'DealCompetitor', 'LeadRoutingEvent', 'DealRoomDocument', 'MutualActionItem',
+  'Quota',
 ]);
 
 const readOperations = new Set([

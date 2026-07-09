@@ -21,6 +21,9 @@ export interface ActivityListFilters {
   contactId?: string;
   leadId?: string;
   accountId?: string;
+  /** Polymorphic money-object link (QUOTE|INVOICE|ORDER|CONTRACT|CAMPAIGN). */
+  entityType?: string;
+  entityId?: string;
   ownerId?: string;
   type?:
     | 'CALL'
@@ -64,6 +67,8 @@ function buildActivityWhere(
   if (f.contactId) where.contactId = f.contactId;
   if (f.leadId) where.leadId = f.leadId;
   if (f.accountId) where.accountId = f.accountId;
+  if (f.entityType) where.entityType = f.entityType;
+  if (f.entityId) where.entityId = f.entityId;
   if (f.ownerId) where.ownerId = f.ownerId;
   if (f.type) where.type = f.type;
   if (f.status) where.status = f.status;
@@ -210,6 +215,13 @@ export function createActivitiesService(
           contactId: data.contactId ?? null,
           leadId: data.leadId ?? null,
           accountId: data.accountId ?? null,
+          entityType: data.entityType ?? null,
+          entityId: data.entityId ?? null,
+          location: data.location ?? null,
+          videoLink: data.videoLink ?? null,
+          recurrence: data.recurrence ?? null,
+          attendees: data.attendees ?? [],
+          reminderMinutes: data.reminderMinutes ?? null,
           customFields: data.customFields as Prisma.InputJsonValue,
         },
       });
@@ -225,6 +237,8 @@ export function createActivitiesService(
             dealId: created.dealId ?? undefined,
             contactId: created.contactId ?? undefined,
             leadId: created.leadId ?? undefined,
+            entityType: created.entityType ?? undefined,
+            entityId: created.entityId ?? undefined,
             dueDate: created.dueDate?.toISOString() ?? undefined,
           },
         })
@@ -260,6 +274,12 @@ export function createActivitiesService(
         updateData.endDate = data.endDate === null ? null : new Date(data.endDate);
       if (data.duration !== undefined) updateData.duration = data.duration;
       if (data.outcome !== undefined) updateData.outcome = data.outcome;
+      if (data.location !== undefined) updateData.location = data.location;
+      if (data.videoLink !== undefined) updateData.videoLink = data.videoLink;
+      if (data.recurrence !== undefined) updateData.recurrence = data.recurrence;
+      if (data.attendees !== undefined) updateData.attendees = data.attendees;
+      if (data.reminderMinutes !== undefined)
+        updateData.reminderMinutes = data.reminderMinutes;
       if (data.dealId !== undefined)
         updateData.deal = data.dealId
           ? { connect: { id: data.dealId } }

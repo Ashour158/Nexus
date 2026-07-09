@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { MeiliSearch } from 'meilisearch';
 import type { JwtPayload } from '@nexus/shared-types';
-import { PERMISSIONS, ValidationError, requirePermission } from '@nexus/service-utils';
+import { PERMISSIONS, ValidationError, requirePermission, checkPermission } from '@nexus/service-utils';
 import { ACCOUNTS_INDEX } from '../indexes/accounts.index.js';
 import { CONTACTS_INDEX } from '../indexes/contacts.index.js';
 import { DEALS_INDEX } from '../indexes/deals.index.js';
@@ -29,6 +29,21 @@ const INDEX_BY_TYPE = {
 
 type SearchType = keyof typeof INDEX_BY_TYPE;
 
+// Each searchable entity → the permission a caller must hold to see its hits in
+// the unified `/search` response. This mirrors the per-entity route gates below
+// (RR-H1): the unified endpoint returns PII (emails/phones on contacts, accounts
+// and leads), so every entity must be authorised independently rather than
+// gating the whole endpoint on a single permission.
+const PERMISSION_BY_TYPE: Record<SearchType, string> = {
+  deals: PERMISSIONS.DEALS.READ,
+  contacts: PERMISSIONS.CONTACTS.READ,
+  accounts: PERMISSIONS.ACCOUNTS.READ,
+  leads: PERMISSIONS.LEADS.READ,
+  activities: PERMISSIONS.ACTIVITIES.READ,
+  quotes: PERMISSIONS.QUOTES.READ,
+  kb_articles: PERMISSIONS.SETTINGS.READ,
+};
+
 const DEFAULT_TYPES: SearchType[] = ['deals', 'contacts', 'accounts', 'leads'];
 
 const SearchQuerySchema = z.object({
@@ -51,13 +66,21 @@ export async function registerSearchRoutes(
   prisma?: SearchPrisma
 ): Promise<void> {
   await app.register(async (r) => {
-    r.get('/search', { preHandler: requirePermission(PERMISSIONS.DEALS.READ) }, async (request, reply) => {
+    // No blanket permission gate here (RR-H1): the global JWT preHandler already
+    // authenticates the caller. Authorisation is enforced per entity below so a
+    // caller only ever receives hits for the entity types they may read — a
+    // `deals:read`-only user no longer sees contact/account/lead PII.
+    r.get('/search', async (request, reply) => {
       const parsed = SearchQuerySchema.safeParse(request.query);
       if (!parsed.success) throw new ValidationError('Invalid query', parsed.error.flatten());
       const typeParsed = TypeFilterSchema.safeParse((request.query as { type?: string }).type);
       if (!typeParsed.success) throw new ValidationError('Invalid type filter', typeParsed.error.flatten());
 
       const jwt = request.user as JwtPayload;
+      const perms = jwt.permissions ?? [];
+      const canRead = (type: SearchType): boolean =>
+        checkPermission(perms, PERMISSION_BY_TYPE[type]);
+
       const { q, limit, page } = parsed.data;
       const offset = (page - 1) * limit;
       // Tenant scoping is mandatory on every index query.
@@ -79,13 +102,18 @@ export async function registerSearchRoutes(
       }
 
       // Default request (no `type`): preserve the original four-entity response
-      // shape so existing clients keep working.
+      // shape, but only for the entity types the caller may read (RR-H1). Keys
+      // for un-permitted entities are returned empty so the shape stays stable
+      // for existing clients while never leaking un-authorised rows/PII. An
+      // admin (`*` / resource wildcards) still gets all four populated; a
+      // `deals:read`-only caller gets deals only, the rest empty.
       if (!requestedTypes) {
+        const empty = { hits: [] as unknown[], estimatedTotalHits: 0 };
         const [deals, contacts, accounts, leads] = await Promise.all([
-          client.index(DEALS_INDEX).search(q, { filter, limit, offset }),
-          client.index(CONTACTS_INDEX).search(q, { filter, limit, offset }),
-          client.index(ACCOUNTS_INDEX).search(q, { filter, limit, offset }),
-          client.index(LEADS_INDEX).search(q, { filter, limit, offset }),
+          canRead('deals') ? client.index(DEALS_INDEX).search(q, { filter, limit, offset }) : empty,
+          canRead('contacts') ? client.index(CONTACTS_INDEX).search(q, { filter, limit, offset }) : empty,
+          canRead('accounts') ? client.index(ACCOUNTS_INDEX).search(q, { filter, limit, offset }) : empty,
+          canRead('leads') ? client.index(LEADS_INDEX).search(q, { filter, limit, offset }) : empty,
         ]);
         return reply.send({
           success: true,
@@ -103,9 +131,12 @@ export async function registerSearchRoutes(
         });
       }
 
-      // Explicit `type` filter: search only the requested indexes and return a
-      // keyed map (still tenant-scoped per index).
-      const types = requestedTypes.length ? requestedTypes : DEFAULT_TYPES;
+      // Explicit `type` filter: search only the requested indexes the caller is
+      // permitted to read (RR-H1) and return a keyed map (still tenant-scoped
+      // per index). Requested-but-unauthorised types are dropped rather than
+      // returned, so no un-permitted hits/PII ever reach the caller.
+      const requested = requestedTypes.length ? requestedTypes : DEFAULT_TYPES;
+      const types = requested.filter(canRead);
       const results = await Promise.all(
         types.map((type) => client.index(INDEX_BY_TYPE[type]).search(q, { filter, limit, offset }))
       );

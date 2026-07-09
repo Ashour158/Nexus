@@ -269,6 +269,28 @@ model CustomRecord {
   @@unique([id, tenantId])
 }
 
+// ─── Feature flags (PC-25) ───────────────────────────────────────────────────
+// Durable, tenant-scoped replacement for the web app's file-based flag store.
+// One row per (tenant, key). The rich shape (rollout / tenants / users) mirrors
+// the admin Feature Flags page contract so nothing regresses. Missing keys fall
+// back to code-defined defaults in the web BFF.
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  tenantId    String
+  key         String
+  enabled     Boolean  @default(false)
+  description String?
+  rollout     Int      @default(0)
+  tenants     Json     @default("[]")
+  users       String   @default("")
+  updatedBy   String   @default("system")
+  updatedAt   DateTime @updatedAt @default(now())
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@unique([id, tenantId])
+}
+
 model CodingAllocationLog {
   id               String   @id @default(cuid())
   tenantId         String

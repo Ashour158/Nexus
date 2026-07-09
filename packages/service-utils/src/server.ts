@@ -305,11 +305,30 @@ export async function createService(config: ServiceConfig): Promise<FastifyInsta
 
   app.addHook('preHandler', async (request, reply) => {
     const path = pathOnly(request.url);
-    if (isPublicRoute(path, request.method)) return;
     // Internal service-to-service routes self-verify `x-service-token` in-route;
     // bypass the end-user JWT preHandler ONLY when a matching token is present.
-    // Without the token this falls through to JWT verification below.
-    if (isInternalServiceRoute(path, request.headers as Record<string, unknown>)) return;
+    // This runs BEFORE the isPublicRoute check so it also covers internal routes
+    // that isPublicRoute lists (e.g. /internal/reporting|outbox|codes) — those
+    // touch tenant-scoped Prisma and would otherwise throw under fail-closed.
+    if (isInternalServiceRoute(path, request.headers as Record<string, unknown>)) {
+      // These routes skip the JWT tenant-seeding below, so seed tenant context
+      // from the `x-tenant-id` header the internal caller sends (e.g. workflow
+      // automation nodes, reporting clients). Without this, tenant-scoped Prisma
+      // ops in an internal route throw under fail-closed enforcement (RR-H2).
+      // Routes that also read tenantId from the body still work; this makes the
+      // ALS path consistent. A request without a matching x-service-token does
+      // NOT enter here (isInternalServiceRoute → false) and falls through to the
+      // isPublicRoute / JWT handling below, preserving prior behavior.
+      const tenantHeader = request.headers['x-tenant-id'];
+      if (typeof tenantHeader === 'string' && tenantHeader.length > 0) {
+        (request.requestContext as { set: (key: string, value: string) => void }).set(
+          'tenantId',
+          tenantHeader
+        );
+      }
+      return;
+    }
+    if (isPublicRoute(path, request.method)) return;
     if (config.publicPrefixes?.some((prefix) => path.startsWith(prefix))) return;
 
     try {

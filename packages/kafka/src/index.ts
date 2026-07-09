@@ -8,6 +8,12 @@ import {
 } from 'kafkajs';
 import { randomUUID } from 'node:crypto';
 import type { NexusKafkaEvent } from '@nexus/shared-types';
+// Seed tenant AsyncLocalStorage per message so consumer handlers touching
+// tenant-scoped Prisma satisfy fail-closed enforcement (RR-H2). Imported from
+// the lean request-context subpath (only pulls @fastify/request-context +
+// node:async_hooks — no fastify server code). service-utils does NOT depend on
+// @nexus/kafka, so this dependency is acyclic.
+import { runWithTenant } from '@nexus/service-utils/request-context';
 import type { IdempotencyStore } from './idempotency.js';
 import { createIdempotencyStore } from './idempotency.js';
 
@@ -354,6 +360,10 @@ export class NexusConsumer {
     }
 
     const handlers = this.handlers.get(event.type) ?? [];
+    // Every domain event carries `tenantId`; seed it into tenant ALS for the
+    // handler's duration so awaited Prisma ops see it (RR-H2 fail-closed). When
+    // absent (malformed event), invoke unwrapped — behavior is unchanged.
+    const tenantId = typeof event.tenantId === 'string' ? event.tenantId : '';
     let allSuccess = true;
     let lastError: unknown;
 
@@ -362,7 +372,9 @@ export class NexusConsumer {
       let success = false;
       while (attempt <= this.maxRetries && !success) {
         try {
-          await handler(event, message);
+          await (tenantId
+            ? runWithTenant(tenantId, () => handler(event, message))
+            : handler(event, message));
           success = true;
         } catch (err) {
           lastError = err;

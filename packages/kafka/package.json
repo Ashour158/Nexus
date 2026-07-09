@@ -20,7 +20,8 @@
   "dependencies": {
     "kafkajs": "^2.2.4",
     "ioredis": "^5.4.1",
-    "@nexus/shared-types": "workspace:*"
+    "@nexus/shared-types": "workspace:*",
+    "@nexus/service-utils": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.14.9",

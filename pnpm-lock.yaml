@@ -277,6 +277,9 @@ importers:
 
   packages/kafka:
     dependencies:
+      '@nexus/service-utils':
+        specifier: workspace:*
+        version: link:../service-utils
       '@nexus/shared-types':
         specifier: workspace:*
         version: link:../shared-types
@@ -535,70 +538,6 @@ importers:
       '@types/node':
         specifier: ^20.14.9
         version: 20.19.39
-      typescript:
-        specifier: ^5.5.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.6.0
-        version: 1.6.1(@types/node@20.19.39)(jsdom@24.1.0)(terser@5.46.2)
-
-  services/accounts-service:
-    dependencies:
-      '@apollo/subgraph':
-        specifier: ^2.8.0
-        version: 2.13.3(graphql@16.13.2)
-      '@fastify/rate-limit':
-        specifier: ^9.1.0
-        version: 9.1.0
-      '@nexus/kafka':
-        specifier: workspace:*
-        version: link:../../packages/kafka
-      '@nexus/outbox':
-        specifier: workspace:*
-        version: link:../../packages/outbox
-      '@nexus/security':
-        specifier: workspace:*
-        version: link:../../packages/security
-      '@nexus/service-utils':
-        specifier: workspace:*
-        version: link:../../packages/service-utils
-      '@nexus/shared-types':
-        specifier: workspace:*
-        version: link:../../packages/shared-types
-      '@nexus/validation':
-        specifier: workspace:*
-        version: link:../../packages/validation
-      '@prisma/client':
-        specifier: ^5.15.0
-        version: 5.22.0(prisma@5.22.0)
-      dotenv:
-        specifier: ^16.4.5
-        version: 16.6.1
-      fastify:
-        specifier: ^4.28.1
-        version: 4.29.1
-      graphql:
-        specifier: ^16.9.0
-        version: 16.13.2
-      graphql-yoga:
-        specifier: ^5.6.0
-        version: 5.21.0(graphql@16.13.2)
-      prom-client:
-        specifier: ^15.1.0
-        version: 15.1.3
-      zod:
-        specifier: ^3.23.8
-        version: 3.25.76
-    devDependencies:
-      '@types/node':
-        specifier: ^20.14.9
-        version: 20.19.39
-      prisma:
-        specifier: ^5.22.0
-        version: 5.22.0
-      tsx:
-        specifier: ^4.16.0
-        version: 4.21.0
       typescript:
         specifier: ^5.5.3
         version: 5.9.3
@@ -1136,6 +1075,55 @@ importers:
         specifier: ^1.6.0
         version: 1.6.1(@types/node@20.19.39)(jsdom@24.1.0)(terser@5.46.2)
 
+  services/campaign-service:
+    dependencies:
+      '@fastify/jwt':
+        specifier: ^8.0.0
+        version: 8.0.1
+      '@fastify/rate-limit':
+        specifier: ^9.1.0
+        version: 9.1.0
+      '@nexus/kafka':
+        specifier: workspace:*
+        version: link:../../packages/kafka
+      '@nexus/service-utils':
+        specifier: workspace:*
+        version: link:../../packages/service-utils
+      '@nexus/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
+      '@nexus/validation':
+        specifier: workspace:*
+        version: link:../../packages/validation
+      '@prisma/client':
+        specifier: ^5.22.0
+        version: 5.22.0(prisma@5.22.0)
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
+      fastify:
+        specifier: ^4.28.1
+        version: 4.29.1
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.39
+      prisma:
+        specifier: ^5.22.0
+        version: 5.22.0
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.5.3
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@20.19.39)(jsdom@24.1.0)(terser@5.46.2)
+
   services/chatbot-service:
     dependencies:
       '@apollo/subgraph':
@@ -1272,82 +1260,6 @@ importers:
       '@types/nodemailer':
         specifier: ^6.4.15
         version: 6.4.23
-      '@types/supertest':
-        specifier: ^7.2.0
-        version: 7.2.0
-      prisma:
-        specifier: ^5.22.0
-        version: 5.22.0
-      supertest:
-        specifier: ^7.2.2
-        version: 7.2.2
-      tsx:
-        specifier: ^4.16.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.5.3
-        version: 5.9.3
-      vitest:
-        specifier: ^1.6.0
-        version: 1.6.1(@types/node@20.19.39)(jsdom@24.1.0)(terser@5.46.2)
-
-  services/contacts-service:
-    dependencies:
-      '@apollo/subgraph':
-        specifier: ^2.8.0
-        version: 2.13.3(graphql@16.13.2)
-      '@fastify/rate-limit':
-        specifier: ^9.1.0
-        version: 9.1.0
-      '@fastify/request-context':
-        specifier: ^5.1.0
-        version: 5.1.0
-      '@fastify/swagger':
-        specifier: ^9.0.0
-        version: 9.7.0
-      '@fastify/swagger-ui':
-        specifier: ^5.0.0
-        version: 5.2.6
-      '@nexus/kafka':
-        specifier: workspace:*
-        version: link:../../packages/kafka
-      '@nexus/security':
-        specifier: workspace:*
-        version: link:../../packages/security
-      '@nexus/service-utils':
-        specifier: workspace:*
-        version: link:../../packages/service-utils
-      '@nexus/shared-types':
-        specifier: workspace:*
-        version: link:../../packages/shared-types
-      '@nexus/validation':
-        specifier: workspace:*
-        version: link:../../packages/validation
-      '@prisma/client':
-        specifier: ^5.15.0
-        version: 5.22.0(prisma@5.22.0)
-      dotenv:
-        specifier: ^16.4.5
-        version: 16.6.1
-      fastify:
-        specifier: ^4.28.1
-        version: 4.29.1
-      graphql:
-        specifier: ^16.9.0
-        version: 16.13.2
-      graphql-yoga:
-        specifier: ^5.6.0
-        version: 5.21.0(graphql@16.13.2)
-      prom-client:
-        specifier: ^15.1.0
-        version: 15.1.3
-      zod:
-        specifier: ^3.23.8
-        version: 3.25.76
-    devDependencies:
-      '@types/node':
-        specifier: ^20.14.9
-        version: 20.19.39
       '@types/supertest':
         specifier: ^7.2.0
         version: 7.2.0
@@ -2719,6 +2631,9 @@ importers:
       '@prisma/client':
         specifier: 5.22.0
         version: 5.22.0(prisma@5.22.0)
+      cron-parser:
+        specifier: 4.9.0
+        version: 4.9.0
       decimal.js:
         specifier: ^10.4.3
         version: 10.6.0
@@ -2820,6 +2735,9 @@ importers:
       '@nexus/validation':
         specifier: workspace:*
         version: link:../../packages/validation
+      '@prisma/client':
+        specifier: ^5.22.0
+        version: 5.22.0(prisma@5.22.0)
       dotenv:
         specifier: ^16.4.5
         version: 16.6.1
@@ -2842,6 +2760,9 @@ importers:
       '@types/node':
         specifier: ^20.14.9
         version: 20.19.39
+      prisma:
+        specifier: ^5.22.0
+        version: 5.22.0
       tsx:
         specifier: ^4.16.0
         version: 4.21.0
@@ -2988,6 +2909,55 @@ importers:
       supertest:
         specifier: ^7.2.2
         version: 7.2.2
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.5.3
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@20.19.39)(jsdom@24.1.0)(terser@5.46.2)
+
+  services/ticket-service:
+    dependencies:
+      '@fastify/jwt':
+        specifier: ^8.0.0
+        version: 8.0.1
+      '@fastify/rate-limit':
+        specifier: ^9.1.0
+        version: 9.1.0
+      '@nexus/cache':
+        specifier: workspace:*
+        version: link:../../packages/cache
+      '@nexus/kafka':
+        specifier: workspace:*
+        version: link:../../packages/kafka
+      '@nexus/service-utils':
+        specifier: workspace:*
+        version: link:../../packages/service-utils
+      '@nexus/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
+      '@prisma/client':
+        specifier: ^5.22.0
+        version: 5.22.0(prisma@5.22.0)
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
+      fastify:
+        specifier: ^4.28.1
+        version: 4.29.1
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.39
+      prisma:
+        specifier: ^5.22.0
+        version: 5.22.0
       tsx:
         specifier: ^4.19.0
         version: 4.21.0

@@ -246,6 +246,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+      # Money-object timeline endpoints proxy activities/notes to crm-service.
+      CRM_SERVICE_URL: http://crm-service:3001
     depends_on:
       postgres:
         condition: service_healthy

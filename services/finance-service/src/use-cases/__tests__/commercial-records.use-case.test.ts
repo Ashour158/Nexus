@@ -265,10 +265,10 @@ describe('commercial records use case', () => {
     })).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it('blocks direct quote creation without RFQ context', async () => {
-    const { useCase } = makeUseCase();
+  it('allows standalone quote creation and resolves the default approval policy', async () => {
+    const { useCase, quotes } = makeUseCase();
 
-    await expect(useCase.createQuote(ctx, {
+    const result = await useCase.createQuote(ctx, {
       dealId: 'deal_1',
       accountId: 'acct_1',
       ownerId: 'usr_1',
@@ -276,8 +276,17 @@ describe('commercial records use case', () => {
       currency: 'USD',
       items: [{ productId: 'prod_1', quantity: 1 }],
       appliedPromos: [],
-      customFields: { approvalPolicyId: 'policy_1' },
-    })).rejects.toBeInstanceOf(BusinessRuleError);
+      customFields: {},
+    });
+
+    expect(result.quote).toBeDefined();
+    expect(quotes.createQuote).toHaveBeenCalledWith(
+      'tenant_1',
+      expect.objectContaining({
+        customFields: expect.objectContaining({ approvalPolicyId: 'default-cpq-approval' }),
+      }),
+      expect.anything()
+    );
   });
 
   it('creates a quote and a discount request when CPQ approval data is complete', async () => {

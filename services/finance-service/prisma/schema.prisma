@@ -929,6 +929,7 @@ model RFQ {
   vendorResponses  Json      @default("[]")
   internalNotes    String?
   convertedQuoteId String?
+  deletedAt        DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

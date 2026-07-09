@@ -87,6 +87,17 @@ export async function registerOrdersRoutes(
         }
       );
 
+      r.get(
+        '/orders/:id',
+        { preHandler: requirePermission(PERMISSIONS.QUOTES.READ) },
+        async (request, reply) => {
+          const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const order = await commercial.getOrder(engineContextFromJwt(request.id, jwt), id);
+          return reply.send({ success: true, data: order });
+        }
+      );
+
       r.post(
         '/orders',
         { preHandler: requirePermission(PERMISSIONS.QUOTES.CREATE) },

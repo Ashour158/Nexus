@@ -162,6 +162,12 @@ type ApprovalTransitionInput = {
 
 const RFQ_CONVERTIBLE_STATUSES = new Set(['REVIEWING', 'RESPONDED', 'READY_FOR_QUOTE']);
 
+// Standalone (non-RFQ) builder quotes that don't carry an explicit approval-path
+// reference resolve to this default CPQ approval policy instead of hard-failing.
+// The web builder may also send `customFields.approvalPolicyId`, but the backend
+// must never *require* it.
+const DEFAULT_CPQ_APPROVAL_POLICY_ID = 'default-cpq-approval';
+
 function actor(ctx: EngineContext) {
   return ctx.audit.actor;
 }
@@ -329,25 +335,6 @@ function customFieldsOf(value: unknown): Record<string, unknown> {
 
 function hasApprovalPathMetadata(customFields: Record<string, unknown>) {
   return hasText(customFields.approvalPathId) || hasText(customFields.approvalPolicyId) || hasText(customFields.approverId);
-}
-
-// BL-01: "system migration mode" must be derived from a trusted, server-set
-// signal on the request context — NOT from the client-supplied request body.
-// The old client-body escape hatch (customFields.systemMigration) let any caller
-// mint a quote with no RFQ and skip the approval gate simply by POSTing
-// `{ customFields: { systemMigration: true } }`.
-//
-// Trusted signals available on EngineContext (all set server-side, never from the
-// request body): `ctx.audit.source` is hard-coded per entrypoint — HTTP routes set
-// 'api', internal consumers/jobs set 'system' | 'worker' | 'import' | 'automation';
-// and `ctx.audit.actor.roles` comes from the verified JWT / service token.
-const SYSTEM_MIGRATION_ROLES = new Set(['SYSTEM', 'SERVICE', 'service-role', 'MIGRATION']);
-function isSystemMigrationContext(ctx: EngineContext): boolean {
-  const source = ctx.audit.source;
-  // Anything other than an external 'api' call is an internal/service path.
-  if (source && source !== 'api') return true;
-  const roles = actor(ctx).roles ?? [];
-  return roles.some((role) => SYSTEM_MIGRATION_ROLES.has(role));
 }
 
 function quoteRevisionSnapshot(quote: Record<string, unknown>, overrides: Record<string, unknown>) {
@@ -1683,19 +1670,20 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
 
     async createQuote(ctx: EngineContext, data: CreateQuoteInput) {
       const tenantId = actor(ctx).tenantId;
-      const customFields = customFieldsOf(data.customFields);
-      const systemMigration = isSystemMigrationContext(ctx);
-      if (!data.rfqId && !systemMigration) {
-        throw new BusinessRuleError('Quote creation must originate from an RFQ');
+      // Standalone builder quotes are allowed for normal API users — a quote no
+      // longer has to originate from an RFQ. When the caller doesn't supply
+      // approval-path metadata we resolve a DEFAULT approval policy instead of
+      // hard-failing, so governance still applies without blocking the builder.
+      // The RFQ-origination path (below) stays fully intact when `rfqId` is set.
+      const customFields: Record<string, unknown> = { ...customFieldsOf(data.customFields) };
+      if (!hasApprovalPathMetadata(customFields)) {
+        customFields.approvalPolicyId = DEFAULT_CPQ_APPROVAL_POLICY_ID;
       }
       if (!hasText(data.dealId) || !hasText(data.accountId) || !hasText(data.ownerId)) {
         throw new BusinessRuleError('Quote creation requires dealId, accountId, tenantId, and actorId');
       }
       if (!Array.isArray(data.items) || data.items.length === 0) {
         throw new BusinessRuleError('Quote creation requires at least one line item');
-      }
-      if (!hasApprovalPathMetadata(customFields) && !systemMigration) {
-        throw new BusinessRuleError('Quote creation requires approval path metadata or a resolvable approval policy');
       }
       if (data.rfqId) {
         const rfq = await prisma.rFQ.findFirst({ where: { id: data.rfqId, tenantId } });
@@ -1733,7 +1721,7 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
 
       const quote = await quotes.createQuote(
         tenantId,
-        { ...data, priceBookId },
+        { ...data, priceBookId, customFields },
         pricing
       );
       const discountRequest =
@@ -2276,7 +2264,20 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
         where: { id: data.quoteRevisionId, tenantId: actor(ctx).tenantId, quoteId: data.quoteId },
       });
       if (!revision) throw new NotFoundError('QuoteRevision', data.quoteRevisionId);
-      const created = await discountRequests.createDiscountRequest(actor(ctx).tenantId, data, actor(ctx).userId);
+      // Persist `quoteRevisionId` inside customFields so the CPQ approval callbacks
+      // (approve/reject) — which read it from customFields when no payload override
+      // is present — can resolve the revision. Without this the approve-callback
+      // throws "DRQ transition requires quoteRevisionId" and the DRQ sits PENDING
+      // forever, so the whole discount-approval loop never completes.
+      const drqCustomFields = {
+        ...customFieldsOf(data.customFields),
+        quoteRevisionId: data.quoteRevisionId,
+      };
+      const created = await discountRequests.createDiscountRequest(
+        actor(ctx).tenantId,
+        { ...data, customFields: drqCustomFields } as CreateDiscountRequestInput,
+        actor(ctx).userId
+      );
       await emitCommercialEvent(ctx, {
         type: 'quote.discount_request.created',
         aggregateType: 'discount_request',
@@ -2291,12 +2292,31 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
           winningProbabilityIfApproved: created.winningProbabilityIfApproved,
         },
       });
+      // Fold create-and-submit: the DRQ service already POSTs the approval-service
+      // request (module 'quote.discount_request', recordId = drq.id) and stores the
+      // returned approvalRequestId. Run SUBMIT_FOR_APPROVAL so the DRQ is formally
+      // recorded in the CPQ transition ledger and `drq.requested` is emitted, which
+      // actually originates the approval loop. Fail-open: if approval-service was
+      // unreachable (no approvalRequestId) or the submit transition can't record
+      // (e.g. the revision was superseded by the version bump on create), leave the
+      // DRQ PENDING with its state intact — never crash the create.
+      if (hasText(created.approvalRequestId)) {
+        try {
+          await this.submitDiscountRequestForApproval(ctx, created.id, {
+            approvalRequestId: created.approvalRequestId ?? undefined,
+            idempotencyKey: `drq-submit:${created.id}`,
+            correlationId: ctx.audit.correlationId,
+          });
+        } catch {
+          // Fail-open: DRQ remains PENDING with its approval-service request intact.
+        }
+      }
       return created;
     },
 
     async listRfqs(ctx: EngineContext) {
       return prisma.rFQ.findMany({
-        where: { tenantId: actor(ctx).tenantId },
+        where: { tenantId: actor(ctx).tenantId, deletedAt: null },
         orderBy: { createdAt: 'desc' },
       });
     },
@@ -2345,9 +2365,81 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
     },
 
     async getRfq(ctx: EngineContext, id: string) {
-      const row = await prisma.rFQ.findFirst({ where: { id, tenantId: actor(ctx).tenantId } });
+      const row = await prisma.rFQ.findFirst({ where: { id, tenantId: actor(ctx).tenantId, deletedAt: null } });
       if (!row) throw new NotFoundError('RFQ', id);
       return row;
+    },
+
+    // Only DRAFT RFQs are editable; line items are re-validated via the same
+    // normalization used at create so an edit can't strip a valid RFQ to zero
+    // usable lines. Additive PATCH — omitted fields are left untouched.
+    async updateRfq(ctx: EngineContext, id: string, data: Partial<RfqInput>) {
+      const tenantId = actor(ctx).tenantId;
+      const existing = await prisma.rFQ.findFirst({ where: { id, tenantId, deletedAt: null } });
+      if (!existing) throw new NotFoundError('RFQ', id);
+      if (String(existing.status) !== 'DRAFT') {
+        throw new BusinessRuleError(`RFQ can only be edited while in DRAFT (current: ${existing.status})`);
+      }
+      if (data.lineItems !== undefined && normalizedCommercialLines(data.lineItems).length === 0) {
+        fieldErrors({ lineItems: ['RFQ update requires at least one normalized line item.'] });
+      }
+      const updated = await prisma.rFQ.update({
+        where: { id: existing.id },
+        data: {
+          title: data.title ?? undefined,
+          dealId: data.dealId ?? undefined,
+          accountId: data.accountId ?? undefined,
+          contactId: data.contactId ?? undefined,
+          currency: data.currency ?? undefined,
+          requiredByDate: data.requiredByDate ?? undefined,
+          lineItems: data.lineItems !== undefined ? (data.lineItems as Prisma.InputJsonValue) : undefined,
+          internalNotes: data.internalNotes ?? undefined,
+        },
+      });
+      await emitCommercialEvent(ctx, {
+        type: 'rfq.updated',
+        aggregateType: 'rfq',
+        aggregateId: updated.id,
+        payload: {
+          rfqId: updated.id,
+          rfqNumber: updated.rfqNumber,
+          accountId: updated.accountId,
+          contactId: updated.contactId,
+          dealId: updated.dealId,
+          status: updated.status,
+          currency: updated.currency,
+        },
+      });
+      return updated;
+    },
+
+    // Soft-delete for consistency with other modules (DealRoom etc.): set
+    // `deletedAt` and filter it out of reads. Converted RFQs are preserved as an
+    // audit trail and cannot be deleted.
+    async deleteRfq(ctx: EngineContext, id: string) {
+      const tenantId = actor(ctx).tenantId;
+      const existing = await prisma.rFQ.findFirst({ where: { id, tenantId, deletedAt: null } });
+      if (!existing) throw new NotFoundError('RFQ', id);
+      if (String(existing.status) === 'CONVERTED') {
+        throw new BusinessRuleError('Converted RFQs cannot be deleted');
+      }
+      const updated = await prisma.rFQ.update({
+        where: { id: existing.id },
+        data: { deletedAt: ctx.now },
+      });
+      await emitCommercialEvent(ctx, {
+        type: 'rfq.deleted',
+        aggregateType: 'rfq',
+        aggregateId: updated.id,
+        payload: {
+          rfqId: updated.id,
+          rfqNumber: updated.rfqNumber,
+          accountId: updated.accountId,
+          dealId: updated.dealId,
+          status: updated.status,
+        },
+      });
+      return { id: updated.id, deleted: true };
     },
 
     async submitRfqForReview(ctx: EngineContext, id: string, meta: CpqTransitionMeta = {}) {
@@ -2497,6 +2589,14 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
         }),
       ]);
       return toPaginatedResult(rows, total, q.page, q.limit);
+    },
+
+    async getOrder(ctx: EngineContext, id: string) {
+      const row = await prisma.salesOrder.findFirst({
+        where: { id, tenantId: actor(ctx).tenantId },
+      });
+      if (!row) throw new NotFoundError('SalesOrder', id);
+      return row;
     },
 
     async createOrder(ctx: EngineContext, data: CreateOrderInput) {

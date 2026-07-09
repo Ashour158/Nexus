@@ -110,6 +110,34 @@ async function computeRequiredApprovalLevel(
 }
 
 /**
+ * QuoteTemplate.variables is stored as a JSON ARRAY (schema default `[]`), where
+ * each entry is a `{ key, value }` or `{ name, default }` descriptor — NOT a plain
+ * object keyed by variable name. This normalizes either shape (array of entries or
+ * a legacy keyed object) into a flat `{ key: stringValue }` lookup so structured
+ * defaults (terms / paymentTerms / notes) actually resolve.
+ */
+function normalizeTemplateVariables(raw: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  const put = (key: unknown, value: unknown) => {
+    if (typeof key !== 'string' || key.trim().length === 0) return;
+    if (value === null || value === undefined) return;
+    out[key] = typeof value === 'string' ? value : String(value);
+  };
+  if (Array.isArray(raw)) {
+    for (const entry of raw) {
+      if (!entry || typeof entry !== 'object') continue;
+      const e = entry as Record<string, unknown>;
+      const key = typeof e.key === 'string' ? e.key : typeof e.name === 'string' ? e.name : undefined;
+      const value = e.value ?? e.default ?? e.defaultValue;
+      put(key, value);
+    }
+  } else if (raw && typeof raw === 'object') {
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) put(k, v);
+  }
+  return out;
+}
+
+/**
  * Pulls default terms / payment terms / notes / validity from an active
  * QuoteTemplate so a quote created against a template inherits its boilerplate
  * (only where the request didn't already supply the field).
@@ -125,12 +153,11 @@ async function applyTemplateDefaults(
     where: { id: templateId, tenantId },
   });
   if (!tpl) return data;
-  const vars = (tpl.variables ?? {}) as Record<string, unknown>;
+  const vars = normalizeTemplateVariables(tpl.variables);
   return {
-    terms: data.terms ?? (typeof vars.terms === 'string' ? vars.terms : tpl.body ?? null),
-    paymentTerms:
-      data.paymentTerms ?? (typeof vars.paymentTerms === 'string' ? vars.paymentTerms : null),
-    notes: data.notes ?? (typeof vars.notes === 'string' ? vars.notes : null),
+    terms: data.terms ?? (vars.terms ?? tpl.body ?? null),
+    paymentTerms: data.paymentTerms ?? (vars.paymentTerms ?? null),
+    notes: data.notes ?? (vars.notes ?? null),
   };
 }
 

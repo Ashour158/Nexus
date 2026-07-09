@@ -101,6 +101,21 @@ export async function registerRFQRoutes(
         return reply.send({ success: true, data: row });
       });
 
+      r.patch('/rfqs/:id', { preHandler: requirePermission(PERMISSIONS.QUOTES.UPDATE) }, async (request, reply) => {
+        const { id } = z.object({ id: z.string().cuid() }).parse(request.params);
+        const parsed = RFQSchema.partial().parse(request.body);
+        const jwt = request.user as JwtPayload;
+        const row = await commercial.updateRfq(engineContextFromJwt(request.id, jwt), id, parsed);
+        return reply.send({ success: true, data: row });
+      });
+
+      r.delete('/rfqs/:id', { preHandler: requirePermission(PERMISSIONS.QUOTES.UPDATE) }, async (request, reply) => {
+        const { id } = z.object({ id: z.string().cuid() }).parse(request.params);
+        const jwt = request.user as JwtPayload;
+        const row = await commercial.deleteRfq(engineContextFromJwt(request.id, jwt), id);
+        return reply.send({ success: true, data: row });
+      });
+
       r.post('/rfqs/:id/send', { preHandler: requirePermission(PERMISSIONS.QUOTES.SEND) }, async (request, reply) => {
         const { id } = z.object({ id: z.string().cuid() }).parse(request.params);
         const jwt = request.user as JwtPayload;

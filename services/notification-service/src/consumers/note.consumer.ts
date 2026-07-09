@@ -46,10 +46,11 @@ export async function startNoteConsumer(deps: NoteConsumerDeps): Promise<NexusCo
   const consumer = new NexusConsumer('notification-service.notes');
 
   consumer.on('note.mentioned', async (event) => {
-    const evt = event as { tenantId: string; payload?: unknown };
+    const evt = event as { tenantId: string; eventId?: string; payload?: unknown };
     const payload = (evt.payload ?? {}) as NoteMentionedPayload;
     if (!payload.userId) return;
     await deps.inApp.send({
+      eventId: evt.eventId,
       tenantId: evt.tenantId,
       userId: payload.userId,
       type: 'NOTE_MENTION',

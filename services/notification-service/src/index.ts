@@ -23,6 +23,7 @@ import { startLeadConsumer } from './consumers/lead.consumer.js';
 import { startNoteConsumer } from './consumers/note.consumer.js';
 import { startApprovalConsumer } from './consumers/approval.consumer.js';
 import { startSlaConsumer } from './consumers/sla.consumer.js';
+import { startNotificationRequestConsumer } from './consumers/notification-request.consumer.js';
 import { registerNotificationsRoutes } from './routes/notifications.routes.js';
 import { registerPreferencesRoutes } from './routes/preferences.routes.js';
 import { createPreferencesService } from './services/preferences.service.js';
@@ -187,6 +188,9 @@ try {
   await startNoteConsumer({ inApp, log: app.log });
   await startApprovalConsumer({ inApp, log: app.log });
   await startSlaConsumer({ inApp, email, sms, push, whatsapp, prefs, lookupOwner, log: app.log });
+  // Generic notification requests from other services (workflow automation
+  // NOTIFY/EMAIL, finance auto-quote send_notification) → real in-app + email.
+  await startNotificationRequestConsumer({ inApp, email, prefs, lookupOwner, log: app.log });
   leadConsumer = await startLeadConsumer({ inApp, email, sms, push, whatsapp, prefs, lookupOwner, log: app.log });
 } catch (err) {
   app.log.warn({ err }, 'Kafka consumers failed to start; HTTP-only mode');

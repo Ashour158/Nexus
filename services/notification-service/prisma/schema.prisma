@@ -25,11 +25,18 @@ model Notification {
   isRead      Boolean   @default(false)
   readAt      DateTime?
   metadata    Json      @default("{}")
+  /// Idempotency key for at-least-once event delivery (RR-H4). Derived from
+  /// `eventId:userId:type` by the in-app channel. NULL for callers that do not
+  /// supply one (Postgres treats NULLs as distinct, so those rows are never
+  /// deduped). A retry / DLQ replay of the same event reuses the same key, so the
+  /// `@@unique([tenantId, dedupKey])` constraint below collapses the duplicate.
+  dedupKey    String?
   createdAt   DateTime  @default(now())
 
   @@index([tenantId, userId, isRead, createdAt])
   @@index([tenantId, entityType, entityId])
   @@unique([id, tenantId])
+  @@unique([tenantId, dedupKey])
 }
 
 /// Per-user, per-channel notification opt-out (NOT-11).

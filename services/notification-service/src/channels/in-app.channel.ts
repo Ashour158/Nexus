@@ -18,6 +18,20 @@ export interface InAppNotificationInput {
   entityId?: string;
   actionUrl?: string;
   metadata?: Record<string, unknown>;
+  /**
+   * Source Kafka `eventId` (RR-H4). When provided, the in-app write becomes
+   * idempotent: the persisted `dedupKey` is derived as `eventId:userId:type`, so
+   * a handler retry or DLQ replay of the same event reuses the same key and the
+   * `@@unique([tenantId, dedupKey])` constraint collapses the duplicate instead
+   * of inserting a second inbox row. Omit it and the legacy create-every-time
+   * behaviour is preserved.
+   */
+  eventId?: string;
+  /**
+   * Explicit idempotency key. Overrides the `eventId`-derived key when a caller
+   * wants full control. Leave both unset for non-idempotent creates.
+   */
+  dedupKey?: string;
 }
 
 export interface InAppChannel {
@@ -27,22 +41,55 @@ export interface InAppChannel {
 export function createInAppChannel(prisma: NotificationPrisma, producer?: NexusProducer): InAppChannel {
   return {
     async send(input) {
-      const row = await prisma.notification.create({
-        data: {
-          tenantId: input.tenantId,
-          userId: input.userId,
-          type: input.type,
-          title: input.title,
-          body: input.body,
-          entityType: input.entityType ?? null,
-          entityId: input.entityId ?? null,
-          actionUrl: input.actionUrl ?? null,
-          channel: 'IN_APP',
-          metadata: (input.metadata ?? {}) as Prisma.InputJsonValue,
-        },
-      });
+      // RR-H4: derive a stable dedup key so at-least-once event delivery (retry
+      // / DLQ replay) cannot create duplicate inbox rows. `eventId:userId:type`
+      // keeps distinct notifications to the same user (e.g. two stage changes)
+      // separate while collapsing re-runs of the same event.
+      const dedupKey =
+        input.dedupKey ??
+        (input.eventId ? `${input.eventId}:${input.userId}:${input.type}` : undefined);
 
-      // Publish to Kafka so realtime-service can push via WebSocket
+      const data = {
+        tenantId: input.tenantId,
+        userId: input.userId,
+        type: input.type,
+        title: input.title,
+        body: input.body,
+        entityType: input.entityType ?? null,
+        entityId: input.entityId ?? null,
+        actionUrl: input.actionUrl ?? null,
+        channel: 'IN_APP',
+        metadata: (input.metadata ?? {}) as Prisma.InputJsonValue,
+        dedupKey: dedupKey ?? null,
+      };
+
+      let row: { id: string };
+      if (dedupKey) {
+        // A prior replay of this event already persisted the row — reuse it and
+        // suppress the realtime re-publish so the client isn't double-notified.
+        const existing = await prisma.notification.findUnique({
+          where: { tenantId_dedupKey: { tenantId: input.tenantId, dedupKey } },
+          select: { id: true },
+        });
+        if (existing) {
+          return { id: existing.id };
+        }
+        // Upsert (not create) on the exact compound unique input Prisma
+        // generates for `@@unique([tenantId, dedupKey])`, so a concurrent replay
+        // that races the check above becomes a no-op update rather than a
+        // unique-constraint throw.
+        row = await prisma.notification.upsert({
+          where: { tenantId_dedupKey: { tenantId: input.tenantId, dedupKey } },
+          create: data,
+          update: {},
+          select: { id: true },
+        });
+      } else {
+        row = await prisma.notification.create({ data, select: { id: true } });
+      }
+
+      // Publish to Kafka so realtime-service can push via WebSocket. Reached only
+      // for a genuinely new row — a replay early-returns above without publishing.
       if (producer) {
         // Recipient's current unread count so realtime-service can update the
         // badge. Fail-open: a count failure must not block the notification.

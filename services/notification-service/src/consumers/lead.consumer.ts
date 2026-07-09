@@ -45,15 +45,18 @@ interface LeadAssignedPayload {
 }
 
 /**
- * Best-effort SMS + push + WhatsApp fan-out. Channels are already guarded no-ops
- * when unconfigured; this isolates any failure so one channel can never block the
- * other or the consumer. WhatsApp reuses the recipient's phone number and is only
- * attempted when the channel is configured.
+ * SMS + push + WhatsApp fan-out. Each channel is a guarded no-op when its
+ * provider is unconfigured and is additionally skipped here when the recipient
+ * has opted the channel out (NOT-11) or has no phone / device token. Preference
+ * lookups are fail-open so a check error never drops a send.
  *
- * Per-channel opt-out (NOT-11) is enforced here via fail-open preference checks.
+ * RR-H5: a GENUINE delivery failure (network / non-2xx) throws out of the channel
+ * and is deliberately NOT swallowed — `Promise.all` re-raises it so the
+ * NexusConsumer retries and, on exhaustion, DLQs the event. The idempotent in-app
+ * write (RR-H4) makes that re-run safe.
  */
 async function fanOutSmsPush(
-  deps: Pick<LeadConsumerDeps, 'sms' | 'push' | 'whatsapp' | 'prefs' | 'log'>,
+  deps: Pick<LeadConsumerDeps, 'sms' | 'push' | 'whatsapp' | 'prefs'>,
   recipient: { tenantId: string; userId: string; phone?: string; deviceToken?: string },
   msg: { title: string; body: string; actionUrl?: string }
 ): Promise<void> {
@@ -63,26 +66,20 @@ async function fanOutSmsPush(
     deps.prefs.isChannelEnabled(tenantId, userId, 'PUSH'),
     deps.prefs.isChannelEnabled(tenantId, userId, 'WHATSAPP'),
   ]);
-  await Promise.allSettled([
+  await Promise.all([
     recipient.phone && smsOn
-      ? deps.sms
-          .send({ to: recipient.phone, body: `${msg.title}: ${msg.body}` })
-          .catch((err) => deps.log.error({ err }, 'sms fan-out failed'))
+      ? deps.sms.send({ to: recipient.phone, body: `${msg.title}: ${msg.body}` })
       : Promise.resolve(),
     recipient.deviceToken && pushOn
-      ? deps.push
-          .send({
-            to: recipient.deviceToken,
-            title: msg.title,
-            body: msg.body,
-            actionUrl: msg.actionUrl,
-          })
-          .catch((err) => deps.log.error({ err }, 'push fan-out failed'))
+      ? deps.push.send({
+          to: recipient.deviceToken,
+          title: msg.title,
+          body: msg.body,
+          actionUrl: msg.actionUrl,
+        })
       : Promise.resolve(),
     recipient.phone && whatsappOn && deps.whatsapp.isConfigured()
-      ? deps.whatsapp
-          .send({ to: recipient.phone, body: `${msg.title}: ${msg.body}` })
-          .catch((err) => deps.log.error({ err }, 'whatsapp fan-out failed'))
+      ? deps.whatsapp.send({ to: recipient.phone, body: `${msg.title}: ${msg.body}` })
       : Promise.resolve(),
   ]);
 }
@@ -99,7 +96,7 @@ export async function startLeadConsumer(deps: LeadConsumerDeps): Promise<NexusCo
   consumer.on('lead.assigned', async (event) => {
     // `lead.assigned` is not in the shared NexusKafkaEvent union, so we read the
     // event shape generically. The handler is only dispatched for this type.
-    const evt = event as { tenantId: string; payload?: unknown };
+    const evt = event as { tenantId: string; eventId?: string; payload?: unknown };
     const payload = (evt.payload ?? {}) as LeadAssignedPayload;
     if (!payload.leadId || !payload.ownerId) return;
 
@@ -110,6 +107,7 @@ export async function startLeadConsumer(deps: LeadConsumerDeps): Promise<NexusCo
     const title = '👤 New lead assigned to you';
     const body = `You've been assigned lead ${label}. Reach out while it's hot.`;
     await deps.inApp.send({
+      eventId: evt.eventId,
       tenantId: evt.tenantId,
       userId: payload.ownerId,
       type: 'LEAD_ASSIGNED',

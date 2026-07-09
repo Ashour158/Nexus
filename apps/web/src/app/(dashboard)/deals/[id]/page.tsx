@@ -311,7 +311,19 @@ export default function DealDetailPage() {
             />
           )}
           {tab === 'dealroom' && <DealRoomPanel dealId={dealId} />}
-          {tab === 'cpq' && <CommercialTab title="Quotes" rows={unwrapRows<AnyRecord>(quotesQuery.data)} isLoading={quotesQuery.isLoading} />}
+          {tab === 'cpq' && (
+            <div className="space-y-3">
+              <div className="flex justify-end">
+                <Link
+                  href={`/quotes/new?dealId=${dealId}`}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand-600 px-3 text-sm font-medium text-white transition hover:bg-brand-700"
+                >
+                  + New Quote
+                </Link>
+              </div>
+              <CommercialTab title="Quotes" rows={unwrapRows<AnyRecord>(quotesQuery.data)} isLoading={quotesQuery.isLoading} />
+            </div>
+          )}
           {tab === 'orders' && <CommercialTab title="Orders" rows={unwrapRows<AnyRecord>(ordersQuery.data)} isLoading={ordersQuery.isLoading} />}
           {tab === 'documents' && (
             <DocumentsTab

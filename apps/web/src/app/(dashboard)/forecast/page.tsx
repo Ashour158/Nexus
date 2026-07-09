@@ -61,7 +61,9 @@ export default function ForecastPage() {
     fetch(`/api/crm/forecast?period=${period}`, { headers: authHeaders })
       .then((r) => r.json())
       .then((d) => {
-        setData(d);
+        // The /api/crm/forecast proxy wraps the payload in { success, data };
+        // fall back to the raw body if an unwrapped shape is ever returned.
+        setData((d?.data ?? d) as ForecastSummary | null);
         setLoading(false);
       })
       .catch(() => setLoading(false));

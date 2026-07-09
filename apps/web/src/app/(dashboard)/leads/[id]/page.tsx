@@ -7,10 +7,11 @@ import type { Activity, Note, PaginatedResult } from '@nexus/shared-types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { useLead, useLeadAiPrediction } from '@/hooks/use-leads';
+import { useLead, useLeadAiPrediction, useConvertLead } from '@/hooks/use-leads';
 import { AiPredictionPanel } from '@/components/crm/AiPredictionPanel';
 import { useLeadNotes } from '@/hooks/use-notes';
 import { useActivities } from '@/hooks/use-activities';
+import { usePipelines } from '@/hooks/use-pipelines';
 import { api } from '@/lib/api-client';
 import { formatDate } from '@/lib/format';
 import { cn } from '@/lib/cn';
@@ -142,6 +143,14 @@ export default function LeadDetailPage() {
     { id: 'conversion', label: 'Conversion' },
   ];
   const leadRecord = lead as unknown as AnyRecord;
+  const alreadyConverted = Boolean(lead.convertedAt);
+  const readiness = {
+    identity: Boolean(lead.email || lead.phone),
+    companyFit: Boolean(lead.company && leadRecord.industry),
+    routing: Boolean(lead.ownerId),
+    consent: !leadRecord.doNotContact,
+  };
+  const isReady = readiness.identity && readiness.routing && readiness.consent;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -155,7 +164,21 @@ export default function LeadDetailPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {canUpdate && <Button onClick={() => setTab('conversion')}>Convert</Button>}
+          {canUpdate && (
+            <Button
+              onClick={() => setTab('conversion')}
+              disabled={alreadyConverted || !isReady}
+              title={
+                alreadyConverted
+                  ? 'This lead has already been converted'
+                  : !isReady
+                    ? 'Complete the readiness checklist before converting'
+                    : undefined
+              }
+            >
+              {alreadyConverted ? 'Converted' : 'Convert'}
+            </Button>
+          )}
           <Button variant="secondary" onClick={() => router.push('/leads')}>
             Back
           </Button>
@@ -188,10 +211,10 @@ export default function LeadDetailPage() {
           <div className="rounded-xl border border-slate-200 bg-white p-5">
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-500">Readiness</h2>
             <div className="space-y-3 text-sm">
-              <ReadinessItem label="Identity" ok={Boolean(lead.email || lead.phone)} />
-              <ReadinessItem label="Company fit" ok={Boolean(lead.company && leadRecord.industry)} />
-              <ReadinessItem label="Routing" ok={Boolean(lead.ownerId)} />
-              <ReadinessItem label="Consent" ok={!leadRecord.doNotContact} />
+              <ReadinessItem label="Identity" ok={readiness.identity} />
+              <ReadinessItem label="Company fit" ok={readiness.companyFit} />
+              <ReadinessItem label="Routing" ok={readiness.routing} />
+              <ReadinessItem label="Consent" ok={readiness.consent} />
             </div>
           </div>
         </div>
@@ -248,7 +271,14 @@ export default function LeadDetailPage() {
               isLoading={fieldHistoryQuery.isLoading || auditQuery.isLoading || outboxQuery.isLoading}
             />
           )}
-          {tab === 'conversion' && <ConversionTab lead={lead as unknown as AnyRecord} canUpdate={canUpdate} />}
+          {tab === 'conversion' && (
+            <ConversionTab
+              leadId={leadId}
+              lead={lead as unknown as AnyRecord}
+              canUpdate={canUpdate}
+              isReady={isReady}
+            />
+          )}
         </div>
       </div>
       <input
@@ -437,34 +467,171 @@ function GovernanceList({ title, rows, primary, secondary, dateKey }: { title: s
   );
 }
 
-function ConversionTab({ lead, canUpdate }: { lead: AnyRecord; canUpdate: boolean }) {
+function ConversionTab({
+  leadId,
+  lead,
+  canUpdate,
+  isReady,
+}: {
+  leadId: string;
+  lead: AnyRecord;
+  canUpdate: boolean;
+  isReady: boolean;
+}) {
+  const router = useRouter();
+  const convert = useConvertLead();
+  const { data: pipelines } = usePipelines();
+
   const converted = Boolean(lead.convertedAt);
-  const rows = [
-    ['Account', lead.convertedToAccountId ?? lead.convertedToId ?? 'Ready to create or link'],
-    ['Contact', lead.convertedToContactId ?? 'Ready to create'],
-    ['Deal', lead.convertedToDealId ?? 'Optional from conversion policy'],
-    ['Policy', 'Validation rules, duplicate scan and routing must pass before conversion'],
-  ];
+  const defaultAccount = String(lead.company ?? `${lead.firstName ?? ''} ${lead.lastName ?? ''}`.trim());
+
+  const [accountName, setAccountName] = useState(defaultAccount);
+  const [createDeal, setCreateDeal] = useState(true);
+  const [dealName, setDealName] = useState(defaultAccount ? `${defaultAccount} Opportunity` : 'New Opportunity');
+  const [dealAmount, setDealAmount] = useState('');
+  const [pipelineId, setPipelineId] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  // Already-converted: show the resulting record links (read-only).
+  if (converted) {
+    const rows = [
+      ['Account', lead.convertedToAccountId ?? lead.convertedToId ?? '—'],
+      ['Contact', lead.convertedToContactId ?? '—'],
+      ['Deal', lead.convertedToDealId ?? 'No deal created'],
+    ];
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Conversion Control</h3>
+            <p className="mt-1 text-xs text-slate-500">This lead has been converted into the records below.</p>
+          </div>
+          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Converted</span>
+        </div>
+        <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+          {rows.map(([label, value]) => (
+            <div key={String(label)} className="rounded-lg bg-slate-50 p-3">
+              <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{String(label)}</dt>
+              <dd className="mt-1 text-sm font-medium text-slate-800">{String(value)}</dd>
+            </div>
+          ))}
+        </dl>
+        {lead.convertedToDealId ? (
+          <Button className="mt-4" onClick={() => router.push(`/deals/${String(lead.convertedToDealId)}`)}>
+            Open deal
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
+
+  async function onConvert(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!accountName.trim()) {
+      setError('An account name is required.');
+      return;
+    }
+    try {
+      const result = await convert.mutateAsync({
+        id: leadId,
+        accountName: accountName.trim(),
+        createDeal,
+        dealName: createDeal ? dealName.trim() || `${accountName.trim()} Opportunity` : undefined,
+        dealAmount: createDeal && dealAmount ? Number(dealAmount) : undefined,
+        pipelineId: createDeal && pipelineId ? pipelineId : undefined,
+      });
+      if (result.dealId) router.push(`/deals/${result.dealId}`);
+      else if (result.accountId) router.push(`/accounts/${result.accountId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Conversion failed.');
+    }
+  }
+
+  const inputClass =
+    'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400';
+
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
+    <form onSubmit={onConvert} className="rounded-xl border border-slate-200 bg-white p-5">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-slate-900">Conversion Control</h3>
-          <p className="mt-1 text-xs text-slate-500">Lead conversion writes account, contact and optional deal in one governed transaction.</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Conversion writes an account, a contact and an optional deal in one governed transaction.
+          </p>
         </div>
-        <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', converted ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700')}>
-          {converted ? 'Converted' : 'Ready'}
+        <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', isReady ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700')}>
+          {isReady ? 'Ready' : 'Needs data'}
         </span>
       </div>
-      <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-        {rows.map(([label, value]) => (
-          <div key={String(label)} className="rounded-lg bg-slate-50 p-3">
-            <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{String(label)}</dt>
-            <dd className="mt-1 text-sm font-medium text-slate-800">{String(value)}</dd>
+
+      {!isReady ? (
+        <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          Complete Identity, Routing and Consent in the readiness checklist before converting.
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
+      ) : null}
+
+      <fieldset disabled={!canUpdate || !isReady} className="mt-4 space-y-4 disabled:opacity-60">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-slate-600">Account name</span>
+          <input
+            className={inputClass}
+            value={accountName}
+            onChange={(e) => setAccountName(e.target.value)}
+            placeholder="Account to create or link"
+          />
+        </label>
+
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" checked={createDeal} onChange={(e) => setCreateDeal(e.target.checked)} />
+          Create a deal from this conversion
+        </label>
+
+        {createDeal ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-600">Deal name</span>
+              <input className={inputClass} value={dealName} onChange={(e) => setDealName(e.target.value)} />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-600">Deal amount</span>
+              <input
+                className={inputClass}
+                type="number"
+                min="0"
+                value={dealAmount}
+                onChange={(e) => setDealAmount(e.target.value)}
+                placeholder="0"
+              />
+            </label>
+            {pipelines && pipelines.length > 0 ? (
+              <label className="block sm:col-span-2">
+                <span className="mb-1 block text-xs font-medium text-slate-600">Pipeline</span>
+                <select className={inputClass} value={pipelineId} onChange={(e) => setPipelineId(e.target.value)}>
+                  <option value="">Default pipeline</option>
+                  {pipelines.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
           </div>
-        ))}
-      </dl>
-      {!canUpdate && <p className="mt-4 text-xs text-amber-700">Your role can view this conversion logic but cannot execute conversion.</p>}
-    </div>
+        ) : null}
+      </fieldset>
+
+      <div className="mt-6 flex items-center justify-end">
+        <Button type="submit" disabled={!canUpdate || !isReady || convert.isPending} isLoading={convert.isPending}>
+          Convert lead
+        </Button>
+      </div>
+      {!canUpdate ? (
+        <p className="mt-3 text-xs text-amber-700">Your role can view this conversion logic but cannot execute conversion.</p>
+      ) : null}
+    </form>
   );
 }

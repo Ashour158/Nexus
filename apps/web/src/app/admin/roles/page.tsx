@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 // Permission catalog mirrors the backend PERMISSIONS vocabulary (resource:action).
 // The backend also honours `*` and `resource:*` wildcards.
@@ -30,6 +31,7 @@ export default function AdminRolesPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const authHeaders = useCallback(
     (): Record<string, string> => ({
@@ -130,7 +132,13 @@ export default function AdminRolesPage() {
 
   async function remove(r: Role) {
     if (r.isSystem) return;
-    if (!window.confirm(`Delete role "${r.name}"? This cannot be undone.`)) return;
+    const ok = await confirm({
+      title: 'Delete role',
+      description: `Delete role "${r.name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     const res = await fetch(`/bff/auth/roles/${r.id}`, {
       method: 'DELETE',
       headers: authHeaders(),
@@ -145,6 +153,7 @@ export default function AdminRolesPage() {
 
   return (
     <div className="space-y-4">
+      {ConfirmDialog}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Roles &amp; Permissions</h2>
         <button

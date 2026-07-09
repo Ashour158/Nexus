@@ -76,6 +76,21 @@ export default function OnboardingPage() {
   const [stepIndex, setStepIndex] = useState(0);
   const [doneSteps, setDoneSteps] = useState<Record<string, boolean>>({});
 
+  // Mark the wizard as "seen" so middleware stops force-redirecting here — this
+  // is what lets the user skip freely without bouncing back into a loop.
+  useEffect(() => {
+    document.cookie = 'nexus_onboarding_seen=1; path=/; max-age=31536000; samesite=lax';
+  }, []);
+
+  // If the server-side store already reports onboarding complete (returning
+  // user who simply lacked the cookie), flag it and send them into the app.
+  useEffect(() => {
+    if (state?.completed) {
+      document.cookie = 'nexus_onboarded=1; path=/; max-age=31536000; samesite=lax';
+      router.replace('/dashboard');
+    }
+  }, [state?.completed, router]);
+
   // Seed local completion state from the persisted store once loaded.
   useEffect(() => {
     if (state?.steps) setDoneSteps((prev) => ({ ...state.steps, ...prev }));
@@ -101,7 +116,8 @@ export default function OnboardingPage() {
 
   function completeOnboarding() {
     persist({ completed: true, steps: { done: true } });
-    router.push('/');
+    document.cookie = 'nexus_onboarded=1; path=/; max-age=31536000; samesite=lax';
+    router.push('/dashboard');
   }
 
   return (

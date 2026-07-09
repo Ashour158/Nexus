@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Network, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useAuthStore } from '@/stores/auth.store';
 import { useUsers } from '@/hooks/use-users';
 import {
@@ -53,6 +54,7 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
   const createDept = useCreateDepartment();
   const updateDept = useUpdateDepartment();
   const deleteDept = useDeleteDepartment();
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [form, setForm] = useState<DeptFormState | null>(null);
@@ -110,7 +112,13 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
   }
 
   async function remove(d: Department) {
-    if (!window.confirm(`Delete department "${d.name}"?`)) return;
+    const ok = await confirm({
+      title: 'Delete department',
+      description: `Delete department "${d.name}"?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     setBanner(null);
     try {
       await deleteDept.mutateAsync(d.id);
@@ -198,6 +206,7 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
 
   return (
     <div className="space-y-4">
+      {ConfirmDialog}
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500">Model your organization&apos;s reporting departments.</p>
         {canEdit ? (
@@ -343,6 +352,7 @@ function LevelsTab({ canEdit }: { canEdit: boolean }) {
   const createLevel = useCreateLevel();
   const updateLevel = useUpdateLevel();
   const deleteLevel = useDeleteLevel();
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const [form, setForm] = useState<LevelFormState | null>(null);
   const [banner, setBanner] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
@@ -388,7 +398,13 @@ function LevelsTab({ canEdit }: { canEdit: boolean }) {
   }
 
   async function remove(l: Level) {
-    if (!window.confirm(`Delete level "${l.name}"?`)) return;
+    const ok = await confirm({
+      title: 'Delete level',
+      description: `Delete level "${l.name}"?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     setBanner(null);
     try {
       await deleteLevel.mutateAsync(l.id);
@@ -400,6 +416,7 @@ function LevelsTab({ canEdit }: { canEdit: boolean }) {
 
   return (
     <div className="space-y-4">
+      {ConfirmDialog}
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500">Seniority levels, ordered by rank (lowest rank = most senior).</p>
         {canEdit ? (

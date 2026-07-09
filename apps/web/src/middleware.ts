@@ -27,13 +27,13 @@ const DEV_AUTH_BYPASS = process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === 'true';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Send the bare root to the app home in middleware. Rendering the root `/`
-  // page segment hits a Next.js standalone-output bug (undefined client
+  // Send the bare root to the executive dashboard in middleware. Rendering the
+  // root `/` page segment hits a Next.js standalone-output bug (undefined client
   // reference manifest → "Cannot read properties of undefined (reading
   // 'clientModules'/'entryCSSFiles')") that 500s regardless of page content, so
-  // never render it. /deals then runs the normal auth check below.
+  // never render it. /dashboard then runs the normal auth check below.
   if (pathname === '/') {
-    return NextResponse.redirect(new URL('/deals', request.url));
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   // The Next.js /api/* proxy handlers forward the incoming Authorization header
@@ -80,6 +80,19 @@ export function middleware(request: NextRequest) {
     // Preserve the original destination so we can redirect back after login
     loginUrl.searchParams.set('redirect', pathname + request.nextUrl.search);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // First-run onboarding — send authenticated users who have neither completed
+  // nor yet seen the wizard to /onboarding. Two cookies keep this loop-free:
+  //   nexus_onboarded       → wizard finished (set on completion)
+  //   nexus_onboarding_seen → wizard visited at least once (set on mount)
+  // Once either is present, or the user is already on /onboarding, we never
+  // force the redirect again — so "Skip onboarding" (which lands on /dashboard)
+  // cannot bounce back into a loop.
+  const onboardingDone = request.cookies.get('nexus_onboarded')?.value === '1';
+  const onboardingSeen = request.cookies.get('nexus_onboarding_seen')?.value === '1';
+  if (!onboardingDone && !onboardingSeen && !pathname.startsWith('/onboarding')) {
+    return NextResponse.redirect(new URL('/onboarding', request.url));
   }
 
   return NextResponse.next();

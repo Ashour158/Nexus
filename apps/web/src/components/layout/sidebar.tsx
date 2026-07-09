@@ -69,7 +69,7 @@ const LEGACY_NAV_GROUPS: NavGroup[] = [
     label: 'Sales',
     icon: TrendingUp,
     items: [
-      { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/leads', label: 'Leads', icon: Target },
       { href: '/deals', label: 'Deals', icon: Briefcase },
       { href: '/pipeline', label: 'Pipeline', icon: Layers },
@@ -223,7 +223,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps): ReactEleme
         aria-label="Main sidebar"
       >
         <div className="mb-4 flex items-center justify-between px-8 pb-4 pt-6">
-          <Link href="/" className="min-w-0" style={{ color: 'var(--text-primary)' }}>
+          <Link href="/dashboard" className="min-w-0" style={{ color: 'var(--text-primary)' }}>
             <span className="block text-xl font-bold tracking-tight text-[#005baf]">Nexus CRM</span>
             <span className="block text-xs font-semibold text-slate-500">Enterprise CRM</span>
           </Link>

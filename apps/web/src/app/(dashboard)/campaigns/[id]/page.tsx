@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { notify } from '@/lib/toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import {
   useAddCampaignMembers,
   useCampaign,
@@ -65,6 +66,7 @@ export default function CampaignDetailPage() {
   const changeStatus = useChangeCampaignStatus();
   const send = useSendCampaign();
   const remove = useDeleteCampaign();
+  const { confirm, ConfirmDialog } = useConfirm();
 
   if (isLoading) {
     return (
@@ -160,10 +162,14 @@ export default function CampaignDetailPage() {
             <button
               type="button"
               disabled={remove.isPending}
-              onClick={() => {
-                if (window.confirm('Delete this campaign? It can be restored via the API.')) {
-                  remove.mutate(id, { onSuccess: () => router.push('/campaigns') });
-                }
+              onClick={async () => {
+                const ok = await confirm({
+                  title: 'Delete campaign',
+                  description: 'Delete this campaign? It can be restored via the API.',
+                  confirmLabel: 'Delete',
+                  danger: true,
+                });
+                if (ok) remove.mutate(id, { onSuccess: () => router.push('/campaigns') });
               }}
               className="inline-flex h-10 items-center gap-2 rounded-lg border border-rose-200 bg-white px-4 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
             >
@@ -187,6 +193,7 @@ export default function CampaignDetailPage() {
       {tab === 'overview' ? <OverviewTab campaign={campaign} /> : null}
       {tab === 'members' ? <MembersTab campaignId={id} /> : null}
       {tab === 'metrics' ? <MetricsTab campaignId={id} /> : null}
+      {ConfirmDialog}
     </CRMModuleShell>
   );
 }

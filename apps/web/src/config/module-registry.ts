@@ -69,7 +69,7 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
       {
         id: 'dashboard',
         label: 'Dashboard',
-        href: '/',
+        href: '/dashboard',
         icon: Layers,
         status: 'preview',
         service: 'web, crm, analytics',
@@ -141,6 +141,7 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
         service: 'planning-service',
         description: 'Quotas, planning calendars, forecast overrides, and capacity assumptions.',
         depth: ['quota setup', 'period planning', 'team summary', 'override governance'],
+        sidebar: true,
       },
     ],
   },
@@ -181,7 +182,8 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
         service: 'finance-service, approval-service',
         description: 'DRQ approval queue for requested discount, prevalidated reason, approval status, and win probability.',
         depth: ['discount percent', 'reason catalog', 'win probability', 'approval workflow', 'audit events'],
-        sidebar: true,
+        // Deduped: routes to /approvals, same as the Operations → Approvals item.
+        sidebar: false,
       },
       {
         id: 'quote-templates-workspace',
@@ -277,6 +279,7 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
         service: 'notes-service',
         description: 'Entity-linked notes, rich text, history, and team capture.',
         depth: ['linked records', 'rich notes', 'searchable context', 'ownership'],
+        sidebar: true,
       },
       {
         id: 'documents',
@@ -287,6 +290,7 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
         service: 'document-service, storage-service',
         description: 'Customer, account, deal, and quote attachments with document lifecycle support.',
         depth: ['entity attachments', 'document preview', 'signature handoff', 'storage metadata'],
+        sidebar: true,
       },
     ],
   },
@@ -360,7 +364,8 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
         service: 'finance-service',
         description: 'Commission calculation, approval, payment, and clawback states.',
         depth: ['commission records', 'approval state', 'clawbacks', 'rep summaries'],
-        sidebar: true,
+        // Deduped in favor of the wired "Commissions" item below (/commission).
+        sidebar: false,
       },
       {
         id: 'incentives',
@@ -375,7 +380,7 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
       },
       {
         id: 'commission',
-        label: 'Commission',
+        label: 'Commissions',
         href: '/commission',
         icon: Percent,
         status: 'wired',
@@ -467,6 +472,7 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
         service: 'reporting-service',
         description: 'Saved reports, dashboards, schedules, widgets, export, and reporting APIs.',
         depth: ['saved reports', 'dashboards', 'schedules', 'widgets', 'exports'],
+        sidebar: true,
       },
     ],
   },
@@ -507,11 +513,12 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
         service: 'workflow-service',
         description: 'Customer journey flows, milestones, and lifecycle automation.',
         depth: ['journey map', 'milestones', 'automation hooks', 'lifecycle states'],
-        sidebar: true,
+        // Merged into the wired "Journeys" (Command Center) item below.
+        sidebar: false,
       },
       {
         id: 'command-center',
-        label: 'Command Center',
+        label: 'Journeys',
         href: '/command-center',
         icon: Compass,
         status: 'wired',
@@ -677,7 +684,9 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
         service: 'integration-service',
         description: 'Mail, calendar, maps, Slack, Teams, ZATCA, and external ERP integrations.',
         depth: ['mail', 'calendar', 'maps', 'Slack', 'Teams', 'ZATCA'],
-        sidebar: true,
+        // Deduped: the wired "Connections & Sync" (/integrations) item is the
+        // single Integrations entry in the sidebar. Still routable from settings.
+        sidebar: false,
       },
       {
         id: 'integration-connections',

@@ -759,6 +759,18 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
         depth: ['roles', 'permission matrix', 'RBAC', 'system role protection'],
         sidebar: true,
       },
+      {
+        id: 'system-status',
+        label: 'System Status',
+        href: '/status',
+        icon: Activity,
+        status: 'ready',
+        service: 'web, all services',
+        description: 'Live per-service health board polled from each service /health endpoint.',
+        depth: ['per-service up/degraded/down', 'latency', 'auto-refresh', 'health summary'],
+        sidebar: true,
+        adminOnly: true,
+      },
     ],
   },
   {

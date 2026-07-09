@@ -4,6 +4,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { FeedbackWidget } from '@/components/feedback-widget';
 import { HydrationGate } from '@/components/hydration-gate';
 import { AppShell } from '@/components/layout/app-shell';
+import { MaintenanceBanner } from '@/components/maintenance-banner';
 import { QuickCreateFab } from '@/components/quick-create-fab';
 
 export default function DashboardLayout({
@@ -17,6 +18,7 @@ export default function DashboardLayout({
   return (
     <HydrationGate>
       <AppShell>
+        <MaintenanceBanner />
         <AnalyticsProvider>
           <ErrorBoundary>{children}</ErrorBoundary>
         </AnalyticsProvider>

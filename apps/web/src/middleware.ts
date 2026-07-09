@@ -4,7 +4,8 @@
  * Redirects unauthenticated requests to /login.  The coarse-grained
  * session cookie `nexus_session` is set on successful login and cleared
  * on logout.  Fine-grained authorization still happens at the API layer
- * via the Bearer token attached by api-client.ts.
+ * via the Bearer token this middleware attaches from the HttpOnly
+ * `nexus_token` cookie when proxying /api/* (RR-H10).
  */
 
 import { NextResponse } from 'next/server';
@@ -37,9 +38,12 @@ export function middleware(request: NextRequest) {
 
   // The Next.js /api/* proxy handlers forward the incoming Authorization header
   // to backend services, but browser calls to /api/* are plain fetch() with no
-  // token (the token lives in client sessionStorage). Inject it here from the
-  // nexus_token cookie so those handlers authenticate — otherwise every
-  // reporting/analytics/finance/etc call 401s.
+  // token — the raw JWT lives ONLY in the HttpOnly `nexus_token` cookie
+  // (RR-H10), unreadable by client JS. Middleware runs server-side and CAN read
+  // that HttpOnly cookie, so we attach the Bearer header here (overriding any
+  // optimistic client-set header) — otherwise every
+  // reporting/analytics/finance/etc call 401s. This is the BFF's server-side
+  // token-attach point: the token never transits through client JavaScript.
   if (pathname === '/api' || pathname.startsWith('/api/')) {
     const token = request.cookies.get('nexus_token')?.value;
     if (token) {

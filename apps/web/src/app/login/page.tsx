@@ -79,12 +79,20 @@ export default function LoginPage() {
         roles: Array.isArray(claims.roles) ? (claims.roles as string[]) : [],
         permissions: Array.isArray(claims.permissions) ? (claims.permissions as string[]) : [],
       });
-      // Coarse-grained session cookie for middleware route protection.
+      // Store the raw JWT ONLY in a server-set HttpOnly, Secure, SameSite=Strict
+      // cookie (RR-H10). This POST hands the token to a server-side route handler
+      // that writes it via `Set-Cookie` — it is never placed in `document.cookie`
+      // or web storage, so client JS (and any XSS) can never read it. The
+      // server-side middleware reads that HttpOnly cookie and attaches
+      // `Authorization: Bearer` when proxying /api/* requests upstream.
+      await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken }),
+      });
+      // Coarse-grained, non-secret presence flag for middleware route protection.
+      // (Not the token — just "a session exists"; safe to be JS-readable.)
       document.cookie = 'nexus_session=1;path=/;max-age=86400;SameSite=Lax';
-      // The access token in a cookie too, so server-side /api/* route handlers
-      // (which can't read the client's sessionStorage) can forward it upstream.
-      // Middleware injects it as the Authorization header on /api/* requests.
-      document.cookie = `nexus_token=${accessToken};path=/;max-age=86400;SameSite=Lax`;
       const redirect = searchParams.get('redirect');
       router.push(redirect ?? '/deals');
     } catch (err) {

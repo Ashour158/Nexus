@@ -116,6 +116,10 @@ export function Topbar(): ReactElement {
 
   const onLogout = () => {
     clearSession();
+    // Clear the HttpOnly access-token cookie server-side (client JS cannot clear
+    // it) as well as the JS-readable session flag (RR-H10). Fire-and-forget; the
+    // redirect to /login happens regardless.
+    void fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
     document.cookie = 'nexus_session=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT';
     setMenuOpen(false);
     router.push('/login');
@@ -172,7 +176,10 @@ export function Topbar(): ReactElement {
       <div className="hidden md:block xl:hidden">
         <GlobalSearch compact />
       </div>
-      <DarkModeToggle />
+      {/* RR-H19: the dark-mode toggle is hidden until the design-token migration
+          reaches full `dark:` coverage. Only ~17% of surfaces were themed, so
+          enabling it produced a broken mixed light/dark UI. Re-add
+          `<DarkModeToggle />` here once dark: coverage is complete. */}
       <LocaleSwitcher currentLocale={currentLocale} />
       <NotificationBell />
       <button
@@ -245,12 +252,18 @@ export function Topbar(): ReactElement {
   );
 }
 
-function DarkModeToggle() {
+// RR-H19: exported (not rendered) so it can be dropped back into the topbar once
+// the design-token migration reaches full `dark:` coverage. Do NOT render it
+// before then — only ~17% of surfaces are themed, so it yields a broken mixed UI.
+export function DarkModeToggle() {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem('theme');
-    if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    // RR-H19: honor ONLY an explicit, previously-saved user choice. The removed
+    // `prefers-color-scheme: dark` branch used to auto-activate dark mode for any
+    // visitor whose OS prefers dark, forcing the broken mixed theme on load with
+    // no user action. Dark mode now activates on explicit toggle only.
+    if (localStorage.getItem('theme') === 'dark') {
       document.documentElement.classList.add('dark');
       setIsDark(true);
     }

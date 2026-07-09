@@ -82,7 +82,18 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              // RR-H10: 'unsafe-eval' is a code-injection amplifier and is NOT
+              // needed by any production client dependency (verified: the only
+              // eval/Function use in the app is server-side dev-mock code, which
+              // is not subject to browser CSP). It is kept ONLY in development,
+              // where Next.js's webpack `eval` devtool / HMR require it.
+              // 'unsafe-inline' stays for now: Next.js injects inline bootstrap
+              // and framework runtime <script> tags without a per-request nonce,
+              // so a strict nonce-based policy is a larger migration (tracked as a
+              // follow-up — needs middleware nonce generation + propagation).
+              isDevelopment
+                ? "script-src 'self' 'unsafe-eval' 'unsafe-inline'"
+                : "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self'",

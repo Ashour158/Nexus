@@ -86,9 +86,17 @@ export const useAuthStore = create<AuthState>()(
       // hasPermission() produce a hydration mismatch (React #418). A HydrationGate
       // rehydrates this store on mount and only then renders the dashboard.
       skipHydration: true,
+      // SECURITY (RR-H10): never persist the raw JWTs to web storage — a
+      // sessionStorage copy is directly exfiltratable by any XSS. The access
+      // token now lives ONLY in a server-set HttpOnly cookie (see
+      // app/api/auth/session), and the server-side middleware attaches it as the
+      // Authorization header when proxying /api/* upstream. `accessToken`/
+      // `refreshToken` remain in the in-memory store for the active tab (socket
+      // handshake, optimistic Bearer on same-origin calls that middleware then
+      // overrides) but are deliberately excluded from `partialize` so they are
+      // gone on reload — the HttpOnly cookie keeps the user authenticated.
+      // Only non-secret identity/authz metadata is persisted for UI gating.
       partialize: (state) => ({
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
         userId: state.userId,
         tenantId: state.tenantId,
         roles: state.roles,

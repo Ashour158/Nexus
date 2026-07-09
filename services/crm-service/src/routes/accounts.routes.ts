@@ -22,6 +22,7 @@ import { uploadToStorage } from '../lib/storage.js';
 import { getFieldHistory } from '../lib/field-history.js';
 import { createCustomerRecordsUseCase } from '../use-cases/customer-records.use-case.js';
 import { buildReadAccessContext } from '../lib/access-context.js';
+import { withIdempotency } from '../lib/idempotency.js';
 import type { EngineContext } from '@nexus/domain-core';
 
 const dataServiceProxyClient = createHttpClient({
@@ -146,11 +147,14 @@ export async function registerAccountsRoutes(
             throw new ValidationError('Invalid body', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
-          const account = await customerRecords.create(engineContextFromJwt(request.id, jwt), {
-            entityType: 'account',
-            data: parsed.data as Record<string, unknown>,
+          const { statusCode, body } = await withIdempotency(prisma, request, jwt.tenantId, async () => {
+            const account = await customerRecords.create(engineContextFromJwt(request.id, jwt), {
+              entityType: 'account',
+              data: parsed.data as Record<string, unknown>,
+            });
+            return { statusCode: 201, body: { success: true, data: account } };
           });
-          return reply.code(201).send({ success: true, data: account });
+          return reply.code(statusCode).send(body);
         }
       );
 

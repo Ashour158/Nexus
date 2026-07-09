@@ -116,6 +116,10 @@ model Contact {
   firstName        String
   lastName         String
   email            String?
+  // Deterministic keyed-HMAC blind index of the normalized email. Backs tenant
+  // email uniqueness + app-level dedup because `email` may be stored as
+  // randomized AES-GCM ciphertext (see packages/security computeBlindIndex).
+  emailHash        String?
   phone            String?
   mobile           String?
   jobTitle         String?
@@ -150,7 +154,9 @@ model Contact {
   addresses        ContactAddress[]
   accountRelations AccountContactRelation[]
 
-  @@unique([tenantId, email])
+  // Uniqueness is on the blind index (deterministic), NOT on `email` — the raw
+  // email column may hold randomized ciphertext, which can never collide.
+  @@unique([tenantId, emailHash])
   @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, accountId])
@@ -1317,4 +1323,21 @@ model SavedView {
 
   @@index([tenantId, ownerId, entityType])
   @@index([tenantId, entityType, isShared])
+}
+
+/// Idempotency ledger for core CRM create endpoints (leads/accounts/contacts/
+/// deals). Used only as the durable fallback when Redis (the primary store) is
+/// unavailable: a client-supplied `Idempotency-Key` maps to the prior HTTP
+/// result so a retried POST returns the original response instead of creating a
+/// duplicate. Scoped per tenant.
+model IdempotencyKey {
+  id         String   @id @default(cuid())
+  tenantId   String
+  key        String
+  statusCode Int
+  response   Json
+  createdAt  DateTime @default(now())
+
+  @@unique([tenantId, key])
+  @@index([tenantId, createdAt])
 }

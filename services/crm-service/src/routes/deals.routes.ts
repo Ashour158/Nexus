@@ -27,6 +27,7 @@ import { getFieldHistory } from '../lib/field-history.js';
 import { uploadToStorage } from '../lib/storage.js';
 import { createSalesRecordsUseCase } from '../use-cases/sales-records.use-case.js';
 import { buildReadAccessContext } from '../lib/access-context.js';
+import { withIdempotency } from '../lib/idempotency.js';
 import type { EngineContext } from '@nexus/domain-core';
 
 // ─── Local param schemas ────────────────────────────────────────────────────
@@ -177,11 +178,14 @@ export async function registerDealsRoutes(
             throw new ValidationError('Invalid body', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
-          const deal = await salesRecords.create(engineContextFromJwt(request.id, jwt), {
-            entityType: 'deal',
-            data: parsed.data as Record<string, unknown>,
+          const { statusCode, body } = await withIdempotency(prisma, request, jwt.tenantId, async () => {
+            const deal = await salesRecords.create(engineContextFromJwt(request.id, jwt), {
+              entityType: 'deal',
+              data: parsed.data as Record<string, unknown>,
+            });
+            return { statusCode: 201, body: { success: true, data: deal } };
           });
-          return reply.code(201).send({ success: true, data: deal });
+          return reply.code(statusCode).send(body);
         }
       );
 

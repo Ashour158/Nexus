@@ -22,6 +22,7 @@ import { getFieldHistory } from '../lib/field-history.js';
 import { uploadToStorage } from '../lib/storage.js';
 import { createCustomerRecordsUseCase } from '../use-cases/customer-records.use-case.js';
 import { buildReadAccessContext } from '../lib/access-context.js';
+import { withIdempotency } from '../lib/idempotency.js';
 import type { EngineContext } from '@nexus/domain-core';
 
 const ContactDealsPaginationQuery = PaginationSchema.pick({ page: true, limit: true });
@@ -166,11 +167,14 @@ export async function registerContactsRoutes(
             throw new ValidationError('Invalid body', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
-          const contact = await customerRecords.create(engineContextFromJwt(request.id, jwt), {
-            entityType: 'contact',
-            data: parsed.data as Record<string, unknown>,
+          const { statusCode, body } = await withIdempotency(prisma, request, jwt.tenantId, async () => {
+            const contact = await customerRecords.create(engineContextFromJwt(request.id, jwt), {
+              entityType: 'contact',
+              data: parsed.data as Record<string, unknown>,
+            });
+            return { statusCode: 201, body: { success: true, data: contact } };
           });
-          return reply.code(201).send({ success: true, data: contact });
+          return reply.code(statusCode).send(body);
         }
       );
 

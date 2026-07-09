@@ -430,6 +430,9 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           currency: created.currency,
           pipelineId: created.pipelineId,
           stageId: created.stageId,
+          // Forecast fields (RR-C4 follow-up): let analytics bucket by close date.
+          expectedCloseDate: created.expectedCloseDate?.toISOString() ?? null,
+          probability: created.probability,
         },
       });
 
@@ -541,6 +544,8 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           currency: created.currency,
           pipelineId: created.pipelineId,
           stageId: created.stageId,
+          expectedCloseDate: created.expectedCloseDate?.toISOString() ?? null,
+          probability: created.probability,
         },
       });
 
@@ -767,6 +772,8 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           status: updated.status,
           amount: decimalToNumber(updated.amount),
           currency: updated.currency,
+          expectedCloseDate: updated.expectedCloseDate?.toISOString() ?? null,
+          probability: updated.probability,
           changedFields: Object.keys(updateData).filter((field) => field !== 'version'),
         },
       });
@@ -993,6 +1000,8 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           amount: decimalToNumber(updated.amount),
           rottenDays: stage.rottenDays,
           stageChangedAt: new Date().toISOString(),
+          expectedCloseDate: updated.expectedCloseDate?.toISOString() ?? null,
+          probability: updated.probability,
         },
       });
 
@@ -1026,6 +1035,8 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
             accountId: updated.accountId,
             amount: decimalToNumber(updated.amount),
             currency: updated.currency,
+            expectedCloseDate: updated.expectedCloseDate?.toISOString() ?? null,
+            probability: updated.probability,
             teamSplits,
           },
         });
@@ -1038,6 +1049,8 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
             ownerId: updated.ownerId,
             reason: updated.lostReason ?? 'Moved to lost stage',
             amount: decimalToNumber(updated.amount),
+            expectedCloseDate: updated.expectedCloseDate?.toISOString() ?? null,
+            probability: updated.probability,
           },
         });
       } else if (statusTransition === 'reopen') {
@@ -1157,6 +1170,8 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           ownerId: updated.ownerId,
           reason,
           amount: decimalToNumber(updated.amount),
+          expectedCloseDate: updated.expectedCloseDate?.toISOString() ?? null,
+          probability: updated.probability,
         },
       });
 

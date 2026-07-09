@@ -24,6 +24,7 @@ import { getFieldHistory } from '../lib/field-history.js';
 import { uploadToStorage } from '../lib/storage.js';
 import { createSalesRecordsUseCase } from '../use-cases/sales-records.use-case.js';
 import { buildReadAccessContext } from '../lib/access-context.js';
+import { withIdempotency } from '../lib/idempotency.js';
 import type { EngineContext } from '@nexus/domain-core';
 
 const MassIdsSchema = z.object({ ids: z.array(z.string().cuid()).min(1).max(200) });
@@ -157,12 +158,17 @@ export async function registerLeadsRoutes(
           const jwt = request.user as JwtPayload;
           const force = (request.query as Record<string, string>)?.force === 'true';
           try {
-            const lead = await salesRecords.create(engineContextFromJwt(request.id, jwt), {
-              entityType: 'lead',
-              data: parsed.data as Record<string, unknown>,
-              force,
+            // ConflictError (duplicate) propagates OUT of withIdempotency and is
+            // handled below — it is never persisted, so a later retry re-runs.
+            const { statusCode, body } = await withIdempotency(prisma, request, jwt.tenantId, async () => {
+              const lead = await salesRecords.create(engineContextFromJwt(request.id, jwt), {
+                entityType: 'lead',
+                data: parsed.data as Record<string, unknown>,
+                force,
+              });
+              return { statusCode: 201, body: { success: true, data: lead } };
             });
-            return reply.code(201).send({ success: true, data: lead });
+            return reply.code(statusCode).send(body);
           } catch (err) {
             if (err instanceof ConflictError && (err as any).duplicates) {
               return reply.code(409).send({

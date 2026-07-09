@@ -110,7 +110,15 @@ export function createOutboxService(
       for (let i = 0; i < rows.length; i += CONCURRENCY) {
         const chunk = rows.slice(i, i + CONCURRENCY);
         const results = await Promise.allSettled(
-          chunk.map(async (row: any) => {
+          chunk.map(async (row: any): Promise<'sent' | 'skipped'> => {
+            // Atomically claim the row QUEUED -> PROCESSING BEFORE sending. If a
+            // second concurrent poller already claimed it, count!==1 and we bail
+            // out without sending — this prevents the double-send race.
+            const claim = await (prisma as any).commOutbox.updateMany({
+              where: { id: row.id, status: 'QUEUED' },
+              data: { status: 'PROCESSING' },
+            });
+            if (claim.count !== 1) return 'skipped';
             if (row.channel === 'EMAIL') {
               // Send through the user's own MailAccount when one is attached;
               // otherwise use the global/system SMTP transport. A bad user
@@ -157,13 +165,16 @@ export function createOutboxService(
                 })
                 .catch(() => undefined);
             }
+            return 'sent';
           })
         );
         for (let r = 0; r < results.length; r++) {
-          if (results[r].status === 'fulfilled') {
-            sent += 1;
+          const res = results[r];
+          if (res.status === 'fulfilled') {
+            // 'skipped' → another poller claimed the row; don't count it.
+            if (res.value === 'sent') sent += 1;
           } else {
-            const rejected = results[r] as PromiseRejectedResult;
+            const rejected = res as PromiseRejectedResult;
             const msg = rejected.reason instanceof Error
               ? rejected.reason.message
               : String(rejected.reason);

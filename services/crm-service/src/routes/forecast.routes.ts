@@ -343,12 +343,20 @@ export async function registerForecastRoutes(app: FastifyInstance, prisma: CrmPr
 
       const base = emptyBuckets();
       const scenario = emptyBuckets();
+      // Only ids that actually matched an in-window open deal contribute — echoing
+      // back non-existent / out-of-window / already-closed ids would be misleading.
+      const appliedWin = new Set<string>();
+      const appliedSlip = new Set<string>();
       for (const deal of openDeals) {
         const amt = baseAmountByDeal.get(deal.id) ?? 0;
         const d = deal as unknown as ForecastDeal;
         foldDeal(base, d, amt);
-        if (slipSet.has(deal.id)) continue; // slipped out of the period entirely
+        if (slipSet.has(deal.id)) {
+          appliedSlip.add(deal.id); // slipped out of the period entirely
+          continue;
+        }
         if (winSet.has(deal.id)) {
+          appliedWin.add(deal.id);
           foldDeal(scenario, { ...d, status: 'WON' }, amt); // force-win → closed
         } else {
           foldDeal(scenario, d, amt);
@@ -369,7 +377,7 @@ export async function registerForecastRoutes(app: FastifyInstance, prisma: CrmPr
         success: true,
         data: {
           period: periodKey,
-          applied: { win: [...winSet], slip: [...slipSet] },
+          applied: { win: [...appliedWin], slip: [...appliedSlip] },
           base: baseView,
           scenario: scenarioView,
           delta: {

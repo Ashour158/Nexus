@@ -274,8 +274,8 @@ async function runSendNotification(
     log.warn({ ruleId: rule.id }, 'Auto quote send_notification skipped: no producer');
     return;
   }
-  await producer
-    .publish(TOPICS.NOTIFICATIONS, {
+  try {
+    await producer.publish(TOPICS.NOTIFICATIONS, {
       type: 'notification.requested',
       tenantId: evt.tenantId,
       payload: {
@@ -287,8 +287,12 @@ async function runSendNotification(
         message: firstString(action.message) || undefined,
         ruleId: rule.id,
       },
-    })
-    .catch(() => undefined);
+    });
+  } catch (err) {
+    // Don't claim success on a swallowed failure — log and bail.
+    log.warn({ ruleId: rule.id, dealId: evt.dealId, quoteId, err }, 'Auto quote send_notification publish failed');
+    return;
+  }
   log.info({ ruleId: rule.id, dealId: evt.dealId, quoteId }, 'Auto quote sent notification');
 }
 

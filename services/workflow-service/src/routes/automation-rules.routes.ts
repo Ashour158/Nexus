@@ -4,6 +4,7 @@ import type { JwtPayload } from '@nexus/shared-types';
 import { PERMISSIONS, ValidationError, requirePermission } from '@nexus/service-utils';
 import type { WorkflowPrisma } from '../prisma.js';
 import {
+  AUTOMATION_MODULES,
   SUPPORTED_OPERATORS,
   buildMetaCatalog,
   createAutomationRulesService,
@@ -24,7 +25,7 @@ const ActionSchema = z.object({
   config: z.record(z.unknown()).default({}),
 });
 
-const CreateRuleSchema = z.object({
+const RuleShape = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(1000).optional(),
   module: z.string().min(1).max(50),
@@ -34,7 +35,37 @@ const CreateRuleSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
-const UpdateRuleSchema = CreateRuleSchema.partial();
+/**
+ * Cross-field check: triggerEvent must belong to module per the AUTOMATION_MODULES
+ * catalog. Skipped when either field is absent (partial PATCH) since we can't
+ * resolve the pair without loading the existing rule.
+ */
+function refineTriggerForModule(
+  val: { module?: string; triggerEvent?: string },
+  ctx: z.RefinementCtx
+): void {
+  if (val.module === undefined || val.triggerEvent === undefined) return;
+  const allowed = AUTOMATION_MODULES[val.module];
+  if (!allowed) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['module'],
+      message: `Unknown module "${val.module}"`,
+    });
+    return;
+  }
+  if (!allowed.includes(val.triggerEvent)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['triggerEvent'],
+      message: `triggerEvent "${val.triggerEvent}" is not valid for module "${val.module}"`,
+    });
+  }
+}
+
+const CreateRuleSchema = RuleShape.superRefine(refineTriggerForModule);
+
+const UpdateRuleSchema = RuleShape.partial().superRefine(refineTriggerForModule);
 
 const ListQuerySchema = z.object({
   module: z.string().optional(),

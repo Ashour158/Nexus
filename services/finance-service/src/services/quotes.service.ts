@@ -494,7 +494,8 @@ export function createQuotesService(
       if (data.name !== undefined) updateData.name = data.name;
       if (data.validUntil !== undefined) {
         const dt = data.validUntil === null ? null : new Date(data.validUntil);
-        assertFutureDate(dt, 'Quote expiry date');
+        // null explicitly CLEARS the expiry — only a real date must be in the future.
+        if (dt !== null) assertFutureDate(dt, 'Quote expiry date');
         updateData.validUntil = dt;
         updateData.expiresAt = dt;
       }

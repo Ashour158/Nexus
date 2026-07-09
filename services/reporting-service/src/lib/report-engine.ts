@@ -177,7 +177,7 @@ async function executeAnalyticsReport(
   // Guarded: analytics is a live read model. On timeout/unreachable/non-2xx we
   // degrade to an empty result instead of throwing, so report/dashboard runs
   // keep working when analytics-service is down.
-  let raw: Record<string, unknown> | Record<string, unknown>[] = {};
+  let raw: Record<string, unknown> | Record<string, unknown>[] | undefined;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ANALYTICS_TIMEOUT_MS);
   try {
@@ -193,7 +193,7 @@ async function executeAnalyticsReport(
         success?: boolean;
         data?: Record<string, unknown> | Record<string, unknown>[];
       };
-      raw = body.data ?? {};
+      raw = body.data;
     }
   } catch {
     // Timeout / connection error / malformed body → fall through to empty result.
@@ -201,7 +201,9 @@ async function executeAnalyticsReport(
     clearTimeout(timer);
   }
 
-  const rows = Array.isArray(raw) ? raw : [raw];
+  // A missing/malformed response leaves raw undefined → zero rows, NOT a fake
+  // [{}] null row that would report total:1.
+  const rows = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
   const filtered = applyFiltersInMemory(rows, query.filters, query.objectType);
   const total = filtered.length;
   const slice = filtered.slice(offset, offset + limit);

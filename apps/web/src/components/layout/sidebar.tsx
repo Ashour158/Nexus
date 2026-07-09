@@ -12,6 +12,7 @@ import {
   CheckSquare,
   ChevronDown,
   ChevronRight,
+  Database,
   DollarSign,
   FileText,
   Globe,
@@ -158,18 +159,35 @@ const LEGACY_NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-const NAV_GROUPS: NavGroup[] = CRM_MODULE_GROUPS.map((group) => ({
-  label: group.label,
-  icon: group.icon,
-  items: group.modules
-    .filter((module) => module.sidebar)
-    .map((module) => ({
-      href: module.href,
-      label: module.label,
-      icon: module.icon,
-      adminOnly: module.adminOnly,
-    })),
-})).filter((group) => group.items.length > 0);
+// Admin consolidation: the many leaf links that used to live under the
+// "Administration" and "Configuration & Data" groups now live inside the single
+// grouped Admin Panel (/admin). Collapse them into one "Admin" entry here and
+// keep only the couple of most-used direct links that non-admins also use.
+const ADMIN_GROUP_IDS = new Set(['administration', 'configuration']);
+
+const NAV_GROUPS: NavGroup[] = [
+  ...CRM_MODULE_GROUPS.filter((group) => !ADMIN_GROUP_IDS.has(group.id)).map((group) => ({
+    label: group.label,
+    icon: group.icon,
+    items: group.modules
+      .filter((module) => module.sidebar)
+      .map((module) => ({
+        href: module.href,
+        label: module.label,
+        icon: module.icon,
+        adminOnly: module.adminOnly,
+      })),
+  })),
+  {
+    label: 'Admin',
+    icon: ShieldCheck,
+    items: [
+      { href: '/org-chart', label: 'Org Chart', icon: Users },
+      { href: '/system-map', label: 'System Map', icon: Database },
+      { href: '/admin', label: 'Admin Panel', icon: ShieldCheck, adminOnly: true },
+    ],
+  },
+].filter((group) => group.items.length > 0);
 
 void LEGACY_NAV_GROUPS;
 

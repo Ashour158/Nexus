@@ -31,6 +31,18 @@ const nextConfig = {
     serverComponentsExternalPackages: ['@prisma/client'],
     optimizePackageImports: ['lucide-react', '@nexus/shared-types'],
   },
+  // Admin consolidation: retire confirmed duplicate twins by redirecting the
+  // legacy route to its canonical admin route. Kept deliberately conservative —
+  // only exact-duplicate pages are redirected. Settings/* pages are NOT mass
+  // redirected; they remain where they are and are surfaced via the Admin hub.
+  async redirects() {
+    return [
+      // Roles existed at both /roles and /admin/roles — canonicalize on the admin tree.
+      { source: '/roles', destination: '/admin/roles', permanent: false },
+      // Validation Rules existed at both /settings/validation-rules and /admin/validation-rules.
+      { source: '/settings/validation-rules', destination: '/admin/validation-rules', permanent: false },
+    ];
+  },
   // Same-origin BFF proxy: the browser calls /bff/<domain>/* on the web origin and
   // Next proxies to the internal service over the Docker network. Avoids CORS and
   // keeps all backend traffic behind the single public web port.

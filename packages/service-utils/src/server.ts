@@ -7,6 +7,9 @@ import fastifyMultipart from '@fastify/multipart';
 import fastifyRateLimit from '@fastify/rate-limit';
 import { fastifyRequestContext } from '@fastify/request-context';
 import { createRedisClient } from './redis.js';
+import { registerSwagger, isSwaggerEnabled } from './swagger.js';
+import { ValidationError } from './errors.js';
+import { flattenValidationError } from './validation.js';
 import pino from 'pino';
 import * as Sentry from '@sentry/node';
 import { type KeyObject } from 'node:crypto';
@@ -81,6 +84,10 @@ function isInternalServiceRoute(url: string, headers: Record<string, unknown> | 
 function isPublicRoute(url: string, method: string): boolean {
   const path = pathOnly(url);
   if (path.startsWith('/health') || path.startsWith('/metrics') || path.startsWith('/ready')) {
+    return true;
+  }
+  /** OpenAPI docs (RR-H17) — swagger-ui + generated document, no JWT. */
+  if (path === '/openapi.json' || path === '/docs' || path.startsWith('/docs/')) {
     return true;
   }
   /** Public comm-service email open/click tracking (no JWT on pixel / webhook). */
@@ -322,6 +329,40 @@ export async function createService(config: ServiceConfig): Promise<FastifyInsta
       });
     }
   });
+
+  // RR-H18 — uniform validation. A zod-aware validator compiler so any route
+  // that declares a zod schema (`{ schema: { body: zodSchema } }`) validates
+  // through the same path, and failures surface as ValidationError → 422 +
+  // flatten() via `globalErrorHandler`. Non-zod (JSON) schemas pass through
+  // unchanged. No route currently declares a route-level schema, so this is
+  // inert for existing traffic and additive for future zod route schemas.
+  app.setValidatorCompiler(({ schema }: { schema: unknown }) => {
+    const s = schema as { safeParse?: (d: unknown) => { success: boolean; data?: unknown; error?: unknown } };
+    if (typeof s?.safeParse !== 'function') {
+      return (data: unknown) => ({ value: data });
+    }
+    return (data: unknown) => {
+      const result = s.safeParse!(data);
+      if (result.success) return { value: result.data };
+      // Returning a NexusError (422) so the shared error handler renders the
+      // standard envelope with flatten() details.
+      return {
+        error: new ValidationError(
+          'Validation failed',
+          flattenValidationError(result.error)
+        ) as unknown as Error,
+      };
+    };
+  });
+  app.setSchemaErrorFormatter((errors) => {
+    return new ValidationError('Validation failed', flattenValidationError(errors)) as unknown as Error;
+  });
+
+  // RR-H17 — mount OpenAPI docs (`/docs`) + document (`/openapi.json`) unless
+  // ENABLE_SWAGGER=false. Safe-default; never throws a service down.
+  if (isSwaggerEnabled()) {
+    await registerSwagger(app as unknown as FastifyInstance, { name: config.name });
+  }
 
   return app as unknown as FastifyInstance<RawServerDefault>;
 }

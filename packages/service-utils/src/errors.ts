@@ -1,5 +1,6 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import * as Sentry from '@sentry/node';
+import { flattenValidationError } from './validation.js';
 
 export class NexusError extends Error {
   constructor(
@@ -67,7 +68,7 @@ export function globalErrorHandler(
   const isZodError =
     (error as { name?: string }).name === 'ZodError' &&
     Array.isArray((error as { issues?: unknown }).issues);
-  // ZodError is malformed client input (→ 400), never a server fault; skip Sentry.
+  // ZodError is malformed client input (→ 422), never a server fault; skip Sentry.
   if (!isZodError && (!error.statusCode || error.statusCode >= 500)) {
     Sentry.captureException(error, {
       extra: {
@@ -97,15 +98,17 @@ export function globalErrorHandler(
   // handler (as opposed to Fastify schema validation, handled via
   // `error.validation` below). Detected by shape rather than `instanceof` so it
   // survives multiple zod copies hoisted under pnpm. Malformed client input is a
-  // 400 — NOT a 500 — and must not be reported to Sentry as a server error.
+  // 422 — NOT a 500 — and must not be reported to Sentry as a server error.
   const zodIssues = (error as { name?: string; issues?: unknown }).issues;
   if ((error as { name?: string }).name === 'ZodError' && Array.isArray(zodIssues)) {
-    reply.code(400).send({
+    // RR-H18: schema-validation failures are ALWAYS 422 (was 400 here) with a
+    // uniform `details = flatten()` shape, matching the ValidationError branch.
+    reply.code(422).send({
       success: false,
       error: {
         code: 'VALIDATION_ERROR',
         message: 'Validation failed',
-        details: zodIssues,
+        details: flattenValidationError(error),
         requestId: request.id,
       },
     });
@@ -137,11 +140,15 @@ export function globalErrorHandler(
   }
 
   if (error.validation) {
+    // RR-H18: Fastify schema-validation failures — 422 with the SAME
+    // `details` shape as raw-ZodError and ValidationError paths. `error.validation`
+    // or an AJV error array; expose it directly as `details`.
     reply.code(422).send({
       success: false,
       error: {
         code: 'VALIDATION_ERROR',
         message: 'Validation failed',
+        details: error.validation,
         requestId: request.id,
       },
     });

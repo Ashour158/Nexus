@@ -1,0 +1,84 @@
+name: Deploy to Staging
+
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event.workflow_run.conclusion == 'success'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        id: ssh_deploy
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /opt/nexus
+            export IMAGE_TAG="${{ github.sha }}"
+            echo "Pulling images with tag: ${IMAGE_TAG}"
+            docker compose pull || true
+
+            echo "Running migrations..."
+            bash scripts/migrate-all.sh
+
+            echo "Starting services..."
+            docker compose up -d --remove-orphans --wait
+
+            echo "Cleaning up old images..."
+            docker system prune -f --filter "until=24h" || true
+
+      - name: Smoke test
+        id: smoke_test
+        uses: appleboy/ssh-action@v1
+        if: always() && steps.ssh_deploy.outcome == 'success'
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            echo "Running smoke tests..."
+            cd /opt/nexus
+            bash scripts/health-check.sh || {
+              echo "❌ Smoke tests failed — initiating rollback..."
+              docker compose down
+              docker compose up -d --wait
+              bash scripts/health-check.sh || exit 1
+              echo "✅ Rollback complete"
+              exit 1
+            }
+            echo "✅ Smoke tests passed"
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          echo "❌ Deployment to staging failed. Check the deployment logs and run rollback if needed: ./scripts/rollback.sh <service>"
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -s -X POST -H 'Content-type: application/json' \
+              --data "{\"text\":\"❌ Staging deployment failed for ${{ github.repository }} @ ${{ github.sha }}. View run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+              "$SLACK_WEBHOOK_URL" || true
+          else
+            echo "SLACK_WEBHOOK_URL not set; skipping Slack notification."
+          fi

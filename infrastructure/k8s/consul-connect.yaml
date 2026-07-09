@@ -1,0 +1,36 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: nexus-crm
+  namespace: nexus
+spec:
+  protocol: http
+  meshGateway:
+    mode: local
+  transparentProxy:
+    outboundListenerPort: 15001
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceResolver
+metadata:
+  name: nexus-crm
+  namespace: nexus
+spec:
+  defaultSubset: stable
+  subsets:
+    stable:
+      filter: "version == stable"
+    canary:
+      filter: "version == canary"
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceSplitter
+metadata:
+  name: nexus-crm
+  namespace: nexus
+spec:
+  splits:
+    - weight: 90
+      serviceSubset: stable
+    - weight: 10
+      serviceSubset: canary

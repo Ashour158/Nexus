@@ -1,0 +1,90 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+type Query {
+  me: User
+  users(limit: Int, offset: Int): [User!]!
+  user(id: ID!): User
+  tenants: [Tenant!]!
+  tenant(id: ID!): Tenant
+}
+
+type Mutation {
+  login(email: String!, password: String!): AuthResponse!
+  logout: Boolean!
+  refreshToken: AuthResponse!
+  createUser(input: CreateUserInput!): User!
+  updateUser(id: ID!, input: UpdateUserInput!): User!
+  deleteUser(id: ID!): Boolean!
+  createTenant(input: CreateTenantInput!): Tenant!
+  updateTenant(id: ID!, input: UpdateTenantInput!): Tenant!
+}
+
+type User @key(fields: "id") {
+  id: ID!
+  email: String!
+  firstName: String
+  lastName: String
+  avatar: String
+  role: Role!
+  tenant: Tenant!
+  isActive: Boolean!
+  lastLogin: String
+  createdAt: String!
+  updatedAt: String!
+}
+
+type Tenant @key(fields: "id") {
+  id: ID!
+  name: String!
+  domain: String
+  logo: String
+  settings: String
+  isActive: Boolean!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type Role {
+  id: ID!
+  name: String!
+  permissions: [String!]!
+}
+
+type AuthResponse {
+  accessToken: String!
+  refreshToken: String!
+  user: User!
+  expiresIn: Int!
+  mfaRequired: Boolean
+  mfaToken: String
+}
+
+input CreateUserInput {
+  email: String!
+  password: String!
+  firstName: String
+  lastName: String
+  roleId: ID!
+  tenantId: ID!
+}
+
+input UpdateUserInput {
+  firstName: String
+  lastName: String
+  roleId: ID
+  isActive: Boolean
+}
+
+input CreateTenantInput {
+  name: String!
+  domain: String
+  settings: String
+}
+
+input UpdateTenantInput {
+  name: String
+  domain: String
+  settings: String
+  isActive: Boolean
+}

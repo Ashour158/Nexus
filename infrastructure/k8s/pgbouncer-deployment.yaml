@@ -1,0 +1,168 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgbouncer
+  namespace: nexus
+  labels:
+    app: pgbouncer
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pgbouncer
+  template:
+    metadata:
+      labels:
+        app: pgbouncer
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - pgbouncer
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: pgbouncer
+          image: pgbouncer/pgbouncer:1.22.1
+          ports:
+            - containerPort: 6432
+              name: pgbouncer
+          env:
+            - name: DATABASES_HOST
+              value: "postgres.nexus.svc.cluster.local"
+            - name: DATABASES_PORT
+              value: "5432"
+            - name: DATABASES_DATABASE
+              value: "nexus"
+            - name: POOL_MODE
+              value: "transaction"
+            - name: MAX_CLIENT_CONN
+              value: "10000"
+            - name: DEFAULT_POOL_SIZE
+              value: "25"
+            - name: MIN_POOL_SIZE
+              value: "5"
+            - name: RESERVE_POOL_SIZE
+              value: "5"
+            - name: RESERVE_POOL_TIMEOUT
+              value: "3"
+            - name: SERVER_IDLE_TIMEOUT
+              value: "600"
+            - name: SERVER_LIFETIME
+              value: "3600"
+            - name: SERVER_CONNECT_TIMEOUT
+              value: "15"
+            - name: CLIENT_LOGIN_TIMEOUT
+              value: "60"
+            - name: QUERY_WAIT_TIMEOUT
+              value: "120"
+            - name: AUTH_TYPE
+              value: "scram-sha-256"
+            - name: AUTH_FILE
+              value: "/etc/pgbouncer/userlist.txt"
+            - name: ADMIN_USERS
+              value: "postgres"
+            - name: STATS_USERS
+              value: "postgres"
+            # Critical for Prisma compatibility
+            - name: SERVER_FAST_CLOSE
+              value: "1"
+            - name: SERVER_ROUND_ROBIN
+              value: "1"
+          volumeMounts:
+            - name: pgbouncer-config
+              mountPath: /etc/pgbouncer
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+            requests:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            tcpSocket:
+              port: 6432
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 6432
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: pgbouncer-config
+          projected:
+            sources:
+              - configMap:
+                  name: pgbouncer-config
+              - secret:
+                  name: nexus-pgbouncer-users
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgbouncer
+  namespace: nexus
+spec:
+  selector:
+    app: pgbouncer
+  ports:
+    - port: 6432
+      targetPort: 6432
+  sessionAffinity: None
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: pgbouncer-hpa
+  namespace: nexus
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pgbouncer
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pgbouncer-pdb
+  namespace: nexus
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pgbouncer

@@ -20,6 +20,15 @@ export interface JwtPayload {
   exp?: number;
 }
 
+// ─── Idempotency — Section 32 ───────────────────────────────────────────────
+
+export interface IdempotencyKey {
+  /** Client-generated UUID for retry-safe mutations (POST / PATCH / DELETE). */
+  key: string;
+  /** TTL in seconds before the key expires and the request can be retried. */
+  ttl?: number;
+}
+
 // ─── Pagination — Section 32 ────────────────────────────────────────────────
 
 export interface PaginationInput {
@@ -27,6 +36,13 @@ export interface PaginationInput {
   limit?: number;
   cursor?: string;
 }
+
+/** Standardized pagination query defaults enforced by all list endpoints. */
+export const PAGINATION_DEFAULTS = {
+  page: 1,
+  limit: 20,
+  maxLimit: 100,
+} as const;
 
 export interface PaginatedResult<T> {
   data: T[];
@@ -36,6 +52,24 @@ export interface PaginatedResult<T> {
   totalPages: number;
   hasNextPage: boolean;
   hasPrevPage: boolean;
+}
+
+export function toPaginatedResult<T>(
+  rows: T[],
+  total: number,
+  page: number,
+  limit: number
+): PaginatedResult<T> {
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  return {
+    data: rows,
+    total,
+    page,
+    limit,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPrevPage: page > 1,
+  };
 }
 
 export interface CursorPaginatedResult<T> {
@@ -107,6 +141,10 @@ export interface DealStageChangedEvent extends KafkaEventBase {
     newStageId: string;
     ownerId: string;
     amount: number;
+    /** Stage rotten-days threshold (included by publishers to avoid consumer fetch). */
+    rottenDays?: number;
+    /** ISO timestamp of when the stage change occurred. */
+    stageChangedAt?: string;
   };
 }
 
@@ -134,6 +172,66 @@ export interface DealLostEvent extends KafkaEventBase {
 export interface ContactCreatedEvent extends KafkaEventBase {
   type: 'contact.created';
   payload: { contactId: string; email?: string; accountId?: string };
+}
+
+export interface NoteCreatedEvent extends KafkaEventBase {
+  type: 'note.created';
+  payload: { noteId: string; authorId: string; resourceType: string; resourceId: string };
+}
+
+export interface NoteUpdatedEvent extends KafkaEventBase {
+  type: 'note.updated';
+  payload: { noteId: string; authorId: string };
+}
+
+export interface NoteDeletedEvent extends KafkaEventBase {
+  type: 'note.deleted';
+  payload: { noteId: string; authorId: string };
+}
+
+export interface CompanyCreatedEvent extends KafkaEventBase {
+  type: 'company.created';
+  payload: { companyId: string; name: string; ownerId: string };
+}
+
+export interface CompanyUpdatedEvent extends KafkaEventBase {
+  type: 'company.updated';
+  payload: { companyId: string; ownerId: string };
+}
+
+export interface CompanyDeletedEvent extends KafkaEventBase {
+  type: 'company.deleted';
+  payload: { companyId: string; ownerId: string };
+}
+
+export interface MeetingCreatedEvent extends KafkaEventBase {
+  type: 'meeting.created';
+  payload: { meetingId: string; ownerId: string; title: string; startTime: string; endTime?: string };
+}
+
+export interface MeetingUpdatedEvent extends KafkaEventBase {
+  type: 'meeting.updated';
+  payload: { meetingId: string; ownerId: string };
+}
+
+export interface MeetingDeletedEvent extends KafkaEventBase {
+  type: 'meeting.deleted';
+  payload: { meetingId: string; ownerId: string };
+}
+
+export interface TaskCreatedEvent extends KafkaEventBase {
+  type: 'task.created';
+  payload: { taskId: string; ownerId: string; title: string; dueDate?: string };
+}
+
+export interface TaskUpdatedEvent extends KafkaEventBase {
+  type: 'task.updated';
+  payload: { taskId: string; ownerId: string };
+}
+
+export interface TaskDeletedEvent extends KafkaEventBase {
+  type: 'task.deleted';
+  payload: { taskId: string; ownerId: string };
 }
 
 export interface ActivityCompletedEvent extends KafkaEventBase {
@@ -253,15 +351,6 @@ export interface InvoicePaidEvent extends KafkaEventBase {
   payload: { invoiceId: string; accountId: string; amount: number };
 }
 
-export interface SubscriptionCreatedEvent extends KafkaEventBase {
-  type: 'subscription.created';
-  payload: { subscriptionId: string; accountId: string; mrr: number };
-}
-
-export interface SubscriptionCancelledEvent extends KafkaEventBase {
-  type: 'subscription.cancelled';
-  payload: { subscriptionId: string; accountId: string; mrr: number; reason?: string };
-}
 
 export interface WorkflowBranchStartEvent extends KafkaEventBase {
   type: 'workflow.branch.start';
@@ -272,35 +361,6 @@ export interface WorkflowBranchStartEvent extends KafkaEventBase {
   };
 }
 
-export interface BillingSubscriptionCreatedEvent extends KafkaEventBase {
-  type: 'billing.subscription.created';
-  payload: { subscriptionId: string; tenantId: string; planId: string; status: string };
-}
-
-export interface BillingSubscriptionUpdatedEvent extends KafkaEventBase {
-  type: 'billing.subscription.updated';
-  payload: { subscriptionId: string; tenantId: string; planId?: string; status?: string };
-}
-
-export interface BillingSubscriptionCanceledEvent extends KafkaEventBase {
-  type: 'billing.subscription.canceled';
-  payload: { subscriptionId: string; tenantId: string };
-}
-
-export interface BillingInvoiceGeneratedEvent extends KafkaEventBase {
-  type: 'billing.invoice.generated';
-  payload: { invoiceId: string; tenantId: string; subscriptionId: string; amount: number };
-}
-
-export interface BillingInvoicePaidEvent extends KafkaEventBase {
-  type: 'billing.invoice.paid';
-  payload: { invoiceId: string; tenantId: string; paidAt: string };
-}
-
-export interface BillingInvoiceVoidedEvent extends KafkaEventBase {
-  type: 'billing.invoice.voided';
-  payload: { invoiceId: string; tenantId: string };
-}
 
 export interface IntegrationSyncStartedEvent extends KafkaEventBase {
   type: 'integration.sync.started';
@@ -339,6 +399,18 @@ export type NexusKafkaEvent =
   | DealWonEvent
   | DealLostEvent
   | ContactCreatedEvent
+  | NoteCreatedEvent
+  | NoteUpdatedEvent
+  | NoteDeletedEvent
+  | CompanyCreatedEvent
+  | CompanyUpdatedEvent
+  | CompanyDeletedEvent
+  | MeetingCreatedEvent
+  | MeetingUpdatedEvent
+  | MeetingDeletedEvent
+  | TaskCreatedEvent
+  | TaskUpdatedEvent
+  | TaskDeletedEvent
   | ActivityCreatedEvent
   | ActivityCompletedEvent
   | QuoteCreatedEvent
@@ -351,15 +423,7 @@ export type NexusKafkaEvent =
   | CommissionClawbackEvent
   | InvoiceCreatedEvent
   | InvoicePaidEvent
-  | SubscriptionCreatedEvent
-  | SubscriptionCancelledEvent
   | WorkflowBranchStartEvent
-  | BillingSubscriptionCreatedEvent
-  | BillingSubscriptionUpdatedEvent
-  | BillingSubscriptionCanceledEvent
-  | BillingInvoiceGeneratedEvent
-  | BillingInvoicePaidEvent
-  | BillingInvoiceVoidedEvent
   | IntegrationSyncStartedEvent
   | IntegrationSyncCompletedEvent
   | IntegrationSyncFailedEvent
@@ -427,6 +491,12 @@ export interface Pipeline {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Sales / renewal / partner — governance (Section 31). */
+  type?: string | null;
+  description?: string | null;
+  ownedBy?: string | null;
+  stages?: Stage[];
+  _count?: { deals: number };
 }
 
 export interface Stage {
@@ -435,6 +505,8 @@ export interface Stage {
   pipelineId: string;
   name: string;
   order: number;
+  /** Alias for `order` when returned by APIs that expose `position`. */
+  position?: number;
   probability: number;
   rottenDays: number;
   requiredFields: unknown;
@@ -442,6 +514,28 @@ export interface Stage {
   color: string;
   createdAt: string;
   updatedAt: string;
+  isWon?: boolean;
+  isLost?: boolean;
+}
+
+export interface Address {
+  line1?: string | null;
+  line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+export interface BillingAddress extends Address {
+  isPrimary?: boolean | null;
+}
+
+export interface ShippingAddress extends Address {
+  sameAsBilling?: boolean | null;
+  shippingInstructions?: string | null;
 }
 
 export interface Account {
@@ -475,6 +569,42 @@ export interface Account {
   tags: string[];
   createdAt: string;
   updatedAt: string;
+  /** Deep account model — optional for backward compatibility. */
+  code?: string | null;
+  legalName?: string | null;
+  tradeName?: string | null;
+  fax?: string | null;
+  subIndustry?: string | null;
+  lifecycleStage?: string | null;
+  foundedYear?: number | null;
+  taxId?: string | null;
+  vatNumber?: string | null;
+  commercialRegistrationNumber?: string | null;
+  paymentTerms?: string | null;
+  creditLimit?: string | null;
+  currency?: string | null;
+  priceBookId?: string | null;
+  territoryId?: string | null;
+  riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | null;
+  lastActivityAt?: string | null;
+  billingAddressLine1?: string | null;
+  billingAddressLine2?: string | null;
+  billingCity?: string | null;
+  billingState?: string | null;
+  billingPostalCode?: string | null;
+  billingCountry?: string | null;
+  billingLatitude?: number | null;
+  billingLongitude?: number | null;
+  shippingAddressLine1?: string | null;
+  shippingAddressLine2?: string | null;
+  shippingCity?: string | null;
+  shippingState?: string | null;
+  shippingPostalCode?: string | null;
+  shippingCountry?: string | null;
+  shippingLatitude?: number | null;
+  shippingLongitude?: number | null;
+  shippingInstructions?: string | null;
+  sameAsBilling?: boolean | null;
 }
 
 export interface Contact {
@@ -482,6 +612,7 @@ export interface Contact {
   tenantId: string;
   ownerId: string;
   accountId: string | null;
+  code?: string | null;
   firstName: string;
   lastName: string;
   email: string | null;
@@ -513,6 +644,7 @@ export interface Deal {
   tenantId: string;
   ownerId: string;
   accountId: string;
+  code?: string | null;
   pipelineId: string;
   stageId: string;
   name: string;
@@ -524,6 +656,9 @@ export interface Deal {
   status: DealStatusLiteral;
   lostReason: string | null;
   lostDetail: string | null;
+  /** Structured win/loss reason code (governance). */
+  closeReason?: string | null;
+  dataQualityScore?: number | null;
   forecastCategory: ForecastCategoryLiteral;
   meddicicScore: number;
   meddicicData: MeddicicData | Record<string, unknown>;
@@ -534,6 +669,19 @@ export interface Deal {
   campaignId: string | null;
   customFields: Record<string, unknown>;
   tags: string[];
+  // ─── Renewal / recurring-revenue fields (may be null on non-renewal deals) ──
+  /** ISO date the underlying contract ends. Drives renewal / expiry filters. */
+  contractEndDate?: string | null;
+  /** 0–100 likelihood the renewal closes. */
+  renewalProbability?: number | null;
+  /** True when this deal represents a renewal of a prior won deal. */
+  isRenewal?: boolean | null;
+  /** The originating deal this renewal was spun off from. */
+  renewedFromDealId?: string | null;
+  /** Monthly recurring revenue. */
+  mrr?: string | number | null;
+  /** Annual recurring revenue. */
+  arr?: string | number | null;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -553,6 +701,7 @@ export interface Lead {
   id: string;
   tenantId: string;
   ownerId: string | null;
+  code?: string | null;
   firstName: string;
   lastName: string;
   email: string | null;
@@ -587,6 +736,7 @@ export interface Activity {
   id: string;
   tenantId: string;
   ownerId: string;
+  code?: string | null;
   type: ActivityTypeLiteral;
   subject: string;
   description: string | null;
@@ -670,8 +820,12 @@ export interface CpqLineItem {
   discountPercent: number;
   /** Per-unit discount amount (list − unit). */
   discountAmount: number;
-  /** Line total = `unitPrice × quantity`. */
+  /** Line total = `unitPrice × quantity` (pre-tax). */
   total: number;
+  /** Tax rate applied to this line (0 for non-taxable products). */
+  taxPercent: number;
+  /** Tax amount for this line = `total × taxPercent`. */
+  taxAmount: number;
   billingType: string;
   notes?: string;
 }
@@ -711,12 +865,61 @@ export interface CpqPricingResult {
   approvalReasons: string[];
 }
 
+export type DiscountReasonCode =
+  | 'COMPETITIVE_MATCH'
+  | 'STRATEGIC_ACCOUNT'
+  | 'VOLUME_COMMITMENT'
+  | 'MULTI_YEAR_COMMITMENT'
+  | 'NEW_LOGO_ACQUISITION'
+  | 'RENEWAL_SAVE'
+  | 'EXECUTIVE_EXCEPTION'
+  | 'MARKET_ENTRY'
+  | 'BUNDLE_NEGOTIATION'
+  | 'PAYMENT_TERMS_TRADEOFF';
+
+export type DiscountRequestStatus =
+  | 'DRAFT'
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'CANCELLED'
+  | 'EXPIRED';
+
+export interface DiscountRequest {
+  id: string;
+  tenantId: string;
+  quoteId: string;
+  requestedById: string;
+  approvalRequestId?: string | null;
+  status: DiscountRequestStatus;
+  reasonCode: DiscountReasonCode;
+  reasonLabel: string;
+  reasonNotes?: string | null;
+  currentDiscountPercent: string;
+  requestedDiscountPercent: string;
+  requestedDiscountAmount: string;
+  winningProbabilityIfApproved: number;
+  businessImpact?: string | null;
+  competitorName?: string | null;
+  expiresAt?: string | null;
+  approvedById?: string | null;
+  approvedAt?: string | null;
+  rejectedById?: string | null;
+  rejectedAt?: string | null;
+  rejectionReason?: string | null;
+  customFields?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ─── Timeline Events — used by Deal / Contact / Account 360-views ─────────────
 
 /**
  * A unified event on a domain object's timeline.
  * Sources include activities, notes, stage changes, won/lost transitions, etc.
  */
+export * from './event-schemas.js';
+
 export interface TimelineEvent {
   id: string;
   /** Source category (what produced this event). */
@@ -731,4 +934,161 @@ export interface TimelineEvent {
   actorId?: string;
   /** Structured metadata (activity type, stage ids, status values, etc.). */
   metadata?: Record<string, unknown>;
+}
+
+// ─── Coding System — Section 32 ──────────────────────────────────────────────
+
+export interface CodingRule {
+  id: string;
+  tenantId: string;
+  entityType: string;
+  name: string;
+  prefix: string;
+  pattern: string;
+  separator: string;
+  sequenceScope: 'TENANT' | 'MODULE' | 'YEAR' | 'MONTH' | 'TERRITORY' | 'BRANCH' | 'TEAM' | 'CATEGORY';
+  resetPolicy: 'NEVER' | 'YEARLY' | 'MONTHLY' | 'DAILY';
+  nextSequence: number;
+  isManualOverrideAllowed: boolean;
+  isRequired: boolean;
+  lockedAfterCreate: boolean;
+  fallbackStrategy: 'BLOCK' | 'USE_DEFAULT' | 'USE_TIMESTAMP';
+  effectiveFrom: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CodingRuleVersion {
+  id: string;
+  tenantId: string;
+  codingRuleId: string;
+  version: number;
+  pattern: string;
+  prefix: string;
+  separator: string;
+  sequenceScope: string;
+  resetPolicy: string;
+  effectiveFrom: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface CodingSequence {
+  id: string;
+  tenantId: string;
+  entityType: string;
+  scopeKey: string;
+  nextValue: number;
+  resetAt: string | null;
+  updatedAt: string;
+}
+
+export interface CodingAllocationLog {
+  id: string;
+  tenantId: string;
+  entityType: string;
+  entityId: string;
+  code: string;
+  ruleId: string;
+  scopeKey: string;
+  allocatedBy: string;
+  allocatedAt: string;
+  isManualOverride: boolean;
+}
+
+// ─── Document Templates — Section 32 ─────────────────────────────────────────
+
+export interface DocumentTemplate {
+  id: string;
+  tenantId: string;
+  module: string;
+  name: string;
+  description: string | null;
+  status: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+  version: number;
+  sourceFormat: 'DOCX' | 'HTML' | 'MARKDOWN';
+  templateBody: string | null;
+  mergeFields: string[];
+  header: string | null;
+  footer: string | null;
+  locale: string;
+  currency: string;
+  pageSize: 'A4' | 'LETTER';
+  orientation: 'PORTRAIT' | 'LANDSCAPE';
+  createdBy: string;
+  updatedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RenderedDocument {
+  id: string;
+  tenantId: string;
+  templateId: string;
+  entityType: string;
+  entityId: string;
+  format: 'DOCX' | 'PDF';
+  fileName: string;
+  storageKey: string;
+  fileSize: number;
+  renderedBy: string;
+  renderedAt: string;
+}
+
+// ─── Import / Export — Section 32 ────────────────────────────────────────────
+
+export interface ImportJob {
+  id: string;
+  tenantId: string;
+  module: string;
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  fileName: string;
+  totalRows: number;
+  imported: number;
+  failed: number;
+  errors: Array<{ row: number; message: string }>;
+  fieldMap: Record<string, string>;
+  duplicateStrategy: string;
+  createdBy: string;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExportJob {
+  id: string;
+  tenantId: string;
+  module: string;
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  format: 'CSV' | 'XLSX';
+  fileName: string;
+  totalRows: number;
+  filters: Record<string, unknown>;
+  columns: string[] | null;
+  downloadUrl: string | null;
+  createdBy: string;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ModuleRegistryEntry {
+  module: string;
+  label: string;
+  entityType: string;
+  sourceUrl: string;
+  fields: Array<{
+    key: string;
+    label: string;
+    type: 'string' | 'number' | 'boolean' | 'date' | 'email' | 'url' | 'enum';
+    required: boolean;
+    enumValues?: string[];
+  }>;
+}
+
+export interface FieldMapping {
+  sourceColumn: string;
+  targetField: string;
+  transform?: string;
 }

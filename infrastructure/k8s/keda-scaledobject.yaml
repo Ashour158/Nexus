@@ -1,0 +1,25 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: nexus-crm-keda
+  namespace: nexus
+spec:
+  scaleTargetRef:
+    name: nexus-crm
+  minReplicaCount: 2
+  maxReplicaCount: 20
+  triggers:
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "70"
+    - type: memory
+      metricType: Utilization
+      metadata:
+        value: "80"
+    - type: kafka
+      metadata:
+        bootstrapServers: kafka:9092
+        consumerGroup: nexus-crm-consumer
+        topic: nexus-events
+        lagThreshold: "100"

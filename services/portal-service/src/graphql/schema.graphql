@@ -1,0 +1,84 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  portalTokens(limit: Int, offset: Int): [PortalToken!]!
+  portalToken(id: ID!): PortalToken
+  portalBranding(tenantId: String!): PortalBranding
+  portalAuditLogs(limit: Int, offset: Int): [PortalAuditLog!]!
+  portalAuditLog(id: ID!): PortalAuditLog
+}
+
+type Mutation {
+  createPortalToken(input: CreatePortalTokenInput!): PortalToken!
+  revokePortalToken(id: ID!): Boolean!
+  updatePortalBranding(tenantId: String!, input: UpdatePortalBrandingInput!): PortalBranding!
+  createPortalAuditLog(input: CreatePortalAuditLogInput!): PortalAuditLog!
+}
+
+type PortalToken @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  token: String!
+  entityType: EntityType!
+  entityId: String!
+  expiresAt: DateTime!
+  viewCount: Int!
+  createdBy: String!
+  createdAt: DateTime!
+}
+
+type PortalBranding @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  logoUrl: String
+  primaryColor: String!
+  companyName: String
+  updatedAt: DateTime!
+}
+
+type PortalAuditLog @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  token: String!
+  entityType: String!
+  entityId: String!
+  action: String!
+  ipAddress: String
+  userAgent: String
+  createdAt: DateTime!
+}
+
+enum EntityType {
+  QUOTE
+  CONTRACT
+  INVOICE
+  ACCOUNT
+}
+
+input CreatePortalTokenInput {
+  tenantId: String!
+  entityType: EntityType!
+  entityId: String!
+  expiresAt: DateTime!
+  createdBy: String!
+}
+
+input UpdatePortalBrandingInput {
+  logoUrl: String
+  primaryColor: String
+  companyName: String
+}
+
+input CreatePortalAuditLogInput {
+  tenantId: String!
+  token: String!
+  entityType: String!
+  entityId: String!
+  action: String!
+  ipAddress: String
+  userAgent: String
+}

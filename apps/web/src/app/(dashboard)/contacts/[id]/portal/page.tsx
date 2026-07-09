@@ -1,79 +1,115 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Eye, Link2, Send } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useContact } from '@/hooks/use-contacts';
+import { cn } from '@/lib/cn';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function ContactPortalPage() {
-  const { id } = useParams<{ id: string }>();
-  const qc = useQueryClient();
-  const [copied, setCopied] = useState(false);
+  const params = useParams();
+  const router = useRouter();
+  const contactId = params.id as string;
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canRead = hasPermission('contacts:read');
+  const contactQuery = useContact(contactId);
+  const [portalEnabled, setPortalEnabled] = useState(false);
 
-  const { data } = useQuery({
-    queryKey: ['contact-portal', id],
-    queryFn: () => fetch(`/api/contacts/${id}/portal`).then((r) => r.json()),
-  });
+  const contact = contactQuery.data;
 
-  const toggle = useMutation({
-    mutationFn: (enabled: boolean) =>
-      fetch(`/api/contacts/${id}/portal`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled }),
-      }).then((r) => r.json()),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contact-portal', id] }),
-  });
-
-  const portalUrl = `${process.env.NEXT_PUBLIC_PORTAL_URL ?? 'https://portal.nexuscrm.io'}/c/${data?.token ?? ''}`;
-
-  const copy = async () => {
-    await navigator.clipboard.writeText(portalUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="mx-auto max-w-2xl space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-900">Customer Portal Access</h2>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">{data?.enabled ? 'Enabled' : 'Disabled'}</span>
-          <button
-            type="button"
-            onClick={() => toggle.mutate(!data?.enabled)}
-            className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${data?.enabled ? 'bg-blue-600' : 'bg-gray-200'}`}
-          >
-            <span className={`mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${data?.enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-          </button>
+  if (!canRead) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
+          You do not have permission to view contacts.
         </div>
       </div>
+    );
+  }
 
-      {data?.enabled ? (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
-            <Link2 className="h-4 w-4 shrink-0 text-gray-400" />
-            <span className="flex-1 truncate text-sm text-gray-600">{portalUrl}</span>
-            <button type="button" onClick={copy} className="shrink-0 text-sm font-medium text-blue-600 hover:text-blue-700">
-              {copied ? 'Copied' : 'Copy'}
-            </button>
+  if (contactQuery.isLoading) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="mt-4 h-64" />
+      </div>
+    );
+  }
+
+  if (contactQuery.isError || !contact) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+          Failed to load contact.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">
+            Portal Access
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {contact.firstName} {contact.lastName} · {contact.email ?? 'No email'}
+          </p>
+        </div>
+        <Button variant="secondary" onClick={() => router.push(`/contacts/${contactId}`)}>
+          ← Back
+        </Button>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Customer Portal</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Enable portal access to let this contact view deals, invoices, and support tickets.
+            </p>
           </div>
+          <button
+            type="button"
+            onClick={() => setPortalEnabled((v) => !v)}
+            className={cn(
+              'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
+              portalEnabled ? 'bg-slate-900' : 'bg-slate-200'
+            )}
+          >
+            <span
+              className={cn(
+                'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                portalEnabled ? 'translate-x-6' : 'translate-x-1'
+              )}
+            />
+          </button>
+        </div>
 
-          <div className="flex gap-3">
-            <button type="button" className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
-              <Send className="h-4 w-4" /> Send invite email
-            </button>
-            <a
-              href={portalUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              <Eye className="h-4 w-4" /> Preview portal
-            </a>
+        <div className="mt-6 space-y-3">
+          <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-3">
+            <span className="text-sm text-slate-700">View Deals</span>
+            <span className={cn('text-xs font-medium', portalEnabled ? 'text-slate-900' : 'text-slate-400')}>
+              {portalEnabled ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-3">
+            <span className="text-sm text-slate-700">View Invoices</span>
+            <span className={cn('text-xs font-medium', portalEnabled ? 'text-slate-900' : 'text-slate-400')}>
+              {portalEnabled ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-3">
+            <span className="text-sm text-slate-700">Submit Support Tickets</span>
+            <span className={cn('text-xs font-medium', portalEnabled ? 'text-slate-900' : 'text-slate-400')}>
+              {portalEnabled ? 'Enabled' : 'Disabled'}
+            </span>
           </div>
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }

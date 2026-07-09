@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
 import type { createTerritoriesService } from '../services/territories.service.js';
+import { NexusCache } from '@nexus/cache';
 
 const Id = z.object({ id: z.string().cuid() });
 const TerritoryBody = z.object({
@@ -11,6 +12,7 @@ const TerritoryBody = z.object({
   ownerIds: z.array(z.string().cuid()).default([]),
   teamId: z.string().optional(),
   priority: z.number().int().default(0),
+  isDefault: z.boolean().default(false),
   rules: z.array(z.object({ field: z.string(), operator: z.string(), value: z.string() })).default([]),
 });
 const Paging = z.object({
@@ -23,22 +25,37 @@ export async function registerTerritoriesRoutes(
   app: FastifyInstance,
   territories: ReturnType<typeof createTerritoriesService>
 ) {
+  const cache = new NexusCache();
+
   app.get('/api/v1/territories', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
-    return reply.send({ success: true, data: await territories.listTerritories(tenantId) });
+    const cacheKey = `territories:${tenantId}`;
+    const data = await cache.cacheAside(
+      cacheKey,
+      () => territories.listTerritories(tenantId),
+      300_000
+    );
+    return reply.send({ success: true, data });
   });
 
   app.post('/api/v1/territories', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const body = TerritoryBody.parse(request.body);
-    return reply.code(201).send({ success: true, data: await territories.createTerritory(tenantId, body) });
+    const data = await territories.createTerritory(tenantId, body);
+    await cache.del(`territories:${tenantId}`);
+    return reply.code(201).send({ success: true, data });
   });
 
   app.get('/api/v1/territories/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const { id } = Id.parse(request.params);
-    const data = await territories.getTerritory(tenantId, id);
-    if (!data) return reply.code(404).send({ success: false, error: 'Not found' });
+    const cacheKey = `territory:${tenantId}:${id}`;
+    const data = await cache.cacheAside(
+      cacheKey,
+      () => territories.getTerritory(tenantId, id),
+      300_000
+    );
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found', requestId: request.id } });
     return reply.send({ success: true, data });
   });
 
@@ -47,14 +64,19 @@ export async function registerTerritoriesRoutes(
     const { id } = Id.parse(request.params);
     const body = TerritoryBody.partial().parse(request.body);
     const data = await territories.updateTerritory(tenantId, id, body);
-    if (!data) return reply.code(404).send({ success: false, error: 'Not found' });
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found', requestId: request.id } });
+    await cache.del(`territory:${tenantId}:${id}`);
+    await cache.del(`territories:${tenantId}`);
     return reply.send({ success: true, data });
   });
 
   app.delete('/api/v1/territories/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const { id } = Id.parse(request.params);
-    return reply.send({ success: true, data: await territories.deleteTerritory(tenantId, id) });
+    const result = await territories.deleteTerritory(tenantId, id);
+    await cache.del(`territory:${tenantId}:${id}`);
+    await cache.del(`territories:${tenantId}`);
+    return reply.send({ success: true, data: result });
   });
 
   app.post('/api/v1/territories/test-assignment', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {

@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { startTracing } from '@nexus/service-utils/tracing';
 import rateLimit from '@fastify/rate-limit';
 import {
   createService,
@@ -13,8 +14,14 @@ import { registerPipelineAnalyticsRoutes } from './routes/pipeline.routes.js';
 import { registerRevenueAnalyticsRoutes } from './routes/revenue.routes.js';
 import { registerActivityAnalyticsRoutes } from './routes/activity.routes.js';
 import { registerForecastAnalyticsRoutes } from './routes/forecast.routes.js';
+import { registerQueryAnalyticsRoutes } from './routes/query.routes.js';
+import { registerAdminRoutes } from './routes/admin.routes.js';
+import { registerGraphQL } from './graphql/index.js';
 import { startAnalyticsConsumer } from './consumers/events.consumer.js';
+import { ensureCurrencyColumns } from './ddl/ensure-currency-columns.js';
+import { ensureReadModelTables } from './ddl/ensure-read-model-tables.js';
 
+startTracing({ serviceName: 'analytics-service' });
 const env = requireEnv(['CLICKHOUSE_URL', 'JWT_SECRET']);
 const port = Number(optionalEnv('PORT', '3008'));
 const jwtSecret = env.JWT_SECRET;
@@ -38,9 +45,32 @@ await app.register(rateLimit, {
   }),
 });
 app.setErrorHandler(globalErrorHandler);
-registerHealthRoutes(app, 'analytics-service', []);
-
 const clickhouse = createClickHouseClient();
+
+registerHealthRoutes(app, 'analytics-service', [
+  async () => {
+    const start = Date.now();
+    try {
+      const result = await clickhouse.query({ query: 'SELECT 1', format: 'JSONEachRow' });
+      await result.json();
+      return { name: 'clickhouse', ok: true, latencyMs: Date.now() - start };
+    } catch (err) {
+      return { name: 'clickhouse', ok: false, latencyMs: Date.now() - start, message: (err as Error).message };
+    }
+  },
+]);
+try {
+  await ensureReadModelTables(clickhouse);
+  app.log.info('Analytics read-model tables ensured');
+} catch (err) {
+  app.log.warn({ err }, 'ensureReadModelTables failed; continuing (consumer degrades until tables land)');
+}
+try {
+  await ensureCurrencyColumns(clickhouse);
+  app.log.info('Analytics base-currency columns ensured');
+} catch (err) {
+  app.log.warn({ err }, 'ensureCurrencyColumns failed; continuing (projections fall back to 1:1)');
+}
 try {
   await startAnalyticsConsumer(clickhouse);
   app.log.info('Analytics consumer started');
@@ -48,9 +78,13 @@ try {
   app.log.warn({ err }, 'Analytics consumer failed to start; continuing in HTTP-only mode');
 }
 
+await registerGraphQL(app);
+
 await startService(app, port, async (a) => {
   await registerPipelineAnalyticsRoutes(a, clickhouse);
   await registerRevenueAnalyticsRoutes(a, clickhouse);
   await registerActivityAnalyticsRoutes(a, clickhouse);
   await registerForecastAnalyticsRoutes(a, clickhouse);
+  await registerQueryAnalyticsRoutes(a, clickhouse);
+  await registerAdminRoutes(a, clickhouse);
 });

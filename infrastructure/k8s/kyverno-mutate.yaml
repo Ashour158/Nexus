@@ -1,0 +1,50 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: add-default-labels
+spec:
+  rules:
+    - name: add-labels
+      match:
+        resources:
+          kinds:
+            - Deployment
+            - Service
+            - ConfigMap
+      mutate:
+        patchStrategicMerge:
+          metadata:
+            labels:
+              +(app.kubernetes.io/managed-by): nexus-crm
+              +(app.kubernetes.io/part-of): nexus-crm
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: add-sidecar
+spec:
+  rules:
+    - name: add-otel-sidecar
+      match:
+        resources:
+          kinds:
+            - Deployment
+          namespaces:
+            - nexus
+      mutate:
+        patchStrategicMerge:
+          spec:
+            template:
+              spec:
+                containers:
+                  - name: otel-agent
+                    image: otel/opentelemetry-collector-contrib:0.102.0
+                    args:
+                      - --config=/conf/agent.yaml
+                    volumeMounts:
+                      - name: otel-config
+                        mountPath: /conf
+                volumes:
+                  - name: otel-config
+                    configMap:
+                      name: otel-collector-config

@@ -5,6 +5,7 @@ import type { IntegrationPrisma } from '../prisma.js';
 import type { createFieldCrypto } from '../lib/crypto.js';
 import { signWebhookBody } from '../lib/crypto.js';
 import { randomBytes } from 'node:crypto';
+import { lookup } from 'node:dns/promises';
 import type {
   CreateWebhookSubscriptionInput,
   UpdateWebhookSubscriptionInput,
@@ -13,11 +14,33 @@ import { alsStore } from '../request-context.js';
 
 type Crypto = ReturnType<typeof createFieldCrypto>;
 
+const PRIVATE_IP_RE = [
+  /^10\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^192\.168\./,
+  /^127\./,
+  /^169\.254\./,
+  /^::1$/,
+  /^fc[0-9a-f]{2}:/i,
+  /^fd[0-9a-f]{2}:/i,
+];
+
+async function isSsrfSafe(url: string): Promise<boolean> {
+  try {
+    const { hostname } = new URL(url);
+    const { address } = await lookup(hostname);
+    return !PRIVATE_IP_RE.some((re) => re.test(address));
+  } catch {
+    return false;
+  }
+}
+
 type DeliveryWithSub = Awaited<
   ReturnType<
     PrismaClient['webhookDelivery']['findMany']
   >
 >[number] & {
+  idempotencyKey?: string;
   subscription: {
     targetUrl: string;
     secret: string;
@@ -89,10 +112,19 @@ export function createWebhooksService(deps: {
       return;
     }
 
+    if (!(await isSsrfSafe(row.subscription.targetUrl))) {
+      await raw.webhookDelivery.update({
+        where: { id: row.id },
+        data: { status: 'FAILED', responseBody: 'ssrf_blocked_private_ip' },
+      });
+      return;
+    }
+
     const body = JSON.stringify({
       id: row.id,
       type: row.eventType,
       payload: row.payload,
+      idempotencyKey: row.idempotencyKey ?? row.id,
     });
     const sig = signWebhookBody(plainSecret, body);
     const attempt = row.attemptCount + 1;
@@ -132,7 +164,8 @@ export function createWebhooksService(deps: {
 
   return {
     async listSubscriptions() {
-      const rows = await prisma.webhookSubscription.findMany({ orderBy: { createdAt: 'desc' } });
+      const rows = await prisma.webhookSubscription.findMany({
+    take: 500, orderBy: { createdAt: 'desc' } });
       return rows.map(({ secret: _s, ...r }) => r);
     },
 
@@ -193,6 +226,84 @@ export function createWebhooksService(deps: {
       });
     },
 
+    /** Paginated delivery log for a subscription, newest first. Tenant-scoped; never leaks the secret. */
+    async listDeliveries(subscriptionId: string, opts: { page: number; limit: number }) {
+      // Confirm the subscription exists within the caller's tenant (prisma is tenant-scoped).
+      const sub = await prisma.webhookSubscription.findFirst({
+        where: { id: subscriptionId },
+        select: { id: true },
+      });
+      if (!sub) throw new NotFoundError('WebhookSubscription', subscriptionId);
+
+      const skip = (opts.page - 1) * opts.limit;
+      const [rows, total] = await Promise.all([
+        prisma.webhookDelivery.findMany({
+          where: { subscriptionId },
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: opts.limit,
+          select: {
+            id: true,
+            eventType: true,
+            status: true,
+            httpStatus: true,
+            attemptCount: true,
+            nextRetryAt: true,
+            deliveredAt: true,
+            createdAt: true,
+          },
+        }),
+        prisma.webhookDelivery.count({ where: { subscriptionId } }),
+      ]);
+      return { data: rows, page: opts.page, limit: opts.limit, total };
+    },
+
+    /** Single delivery detail (may include responseBody). Tenant-scoped. Returns null if not found. */
+    async getDelivery(deliveryId: string) {
+      const row = await prisma.webhookDelivery.findFirst({
+        where: { id: deliveryId },
+        select: {
+          id: true,
+          subscriptionId: true,
+          eventType: true,
+          payload: true,
+          status: true,
+          httpStatus: true,
+          responseBody: true,
+          attemptCount: true,
+          nextRetryAt: true,
+          deliveredAt: true,
+          createdAt: true,
+        },
+      });
+      return row;
+    },
+
+    /** Rotate a subscription's signing secret. Returns the new plaintext secret ONCE. Tenant-scoped. */
+    async rotateSecret(subscriptionId: string) {
+      const cur = await prisma.webhookSubscription.findFirst({ where: { id: subscriptionId } });
+      if (!cur) throw new NotFoundError('WebhookSubscription', subscriptionId);
+      const plain = newSigningSecret();
+      await prisma.webhookSubscription.update({
+        where: { id: subscriptionId },
+        data: { secret: crypto.encrypt(plain), version: { increment: 1 } },
+      });
+      return { id: subscriptionId, signingSecret: plain };
+    },
+
+    async replayDelivery(deliveryId: string): Promise<boolean> {
+      const row = await raw.webhookDelivery.findFirst({
+        where: { id: deliveryId },
+        include: { subscription: true },
+      });
+      if (!row || !row.subscription?.isActive) return false;
+      await raw.webhookDelivery.update({
+        where: { id: deliveryId },
+        data: { status: 'PENDING', attemptCount: 0, nextRetryAt: null, responseBody: null, httpStatus: null },
+      });
+      return true;
+    },
+
     async processDeliveryQueue(batch = 25): Promise<number> {
       const now = new Date();
       const pending = await raw.webhookDelivery.findMany({
@@ -210,10 +321,15 @@ export function createWebhooksService(deps: {
         include: { subscription: true },
       });
 
+      // Deliver webhooks with bounded concurrency to avoid head-of-line blocking
+      const CONCURRENCY = 10;
       let done = 0;
-      for (const d of pending) {
-        await deliverOne(d as DeliveryWithSub);
-        done += 1;
+      for (let i = 0; i < pending.length; i += CONCURRENCY) {
+        const chunk = pending.slice(i, i + CONCURRENCY);
+        await Promise.allSettled(
+          chunk.map((d) => deliverOne(d as unknown as DeliveryWithSub))
+        );
+        done += chunk.length;
       }
       return done;
     },

@@ -1,0 +1,220 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  savedReports(limit: Int, offset: Int): [SavedReport!]!
+  savedReport(id: ID!): SavedReport
+  reportSchedules(limit: Int, offset: Int): [ReportSchedule!]!
+  reportSchedule(id: ID!): ReportSchedule
+  dashboards(limit: Int, offset: Int): [Dashboard!]!
+  dashboard(id: ID!): Dashboard
+  dashboardWidgets(limit: Int, offset: Int): [DashboardWidget!]!
+  dashboardWidget(id: ID!): DashboardWidget
+  pipelineSnapshots(limit: Int, offset: Int): [PipelineSnapshot!]!
+  pipelineSnapshot(id: ID!): PipelineSnapshot
+}
+
+type Mutation {
+  createSavedReport(input: CreateSavedReportInput!): SavedReport!
+  updateSavedReport(id: ID!, input: UpdateSavedReportInput!): SavedReport!
+  deleteSavedReport(id: ID!): Boolean!
+  createReportSchedule(input: CreateReportScheduleInput!): ReportSchedule!
+  updateReportSchedule(id: ID!, input: UpdateReportScheduleInput!): ReportSchedule!
+  deleteReportSchedule(id: ID!): Boolean!
+  createDashboard(input: CreateDashboardInput!): Dashboard!
+  updateDashboard(id: ID!, input: UpdateDashboardInput!): Dashboard!
+  deleteDashboard(id: ID!): Boolean!
+  createDashboardWidget(input: CreateDashboardWidgetInput!): DashboardWidget!
+  updateDashboardWidget(id: ID!, input: UpdateDashboardWidgetInput!): DashboardWidget!
+  deleteDashboardWidget(id: ID!): Boolean!
+  createPipelineSnapshot(input: CreatePipelineSnapshotInput!): PipelineSnapshot!
+  updatePipelineSnapshot(id: ID!, input: UpdatePipelineSnapshotInput!): PipelineSnapshot!
+  deletePipelineSnapshot(id: ID!): Boolean!
+}
+
+type SavedReport @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  description: String
+  objectType: String!
+  columns: JSON!
+  filters: JSON!
+  groupBy: String
+  sortBy: String!
+  sortDir: String!
+  isShared: Boolean!
+  ownerId: String!
+  folderId: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  schedules: [ReportSchedule!]!
+}
+
+type ReportSchedule @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  reportId: String!
+  report: SavedReport!
+  cron: String!
+  format: String!
+  recipients: [String!]!
+  subject: String
+  lastRunAt: DateTime
+  nextRunAt: DateTime
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Dashboard @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  ownerId: String!
+  isShared: Boolean!
+  isPinned: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  widgets: [DashboardWidget!]!
+}
+
+type DashboardWidget {
+  id: ID!
+  tenantId: String!
+  dashboardId: String!
+  dashboard: Dashboard!
+  title: String!
+  widgetType: String!
+  reportId: String
+  config: JSON!
+  position: Int!
+  width: Int!
+  height: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type PipelineSnapshot @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  pipelineId: String!
+  snapshotDate: DateTime!
+  stage: String!
+  dealCount: Int!
+  totalValue: String!
+  dealIds: JSON!
+  createdAt: DateTime!
+}
+
+input CreateSavedReportInput {
+  tenantId: String!
+  name: String!
+  description: String
+  objectType: String!
+  columns: JSON
+  filters: JSON
+  groupBy: String
+  sortBy: String
+  sortDir: String
+  isShared: Boolean
+  ownerId: String!
+  folderId: ID
+}
+
+input UpdateSavedReportInput {
+  name: String
+  description: String
+  objectType: String
+  columns: JSON
+  filters: JSON
+  groupBy: String
+  sortBy: String
+  sortDir: String
+  isShared: Boolean
+  ownerId: String
+  folderId: ID
+}
+
+input CreateReportScheduleInput {
+  tenantId: String!
+  reportId: ID!
+  cron: String!
+  format: String
+  recipients: [String!]
+  subject: String
+  lastRunAt: DateTime
+  nextRunAt: DateTime
+  isActive: Boolean
+}
+
+input UpdateReportScheduleInput {
+  reportId: ID
+  cron: String
+  format: String
+  recipients: [String!]
+  subject: String
+  lastRunAt: DateTime
+  nextRunAt: DateTime
+  isActive: Boolean
+}
+
+input CreateDashboardInput {
+  tenantId: String!
+  name: String!
+  ownerId: String!
+  isShared: Boolean
+  isPinned: Boolean
+}
+
+input UpdateDashboardInput {
+  name: String
+  ownerId: String
+  isShared: Boolean
+  isPinned: Boolean
+}
+
+input CreateDashboardWidgetInput {
+  tenantId: String!
+  dashboardId: ID!
+  title: String!
+  widgetType: String!
+  reportId: ID
+  config: JSON
+  position: Int
+  width: Int
+  height: Int
+}
+
+input UpdateDashboardWidgetInput {
+  dashboardId: ID
+  title: String
+  widgetType: String
+  reportId: ID
+  config: JSON
+  position: Int
+  width: Int
+  height: Int
+}
+
+input CreatePipelineSnapshotInput {
+  tenantId: String!
+  pipelineId: String!
+  snapshotDate: DateTime!
+  stage: String!
+  dealCount: Int
+  totalValue: String
+  dealIds: JSON
+}
+
+input UpdatePipelineSnapshotInput {
+  pipelineId: String
+  snapshotDate: DateTime
+  stage: String
+  dealCount: Int
+  totalValue: String
+  dealIds: JSON
+}

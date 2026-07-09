@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Controller,
   useForm,
@@ -37,6 +37,7 @@ import { TagInput } from '@/components/ui/tag-input';
 import { Textarea } from '@/components/ui/textarea';
 import { QuickCreateContact } from '@/components/deals/QuickCreateContact';
 import { UserPlus } from 'lucide-react';
+import { notify } from '@/lib/toast';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -197,7 +198,7 @@ export function DealForm({
   const stagesQuery = useStages(pipelineId || null);
 
   // ── Reset stageId when pipelineId changes ───────────────────────────────
-  const previousPipelineIdRef = useMemo(() => ({ current: pipelineId }), []);
+  const previousPipelineIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (
       previousPipelineIdRef.current !== pipelineId &&
@@ -206,7 +207,7 @@ export function DealForm({
       setValue('stageId', '', { shouldValidate: false, shouldDirty: true });
     }
     previousPipelineIdRef.current = pipelineId;
-  }, [pipelineId, setValue, previousPipelineIdRef]);
+  }, [pipelineId, setValue]);
 
   // ── Custom-fields JSON draft state ──────────────────────────────────────
   const initialCustomJson = stringifyCustomFields(
@@ -276,6 +277,7 @@ export function DealForm({
     try {
       if (mode === 'create') {
         const deal = await createMutation.mutateAsync(values);
+        notify.success('Deal saved');
         onSuccess?.(deal);
       } else {
         if (!dealId) {
@@ -290,9 +292,11 @@ export function DealForm({
           id: dealId,
           data: payload,
         });
+        notify.success('Deal saved');
         onSuccess?.(deal);
       }
     } catch (err) {
+      notify.error('Failed to save deal', err instanceof Error ? err.message : undefined);
       setError('root', {
         type: 'server',
         message: err instanceof Error ? err.message : 'Submission failed.',
@@ -505,7 +509,7 @@ export function DealForm({
             <div className="relative">
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-xs text-muted-foreground"
+                className="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-xs text-muted-foreground"
               >
                 {watch('currency') || 'USD'}
               </span>
@@ -517,7 +521,7 @@ export function DealForm({
                 inputMode="decimal"
                 aria-describedby={describedBy}
                 invalid={Boolean(errors.amount)}
-                className="pl-12 tabular-nums"
+                className="ps-12 tabular-nums"
                 {...register('amount', { valueAsNumber: true })}
               />
             </div>

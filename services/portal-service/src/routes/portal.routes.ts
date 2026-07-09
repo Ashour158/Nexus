@@ -1,7 +1,17 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
-import type { createPortalService } from '../services/portal.service.js';
+import type { FastifyRequest } from 'fastify';
+import { createPortalService, IllegalPortalTransitionError } from '../services/portal.service.js';
+
+/** Capture ip / user-agent from the request for the portal audit trail. */
+function reqCtx(request: FastifyRequest): { ipAddress: string | null; userAgent: string | null } {
+  const ua = request.headers['user-agent'];
+  return {
+    ipAddress: request.ip ?? null,
+    userAgent: typeof ua === 'string' ? ua : null,
+  };
+}
 
 export async function registerPortalRoutes(
   app: FastifyInstance,
@@ -9,36 +19,53 @@ export async function registerPortalRoutes(
 ): Promise<void> {
   app.get('/portal/:token', async (request, reply) => {
     const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
-    const data = await portal.getPortalContext(token);
-    if (!data) return reply.code(404).send({ success: false, error: 'Portal link expired or invalid' });
+    const data = await portal.getPortalContext(token, reqCtx(request));
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Portal link expired or invalid', requestId: request.id } });
     return reply.send({ success: true, data });
   });
 
   app.post('/portal/:token/accept', async (request, reply) => {
     const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
-    const data = await portal.accept(token);
-    if (!data) return reply.code(404).send({ success: false, error: 'Portal link expired or invalid' });
+    let data;
+    try {
+      data = await portal.accept(token, reqCtx(request));
+    } catch (err) {
+      if (err instanceof IllegalPortalTransitionError) {
+        return reply.code(409).send({ success: false, error: { code: 'ILLEGAL_TRANSITION', message: err.message, requestId: request.id } });
+      }
+      throw err;
+    }
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Portal link expired or invalid', requestId: request.id } });
     return reply.send({ success: true, data });
   });
 
   app.post('/portal/:token/reject', async (request, reply) => {
     const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
     const body = z.object({ reason: z.string().optional() }).parse(request.body ?? {});
-    const data = await portal.reject(token, body.reason);
-    if (!data) return reply.code(404).send({ success: false, error: 'Portal link expired or invalid' });
+    let data;
+    try {
+      data = await portal.reject(token, body.reason, reqCtx(request));
+    } catch (err) {
+      if (err instanceof IllegalPortalTransitionError) {
+        return reply.code(409).send({ success: false, error: { code: 'ILLEGAL_TRANSITION', message: err.message, requestId: request.id } });
+      }
+      throw err;
+    }
+    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Portal link expired or invalid', requestId: request.id } });
     return reply.send({ success: true, data });
   });
 
   app.get('/portal/:token/download', async (request, reply) => {
     const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
-    const ctx = await portal.getPortalContext(token);
-    if (!ctx) return reply.code(404).send({ success: false, error: 'Portal link expired or invalid' });
-    await portal.recordAction(token, 'downloaded');
+    const rc = reqCtx(request);
+    const ctx = await portal.getPortalContext(token, rc);
+    if (!ctx) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Portal link expired or invalid', requestId: request.id } });
+    await portal.recordAction(token, 'downloaded', undefined, undefined, undefined, rc);
     const documentUrl = process.env.DOCUMENT_SERVICE_URL ?? 'http://localhost:3016';
     const res = await fetch(`${documentUrl}/api/v1/documents/quotes/${ctx.entityId}/pdf`, {
       headers: { Authorization: `Bearer ${process.env.INTERNAL_SERVICE_TOKEN ?? ''}` },
     });
-    if (!res.ok) return reply.code(502).send({ success: false, error: 'Could not generate PDF' });
+    if (!res.ok) return reply.code(502).send({ success: false, error: { code: 'BAD_GATEWAY', message: 'Could not generate PDF', requestId: request.id } });
     return reply.header('content-type', 'application/pdf').send(Buffer.from(await res.arrayBuffer()));
   });
 

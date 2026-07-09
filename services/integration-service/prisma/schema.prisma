@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("INTEGRATION_DATABASE_URL")
 }
 
 model WebhookSubscription {
@@ -23,6 +23,7 @@ model WebhookSubscription {
 
   @@index([tenantId])
   @@index([tenantId, isActive])
+  @@unique([id, tenantId])
 }
 
 model WebhookDelivery {
@@ -32,6 +33,7 @@ model WebhookDelivery {
   tenantId       String
   eventType      String
   payload        Json
+  idempotencyKey String              @unique @default(uuid())
   status         DeliveryStatus      @default(PENDING)
   httpStatus     Int?
   responseBody   String?             @db.Text
@@ -42,6 +44,8 @@ model WebhookDelivery {
 
   @@index([tenantId, status])
   @@index([status, nextRetryAt])
+  @@index([idempotencyKey])
+  @@unique([id, tenantId])
 }
 
 model OAuthConnection {
@@ -56,10 +60,18 @@ model OAuthConnection {
   email        String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  // Connector sync state — makes syncs resumable and observable at the
+  // connection level (independent of individual SyncJob runs).
+  syncStatus       SyncStatus @default(PENDING)
+  syncCursor       String?    @db.Text
+  lastSyncedAt     DateTime?
+  lastSyncError    String?    @db.Text
+  syncedRecords    Int        @default(0)
   syncJobs     SyncJob[]
 
   @@unique([tenantId, userId, provider, scope])
   @@index([tenantId, userId])
+  @@unique([id, tenantId])
 }
 
 model SyncJob {
@@ -78,6 +90,7 @@ model SyncJob {
   createdAt        DateTime        @default(now())
 
   @@index([tenantId, status])
+  @@unique([id, tenantId])
 }
 
 model SyncedCalendarEvent {
@@ -90,6 +103,7 @@ model SyncedCalendarEvent {
   syncedAt   DateTime @default(now())
 
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 model GeocodedAccount {
@@ -101,6 +115,7 @@ model GeocodedAccount {
   geocodedAt DateTime @default(now())
 
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 enum DeliveryStatus {
@@ -116,4 +131,25 @@ enum SyncStatus {
   COMPLETED
   FAILED
   CANCELED
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
 }

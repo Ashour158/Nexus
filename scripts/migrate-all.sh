@@ -1,9 +1,21 @@
-﻿#!/bin/bash
+#!/bin/bash
 set -e
 
 echo "╔══════════════════════════════════════════════╗"
 echo "║     NEXUS — Prisma Migration Runner          ║"
 echo "╚══════════════════════════════════════════════╝"
+
+# Safety: default to deploy mode. Override with MODE=dev only in local development.
+MIGRATE_MODE="${MODE:-deploy}"
+
+if [ "$MIGRATE_MODE" = "deploy" ]; then
+  echo "ℹ️  Running in DEPLOY mode (prisma migrate deploy)"
+elif [ "$MIGRATE_MODE" = "dev" ]; then
+  echo "⚠️  Running in DEV mode (prisma migrate dev) — NOT for production"
+else
+  echo "❌ Unknown MODE='$MIGRATE_MODE'. Use 'deploy' or 'dev'"
+  exit 1
+fi
 
 SERVICES=(
   "auth-service"
@@ -13,7 +25,6 @@ SERVICES=(
   "comm-service"
   "storage-service"
   "workflow-service"
-  "billing-service"
   "integration-service"
   "blueprint-service"
   "approval-service"
@@ -27,6 +38,15 @@ SERVICES=(
   "data-service"
   "chatbot-service"
   "document-service"
+  "email-sync-service"
+  "activities-service"
+  "contacts-service"
+  "deals-service"
+  "metadata-service"
+  "leads-service"
+  "accounts-service"
+  "notes-service"
+  "quotes-service"
 )
 
 FAILED=()
@@ -40,7 +60,14 @@ for svc in "${SERVICES[@]}"; do
 
   echo ""
   echo "→ Migrating $svc..."
-  if (cd "services/$svc" && pnpm prisma migrate deploy 2>&1); then
+
+  if [ "$MIGRATE_MODE" = "deploy" ]; then
+    MIGRATE_CMD="migrate deploy"
+  else
+    MIGRATE_CMD="migrate dev --name init"
+  fi
+
+  if (cd "services/$svc" && pnpm prisma $MIGRATE_CMD 2>&1); then
     echo "  ✓ $svc migrated"
   else
     echo "  ✗ $svc FAILED"

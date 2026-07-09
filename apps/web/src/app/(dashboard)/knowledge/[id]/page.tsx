@@ -1,59 +1,244 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { Copy } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useState } from 'react';
+import { useConfirm } from '@/hooks/use-confirm';
+import { Copy, Pencil, Trash2, Archive, CheckCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { apiClients } from '@/lib/api-client';
-
-type Article = { id: string; title: string; body: string; categoryId?: string | null; updatedAt?: string; createdAt?: string; authorId?: string };
+import { Button } from '@/components/ui/button';
+import { TableSkeleton } from '@/components/ui/skeleton';
+import {
+  useKnowledgeArticle,
+  useUpdateKnowledgeArticle,
+  usePublishKnowledgeArticle,
+  useArchiveKnowledgeArticle,
+  useDeleteKnowledgeArticle,
+} from '@/hooks/use-knowledge';
+import { notify } from '@/lib/toast';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function KnowledgeArticlePage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const id = params?.id ?? '';
-  const [comment, setComment] = useState('');
-  const [helpful, setHelpful] = useState<'up' | 'down' | null>(null);
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canRead = hasPermission('documents:read');
+  const { confirm, ConfirmDialog } = useConfirm();
+  const articleQuery = useKnowledgeArticle(id);
+  const updateArticle = useUpdateKnowledgeArticle();
+  const publishArticle = usePublishKnowledgeArticle();
+  const archiveArticle = useArchiveKnowledgeArticle();
+  const deleteArticle = useDeleteKnowledgeArticle();
 
-  const article = useQuery({ queryKey: ['knowledge-article', id], queryFn: () => apiClients.knowledge.get<Article>(`/knowledge/articles/${id}`), enabled: Boolean(id) });
-  const related = useQuery({ queryKey: ['knowledge-related'], queryFn: () => apiClients.knowledge.get<Article[]>('/knowledge/articles', { params: { status: 'PUBLISHED' } }) });
-  const recordView = useMutation({ mutationFn: () => apiClients.knowledge.post(`/knowledge/articles/${id}/view`, {}) });
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ title: '', body: '' });
 
-  useEffect(() => {
-    if (!id || recordView.isSuccess || recordView.isPending) return;
-    recordView.mutate();
-  }, [id, recordView]);
+  const article = articleQuery.data;
+
+  if (!canRead) {
+    return (
+      <main className="p-6">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          You do not have permission to view knowledge base articles.
+        </div>
+      </main>
+    );
+  }
+
+  if (articleQuery.isLoading) {
+    return (
+      <main className="grid gap-4 p-4 lg:grid-cols-12">
+        <article className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 lg:col-span-8">
+          <TableSkeleton rows={6} cols={1} />
+        </article>
+      </main>
+    );
+  }
+
+  if (!article) {
+    return (
+      <main className="p-6">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Article not found.
+        </div>
+        <Link href="/knowledge" className="mt-2 inline-block text-sm underline">
+          Back to knowledge base
+        </Link>
+      </main>
+    );
+  }
+
+  const art = article;
+
+  function startEdit() {
+    setEditForm({ title: art!.title, body: art!.body });
+    setEditing(true);
+  }
+
+  function saveEdit() {
+    updateArticle.mutate(
+      { id, data: { title: editForm.title, body: editForm.body } },
+      {
+        onSuccess: () => {
+          setEditing(false);
+          notify.success('Article updated');
+        },
+        onError: (err) => notify.error('Update failed', err.message),
+      }
+    );
+  }
 
   return (
     <main className="grid gap-4 p-4 lg:grid-cols-12">
       <article className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 lg:col-span-8">
-        {!article.data ? <p className="text-sm text-slate-500">{article.isLoading ? 'Loading...' : 'Article not found.'}</p> : (
-          <>
-            <div><p className="text-xs text-slate-500">Knowledge article</p><h1 className="text-2xl font-bold text-slate-900">{article.data.title}</h1><p className="text-sm text-slate-500">Author: {article.data.authorId ?? 'N/A'} ù Last updated: {article.data.updatedAt ? new Date(article.data.updatedAt).toLocaleDateString() : 'ù'}</p></div>
-            <div className="prose prose-gray max-w-none rounded bg-slate-50 p-3">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{article.data.body ?? ''}</ReactMarkdown>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-sm text-slate-500">
+              <Link href="/knowledge" className="hover:text-slate-800">
+                Knowledge Base
+              </Link>
+              <span> / </span>
+              <span className="text-xs">{art.status}</span>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => navigator.clipboard.writeText(window.location.href)} className="rounded border border-slate-300 px-3 py-2 text-sm">Copy link</button>
-              <button
-                onClick={() => {
-                  const summary = article.data.body?.slice(0, 500) ?? '';
-                  navigator.clipboard
-                    .writeText(summary)
-                    .then(() => window.alert('Copied to clipboard'))
-                    .catch(() => window.alert('Could not copy'));
-                }}
-                className="flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm text-blue-600 hover:text-blue-700"
+            {editing ? (
+              <input
+                value={editForm.title}
+                onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
+                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-xl font-bold text-slate-900"
+              />
+            ) : (
+              <h1 className="mt-1 text-2xl font-bold text-slate-900">{art.title}</h1>
+            )}
+            <p className="text-sm text-slate-500">
+              Author: {article.authorId ?? 'N/A'} ¬∑ Last updated:{' '}
+              {article.updatedAt ? new Date(article.updatedAt).toLocaleDateString() : '‚Äî'}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {editing ? (
+              <>
+                <Button type="button" onClick={saveEdit} disabled={updateArticle.isPending}>
+                  {updateArticle.isPending ? 'Saving‚Ä¶' : 'Save'}
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => setEditing(false)}>
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button type="button" variant="secondary" onClick={startEdit}>
+                  <Pencil className="h-4 w-4" /> Edit
+                </Button>
+                {art.status === 'DRAFT' && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() =>
+                      publishArticle.mutate(id, {
+                        onSuccess: () => notify.success('Article published'),
+                        onError: (err) => notify.error('Publish failed', err.message),
+                      })
+                    }
+                    disabled={publishArticle.isPending}
+                  >
+                    <CheckCircle className="h-4 w-4" /> Publish
+                  </Button>
+                )}
+                {art.status === 'PUBLISHED' && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() =>
+                      archiveArticle.mutate(id, {
+                        onSuccess: () => notify.success('Article archived'),
+                        onError: (err) => notify.error('Archive failed', err.message),
+                      })
+                    }
+                    disabled={archiveArticle.isPending}
+                  >
+                    <Archive className="h-4 w-4" /> Archive
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={async () => {
+                    if (await confirm('Delete this article?', 'Delete Article')) {
+                      deleteArticle.mutate(id, {
+                        onSuccess: () => {
+                          notify.success('Article deleted');
+                          router.push('/knowledge');
+                        },
+                        onError: (err) => notify.error('Delete failed', err.message),
+                      });
+                    }
+                  }}
+                  disabled={deleteArticle.isPending}
+                >
+                  <Trash2 className="h-4 w-4" /> Delete
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {editing ? (
+          <textarea
+            value={editForm.body}
+            onChange={(e) => setEditForm((f) => ({ ...f, body: e.target.value }))}
+            rows={20}
+            className="w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
+          />
+        ) : (
+          <div className="prose prose-gray max-w-none rounded bg-slate-50 p-4">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{art.body ?? ''}</ReactMarkdown>
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => navigator.clipboard.writeText(window.location.href)}
+            className="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
+          >
+            Copy link
+          </button>
+          <button
+            onClick={() => {
+              const summary = art.body?.slice(0, 500) ?? '';
+              navigator.clipboard
+                .writeText(summary)
+                .then(() => notify.success('Copied to clipboard'))
+                .catch(() => notify.error('Could not copy'));
+            }}
+            className="flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm text-blue-600 hover:text-blue-700 hover:bg-slate-50"
+          >
+            <Copy className="h-4 w-4" /> Use in email
+          </button>
+        </div>
+
+        {art.tags && art.tags.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {art.tags.map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700"
               >
-                <Copy className="h-4 w-4" /> Use in email
-              </button>
-            </div>
-            <div className="rounded border border-slate-200 p-3"><p className="text-sm font-medium">Was this helpful?</p><div className="mt-2 flex gap-2"><button onClick={() => setHelpful('up')} className={`rounded px-3 py-1 text-sm ${helpful==='up'?'bg-emerald-600 text-white':'border border-slate-300'}`}>??</button><button onClick={() => setHelpful('down')} className={`rounded px-3 py-1 text-sm ${helpful==='down'?'bg-red-600 text-white':'border border-slate-300'}`}>??</button></div><textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Optional comment" className="mt-2 w-full rounded border border-slate-300 px-3 py-2 text-sm" /></div>
-          </>
+                {tag}
+              </span>
+            ))}
+          </div>
         )}
       </article>
-      <aside className="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-4"><h2 className="text-sm font-semibold">Related articles</h2><ul className="mt-2 space-y-2 text-sm">{(related.data ?? []).filter((x) => x.id !== id).slice(0, 5).map((a) => <li key={a.id}>{a.title}</li>)}</ul></aside>
+
+      {ConfirmDialog}
+      <aside className="space-y-4 lg:col-span-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-slate-900">Related articles</h2>
+          <p className="mt-2 text-xs text-slate-500">Related articles will appear here.</p>
+        </div>
+      </aside>
     </main>
   );
 }

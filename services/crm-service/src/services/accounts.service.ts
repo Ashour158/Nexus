@@ -3,7 +3,7 @@ import type {
   PaginatedResult,
   TimelineEvent,
 } from '@nexus/shared-types';
-import { NotFoundError } from '@nexus/service-utils';
+import { BusinessRuleError, NotFoundError } from '@nexus/service-utils';
 import type {
   AccountListQuery,
   CreateAccountInput,
@@ -17,7 +17,22 @@ import type {
   Deal,
 } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { CrmPrisma } from '../prisma.js';
-import { toPaginatedResult } from '../lib/pagination.js';
+import { toPaginatedResult } from '@nexus/shared-types';
+import { updateAccountDataQuality } from '../lib/data-quality.js';
+import { enrichAccount } from '../lib/enrichment.engine.js';
+import {
+  recordFieldChanges,
+  recordCreateSnapshot,
+  recordSingleChange,
+} from '../lib/field-history.js';
+import { validateCustomFields } from '../lib/custom-field-validation.js';
+import {
+  enforceValidationRules,
+  applyFieldPermissions,
+  maskFieldPermissions,
+  mergeForValidation,
+} from '../lib/write-guards.js';
+import type { ReadAccessContext } from './deals.service.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -129,13 +144,78 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
     return row;
   }
 
+  /**
+   * BL-03: validate a proposed `parentAccountId` before it is set/changed so the
+   * account hierarchy can never form a cycle (which would cause the hierarchy
+   * BFS roll-ups and buying-committee/org features to recurse forever).
+   *
+   * Rejects when:
+   *  - the parent does not exist in this tenant (existence check),
+   *  - the parent is the account itself (self-parent — `selfId` supplied),
+   *  - the parent is a descendant of the account. Descendants are the transitive
+   *    closure of `parentAccountId` (childAccounts), so we walk UP from the
+   *    proposed parent via `parentAccountId`; if that ancestor chain reaches
+   *    `selfId`, the parent sits below the account and the link would cycle.
+   *
+   * The walk is bounded by a visited-set and a max-depth guard so an already
+   * corrupt (pre-existing cyclic) chain can never spin forever.
+   */
+  async function assertValidParent(
+    tenantId: string,
+    parentAccountId: string,
+    selfId: string | null
+  ): Promise<void> {
+    if (selfId && parentAccountId === selfId) {
+      throw new BusinessRuleError(
+        'An account cannot be its own parent'
+      );
+    }
+    const MAX_DEPTH = 100;
+    const visited = new Set<string>();
+    let cursor: string | null = parentAccountId;
+    let existenceChecked = false;
+    for (let depth = 0; cursor && depth < MAX_DEPTH; depth++) {
+      if (visited.has(cursor)) {
+        // Pre-existing corrupt cycle upstream of the proposed parent; stop.
+        break;
+      }
+      visited.add(cursor);
+      const node: { id: string; parentAccountId: string | null } | null =
+        await prisma.account.findFirst({
+          where: { id: cursor, tenantId },
+          select: { id: true, parentAccountId: true },
+        });
+      if (!node) {
+        // The first node in the walk IS the proposed parent — if it is missing
+        // the parent doesn't exist / is in another tenant. Deeper nulls just
+        // terminate the walk (a broken ancestor ref is not this update's fault).
+        if (!existenceChecked) {
+          throw new NotFoundError('Account', parentAccountId);
+        }
+        break;
+      }
+      existenceChecked = true;
+      if (selfId && node.parentAccountId === selfId) {
+        throw new BusinessRuleError(
+          'Cannot set parent account: the selected parent is a descendant of this account, which would create a circular hierarchy'
+        );
+      }
+      cursor = node.parentAccountId;
+    }
+  }
+
   return {
     async listAccounts(
       tenantId: string,
       filters: AccountListFilters,
-      pagination: ListPagination
+      pagination: ListPagination,
+      access?: ReadAccessContext
     ): Promise<PaginatedResult<Account>> {
-      const where = buildWhere(tenantId, filters);
+      // Ownership scope is intersected into the tenant+filter where (additive).
+      const where = {
+        ...buildWhere(tenantId, filters),
+        ...(access?.ownershipWhere ?? {}),
+      } as Prisma.AccountWhereInput;
       const sortField = resolveSortField(pagination.sortBy);
       const orderBy: Prisma.AccountOrderByWithRelationInput = {
         [sortField]: pagination.sortDir,
@@ -149,36 +229,59 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
           orderBy,
         }),
       ]);
-      return toPaginatedResult(rows, total, pagination.page, pagination.limit);
+      const masked = (await maskFieldPermissions(
+        prisma,
+        tenantId,
+        'account',
+        rows as unknown as Record<string, unknown>[],
+        access?.roles
+      )) as unknown as Account[];
+      return toPaginatedResult(masked, total, pagination.page, pagination.limit);
     },
 
-    async getAccountById(tenantId: string, id: string): Promise<Account> {
-      return loadOrThrow(tenantId, id);
+    async getAccountById(tenantId: string, id: string, access?: ReadAccessContext): Promise<Account> {
+      const row = await loadOrThrow(tenantId, id);
+      return (await maskFieldPermissions(
+        prisma,
+        tenantId,
+        'account',
+        row as unknown as Record<string, unknown>,
+        access?.roles
+      )) as unknown as Account;
     },
 
     async createAccount(tenantId: string, data: CreateAccountInput): Promise<Account> {
       if (data.parentAccountId) {
-        const parent = await prisma.account.findFirst({
-          where: { id: data.parentAccountId, tenantId },
-        });
-        if (!parent) throw new NotFoundError('Account', data.parentAccountId);
+        // BL-03: existence + cycle guard. No self yet on create, so selfId=null.
+        await assertValidParent(tenantId, data.parentAccountId, null);
       }
+      // Enforce active validation rules (fail-open: no rules / eval error => allow).
+      await enforceValidationRules(prisma, tenantId, 'account', data as Record<string, unknown>);
+      // Low-code governance: validate customFields against CustomFieldDefinition (422 on violation, fail-open).
+      await validateCustomFields(prisma, tenantId, 'account', data.customFields);
       const created = await prisma.account.create({
         data: {
           tenantId,
           ownerId: data.ownerId,
           parentAccountId: data.parentAccountId ?? null,
+          code: data.code ?? null,
           name: data.name,
+          legalName: data.legalName ?? null,
+          tradeName: data.tradeName ?? null,
           website: data.website ?? null,
           phone: data.phone ?? null,
+          fax: data.fax ?? null,
           email: data.email ?? null,
           industry: data.industry ?? null,
+          subIndustry: data.subIndustry ?? null,
           type: data.type,
           tier: data.tier,
           status: data.status,
+          lifecycleStage: data.lifecycleStage ?? null,
           annualRevenue:
             data.annualRevenue !== undefined ? new Prisma.Decimal(data.annualRevenue) : null,
           employeeCount: data.employeeCount ?? null,
+          foundedYear: data.foundedYear ?? null,
           country: data.country ?? null,
           city: data.city ?? null,
           address: data.address ?? null,
@@ -187,75 +290,287 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
           description: data.description ?? null,
           sicCode: data.sicCode ?? null,
           naicsCode: data.naicsCode ?? null,
+          taxId: data.taxId ?? null,
+          vatNumber: data.vatNumber ?? null,
+          commercialRegistrationNumber: data.commercialRegistrationNumber ?? null,
+          paymentTerms: data.paymentTerms ?? null,
+          creditLimit: data.creditLimit !== undefined ? new Prisma.Decimal(data.creditLimit) : null,
+          currency: data.currency ?? 'USD',
+          priceBookId: data.priceBookId ?? null,
+          territoryId: data.territoryId ?? null,
+          healthScore: data.healthScore ?? null,
+          npsScore: data.npsScore ?? null,
+          riskLevel: data.riskLevel ?? null,
+          lastActivityAt: data.lastActivityAt ? new Date(data.lastActivityAt) : null,
+          billingAddressLine1: data.billingAddressLine1 ?? null,
+          billingAddressLine2: data.billingAddressLine2 ?? null,
+          billingCity: data.billingCity ?? null,
+          billingState: data.billingState ?? null,
+          billingPostalCode: data.billingPostalCode ?? null,
+          billingCountry: data.billingCountry ?? null,
+          billingLatitude: data.billingLatitude ?? null,
+          billingLongitude: data.billingLongitude ?? null,
+          shippingAddressLine1: data.shippingAddressLine1 ?? null,
+          shippingAddressLine2: data.shippingAddressLine2 ?? null,
+          shippingCity: data.shippingCity ?? null,
+          shippingState: data.shippingState ?? null,
+          shippingPostalCode: data.shippingPostalCode ?? null,
+          shippingCountry: data.shippingCountry ?? null,
+          shippingLatitude: data.shippingLatitude ?? null,
+          shippingLongitude: data.shippingLongitude ?? null,
+          shippingInstructions: data.shippingInstructions ?? null,
+          sameAsBilling: data.sameAsBilling ?? false,
           customFields: data.customFields as Prisma.InputJsonValue,
           tags: data.tags,
         },
       });
       await producer
         .publish(TOPICS.ACCOUNTS, {
-          type: 'contact.created',
+          type: 'account.created',
           tenantId,
-          payload: { contactId: created.id, accountId: created.id, email: created.email ?? undefined },
+          payload: {
+            id: created.id,
+            accountId: created.id,
+            name: created.name,
+            industry: created.industry ?? undefined,
+            website: created.website ?? undefined,
+            email: created.email ?? undefined,
+            ownerId: created.ownerId,
+          },
         })
         .catch(() => undefined);
+
+      // Full history: initial snapshot on CREATE (oldValue=null per tracked field).
+      await recordCreateSnapshot(
+        prisma,
+        tenantId,
+        'account',
+        created.id,
+        created as unknown as Record<string, unknown>,
+        created.ownerId,
+        'system'
+      );
+
+      updateAccountDataQuality(prisma, created.id).catch(() => undefined);
+
+      // Auto-enrichment (fire-and-forget): only when a provider key is configured
+      // so we never churn EnrichmentJob rows or block the create otherwise.
+      if (process.env.CLEARBIT_API_KEY || process.env.APOLLO_API_KEY) {
+        void enrichAccount(prisma, tenantId, created.id, producer).catch(() => undefined);
+      }
+
       return created;
     },
 
     async updateAccount(
       tenantId: string,
       id: string,
-      data: UpdateAccountInput
+      data: UpdateAccountInput,
+      changedBy?: string,
+      changedByName?: string,
+      roles?: string[]
     ): Promise<Account> {
-      await loadOrThrow(tenantId, id);
+      const existing = await loadOrThrow(tenantId, id);
+      const oldValues: Record<string, unknown> = {};
       const update: Prisma.AccountUpdateInput = {};
-      if (data.name !== undefined) update.name = data.name;
-      if (data.ownerId !== undefined) update.ownerId = data.ownerId;
+      if (data.code !== undefined) { update.code = data.code; oldValues.code = existing.code; }
+      if (data.name !== undefined) { update.name = data.name; oldValues.name = existing.name; }
+      if (data.ownerId !== undefined) { update.ownerId = data.ownerId; oldValues.ownerId = existing.ownerId; }
       if (data.parentAccountId !== undefined) {
+        if (data.parentAccountId) {
+          // BL-03: reject self-parent and any parent that is a descendant of
+          // this account (would create a circular hierarchy), plus keep the
+          // existing existence/tenant check.
+          await assertValidParent(tenantId, data.parentAccountId, id);
+        }
         update.parentAccount = data.parentAccountId
           ? { connect: { id: data.parentAccountId } }
           : { disconnect: true };
       }
-      if (data.website !== undefined) update.website = data.website;
-      if (data.phone !== undefined) update.phone = data.phone;
-      if (data.email !== undefined) update.email = data.email;
-      if (data.industry !== undefined) update.industry = data.industry;
-      if (data.type !== undefined) update.type = data.type;
-      if (data.tier !== undefined) update.tier = data.tier;
-      if (data.status !== undefined) update.status = data.status;
+      if (data.website !== undefined) { update.website = data.website; oldValues.website = existing.website; }
+      if (data.phone !== undefined) { update.phone = data.phone; oldValues.phone = existing.phone; }
+      if (data.fax !== undefined) { update.fax = data.fax; oldValues.fax = existing.fax; }
+      if (data.email !== undefined) { update.email = data.email; oldValues.email = existing.email; }
+      if (data.industry !== undefined) { update.industry = data.industry; oldValues.industry = existing.industry; }
+      if (data.legalName !== undefined) { update.legalName = data.legalName; oldValues.legalName = existing.legalName; }
+      if (data.tradeName !== undefined) { update.tradeName = data.tradeName; oldValues.tradeName = existing.tradeName; }
+      if (data.subIndustry !== undefined) { update.subIndustry = data.subIndustry; oldValues.subIndustry = existing.subIndustry; }
+      if (data.type !== undefined) { update.type = data.type; oldValues.type = existing.type; }
+      if (data.tier !== undefined) { update.tier = data.tier; oldValues.tier = existing.tier; }
+      if (data.status !== undefined) { update.status = data.status; oldValues.status = existing.status; }
+      if (data.lifecycleStage !== undefined) { update.lifecycleStage = data.lifecycleStage; oldValues.lifecycleStage = existing.lifecycleStage; }
       if (data.annualRevenue !== undefined) {
         update.annualRevenue = new Prisma.Decimal(data.annualRevenue);
+        oldValues.annualRevenue = existing.annualRevenue;
       }
-      if (data.employeeCount !== undefined) update.employeeCount = data.employeeCount;
-      if (data.country !== undefined) update.country = data.country;
-      if (data.city !== undefined) update.city = data.city;
-      if (data.address !== undefined) update.address = data.address;
-      if (data.zipCode !== undefined) update.zipCode = data.zipCode;
-      if (data.linkedInUrl !== undefined) update.linkedInUrl = data.linkedInUrl;
-      if (data.description !== undefined) update.description = data.description;
-      if (data.sicCode !== undefined) update.sicCode = data.sicCode;
-      if (data.naicsCode !== undefined) update.naicsCode = data.naicsCode;
+      if (data.employeeCount !== undefined) { update.employeeCount = data.employeeCount; oldValues.employeeCount = existing.employeeCount; }
+      if (data.foundedYear !== undefined) { update.foundedYear = data.foundedYear; oldValues.foundedYear = existing.foundedYear; }
+      if (data.country !== undefined) { update.country = data.country; oldValues.country = existing.country; }
+      if (data.city !== undefined) { update.city = data.city; oldValues.city = existing.city; }
+      if (data.address !== undefined) { update.address = data.address; oldValues.address = existing.address; }
+      if (data.zipCode !== undefined) { update.zipCode = data.zipCode; oldValues.zipCode = existing.zipCode; }
+      if (data.linkedInUrl !== undefined) { update.linkedInUrl = data.linkedInUrl; oldValues.linkedInUrl = existing.linkedInUrl; }
+      if (data.description !== undefined) { update.description = data.description; oldValues.description = existing.description; }
+      if (data.sicCode !== undefined) { update.sicCode = data.sicCode; oldValues.sicCode = existing.sicCode; }
+      if (data.naicsCode !== undefined) { update.naicsCode = data.naicsCode; oldValues.naicsCode = existing.naicsCode; }
+      if (data.taxId !== undefined) { update.taxId = data.taxId; oldValues.taxId = existing.taxId; }
+      if (data.vatNumber !== undefined) { update.vatNumber = data.vatNumber; oldValues.vatNumber = existing.vatNumber; }
+      if (data.commercialRegistrationNumber !== undefined) { update.commercialRegistrationNumber = data.commercialRegistrationNumber; oldValues.commercialRegistrationNumber = existing.commercialRegistrationNumber; }
+      if (data.paymentTerms !== undefined) { update.paymentTerms = data.paymentTerms; oldValues.paymentTerms = existing.paymentTerms; }
+      if (data.creditLimit !== undefined) { update.creditLimit = new Prisma.Decimal(data.creditLimit); oldValues.creditLimit = existing.creditLimit; }
+      if (data.currency !== undefined) { update.currency = data.currency; oldValues.currency = existing.currency; }
+      if (data.priceBookId !== undefined) { update.priceBookId = data.priceBookId; oldValues.priceBookId = existing.priceBookId; }
+      if (data.territoryId !== undefined) { update.territoryId = data.territoryId; oldValues.territoryId = existing.territoryId; }
+      if (data.healthScore !== undefined) { update.healthScore = data.healthScore; oldValues.healthScore = existing.healthScore; }
+      if (data.npsScore !== undefined) { update.npsScore = data.npsScore; oldValues.npsScore = existing.npsScore; }
+      if (data.riskLevel !== undefined) { update.riskLevel = data.riskLevel; oldValues.riskLevel = existing.riskLevel; }
+      if (data.lastActivityAt !== undefined) { update.lastActivityAt = data.lastActivityAt ? new Date(data.lastActivityAt) : null; oldValues.lastActivityAt = existing.lastActivityAt; }
+      if (data.billingAddressLine1 !== undefined) { update.billingAddressLine1 = data.billingAddressLine1; oldValues.billingAddressLine1 = existing.billingAddressLine1; }
+      if (data.billingAddressLine2 !== undefined) { update.billingAddressLine2 = data.billingAddressLine2; oldValues.billingAddressLine2 = existing.billingAddressLine2; }
+      if (data.billingCity !== undefined) { update.billingCity = data.billingCity; oldValues.billingCity = existing.billingCity; }
+      if (data.billingState !== undefined) { update.billingState = data.billingState; oldValues.billingState = existing.billingState; }
+      if (data.billingPostalCode !== undefined) { update.billingPostalCode = data.billingPostalCode; oldValues.billingPostalCode = existing.billingPostalCode; }
+      if (data.billingCountry !== undefined) { update.billingCountry = data.billingCountry; oldValues.billingCountry = existing.billingCountry; }
+      if (data.billingLatitude !== undefined) { update.billingLatitude = data.billingLatitude; oldValues.billingLatitude = existing.billingLatitude; }
+      if (data.billingLongitude !== undefined) { update.billingLongitude = data.billingLongitude; oldValues.billingLongitude = existing.billingLongitude; }
+      if (data.shippingAddressLine1 !== undefined) { update.shippingAddressLine1 = data.shippingAddressLine1; oldValues.shippingAddressLine1 = existing.shippingAddressLine1; }
+      if (data.shippingAddressLine2 !== undefined) { update.shippingAddressLine2 = data.shippingAddressLine2; oldValues.shippingAddressLine2 = existing.shippingAddressLine2; }
+      if (data.shippingCity !== undefined) { update.shippingCity = data.shippingCity; oldValues.shippingCity = existing.shippingCity; }
+      if (data.shippingState !== undefined) { update.shippingState = data.shippingState; oldValues.shippingState = existing.shippingState; }
+      if (data.shippingPostalCode !== undefined) { update.shippingPostalCode = data.shippingPostalCode; oldValues.shippingPostalCode = existing.shippingPostalCode; }
+      if (data.shippingCountry !== undefined) { update.shippingCountry = data.shippingCountry; oldValues.shippingCountry = existing.shippingCountry; }
+      if (data.shippingLatitude !== undefined) { update.shippingLatitude = data.shippingLatitude; oldValues.shippingLatitude = existing.shippingLatitude; }
+      if (data.shippingLongitude !== undefined) { update.shippingLongitude = data.shippingLongitude; oldValues.shippingLongitude = existing.shippingLongitude; }
+      if (data.shippingInstructions !== undefined) { update.shippingInstructions = data.shippingInstructions; oldValues.shippingInstructions = existing.shippingInstructions; }
+      if (data.sameAsBilling !== undefined) { update.sameAsBilling = data.sameAsBilling; oldValues.sameAsBilling = existing.sameAsBilling; }
       if (data.customFields !== undefined) {
         update.customFields = data.customFields as Prisma.InputJsonValue;
+        oldValues.customFields = existing.customFields;
       }
-      if (data.tags !== undefined) update.tags = data.tags;
+      if (data.tags !== undefined) { update.tags = data.tags; oldValues.tags = existing.tags; }
 
-      return prisma.account.update({ where: { id }, data: update });
+      // FieldPermission: strip fields the caller may not write (fail-open).
+      const permResult = await applyFieldPermissions(
+        prisma,
+        tenantId,
+        'account',
+        update as Record<string, unknown>,
+        roles
+      );
+      const safeUpdate = permResult.update as Prisma.AccountUpdateInput;
+
+      // Validation rules run against the post-write record (existing + patch).
+      await enforceValidationRules(
+        prisma,
+        tenantId,
+        'account',
+        mergeForValidation(existing as Record<string, unknown>, safeUpdate as Record<string, unknown>)
+      );
+
+      // Low-code governance: validate incoming customFields (422 on violation, fail-open).
+      if (data.customFields !== undefined) {
+        await validateCustomFields(prisma, tenantId, 'account', data.customFields);
+      }
+
+      const updated = await prisma.account.update({ where: { id }, data: safeUpdate });
+      if (changedBy) {
+        await recordFieldChanges(prisma, tenantId, 'account', id, oldValues, data as Record<string, unknown>, changedBy, changedByName);
+      }
+      await producer
+        .publish(TOPICS.ACCOUNTS, {
+          type: 'account.updated',
+          tenantId,
+          payload: {
+            id: updated.id,
+            accountId: updated.id,
+            name: updated.name,
+            industry: updated.industry ?? undefined,
+            website: updated.website ?? undefined,
+            ownerId: updated.ownerId,
+            changedFields: Object.keys(oldValues),
+          },
+        })
+        .catch(() => undefined);
+      updateAccountDataQuality(prisma, id).catch(() => undefined);
+      return updated;
     },
 
     /**
-     * Deletes an account. Refuses when open (non-lost/dormant) deals or active
-     * contacts reference it; callers should reassign first. Returns the
-     * deleted row.
+     * Soft-deletes an account. Refuses when open (non-lost/dormant) deals or active
+     * contacts reference it; callers should reassign first.
      */
     async deleteAccount(tenantId: string, id: string): Promise<void> {
-      await loadOrThrow(tenantId, id);
-      const openDealCount = await prisma.deal.count({
-        where: { accountId: id, tenantId, status: { in: ['OPEN', 'WON'] } },
-      });
+      const existing = await loadOrThrow(tenantId, id);
+      if (existing.deletedAt) return;
+      const [openDealCount, activeContactCount] = await Promise.all([
+        prisma.deal.count({
+          where: { accountId: id, tenantId, status: { in: ['OPEN', 'WON'] } },
+        }),
+        prisma.contact.count({
+          where: { accountId: id, tenantId, isActive: true, deletedAt: null },
+        }),
+      ]);
       if (openDealCount > 0) {
-        throw new NotFoundError('Account.deletable', id);
+        throw new BusinessRuleError('Account cannot be archived while open or won deals are linked');
       }
-      await prisma.account.delete({ where: { id } });
+      if (activeContactCount > 0) {
+        throw new BusinessRuleError('Account cannot be archived while active contacts are linked');
+      }
+      await prisma.account.update({ where: { id }, data: { deletedAt: new Date() } });
+      await recordSingleChange(
+        prisma,
+        tenantId,
+        'account',
+        id,
+        'status',
+        existing.status,
+        'archived',
+        existing.ownerId,
+        'system'
+      );
+      await producer
+        .publish(TOPICS.ACCOUNTS, {
+          type: 'account.archived',
+          tenantId,
+          payload: {
+            accountId: existing.id,
+            name: existing.name,
+            ownerId: existing.ownerId,
+          },
+        })
+        .catch(() => undefined);
+    },
+
+    async restoreAccount(tenantId: string, id: string): Promise<Account> {
+      const result = await prisma.account.updateMany({
+        where: { id, tenantId, deletedAt: { not: null } },
+        data: { deletedAt: null },
+      });
+      if (result.count === 0) throw new NotFoundError('Account', id);
+      const restored = await prisma.account.findFirstOrThrow({ where: { id, tenantId } });
+      await recordSingleChange(
+        prisma,
+        tenantId,
+        'account',
+        id,
+        'status',
+        'archived',
+        restored.status,
+        restored.ownerId,
+        'system'
+      );
+      await producer
+        .publish(TOPICS.ACCOUNTS, {
+          type: 'account.restored',
+          tenantId,
+          payload: {
+            accountId: restored.id,
+            name: restored.name,
+            ownerId: restored.ownerId,
+          },
+        })
+        .catch(() => undefined);
+      return restored;
     },
 
     async listAccountContacts(

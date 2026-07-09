@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: jwt-key-rotation
+  namespace: nexus
+spec:
+  schedule: "0 2 * * 0"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: nexus-crm
+          containers:
+            - name: jwt-rotation
+              image: nexus-crm/jwt-rotation:latest
+              envFrom:
+                - configMapRef:
+                    name: nexus-config
+              env:
+                - name: REDIS_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: nexus-redis
+                      key: url
+              resources:
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+                requests:
+                  cpu: 50m
+                  memory: 64Mi

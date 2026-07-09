@@ -1,96 +1,47 @@
 import { PrismaClient } from '../../../node_modules/.prisma/auth-client/index.js';
+import { createPrismaClientWithReplicas } from '@nexus/service-utils/prisma-client';
+import { createTenantPrismaExtension } from '@nexus/service-utils/prisma-tenant';
+import { withFieldEncryption } from '@nexus/security';
+import { attachSlowQueryLog } from '@nexus/service-utils/db';
 import { alsStore } from './request-context.js';
 
 /**
  * Tenant isolation — Section 35.1 semantics via Prisma 5 `$extends`.
  * Models without `tenantId` and global `Tenant` are excluded.
  */
-const skipTenantModels = new Set(['Tenant', 'Session', 'UserRole']);
-
-function mergeWhere(args: Record<string, unknown>, tenantId: string): Record<string, unknown> {
-  const where = (args.where as Record<string, unknown> | undefined) ?? {};
-  return { ...args, where: { ...where, tenantId } };
-}
-
-function applyTenantArgs(operation: string, args: Record<string, unknown>, tenantId: string): Record<string, unknown> {
-  switch (operation) {
-    case 'create':
-      return { ...args, data: { ...(args.data as Record<string, unknown>), tenantId } };
-    case 'createMany':
-      if (Array.isArray(args.data)) {
-        return {
-          ...args,
-          data: (args.data as Record<string, unknown>[]).map((d) => ({ ...d, tenantId })),
-        };
-      }
-      return args;
-    case 'update':
-    case 'updateMany':
-    case 'delete':
-    case 'deleteMany':
-    case 'findMany':
-    case 'findFirst':
-    case 'findFirstOrThrow':
-    case 'count':
-    case 'aggregate':
-    case 'groupBy':
-      return mergeWhere(args, tenantId);
-    case 'upsert':
-      return {
-        ...args,
-        where: { ...(args.where as Record<string, unknown>), tenantId },
-        create: { ...(args.create as Record<string, unknown>), tenantId },
-      };
-    default:
-      return args;
-  }
-}
-
-function delegateName(model: string): keyof PrismaClient {
-  return (model.charAt(0).toLowerCase() + model.slice(1)) as keyof PrismaClient;
-}
+// Models that have no tenantId column — the tenant extension must not inject one.
+const skipTenantModels = new Set(['Tenant', 'Session', 'UserRole', 'MfaConfiguration', 'PasswordReset']);
 
 export function createAuthPrisma() {
-  const base = new PrismaClient();
-  return base.$extends({
-    query: {
-      $allModels: {
-        async $allOperations({
-          model,
-          operation,
-          args,
-          query,
-        }: {
-          model: string;
-          operation: string;
-          args: unknown;
-          query: (a: unknown) => Promise<unknown>;
-        }) {
-          if (skipTenantModels.has(model)) {
-            return query(args);
-          }
-          const tenantId = alsStore.get('tenantId') as string | undefined;
-          if (!tenantId) {
-            return query(args);
-          }
-
-          const d = base[delegateName(model)] as {
-            findFirst?: (a: unknown) => Promise<unknown>;
-            findFirstOrThrow?: (a: unknown) => Promise<unknown>;
-          };
-
-          if (operation === 'findUnique' && d.findFirst) {
-            return d.findFirst(mergeWhere(args as Record<string, unknown>, tenantId));
-          }
-          if (operation === 'findUniqueOrThrow' && d.findFirstOrThrow) {
-            return d.findFirstOrThrow(mergeWhere(args as Record<string, unknown>, tenantId));
-          }
-
-          return query(applyTenantArgs(operation, args as Record<string, unknown>, tenantId));
-        },
-      },
+  const base = createPrismaClientWithReplicas(
+    (url: string) => {
+      const client = new PrismaClient({
+        datasources: { db: { url } },
+        log: [{ emit: 'event', level: 'query' }],
+      });
+      attachSlowQueryLog(client as any, 'auth-service');
+      return client;
     },
-  });
+    { connectionLimit: 5, poolTimeout: 10 }
+  );
+
+  // Wire field-level encryption for PII fields (GDPR Art. 32 compliance)
+  const encryptionKey = process.env.ENCRYPTION_MASTER_KEY;
+  if (encryptionKey && encryptionKey.length >= 32) {
+    withFieldEncryption(base as any, encryptionKey, [
+      { model: 'User', fields: ['email', 'phone', 'firstName', 'lastName'] },
+      { model: 'UserProfile', fields: ['personalEmail', 'emergencyPhone', 'address', 'dateOfBirth'] },
+      { model: 'SsoConfiguration', fields: ['certificate'] },
+      { model: 'MfaConfiguration', fields: ['secret'] },
+    ]);
+  }
+
+  return base.$extends(
+    createTenantPrismaExtension(base, {
+      getTenantId: () => alsStore.get('tenantId') as string | undefined,
+      skipModels: skipTenantModels,
+    })
+  );
 }
 
 export type AuthPrisma = ReturnType<typeof createAuthPrisma>;

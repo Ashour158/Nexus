@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, type JSX } from 'react';
+import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClients } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,7 @@ interface Paginated<T> {
 }
 
 export default function WorkflowsPage(): JSX.Element {
+  const router = useRouter();
   const qc = useQueryClient();
   const toast = useUiStore((s) => s.pushToast);
   const [tab, setTab] = useState<'workflows' | 'executions'>('workflows');
@@ -98,9 +100,12 @@ export default function WorkflowsPage(): JSX.Element {
 
   return (
     <main className="space-y-4 p-4">
-      <header>
-        <h1 className="text-xl font-semibold">Workflows</h1>
-        <p className="text-sm text-slate-500">Automation workflows and recent execution history.</p>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">Workflows</h1>
+          <p className="text-sm text-slate-500">Automation workflows and recent execution history.</p>
+        </div>
+        <Button onClick={() => router.push('/workflows/new')}>+ New Workflow</Button>
       </header>
       <div className="inline-flex rounded-md border border-slate-200 bg-white p-0.5">
         <button type="button" onClick={() => setTab('workflows')} className={`rounded px-3 py-1 text-sm ${tab === 'workflows' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>Workflows</button>
@@ -115,8 +120,8 @@ export default function WorkflowsPage(): JSX.Element {
             <p className="p-8 text-center text-sm text-slate-500">No workflows configured.</p>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-                <tr><th className="px-3 py-2">Name</th><th>Trigger</th><th>Status</th><th>Created</th><th className="text-right pr-3">Actions</th></tr>
+              <thead className="bg-slate-50 text-start text-xs uppercase text-slate-500">
+                <tr><th className="px-3 py-2">Name</th><th>Trigger</th><th>Status</th><th>Created</th><th className="text-end pe-3">Actions</th></tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {workflows.map((workflow) => (
@@ -129,8 +134,14 @@ export default function WorkflowsPage(): JSX.Element {
                       </span>
                     </td>
                     <td>{formatDateTime(workflow.createdAt)}</td>
-                    <td className="pr-3 text-right">
+                    <td className="pe-3 text-end">
                       <div className="inline-flex gap-1">
+                        <Button
+                          variant="secondary"
+                          onClick={() => router.push(`/workflows/${workflow.id}`)}
+                        >
+                          Builder
+                        </Button>
                         <Button
                           variant="secondary"
                           onClick={() =>
@@ -162,7 +173,7 @@ export default function WorkflowsPage(): JSX.Element {
             <p className="p-8 text-center text-sm text-slate-500">No executions yet.</p>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+              <thead className="bg-slate-50 text-start text-xs uppercase text-slate-500">
                 <tr><th className="px-3 py-2">Workflow</th><th>Status</th><th>Started At</th><th>Duration</th></tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

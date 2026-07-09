@@ -1,0 +1,41 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  fileAttachments(limit: Int, offset: Int, entityType: String, entityId: String): [FileAttachment!]!
+  fileAttachment(id: ID!): FileAttachment
+}
+
+type Mutation {
+  createFileAttachment(input: CreateFileAttachmentInput!): FileAttachment!
+  deleteFileAttachment(id: ID!): Boolean!
+}
+
+type FileAttachment @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  uploadedBy: String!
+  entityType: String!
+  entityId: String!
+  filename: String!
+  storedKey: String!
+  mimeType: String!
+  sizeBytes: Int!
+  url: String
+  createdAt: DateTime!
+}
+
+input CreateFileAttachmentInput {
+  tenantId: String!
+  uploadedBy: String!
+  entityType: String!
+  entityId: String!
+  filename: String!
+  storedKey: String!
+  mimeType: String!
+  sizeBytes: Int!
+  url: String
+}

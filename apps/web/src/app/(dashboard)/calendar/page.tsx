@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClients } from '@/lib/api-client';
 import { Modal } from '@/components/ui/modal';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type EventType = 'meeting' | 'task' | 'call' | 'deadline';
 
@@ -105,7 +106,7 @@ export default function CalendarPage() {
               <p className="text-sm font-semibold text-slate-900">{date}</p>
               <div className="mt-2 space-y-2">
                 {list.map((event) => (
-                  <button key={event.id} onClick={() => setSelected(event)} className="w-full rounded border border-slate-200 p-2 text-left hover:bg-slate-50">
+                  <button key={event.id} onClick={() => setSelected(event)} className="w-full rounded border border-slate-200 p-2 text-start hover:bg-slate-50">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium">{event.activityId.slice(0, 8)} - {event.externalId}</p>
                       <span className={`rounded px-2 py-0.5 text-xs ${TYPE_COLORS.meeting}`}>{event.provider}</span>
@@ -115,7 +116,18 @@ export default function CalendarPage() {
               </div>
             </div>
           ))}
-          {grouped.length === 0 ? <p className="text-sm text-slate-500">{events.isLoading ? 'Loading...' : 'No synced events yet.'}</p> : null}
+          {grouped.length === 0 ? (
+            events.isLoading ? (
+              <p className="text-sm text-slate-500">Loading...</p>
+            ) : (
+              <EmptyState
+                icon="📅"
+                title="Nothing scheduled"
+                description="No meetings or tasks scheduled for this period"
+                cta={{ label: '+ Add Event', onClick: () => setShowCreate(true) }}
+              />
+            )
+          ) : null}
         </div>
       </section>
 
@@ -162,11 +174,11 @@ export default function CalendarPage() {
               <input value={form.deal} onChange={(e) => setForm((p) => ({ ...p, deal: e.target.value }))} placeholder="Link to deal" className="rounded border border-slate-300 px-3 py-2 text-sm" />
               <input value={form.joinLink} onChange={(e) => setForm((p) => ({ ...p, joinLink: e.target.value }))} placeholder="Video link" className="rounded border border-slate-300 px-3 py-2 text-sm" />
               <select value={form.reminder} onChange={(e) => setForm((p) => ({ ...p, reminder: e.target.value }))} className="rounded border border-slate-300 px-3 py-2 text-sm"><option>15 min</option><option>1 hour</option><option>1 day</option></select>
-              <textarea value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} rows={3} placeholder="Description / agenda" className="md:col-span-2 rounded border border-slate-300 px-3 py-2 text-sm" />
+              <textarea value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} rows={3} placeholder="Description / agenda" className="rounded border border-slate-300 px-3 py-2 text-sm md:col-span-2" />
         </div>
-        <div className="mt-3 flex justify-end gap-2">
-          <button onClick={() => setShowCreate(false)} className="rounded border border-slate-300 px-3 py-2 text-sm">Cancel</button>
-          <button onClick={() => create.mutate()} disabled={!form.title || !form.date || !form.time || create.isPending} className="rounded bg-blue-600 px-3 py-2 text-sm text-white disabled:opacity-50">Save</button>
+        <div className="mt-4 flex justify-end gap-2">
+          <button type="button" onClick={() => setShowCreate(false)} className="rounded border border-slate-300 px-4 py-2 text-sm text-slate-700">Cancel</button>
+          <button type="button" onClick={() => create.mutate()} disabled={!form.title} className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50">Save event</button>
         </div>
       </Modal>
     </main>

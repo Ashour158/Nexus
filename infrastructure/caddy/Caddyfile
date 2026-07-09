@@ -1,0 +1,20 @@
+# Nexus production TLS reverse proxy.
+#
+# Caddy terminates HTTPS (auto Let's Encrypt for $DOMAIN) and proxies to the web
+# container over the internal docker network. Requires DOMAIN to be set and DNS
+# A/AAAA records pointing at this host BEFORE the caddy service is started:
+#     export DOMAIN=crm.example.com
+#     docker compose --profile prod up -d caddy
+#
+# Until a domain exists the app is reached directly on host :3100 (plain HTTP).
+{$DOMAIN} {
+	encode gzip zstd
+
+	# HSTS is only meaningful over the HTTPS Caddy serves; the app already sets
+	# X-Frame-Options / X-Content-Type-Options / CSP / Referrer-Policy itself.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+
+	reverse_proxy web:3000
+}

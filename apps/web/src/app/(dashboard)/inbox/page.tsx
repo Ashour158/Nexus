@@ -1,9 +1,11 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Inbox, Mail, Paperclip, RefreshCw, Search, Send, X } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
+import DOMPurify from 'dompurify';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 
 interface Thread {
   id: string;
@@ -26,12 +28,39 @@ interface Message {
   isInbound: boolean;
 }
 
+interface EmailTemplate {
+  id: string;
+  name: string;
+  subject: string;
+  htmlBody: string;
+  textBody: string;
+  category: string;
+}
+
+function sanitizeEmailBody(html: string): string {
+  if (!html) return '';
+  if (typeof window === 'undefined') return html;
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      'b', 'i', 'u', 'strong', 'em', 'br', 'p', 'ul', 'ol', 'li',
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'pre', 'code',
+      'span', 'div', 'a',
+    ],
+    ALLOWED_ATTR: ['href', 'target', 'rel'],
+    ALLOW_DATA_ATTR: false,
+    SANITIZE_DOM: true,
+    WHOLE_DOCUMENT: false,
+  });
+}
+
 export default function InboxPage() {
   const userId = useAuthStore((s) => s.userId);
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null);
   const [showCompose, setShowCompose] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [replyBody, setReplyBody] = useState('');
+  const [composeBody, setComposeBody] = useState('');
+  const [composeSubject, setComposeSubject] = useState('');
   const qc = useQueryClient();
 
   const { data: connection } = useQuery({
@@ -60,6 +89,15 @@ export default function InboxPage() {
     enabled: Boolean(selectedThread),
   });
 
+  const { data: templates = [] } = useQuery<EmailTemplate[]>({
+    queryKey: ['email-templates'],
+    queryFn: async () => {
+      const res = await fetch('/api/templates/email?isActive=true');
+      const json = await res.json();
+      return json.data ?? [];
+    },
+  });
+
   const sendMutation = useMutation({
     mutationFn: (payload: { threadId: string; body: string; to: string; subject: string }) =>
       fetch('/api/email/send', {
@@ -73,6 +111,11 @@ export default function InboxPage() {
       void qc.invalidateQueries({ queryKey: ['inbox', userId] });
     },
   });
+
+  const applyTemplate = (template: EmailTemplate) => {
+    setComposeSubject(template.subject);
+    setComposeBody(template.htmlBody);
+  };
 
   if (!connection?.connected) {
     return (
@@ -133,21 +176,24 @@ export default function InboxPage() {
               <div key={msg.id} className={`flex ${msg.isInbound ? 'justify-start' : 'justify-end'}`}>
                 <div className={`max-w-[80%] rounded-xl p-4 ${msg.isInbound ? 'bg-gray-100 text-gray-900' : 'bg-blue-600 text-white'}`}>
                   <div className={`mb-2 text-xs ${msg.isInbound ? 'text-gray-500' : 'text-blue-100'}`}>{msg.isInbound ? msg.from : 'You'} · {new Date(msg.sentAt).toLocaleString()}</div>
-                  <div className="whitespace-pre-wrap text-sm" dangerouslySetInnerHTML={{ __html: msg.body }} />
+                  <div className="whitespace-pre-wrap text-sm" dangerouslySetInnerHTML={{ __html: sanitizeEmailBody(msg.body) }} />
                 </div>
               </div>
             ))}
           </div>
           <div className="border-t border-gray-200 p-4">
-            <div className="overflow-hidden rounded-xl border border-gray-200">
-              <textarea value={replyBody} onChange={(e) => setReplyBody(e.target.value)} placeholder="Write your reply..." rows={4} className="w-full resize-none p-3 text-sm focus:outline-none" />
-              <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50 px-3 py-2">
-                <button className="rounded p-1.5 hover:bg-gray-200" title="Attach file" aria-label="Attach file"><Paperclip className="h-4 w-4 text-gray-500" /></button>
-                <button onClick={() => {
-                  if (!selectedThread || !replyBody.trim()) return;
-                  sendMutation.mutate({ threadId: selectedThread.id, to: selectedThread.from, subject: `Re: ${selectedThread.subject}`, body: replyBody });
-                }} disabled={!replyBody.trim() || sendMutation.isPending} className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-3.5 w-3.5" />{sendMutation.isPending ? 'Sending...' : 'Send'}</button>
-              </div>
+            <RichTextEditor
+              content={replyBody}
+              onChange={setReplyBody}
+              placeholder="Write your reply..."
+              minHeight="100px"
+            />
+            <div className="flex items-center justify-between mt-2">
+              <button className="rounded p-1.5 hover:bg-gray-200" title="Attach file" aria-label="Attach file"><Paperclip className="h-4 w-4 text-gray-500" /></button>
+              <button onClick={() => {
+                if (!selectedThread || !replyBody.trim()) return;
+                sendMutation.mutate({ threadId: selectedThread.id, to: selectedThread.from, subject: `Re: ${selectedThread.subject}`, body: replyBody });
+              }} disabled={!replyBody.trim() || sendMutation.isPending} className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-3.5 w-3.5" />{sendMutation.isPending ? 'Sending...' : 'Send'}</button>
             </div>
           </div>
         </div>
@@ -157,13 +203,43 @@ export default function InboxPage() {
 
       {showCompose ? (
         <div className="pointer-events-none fixed inset-0 z-50 flex items-end justify-end p-4">
-          <div className="pointer-events-auto w-full max-w-lg overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between bg-gray-800 px-4 py-3"><span className="text-sm font-medium text-white">New Email</span><button onClick={() => setShowCompose(false)} className="rounded p-1 hover:bg-gray-700" aria-label="Close compose"><X className="h-4 w-4 text-gray-400" /></button></div>
+          <div className="pointer-events-auto w-full max-w-2xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between bg-gray-800 px-4 py-3">
+              <span className="text-sm font-medium text-white">New Email</span>
+              <button onClick={() => setShowCompose(false)} className="rounded p-1 hover:bg-gray-700" aria-label="Close compose"><X className="h-4 w-4 text-gray-400" /></button>
+            </div>
             <div className="space-y-3 p-4">
               <input placeholder="To" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-              <input placeholder="Subject" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-              <textarea placeholder="Message" rows={8} className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-              <div className="flex justify-end gap-2"><button onClick={() => setShowCompose(false)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Discard</button><button className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"><Send className="h-3.5 w-3.5" />Send</button></div>
+              <div className="flex gap-2">
+                <input value={composeSubject} onChange={(e) => setComposeSubject(e.target.value)} placeholder="Subject" className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+                {templates.length > 0 ? (
+                  <div className="relative">
+                    <select
+                      onChange={(e) => {
+                        const t = templates.find((tm) => tm.id === e.target.value);
+                        if (t) applyTemplate(t);
+                      }}
+                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white"
+                      defaultValue=""
+                    >
+                      <option value="" disabled>Template</option>
+                      {templates.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+              </div>
+              <RichTextEditor
+                content={composeBody}
+                onChange={setComposeBody}
+                placeholder="Write your message..."
+                minHeight="200px"
+              />
+              <div className="flex justify-end gap-2">
+                <button onClick={() => { setShowCompose(false); setComposeBody(''); setComposeSubject(''); }} className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Discard</button>
+                <button className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"><Send className="h-3.5 w-3.5" />Send</button>
+              </div>
             </div>
           </div>
         </div>

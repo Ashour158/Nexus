@@ -1,0 +1,84 @@
+﻿apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: activities-service
+  namespace: nexus
+  labels:
+    app.kubernetes.io/name: nexus-activities-service
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nexus-activities-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nexus-activities-service
+        app.kubernetes.io/component: backend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+      - name: activities-service
+        image: ghcr.io/nexus-crm/nexus-activities-service:latest
+        ports:
+        - containerPort: 3043
+          name: http
+        env:
+        - name: PORT
+          value: "3043"
+        - name: SERVICE_DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: nexus-secrets
+              key: activities-service-database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: nexus-secrets
+              key: redis-url
+        - name: KAFKA_BROKERS
+          valueFrom:
+            configMapKeyRef:
+              name: nexus-config
+              key: KAFKA_BROKERS
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3043
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3043
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        securityContext:
+          readOnlyRootFilesystem: false
+          allowPrivilegeEscalation: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: activities-service
+  namespace: nexus
+  labels:
+    app.kubernetes.io/name: nexus-activities-service
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: nexus-activities-service
+  ports:
+  - name: http
+    port: 3043
+    targetPort: 3043

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 /**
  * Auth store (Section 39 frontend layer).
@@ -10,12 +11,12 @@ import { create } from 'zustand';
  * `checkPermission()` semantics in `@nexus/service-utils/rbac` (wildcard `*`
  * and resource-wildcards like `deals:*`).
  *
- * The full session lifecycle (refresh, logout, Keycloak SSO) is expanded in
- * later prompts.
+ * Persisted to localStorage so the session survives page refreshes.
  */
 
 interface SetSessionPayload {
   accessToken: string;
+  refreshToken?: string;
   userId: string;
   tenantId: string;
   roles?: string[];
@@ -24,11 +25,13 @@ interface SetSessionPayload {
 
 interface AuthState {
   accessToken: string | null;
+  refreshToken: string | null;
   userId: string | null;
   tenantId: string | null;
   roles: string[];
   permissions: string[];
   setSession: (payload: SetSessionPayload) => void;
+  setAccessToken: (token: string) => void;
   clearSession: () => void;
   /**
    * Returns `true` when the current user holds `permission`. Mirrors the
@@ -38,34 +41,59 @@ interface AuthState {
   hasPermission: (permission: string) => boolean;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-  accessToken: null,
-  userId: null,
-  tenantId: null,
-  roles: [],
-  permissions: [],
-  setSession: ({ accessToken, userId, tenantId, roles, permissions }) =>
-    set({
-      accessToken,
-      userId,
-      tenantId,
-      roles: roles ?? [],
-      permissions: permissions ?? [],
-    }),
-  clearSession: () =>
-    set({
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set, get) => ({
       accessToken: null,
+      refreshToken: null,
       userId: null,
       tenantId: null,
       roles: [],
       permissions: [],
+      setSession: ({ accessToken, refreshToken, userId, tenantId, roles, permissions }) =>
+        set({
+          accessToken,
+          refreshToken: refreshToken ?? get().refreshToken,
+          userId,
+          tenantId,
+          roles: roles ?? [],
+          permissions: permissions ?? [],
+        }),
+      setAccessToken: (token: string) => set({ accessToken: token }),
+      clearSession: () =>
+        set({
+          accessToken: null,
+          userId: null,
+          tenantId: null,
+          roles: [],
+          permissions: [],
+        }),
+      hasPermission: (permission) => {
+        const owned = get().permissions;
+        if (owned.length === 0) return false;
+        if (owned.includes('*')) return true;
+        if (owned.includes(permission)) return true;
+        const [resource] = permission.split(':');
+        return resource ? owned.includes(`${resource}:*`) : false;
+      },
     }),
-  hasPermission: (permission) => {
-    const owned = get().permissions;
-    if (owned.length === 0) return false;
-    if (owned.includes('*')) return true;
-    if (owned.includes(permission)) return true;
-    const [resource] = permission.split(':');
-    return resource ? owned.includes(`${resource}:*`) : false;
-  },
-}));
+    {
+      name: 'nexus-auth',
+      storage: createJSONStorage(() => sessionStorage),
+      // Do NOT auto-hydrate: otherwise the client's first render has the
+      // persisted session (permissions populated) while the server render has an
+      // empty store, so permission-gated pages that swap their whole tree on
+      // hasPermission() produce a hydration mismatch (React #418). A HydrationGate
+      // rehydrates this store on mount and only then renders the dashboard.
+      skipHydration: true,
+      partialize: (state) => ({
+        accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
+        userId: state.userId,
+        tenantId: state.tenantId,
+        roles: state.roles,
+        permissions: state.permissions,
+      }),
+    }
+  )
+);

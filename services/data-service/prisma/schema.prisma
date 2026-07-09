@@ -20,6 +20,7 @@ model RecycleBinItem {
 
   @@index([tenantId, module])
   @@index([tenantId, expiresAt])
+  @@unique([id, tenantId])
 }
 
 model FieldAuditLog {
@@ -35,6 +36,7 @@ model FieldAuditLog {
 
   @@index([tenantId, module, recordId])
   @@index([tenantId, changedAt])
+  @@unique([id, tenantId])
 }
 
 model SavedView {
@@ -53,6 +55,7 @@ model SavedView {
 
   @@unique([tenantId, userId, module, name])
   @@index([tenantId, userId, module])
+  @@unique([id, tenantId])
 }
 
 model RecentRecord {
@@ -65,6 +68,7 @@ model RecentRecord {
 
   @@unique([tenantId, userId, module, recordId])
   @@index([tenantId, userId])
+  @@unique([id, tenantId])
 }
 
 model ImportJob {
@@ -83,6 +87,7 @@ model ImportJob {
   completedAt DateTime?
 
   @@index([tenantId, module])
+  @@unique([id, tenantId])
 }
 
 enum ImportStatus {
@@ -90,4 +95,25 @@ enum ImportStatus {
   PROCESSING
   COMPLETED
   FAILED
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
 }

@@ -1,49 +1,61 @@
-import Fastify from 'fastify';
-import fastifyJwt from '@fastify/jwt';
+import 'dotenv/config';
+import { startTracing } from '@nexus/service-utils/tracing';
+import { createService, startService, globalErrorHandler, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
 import rateLimit from '@fastify/rate-limit';
 import { NexusConsumer, NexusProducer, TOPICS } from '@nexus/kafka';
-import { globalErrorHandler, startService } from '@nexus/service-utils';
-import { getPrisma } from './prisma.js';
+import { getPrisma, tenantAls } from './prisma.js';
 import { createCadencesService } from './services/cadences.service.js';
 import { createEnrollmentsService } from './services/enrollments.service.js';
 import { createQueueService } from './services/queue.service.js';
 import { registerCadencesRoutes } from './routes/cadences.routes.js';
 import { registerEnrollmentsRoutes } from './routes/enrollments.routes.js';
+import { registerInternalRoutes } from './routes/internal.routes.js';
+import { registerGraphQL } from './graphql/index.js';
 
-const app = Fastify({ logger: true });
+startTracing({ serviceName: 'cadence-service' });
+const port = parseInt(process.env.PORT ?? '3018', 10);
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret || jwtSecret.length < 32) {
+  throw new Error('JWT_SECRET must be set to at least 32 characters.');
+}
+
+const app = await createService({
+  name: 'cadence-service',
+  port,
+  jwtSecret,
+  corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(',').map((s) => s.trim()),
+});
+
 const prisma = getPrisma();
 const producer = new NexusProducer('cadence-service');
 const consumer = new NexusConsumer('cadence-service-events');
 
-await app.register(fastifyJwt, { secret: process.env.JWT_SECRET ?? 'nexus-secret' });
+const cadences = createCadencesService(prisma);
+const enrollments = createEnrollmentsService(prisma, producer);
+const queue = createQueueService(prisma, producer);
+const stopQueueWorker = queue.startQueueWorker();
+
 await app.register(rateLimit, {
   global: true,
   max: 300,
   timeWindow: '1 minute',
-  errorResponseBuilder: (_req, context) => ({
+  errorResponseBuilder: (_req: any, context: any) => ({
     success: false,
     error: 'RATE_LIMIT_EXCEEDED',
     message: `Too many requests. Retry after ${context.after}.`,
   }),
 });
-app.setErrorHandler(globalErrorHandler);
-
-app.addHook('onRequest', async (request, reply) => {
-  try {
-    await request.jwtVerify();
-  } catch {
-    return reply.code(401).send({ success: false, error: 'Unauthorized' });
-  }
+// Bridge Fastify request-context tenantId into Prisma tenant ALS
+app.addHook('preHandler', async (request) => {
+  const tenantId = (request as any).requestContext?.get('tenantId');
+  if (tenantId) tenantAls.enterWith({ tenantId });
 });
 
-const cadences = createCadencesService(prisma);
-const enrollments = createEnrollmentsService(prisma, producer);
-const queue = createQueueService(prisma, producer);
-await registerCadencesRoutes(app, cadences);
-await registerEnrollmentsRoutes(app, enrollments);
+registerHealthRoutes(app, 'cadence-service', [() => checkDatabase(prisma as any)]);
+app.setErrorHandler(globalErrorHandler);
 
 await producer.connect().catch(() => undefined);
-await consumer.subscribe([TOPICS.ACTIVITIES]).catch(() => undefined);
+await consumer.subscribe([TOPICS.ACTIVITIES, TOPICS.EMAILS]).catch(() => undefined);
 consumer.on('activity.completed', async (event) => {
   const payload = event.payload as { type?: string; contactId?: string };
   if (payload.type !== 'MEETING' || !payload.contactId) return;
@@ -54,14 +66,40 @@ consumer.on('activity.completed', async (event) => {
     rows.map((r) => enrollments.exitEnrollment(event.tenantId, r.id, 'meeting_booked'))
   );
 });
+
+// exitOnReply: when a prospect replies to an email, exit their active
+// enrollments whose cadence template has exitOnReply=true. This mirrors the
+// exitOnMeeting consumer above but gates on the template flag. comm-service /
+// email-sync can drive this either by emitting a reply event on the EMAILS
+// topic, or by calling the internal /internal/cadence/reply-signal endpoint.
+// Both paths are fully guarded so a Kafka/DB hiccup can never crash the service.
+const handleReplySignal = async (event: {
+  tenantId: string;
+  payload: unknown;
+}): Promise<void> => {
+  try {
+    const payload = (event.payload ?? {}) as { contactId?: string; leadId?: string; objectId?: string };
+    const objectId = payload.contactId ?? payload.leadId ?? payload.objectId;
+    if (!event.tenantId || !objectId) return;
+    await enrollments.exitEnrollmentsForObject(event.tenantId, objectId, 'exitOnReply', 'replied');
+  } catch {
+    /* never let a reply signal crash the consumer */
+  }
+};
+consumer.on('email.replied', handleReplySignal);
+consumer.on('email.received', handleReplySignal);
 await consumer.start().catch(() => undefined);
 
 app.addHook('onClose', async () => {
+  stopQueueWorker();
   try { await producer.disconnect(); } catch { /* ignore */ }
-  try { await consumer.stop(); } catch { /* ignore */ }
+  try { await consumer.disconnect(); } catch { /* ignore */ }
 });
 
-const port = parseInt(process.env.PORT ?? '3018', 10);
+await registerGraphQL(app, prisma);
+
 await startService(app, port, async () => {
-  await prisma.$disconnect();
+  await registerCadencesRoutes(app, cadences);
+  await registerEnrollmentsRoutes(app, enrollments);
+  await registerInternalRoutes(app, enrollments);
 });

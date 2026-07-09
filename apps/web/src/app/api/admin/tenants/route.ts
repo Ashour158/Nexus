@@ -1,23 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 
-function mockTenants() {
-  return Array.from({ length: 35 }).map((_, i) => ({
-    id: String(i + 1),
-    name: `Tenant ${i + 1}`,
-    plan: i % 6 === 0 ? 'Enterprise' : i % 2 === 0 ? 'Pro' : 'Free',
-    usersCount: 8 + i,
-    dealsCount: 50 + i * 4,
-    storageUsed: `${2 + i} GB`,
-    createdAt: new Date(Date.now() - i * 86400000 * 10).toISOString(),
-    status: i % 8 === 0 ? 'Suspended' : 'Active',
-  }));
-}
+const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://auth-service:3010/api/v1';
 
 export async function GET(req: NextRequest) {
   try {
     await requireAdmin(req);
-    return NextResponse.json({ data: mockTenants() });
+    const auth = req.headers.get('authorization') ?? '';
+
+    const res = await fetch(`${AUTH_URL}/tenants`, {
+      headers: { Authorization: auth },
+    }).catch(() => null);
+
+    if (res && res.ok) {
+      const tenants = await res.json().catch(() => null);
+      if (tenants) {
+        const data = Array.isArray(tenants.data) ? tenants.data : Array.isArray(tenants) ? tenants : [];
+        return NextResponse.json({
+          data: data.map((tenant: Record<string, unknown>) => ({
+            id: tenant.id ?? 'unknown',
+            name: tenant.name ?? 'Unknown Tenant',
+            plan: tenant.plan ?? 'starter',
+            usersCount: (tenant.usersCount ?? tenant.userCount ?? tenant.users) ?? null,
+            dealsCount: (tenant.dealsCount ?? tenant.dealCount ?? tenant.deals) ?? null,
+            storageUsed: tenant.storageUsed ?? null,
+            createdAt: tenant.createdAt ?? new Date().toISOString(),
+            status: (tenant.isActive === true) ? 'Active' : (tenant.isActive === false) ? 'Suspended' : (tenant.status as string) ?? 'Unknown',
+          })),
+        });
+      }
+    }
+
+    return NextResponse.json({ data: [] });
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -26,8 +40,17 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     await requireAdmin(req);
-    const body = await req.json();
-    return NextResponse.json({ id: crypto.randomUUID(), ...body, createdAt: new Date().toISOString() }, { status: 201 });
+    const auth = req.headers.get('authorization') ?? '';
+    const body = await req.text();
+
+    const res = await fetch(`${AUTH_URL}/tenants`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: auth },
+      body,
+    });
+
+    const data = await res.json().catch(() => ({}));
+    return NextResponse.json(data, { status: res.status });
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

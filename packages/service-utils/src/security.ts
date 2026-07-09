@@ -6,7 +6,7 @@ export async function securityPlugin(app: FastifyInstance): Promise<void> {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'"],
         scriptSrc: ["'self'"],
         imgSrc: ["'self'", 'data:', 'https:'],
       },

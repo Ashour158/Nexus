@@ -19,7 +19,7 @@ export function createRevenueAnalyticsService(client: ClickHouseClient) {
       const res = await client.query({
         query: `
           SELECT
-            sumIf(amount, event_type = 'deal.won') AS totalRevenue,
+            sumIf(if(base_amount != 0, base_amount, amount), event_type = 'deal.won') AS totalRevenue,
             countIf(event_type = 'deal.won') AS wonDeals,
             countIf(event_type = 'deal.lost') AS lostDeals
           FROM deal_events
@@ -56,7 +56,7 @@ export function createRevenueAnalyticsService(client: ClickHouseClient) {
         query: `
           SELECT
             owner_id AS ownerId,
-            sumIf(amount, event_type = 'deal.won') AS totalRevenue,
+            sumIf(if(base_amount != 0, base_amount, amount), event_type = 'deal.won') AS totalRevenue,
             countIf(event_type = 'deal.won') AS wonDeals,
             countIf(event_type = 'deal.lost') AS lostDeals
           FROM deal_events

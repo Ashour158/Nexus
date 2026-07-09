@@ -81,18 +81,17 @@ export function MultiSelect({
   };
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative" data-invalid={invalid || undefined}>
       <button
         id={id}
         type="button"
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-invalid={invalid || undefined}
         aria-describedby={describedBy}
         onClick={() => !disabled && setOpen((o) => !o)}
         className={cn(
-          'flex min-h-9 w-full flex-wrap items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-left text-sm',
+          'flex min-h-9 w-full flex-wrap items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-start text-sm',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
           'disabled:cursor-not-allowed disabled:opacity-60',
           invalid && 'border-destructive focus-visible:ring-destructive'

@@ -1,0 +1,15 @@
+{
+  "name": "@nexus/graphql-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "compose": "rover supergraph compose --config supergraph.yaml --output supergraph.graphql",
+    "dev": "rover dev --supergraph-config supergraph.yaml",
+    "build": "rover supergraph compose --config supergraph.yaml --output dist/supergraph.graphql --elv2-license=accept",
+    "typecheck": "echo 'No TypeScript files in gateway'",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@apollo/rover": "^0.23.0"
+  }
+}

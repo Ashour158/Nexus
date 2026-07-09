@@ -1,32 +1,45 @@
-import Fastify from 'fastify';
-import fastifyJwt from '@fastify/jwt';
-import rateLimit from '@fastify/rate-limit';
-import { globalErrorHandler, startService } from '@nexus/service-utils';
-import { registerDocumentsRoutes } from './routes/documents.routes.js';
+import 'dotenv/config';
+import { startTracing } from '@nexus/service-utils/tracing';
+import { createService, startService, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
+import { registerRoutes } from './routes/index.js';
+import { registerGraphQL } from './graphql/index.js';
+import { PrismaClient } from '../../../node_modules/.prisma/document-client/index.js';
+import { createTenantPrismaExtension } from '@nexus/service-utils/prisma-tenant';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
-const app = Fastify({ logger: true });
-await app.register(fastifyJwt, { secret: process.env.JWT_SECRET ?? 'nexus-secret' });
-await app.register(rateLimit, {
-  global: true,
-  max: 300,
-  timeWindow: '1 minute',
-  errorResponseBuilder: (_req, context) => ({
-    success: false,
-    error: 'RATE_LIMIT_EXCEEDED',
-    message: `Too many requests. Retry after ${context.after}.`,
-  }),
-});
-app.setErrorHandler(globalErrorHandler);
+const tenantAls = new AsyncLocalStorage<{ tenantId: string }>();
 
-app.addHook('onRequest', async (request, reply) => {
-  try {
-    await request.jwtVerify();
-  } catch {
-    return reply.code(401).send({ success: false, error: 'Unauthorized' });
-  }
-});
-
-await registerDocumentsRoutes(app);
-
+startTracing({ serviceName: 'document-service' });
 const port = parseInt(process.env.PORT ?? '3016', 10);
-await startService(app, port, async () => { /* no prisma in this service */ });
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret || jwtSecret.length < 32) {
+  throw new Error('JWT_SECRET must be set to at least 32 characters.');
+}
+
+const app = await createService({
+  name: 'document-service',
+  port,
+  jwtSecret,
+  corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(',').map((s) => s.trim()),
+});
+
+const prismaBase = new PrismaClient();
+const prisma = prismaBase.$extends(
+  createTenantPrismaExtension(prismaBase as any, {
+    getTenantId: () => tenantAls.getStore()?.tenantId,
+    skipModels: new Set(['DocumentVersion', 'DocumentPermission']),
+  })
+);
+
+// Bridge Fastify request-context tenantId into Prisma tenant ALS
+app.addHook('preHandler', async (request) => {
+  const tenantId = (request as any).requestContext?.get('tenantId');
+  if (tenantId) tenantAls.enterWith({ tenantId });
+});
+
+registerHealthRoutes(app, 'document-service', [() => checkDatabase(prismaBase)]);
+
+await registerRoutes(app, prisma as unknown as Parameters<typeof registerRoutes>[1]);
+await registerGraphQL(app, prisma);
+
+await startService(app, port, async () => { /* routes already registered above */ });

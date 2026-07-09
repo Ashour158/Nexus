@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import { registerHealthRoutes } from '@nexus/service-utils';
+import { registerHealthRoutes, checkRedis } from '@nexus/service-utils';
 
-export function registerRealtimeHealthRoutes(app: FastifyInstance): void {
-  registerHealthRoutes(app, 'realtime-service', []);
+export function registerRealtimeHealthRoutes(app: FastifyInstance, redis: any): void {
+  registerHealthRoutes(app, 'realtime-service', [() => checkRedis(redis)]);
 }

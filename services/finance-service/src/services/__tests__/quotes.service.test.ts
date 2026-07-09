@@ -75,12 +75,9 @@ describe('sendQuote', () => {
     expect((res as { sentAt?: Date }).sentAt).toBeTruthy();
   });
 
-  it('publishes quote.sent event', async () => {
+  it('does not publish quote.sent directly because commercial outbox owns business events', async () => {
     await svc.sendQuote(TENANT, 'q1');
-    expect(producer.publish).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ type: 'quote.sent' })
-    );
+    expect(producer.publish).not.toHaveBeenCalled();
   });
 });
 
@@ -136,20 +133,11 @@ describe('duplicateQuote', () => {
 });
 
 describe('expireQuotes', () => {
-  it('only expires SENT quotes past expiresAt', async () => {
+  it('is disabled so batch expiry cannot bypass CPQ transition authority', async () => {
     const prisma = makePrisma();
     const svc = createQuotesService(prisma as never, makeProducer() as never);
-    await svc.expireQuotes(TENANT);
-    expect(prisma.quote.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ status: 'SENT', expiresAt: expect.any(Object) }),
-      })
-    );
-  });
 
-  it('returns correct count of expired quotes', async () => {
-    const svc = createQuotesService(makePrisma() as never, makeProducer() as never);
-    const count = await svc.expireQuotes(TENANT);
-    expect(count).toBe(2);
+    await expect(svc.expireQuotes(TENANT)).rejects.toBeInstanceOf(BusinessRuleError);
+    expect(prisma.quote.updateMany).not.toHaveBeenCalled();
   });
 });

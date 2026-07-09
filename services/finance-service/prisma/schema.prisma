@@ -27,7 +27,10 @@ model Product {
   tenantId      String
   sku           String
   name          String
+  nameAr        String?
   description   String?
+  descriptionAr String?
+  unitAr        String?
   type          ProductType @default(SERVICE)
   category      String?
   currency      String      @default("USD")
@@ -47,6 +50,8 @@ model Product {
 
   @@unique([tenantId, sku])
   @@index([tenantId])
+  @@index([tenantId, isActive])
+  @@unique([id, tenantId])
 }
 
 enum ProductType {
@@ -76,6 +81,7 @@ model PriceTier {
   createdAt DateTime @default(now())
 
   @@index([tenantId, productId])
+  @@unique([id, tenantId])
 }
 
 // ─── Promotions (CPQ Rule 5) ────────────────────────────────────────────────
@@ -99,6 +105,7 @@ model PromoCode {
 
   @@unique([tenantId, code])
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 // ─── Account read-model (denormalized from CRM for pricing lookups) ─────────
@@ -111,6 +118,7 @@ model Account {
   updatedAt     DateTime @updatedAt
 
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 // ─── Quotes (CPQ persistence — Section 40) ──────────────────────────────────
@@ -120,6 +128,7 @@ model Quote {
   tenantId         String
   dealId           String
   accountId        String
+  contactId        String?
   ownerId          String
   quoteNumber      String
   name             String
@@ -149,14 +158,101 @@ model Quote {
   lineItems        Json            @default("[]")
   pricingBreakdown Json            @default("{}")
   customFields     Json            @default("{}")
+  baseCurrency     String?
+  baseTotal        Decimal?        @db.Decimal(18, 2)
+  exchangeRate     Decimal?        @db.Decimal(18, 6)
+  taxZoneId        String?
+  taxBreakdown     Json            @default("[]")
+  templateId       String?
+  rfqId            String?
+  acceptanceToken  String?         @unique
+  marginTotal      Decimal?        @db.Decimal(18, 2)
+  priceBookId      String?
+  vendorTaxReg     String?
+  buyerTaxReg      String?
+  dueDate          DateTime?
   version          Int             @default(1)
+  /// Multi-level approval: the highest tier level this quote needs cleared
+  /// (0 = none) and how many levels have been approved so far. A quote is fully
+  /// approved when approvalLevel >= requiredApprovalLevel.
+  requiredApprovalLevel Int        @default(0)
+  approvalLevel         Int        @default(0)
+  /// Set when the quote reaches a terminal archive state (expired / voided /
+  /// superseded). Non-archived quotes have `archivedAt = null` so the hot list
+  /// filters `archivedAt: null` to stay clean; archived quotes are read via the
+  /// dedicated `/api/v1/quotes/archived` endpoint.
+  archivedAt       DateTime?
+  /// When this quote was superseded by a newer revision/version, points at the
+  /// quote id that replaced it (null otherwise).
+  supersededById   String?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
+  discountRequests DiscountRequest[]
+  normalizedLines  QuoteLine[]
+  revisions        QuoteRevision[]
+  documents        QuoteDocument[]
+  eSignEnvelopes   QuoteESignEnvelope[]
 
   @@unique([tenantId, quoteNumber])
   @@index([tenantId, dealId])
   @@index([tenantId, accountId])
+  @@index([tenantId, contactId])
   @@index([tenantId, status])
+  @@index([tenantId, dueDate])
+  @@index([tenantId, archivedAt])
+  @@unique([id, tenantId])
+}
+
+/// Admin-controlled quote-number format + atomic sequence, one row per tenant.
+/// `generateQuoteNumber` upserts+increments `nextSequence` inside a transaction
+/// so concurrent creates never collide, and lets admins set the prefix/padding/
+/// yearly-reset instead of the old hardcoded `QUO-{year}-{seq}`.
+model QuoteNumberConfig {
+  tenantId     String   @id
+  prefix       String   @default("QUO")
+  separator    String   @default("-")
+  includeYear  Boolean  @default(true)
+  padding      Int      @default(5)
+  resetYearly  Boolean  @default(true)
+  nextSequence Int      @default(1)
+  lastYear     Int?
+  updatedAt    DateTime @updatedAt
+}
+
+/// BL-04: atomic, gapless document-number sequence shared by Order / Invoice /
+/// RFQ numbering. One row per (tenant, entity, period) — `period` is the year
+/// for yearly-reset series (Order/Invoice) or a constant ("ALL") for continuous
+/// series (RFQ). Numbers are allocated with a single `INSERT … ON CONFLICT DO
+/// UPDATE SET nextSequence = nextSequence + 1 RETURNING` statement executed
+/// INSIDE the record-insert transaction, so concurrent creates can never mint
+/// the same number and a rolled-back insert never burns/gaps a number. This
+/// replaces the race-prone `count()+1` / `findFirst desc + slice + 1` schemes.
+model DocumentSequence {
+  tenantId     String
+  entity       String
+  period       String
+  nextSequence Int      @default(1)
+  updatedAt    DateTime @updatedAt
+
+  @@id([tenantId, entity, period])
+}
+
+/// Multi-level quote approval policy. A quote requires the highest `level` of any
+/// active tier whose threshold it crosses (by total amount and/or discount %).
+model QuoteApprovalTier {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  name               String
+  level              Int
+  minAmount          Decimal? @db.Decimal(18, 2)
+  minDiscountPercent Decimal? @db.Decimal(9, 4)
+  approverRole       String?
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([tenantId, isActive])
+  @@unique([id, tenantId])
 }
 
 enum QuoteStatus {
@@ -170,6 +266,156 @@ enum QuoteStatus {
   EXPIRED
   VOID
   CONVERTED
+  // Terminal status for quotes replaced by a newer revision/version. Present in
+  // finance CPQ code paths (commercial-records.use-case.ts) that previously
+  // referenced it despite it being absent from the enum (schema/code drift).
+  SUPERSEDED
+  // Terminal status for quotes whose e-sign envelope completed. Referenced by
+  // the MARK_SIGNED transition path; added to resolve the same drift.
+  SIGNED
+}
+
+model QuoteLine {
+  id              String   @id @default(cuid())
+  tenantId        String
+  quoteId         String
+  quote           Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  productId       String
+  productName     String?
+  description     String?
+  quantity        Decimal  @db.Decimal(18, 6)
+  listPrice       Decimal? @db.Decimal(18, 2)
+  unitPrice       Decimal  @db.Decimal(18, 2)
+  discountPercent Decimal  @default(0) @db.Decimal(9, 4)
+  discountAmount  Decimal  @default(0) @db.Decimal(18, 2)
+  taxPercent      Decimal  @default(0) @db.Decimal(9, 4)
+  taxAmount       Decimal  @default(0) @db.Decimal(18, 2)
+  lineTotal       Decimal  @db.Decimal(18, 2)
+  sortOrder       Int      @default(0)
+  source          String   @default("CPQ")
+  customFields    Json     @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId, quoteId])
+  @@index([tenantId, productId])
+  @@unique([id, tenantId])
+}
+
+model QuoteRevision {
+  id             String   @id @default(cuid())
+  tenantId       String
+  quoteId        String
+  quote          Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  version        Int
+  reason         String
+  status         QuoteStatus
+  snapshot       Json
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  @@unique([tenantId, quoteId, version])
+  @@index([tenantId, quoteId])
+  @@unique([id, tenantId])
+}
+
+model DiscountRequest {
+  id                           String                @id @default(cuid())
+  tenantId                     String
+  quoteId                      String
+  quote                        Quote                 @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  requestedById                String
+  approvalRequestId            String?
+  status                       DiscountRequestStatus @default(PENDING)
+  reasonCode                   DiscountReasonCode
+  reasonLabel                  String
+  reasonNotes                  String?
+  currentDiscountPercent       Decimal               @default(0) @db.Decimal(9, 4)
+  requestedDiscountPercent     Decimal               @db.Decimal(9, 4)
+  requestedDiscountAmount      Decimal               @db.Decimal(18, 2)
+  winningProbabilityIfApproved Int
+  businessImpact               String?
+  competitorName               String?
+  expiresAt                    DateTime?
+  approvedById                 String?
+  approvedAt                   DateTime?
+  rejectedById                 String?
+  rejectedAt                   DateTime?
+  rejectionReason              String?
+  customFields                 Json                  @default("{}")
+  createdAt                    DateTime              @default(now())
+  updatedAt                    DateTime              @updatedAt
+
+  @@index([tenantId, quoteId])
+  @@index([tenantId, status])
+  @@index([tenantId, requestedById])
+  @@unique([id, tenantId])
+}
+
+enum DiscountRequestStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  EXPIRED
+}
+
+enum DiscountReasonCode {
+  COMPETITIVE_MATCH
+  STRATEGIC_ACCOUNT
+  VOLUME_COMMITMENT
+  MULTI_YEAR_COMMITMENT
+  NEW_LOGO_ACQUISITION
+  RENEWAL_SAVE
+  EXECUTIVE_EXCEPTION
+  MARKET_ENTRY
+  BUNDLE_NEGOTIATION
+  PAYMENT_TERMS_TRADEOFF
+}
+
+model SalesOrder {
+  id                    String           @id @default(cuid())
+  tenantId              String
+  accountId             String
+  contactId             String?
+  dealId                String?
+  quoteId               String?
+  ownerId               String
+  orderNumber           String
+  name                  String
+  status                SalesOrderStatus @default(DRAFT)
+  currency              String           @default("USD")
+  subtotal              Decimal          @default(0) @db.Decimal(18, 2)
+  taxAmount             Decimal          @default(0) @db.Decimal(18, 2)
+  discountAmount        Decimal          @default(0) @db.Decimal(18, 2)
+  total                 Decimal          @default(0) @db.Decimal(18, 2)
+  orderedAt             DateTime?
+  expectedFulfillmentAt DateTime?
+  fulfilledAt           DateTime?
+  cancelledAt           DateTime?
+  lineItems             Json             @default("[]")
+  customFields          Json             @default("{}")
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  invoices              Invoice[]
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId, accountId])
+  @@index([tenantId, contactId])
+  @@index([tenantId, quoteId])
+  @@index([tenantId, status])
+  @@unique([id, tenantId])
+}
+
+enum SalesOrderStatus {
+  DRAFT
+  PENDING_APPROVAL
+  CONFIRMED
+  FULFILLING
+  FULFILLED
+  CANCELLED
+  CLOSED
 }
 
 // ─── Contracts & Subscriptions ──────────────────────────────────────────────
@@ -202,6 +448,8 @@ model Contract {
 
   @@unique([tenantId, contractNumber])
   @@index([tenantId, accountId])
+  @@index([tenantId, status])
+  @@unique([id, tenantId])
 }
 
 enum ContractStatus {
@@ -241,8 +489,10 @@ model Subscription {
   invoices        Invoice[]
   usageRecords    UsageRecord[]
 
+  @@unique([tenantId, accountId, productId])
   @@index([tenantId, accountId])
   @@index([tenantId, status])
+  @@unique([id, tenantId])
 }
 
 enum SubscriptionStatus {
@@ -262,6 +512,14 @@ model Invoice {
   subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
   contractId     String?
   contract       Contract?     @relation(fields: [contractId], references: [id])
+  // BL-02: origin links for the won-deal → order → invoice handoff. `orderId`
+  // ties an invoice back to the SalesOrder it was derived from (totals/tax/
+  // currency copied server-side). `quoteId` records the upstream accepted quote
+  // when the order originated from one. SetNull (never Cascade) so deleting an
+  // order never destroys its financial invoices.
+  orderId        String?
+  order          SalesOrder?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  quoteId        String?
   invoiceNumber  String
   status         InvoiceStatus @default(DRAFT)
   currency       String        @default("USD")
@@ -282,6 +540,29 @@ model Invoice {
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, accountId])
   @@index([tenantId, status])
+  @@index([tenantId, orderId])
+  @@unique([id, tenantId])
+}
+
+model ZatcaSubmission {
+  id              String   @id @default(cuid())
+  tenantId        String
+  invoiceId       String   @unique
+  invoiceNumber   String
+  submittedAt     DateTime @default(now())
+  status          String
+  clearanceStatus String?
+  zatcaUuid       String?
+  qrCode          String?
+  invoiceHash     String?
+  warnings        Json?
+  errors          Json?
+  retryCount      Int      @default(0)
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([status, tenantId])
+  @@unique([id, tenantId])
 }
 
 enum InvoiceStatus {
@@ -314,6 +595,7 @@ model Payment {
   updatedAt     DateTime      @updatedAt
 
   @@index([tenantId, invoiceId])
+  @@unique([id, tenantId])
 }
 
 enum PaymentMethod {
@@ -356,6 +638,7 @@ model CommissionPlan {
 
   @@unique([tenantId, name])
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 model CommissionAssignment {
@@ -370,6 +653,7 @@ model CommissionAssignment {
   createdAt DateTime       @default(now())
 
   @@index([tenantId, userId])
+  @@unique([id, tenantId])
 }
 
 model CommissionRecord {
@@ -399,6 +683,9 @@ model CommissionRecord {
 
   @@index([tenantId, userId])
   @@index([tenantId, period])
+  @@index([tenantId, status])
+  @@index([tenantId, planId])
+  @@unique([id, tenantId])
 }
 
 enum CommissionType {
@@ -433,4 +720,466 @@ model UsageRecord {
 
   @@index([tenantId, subscriptionId])
   @@index([tenantId, recordedAt])
+  @@unique([id, tenantId])
+}
+
+// ─── MULTI-CURRENCY ───────────────────────────────────────────────────────────
+
+model Currency {
+  id            String   @id @default(cuid())
+  tenantId      String
+  code          String
+  name          String
+  symbol        String
+  isBase        Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  decimalPlaces Int      @default(2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@unique([id, tenantId])
+}
+
+model ExchangeRate {
+  id            String   @id @default(cuid())
+  tenantId      String
+  fromCurrency  String
+  toCurrency    String
+  rate          Decimal  @db.Decimal(18, 6)
+  source        String   @default("manual")
+  effectiveFrom DateTime @default(now())
+  effectiveTo   DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, fromCurrency, toCurrency])
+  @@index([tenantId, effectiveFrom])
+  @@unique([id, tenantId])
+}
+
+// ─── TAX / VAT ────────────────────────────────────────────────────────────────
+
+model TaxZone {
+  id        String    @id @default(cuid())
+  tenantId  String
+  name      String
+  country   String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  rates     TaxRate[]
+
+  @@index([tenantId])
+  @@unique([id, tenantId])
+}
+
+model TaxRate {
+  id        String   @id @default(cuid())
+  tenantId  String
+  zoneId    String
+  zone      TaxZone  @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  name      String
+  code      String
+  rate      Float
+  taxType   String   @default("VAT")
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, zoneId])
+  @@unique([id, tenantId])
+}
+
+// ─── VENDOR MANAGEMENT ────────────────────────────────────────────────────────
+
+model Vendor {
+  id              String          @id @default(cuid())
+  tenantId        String
+  name            String
+  code            String?
+  email           String?
+  phone           String?
+  website         String?
+  address         Json            @default("{}")
+  taxRegistration String?
+  paymentTerms    String?
+  currency        String          @default("USD")
+  isActive        Boolean         @default(true)
+  notes           String?
+  customFields    Json            @default("{}")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  products        VendorProduct[]
+
+  @@index([tenantId])
+  @@unique([id, tenantId])
+}
+
+model VendorProduct {
+  id           String   @id @default(cuid())
+  tenantId     String
+  vendorId     String
+  vendor       Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  productId    String
+  vendorSku    String?
+  costPrice    Decimal  @db.Decimal(18, 2)
+  currency     String   @default("USD")
+  leadTimeDays Int      @default(0)
+  minOrderQty  Int      @default(1)
+  isPreferred  Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([tenantId, vendorId])
+  @@index([tenantId, productId])
+  @@unique([id, tenantId])
+}
+
+// ─── PRODUCT KITS / BUNDLES ───────────────────────────────────────────────────
+
+model ProductKit {
+  id                String           @id @default(cuid())
+  tenantId          String
+  name              String
+  sku               String?
+  description       String?
+  currency          String           @default("USD")
+  listPrice         Decimal          @db.Decimal(18, 2)
+  isActive          Boolean          @default(true)
+  allowItemOverride Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  items             ProductKitItem[]
+
+  @@index([tenantId])
+  @@unique([id, tenantId])
+}
+
+model ProductKitItem {
+  id         String     @id @default(cuid())
+  tenantId   String
+  kitId      String
+  kit        ProductKit @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  productId  String
+  quantity   Int        @default(1)
+  unitPrice  Decimal?   @db.Decimal(18, 2)
+  isOptional Boolean    @default(false)
+  sortOrder  Int        @default(0)
+
+  @@index([tenantId, kitId])
+  @@unique([id, tenantId])
+}
+
+// ─── PRICE BOOKS ──────────────────────────────────────────────────────────────
+
+model PriceBook {
+  id        String          @id @default(cuid())
+  tenantId  String
+  name      String
+  code      String?
+  currency  String          @default("USD")
+  isDefault Boolean         @default(false)
+  isActive  Boolean         @default(true)
+  validFrom DateTime?
+  validTo   DateTime?
+  tiers     String[]        @default([])
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  entries   PriceBookEntry[]
+
+  @@index([tenantId])
+  @@unique([id, tenantId])
+}
+
+model PriceBookEntry {
+  id          String    @id @default(cuid())
+  tenantId    String
+  priceBookId String
+  priceBook   PriceBook @relation(fields: [priceBookId], references: [id], onDelete: Cascade)
+  productId   String
+  unitPrice   Decimal   @db.Decimal(18, 2)
+  minQty      Int       @default(1)
+  discountPct Float     @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([priceBookId, productId, minQty])
+  @@index([tenantId, priceBookId])
+  @@unique([id, tenantId])
+}
+
+// ─── RFQ MODULE ───────────────────────────────────────────────────────────────
+
+model RFQ {
+  id               String    @id @default(cuid())
+  tenantId         String
+  rfqNumber        String
+  title            String
+  dealId           String?
+  accountId        String?
+  contactId        String?
+  ownerId          String
+  status           RFQStatus @default(DRAFT)
+  currency         String    @default("USD")
+  requiredByDate   DateTime?
+  lineItems        Json      @default("[]")
+  vendorResponses  Json      @default("[]")
+  internalNotes    String?
+  convertedQuoteId String?
+  deletedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([tenantId, rfqNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, dealId])
+  @@index([tenantId, accountId])
+  @@unique([id, tenantId])
+}
+
+enum RFQStatus {
+  DRAFT
+  SENT
+  RESPONDED
+  REVIEWING
+  CONVERTED
+  CANCELLED
+}
+
+// ─── QUOTE TEMPLATES ──────────────────────────────────────────────────────────
+
+model QuoteTemplate {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  storageKey  String
+  version     Int      @default(1)
+  status      QuoteTemplateStatus @default(DRAFT)
+  contentType String   @default("text/html")
+  body        String?
+  variables   Json     @default("[]")
+  isDefault   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  language    String   @default("en")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  documents   QuoteDocument[]
+
+  @@index([tenantId])
+  @@index([tenantId, isActive, language])
+  @@unique([tenantId, name, version, language])
+  @@unique([id, tenantId])
+}
+
+enum QuoteTemplateStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model QuoteDocument {
+  id              String              @id @default(cuid())
+  tenantId        String
+  quoteId         String
+  quote           Quote               @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  templateId      String?
+  template        QuoteTemplate?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  format          QuoteDocumentFormat
+  status          QuoteDocumentStatus @default(QUEUED)
+  storageKey      String?
+  fileName        String
+  contentType     String
+  renderedHtml    String?
+  contentBase64   String?
+  contentSize     Int?
+  checksum        String?
+  renderData      Json                @default("{}")
+  error           String?
+  generatedById   String?
+  generatedAt     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([tenantId, quoteId])
+  @@index([tenantId, status])
+  @@unique([id, tenantId])
+}
+
+enum QuoteDocumentFormat {
+  HTML
+  PDF
+  DOCX
+}
+
+enum QuoteDocumentStatus {
+  QUEUED
+  RENDERED
+  FAILED
+  ARCHIVED
+}
+
+model QuoteESignEnvelope {
+  id                 String               @id @default(cuid())
+  tenantId           String
+  quoteId            String
+  quote              Quote                @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  documentId         String?
+  provider           String               @default("INTERNAL")
+  providerEnvelopeId String?
+  status             QuoteESignStatus     @default(DRAFT)
+  recipientName      String
+  recipientEmail     String
+  sentById           String
+  sentAt             DateTime?
+  viewedAt           DateTime?
+  signedAt           DateTime?
+  declinedAt         DateTime?
+  declinedReason     String?
+  expiresAt          DateTime?
+  auditTrail         Json                 @default("[]")
+  customFields       Json                 @default("{}")
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([tenantId, quoteId])
+  @@index([tenantId, status])
+  @@unique([id, tenantId])
+}
+
+enum QuoteESignStatus {
+  DRAFT
+  SENT
+  VIEWED
+  SIGNED
+  DECLINED
+  VOIDED
+  EXPIRED
+}
+
+// ─── QUOTE AUTOMATION RULES ───────────────────────────────────────────────────
+
+model QuoteAutomationRule {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  isActive    Boolean  @default(true)
+  trigger     String
+  conditions  Json     @default("{}")
+  templateId  String?
+  priceBookId String?
+  actions     Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, trigger])
+  @@unique([id, tenantId])
+}
+
+model DealRoom {
+  id           String   @id @default(cuid())
+  tenantId     String
+  dealId       String   @unique
+  title        String
+  slug         String   @unique
+  isPublished  Boolean  @default(false)
+  buyerEmails  Json     @default("[]")
+  lastViewedAt DateTime?
+  viewCount    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+  items        MutualActionItem[]
+  documents    DealRoomDocument[]
+
+  @@index([tenantId])
+  @@unique([id, tenantId])
+}
+
+model MutualActionItem {
+  id          String    @id @default(cuid())
+  tenantId    String
+  dealRoomId  String
+  title       String
+  description String?
+  owner       String
+  ownerName   String?
+  dueDate     DateTime?
+  completedAt DateTime?
+  position    Int       @default(0)
+  createdAt   DateTime  @default(now())
+  dealRoom    DealRoom  @relation(fields: [dealRoomId], references: [id], onDelete: Cascade)
+
+  @@index([dealRoomId])
+  @@unique([id, tenantId])
+}
+
+model DealRoomDocument {
+  id         String   @id @default(cuid())
+  tenantId   String
+  dealRoomId String
+  name       String
+  url        String
+  fileType   String?
+  uploadedBy String
+  createdAt  DateTime @default(now())
+  dealRoom   DealRoom @relation(fields: [dealRoomId], references: [id], onDelete: Cascade)
+
+  @@index([dealRoomId])
+  @@unique([id, tenantId])
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  key            String?
+  payload        Json
+  tenantId       String?
+  aggregateType  String?
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  processedAt    DateTime?
+  retryCount     Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([processedAt, retryCount, createdAt])
+  @@index([aggregateType, aggregateId])
+  @@index([aggregateId])
+}
+
+model CpqTransitionLedger {
+  id                String   @id @default(cuid())
+  tenantId          String
+  entity            String
+  entityId          String
+  action            String
+  idempotencyKey    String
+  correlationId     String?
+  actorId           String?
+  source            String?
+  sourceEventId     String?
+  approvalRequestId String?
+  previousStatus    String?
+  nextStatus        String?
+  result            Json?
+  error             Json?
+  status            String   @default("STARTED")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([tenantId, entity, entityId, action, idempotencyKey], map: "cpq_transition_ledger_idempotency_key")
+  @@unique([id, tenantId], map: "cpq_transition_ledger_id_tenant_key")
+  @@index([tenantId, entity, entityId], map: "cpq_transition_ledger_entity_idx")
+  @@index([tenantId, correlationId], map: "cpq_transition_ledger_correlation_idx")
+  @@index([tenantId, sourceEventId], map: "cpq_transition_ledger_source_event_idx")
 }

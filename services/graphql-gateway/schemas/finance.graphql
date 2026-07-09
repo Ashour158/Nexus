@@ -1,0 +1,679 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+type Query {
+  products(limit: Int, offset: Int): [Product!]!
+  product(id: ID!): Product
+  priceTiers(productId: ID, limit: Int, offset: Int): [PriceTier!]!
+  priceTier(id: ID!): PriceTier
+  promoCodes(limit: Int, offset: Int): [PromoCode!]!
+  promoCode(id: ID!): PromoCode
+  accounts(limit: Int, offset: Int): [Account!]! @shareable
+  account(id: ID!): Account @shareable
+  quotes(limit: Int, offset: Int): [Quote!]!
+  quote(id: ID!): Quote
+  invoices(limit: Int, offset: Int): [Invoice!]!
+  invoice(id: ID!): Invoice
+  contracts(limit: Int, offset: Int): [Contract!]!
+  contract(id: ID!): Contract
+  subscriptions(limit: Int, offset: Int): [Subscription!]!
+  subscription(id: ID!): Subscription
+  payments(limit: Int, offset: Int): [Payment!]!
+  payment(id: ID!): Payment
+  currencies(limit: Int, offset: Int): [Currency!]!
+  currency(id: ID!): Currency
+  taxZones(limit: Int, offset: Int): [TaxZone!]!
+  taxZone(id: ID!): TaxZone
+  taxRates(limit: Int, offset: Int): [TaxRate!]!
+  taxRate(id: ID!): TaxRate
+}
+
+type Mutation {
+  createProduct(input: CreateProductInput!): Product!
+  updateProduct(id: ID!, input: UpdateProductInput!): Product!
+  deleteProduct(id: ID!): Boolean!
+  createPriceTier(input: CreatePriceTierInput!): PriceTier!
+  updatePriceTier(id: ID!, input: UpdatePriceTierInput!): PriceTier!
+  deletePriceTier(id: ID!): Boolean!
+  createPromoCode(input: CreatePromoCodeInput!): PromoCode!
+  updatePromoCode(id: ID!, input: UpdatePromoCodeInput!): PromoCode!
+  deletePromoCode(id: ID!): Boolean!
+  createQuote(input: CreateQuoteInput!): Quote! @deprecated(reason: "CPQ mutations moved to finance-service transition authority.")
+  updateQuote(id: ID!, input: UpdateQuoteInput!): Quote! @deprecated(reason: "CPQ mutations moved to finance-service transition authority.")
+  deleteQuote(id: ID!): Boolean! @deprecated(reason: "CPQ mutations moved to finance-service transition authority.")
+  createInvoice(input: CreateInvoiceInput!): Invoice!
+  updateInvoice(id: ID!, input: UpdateInvoiceInput!): Invoice!
+  deleteInvoice(id: ID!): Boolean!
+  createContract(input: CreateContractInput!): Contract!
+  updateContract(id: ID!, input: UpdateContractInput!): Contract!
+  deleteContract(id: ID!): Boolean!
+  createSubscription(input: CreateSubscriptionInput!): Subscription!
+  updateSubscription(id: ID!, input: UpdateSubscriptionInput!): Subscription!
+  deleteSubscription(id: ID!): Boolean!
+  createPayment(input: CreatePaymentInput!): Payment!
+  updatePayment(id: ID!, input: UpdatePaymentInput!): Payment!
+  deletePayment(id: ID!): Boolean!
+  createCurrency(input: CreateCurrencyInput!): Currency!
+  updateCurrency(id: ID!, input: UpdateCurrencyInput!): Currency!
+  deleteCurrency(id: ID!): Boolean!
+  createTaxZone(input: CreateTaxZoneInput!): TaxZone!
+  updateTaxZone(id: ID!, input: UpdateTaxZoneInput!): TaxZone!
+  deleteTaxZone(id: ID!): Boolean!
+  createTaxRate(input: CreateTaxRateInput!): TaxRate!
+  updateTaxRate(id: ID!, input: UpdateTaxRateInput!): TaxRate!
+  deleteTaxRate(id: ID!): Boolean!
+}
+
+type Product @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  sku: String!
+  name: String!
+  nameAr: String
+  description: String
+  descriptionAr: String
+  unitAr: String
+  type: String!
+  category: String
+  currency: String!
+  listPrice: Float!
+  cost: Float
+  billingType: String!
+  billingPeriod: String
+  taxable: Boolean!
+  taxCode: String
+  isActive: Boolean!
+  pricingRules: JSON
+  customFields: JSON
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type PriceTier @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  productId: ID!
+  name: String!
+  minQty: Int!
+  maxQty: Int
+  unitPrice: Float!
+  createdAt: DateTime!
+}
+
+type PromoCode @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  code: String!
+  description: String
+  discountPercent: Float!
+  isActive: Boolean!
+  validFrom: DateTime
+  validUntil: DateTime
+  maxUses: Int
+  uses: Int!
+  applicableProductIds: [String!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Account @key(fields: "id") {
+  id: ID!
+  tenantId: ID! @shareable
+  tier: String! @shareable
+  annualRevenue: Float @shareable
+  updatedAt: DateTime! @shareable
+}
+
+type Quote @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  dealId: ID!
+  accountId: ID!
+  ownerId: ID!
+  quoteNumber: String!
+  name: String!
+  status: String!
+  currency: String!
+  subtotal: Float!
+  discountAmount: Float!
+  taxAmount: Float!
+  total: Float!
+  validUntil: DateTime
+  expiresAt: DateTime
+  approvalRequired: Boolean!
+  approvalStatus: String
+  approvedById: ID
+  approvedAt: DateTime
+  sentAt: DateTime
+  viewedAt: DateTime
+  acceptedAt: DateTime
+  rejectedAt: DateTime
+  rejectionReason: String
+  voidedAt: DateTime
+  voidReason: String
+  paymentTerms: String
+  terms: String
+  notes: String
+  appliedPromos: [String!]!
+  lineItems: JSON
+  pricingBreakdown: JSON
+  customFields: JSON
+  baseCurrency: String
+  baseTotal: Float
+  exchangeRate: Float
+  taxZoneId: ID
+  taxBreakdown: JSON
+  templateId: ID
+  rfqId: ID
+  acceptanceToken: String
+  marginTotal: Float
+  priceBookId: ID
+  vendorTaxReg: String
+  buyerTaxReg: String
+  dueDate: DateTime
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Invoice @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  accountId: ID!
+  subscriptionId: ID
+  contractId: ID
+  invoiceNumber: String!
+  status: String!
+  currency: String!
+  subtotal: Float!
+  taxAmount: Float!
+  discountAmount: Float!
+  total: Float!
+  dueDate: DateTime
+  paidAt: DateTime
+  paidAmount: Float
+  lineItems: JSON
+  notes: String
+  customFields: JSON
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Contract @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  accountId: ID!
+  ownerId: ID!
+  contractNumber: String!
+  name: String!
+  status: String!
+  startDate: DateTime
+  endDate: DateTime
+  autoRenew: Boolean!
+  renewalTermDays: Int!
+  currency: String!
+  totalValue: Float!
+  signedAt: DateTime
+  signedById: ID
+  signatureData: JSON
+  terms: String
+  lineItems: JSON
+  customFields: JSON
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Subscription @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  accountId: ID!
+  contractId: ID
+  productId: ID!
+  planName: String!
+  status: String!
+  quantity: Int!
+  unitPrice: Float!
+  currency: String!
+  billingPeriod: String!
+  billingDay: Int!
+  startDate: DateTime!
+  endDate: DateTime
+  trialEndDate: DateTime
+  cancelledAt: DateTime
+  cancelReason: String
+  mrr: Float!
+  arr: Float!
+  nextBillingDate: DateTime
+  customFields: JSON
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Payment @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  invoiceId: ID!
+  amount: Float!
+  currency: String!
+  method: String!
+  status: String!
+  reference: String
+  gateway: String
+  gatewayRef: String
+  notes: String
+  paidAt: DateTime
+  failedAt: DateTime
+  failureReason: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Currency @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  code: String!
+  name: String!
+  symbol: String!
+  isBase: Boolean!
+  isActive: Boolean!
+  decimalPlaces: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type TaxZone @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  name: String!
+  country: String
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type TaxRate @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  zoneId: ID!
+  name: String!
+  code: String!
+  rate: Float!
+  taxType: String!
+  isDefault: Boolean!
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+input CreateProductInput {
+  tenantId: ID!
+  sku: String!
+  name: String!
+  nameAr: String
+  description: String
+  descriptionAr: String
+  unitAr: String
+  type: String
+  category: String
+  currency: String
+  listPrice: Float!
+  cost: Float
+  billingType: String
+  billingPeriod: String
+  taxable: Boolean
+  taxCode: String
+  isActive: Boolean
+  pricingRules: JSON
+  customFields: JSON
+}
+
+input UpdateProductInput {
+  sku: String
+  name: String
+  nameAr: String
+  description: String
+  descriptionAr: String
+  unitAr: String
+  type: String
+  category: String
+  currency: String
+  listPrice: Float
+  cost: Float
+  billingType: String
+  billingPeriod: String
+  taxable: Boolean
+  taxCode: String
+  isActive: Boolean
+  pricingRules: JSON
+  customFields: JSON
+}
+
+input CreatePriceTierInput {
+  tenantId: ID!
+  productId: ID!
+  name: String!
+  minQty: Int
+  maxQty: Int
+  unitPrice: Float!
+}
+
+input UpdatePriceTierInput {
+  productId: ID
+  name: String
+  minQty: Int
+  maxQty: Int
+  unitPrice: Float
+}
+
+input CreatePromoCodeInput {
+  tenantId: ID!
+  code: String!
+  description: String
+  discountPercent: Float
+  isActive: Boolean
+  validFrom: DateTime
+  validUntil: DateTime
+  maxUses: Int
+  applicableProductIds: [String!]
+}
+
+input UpdatePromoCodeInput {
+  code: String
+  description: String
+  discountPercent: Float
+  isActive: Boolean
+  validFrom: DateTime
+  validUntil: DateTime
+  maxUses: Int
+  applicableProductIds: [String!]
+}
+
+input CreateQuoteInput {
+  tenantId: ID!
+  dealId: ID!
+  accountId: ID!
+  ownerId: ID!
+  quoteNumber: String!
+  name: String!
+  status: String
+  currency: String
+  subtotal: Float
+  discountAmount: Float
+  taxAmount: Float
+  total: Float
+  validUntil: DateTime
+  expiresAt: DateTime
+  approvalRequired: Boolean
+  paymentTerms: String
+  terms: String
+  notes: String
+  appliedPromos: [String!]
+  lineItems: JSON
+  pricingBreakdown: JSON
+  customFields: JSON
+  baseCurrency: String
+  baseTotal: Float
+  exchangeRate: Float
+  taxZoneId: ID
+  taxBreakdown: JSON
+  templateId: ID
+  rfqId: ID
+  marginTotal: Float
+  priceBookId: ID
+  vendorTaxReg: String
+  buyerTaxReg: String
+  dueDate: DateTime
+}
+
+input UpdateQuoteInput {
+  dealId: ID
+  accountId: ID
+  ownerId: ID
+  quoteNumber: String
+  name: String
+  status: String
+  currency: String
+  subtotal: Float
+  discountAmount: Float
+  taxAmount: Float
+  total: Float
+  validUntil: DateTime
+  expiresAt: DateTime
+  approvalRequired: Boolean
+  approvalStatus: String
+  approvedById: ID
+  approvedAt: DateTime
+  sentAt: DateTime
+  viewedAt: DateTime
+  acceptedAt: DateTime
+  rejectedAt: DateTime
+  rejectionReason: String
+  voidedAt: DateTime
+  voidReason: String
+  paymentTerms: String
+  terms: String
+  notes: String
+  appliedPromos: [String!]
+  lineItems: JSON
+  pricingBreakdown: JSON
+  customFields: JSON
+  baseCurrency: String
+  baseTotal: Float
+  exchangeRate: Float
+  taxZoneId: ID
+  taxBreakdown: JSON
+  templateId: ID
+  rfqId: ID
+  marginTotal: Float
+  priceBookId: ID
+  vendorTaxReg: String
+  buyerTaxReg: String
+  dueDate: DateTime
+}
+
+input CreateInvoiceInput {
+  tenantId: ID!
+  accountId: ID!
+  subscriptionId: ID
+  contractId: ID
+  invoiceNumber: String!
+  status: String
+  currency: String
+  subtotal: Float!
+  taxAmount: Float
+  discountAmount: Float
+  total: Float!
+  dueDate: DateTime
+  lineItems: JSON
+  notes: String
+  customFields: JSON
+}
+
+input UpdateInvoiceInput {
+  accountId: ID
+  subscriptionId: ID
+  contractId: ID
+  invoiceNumber: String
+  status: String
+  currency: String
+  subtotal: Float
+  taxAmount: Float
+  discountAmount: Float
+  total: Float
+  dueDate: DateTime
+  paidAt: DateTime
+  paidAmount: Float
+  lineItems: JSON
+  notes: String
+  customFields: JSON
+}
+
+input CreateContractInput {
+  tenantId: ID!
+  accountId: ID!
+  ownerId: ID!
+  contractNumber: String!
+  name: String!
+  status: String
+  startDate: DateTime
+  endDate: DateTime
+  autoRenew: Boolean
+  renewalTermDays: Int
+  currency: String
+  totalValue: Float!
+  signedById: ID
+  signatureData: JSON
+  terms: String
+  lineItems: JSON
+  customFields: JSON
+}
+
+input UpdateContractInput {
+  accountId: ID
+  ownerId: ID
+  contractNumber: String
+  name: String
+  status: String
+  startDate: DateTime
+  endDate: DateTime
+  autoRenew: Boolean
+  renewalTermDays: Int
+  currency: String
+  totalValue: Float
+  signedById: ID
+  signatureData: JSON
+  terms: String
+  lineItems: JSON
+  customFields: JSON
+}
+
+input CreateSubscriptionInput {
+  tenantId: ID!
+  accountId: ID!
+  contractId: ID
+  productId: ID!
+  planName: String!
+  status: String
+  quantity: Int
+  unitPrice: Float!
+  currency: String
+  billingPeriod: String
+  billingDay: Int
+  startDate: DateTime!
+  endDate: DateTime
+  trialEndDate: DateTime
+  cancelledAt: DateTime
+  cancelReason: String
+  mrr: Float!
+  arr: Float!
+  nextBillingDate: DateTime
+  customFields: JSON
+}
+
+input UpdateSubscriptionInput {
+  accountId: ID
+  contractId: ID
+  productId: ID
+  planName: String
+  status: String
+  quantity: Int
+  unitPrice: Float
+  currency: String
+  billingPeriod: String
+  billingDay: Int
+  startDate: DateTime
+  endDate: DateTime
+  trialEndDate: DateTime
+  cancelledAt: DateTime
+  cancelReason: String
+  mrr: Float
+  arr: Float
+  nextBillingDate: DateTime
+  customFields: JSON
+}
+
+input CreatePaymentInput {
+  tenantId: ID!
+  invoiceId: ID!
+  amount: Float!
+  currency: String
+  method: String!
+  status: String
+  reference: String
+  gateway: String
+  gatewayRef: String
+  notes: String
+  paidAt: DateTime
+}
+
+input UpdatePaymentInput {
+  invoiceId: ID
+  amount: Float
+  currency: String
+  method: String
+  status: String
+  reference: String
+  gateway: String
+  gatewayRef: String
+  notes: String
+  paidAt: DateTime
+  failedAt: DateTime
+  failureReason: String
+}
+
+input CreateCurrencyInput {
+  tenantId: ID!
+  code: String!
+  name: String!
+  symbol: String!
+  isBase: Boolean
+  isActive: Boolean
+  decimalPlaces: Int
+}
+
+input UpdateCurrencyInput {
+  code: String
+  name: String
+  symbol: String
+  isBase: Boolean
+  isActive: Boolean
+  decimalPlaces: Int
+}
+
+input CreateTaxZoneInput {
+  tenantId: ID!
+  name: String!
+  country: String
+  isActive: Boolean
+}
+
+input UpdateTaxZoneInput {
+  name: String
+  country: String
+  isActive: Boolean
+}
+
+input CreateTaxRateInput {
+  tenantId: ID!
+  zoneId: ID!
+  name: String!
+  code: String!
+  rate: Float!
+  taxType: String
+  isDefault: Boolean
+  isActive: Boolean
+}
+
+input UpdateTaxRateInput {
+  zoneId: ID
+  name: String
+  code: String
+  rate: Float
+  taxType: String
+  isDefault: Boolean
+  isActive: Boolean
+}
+
+scalar DateTime
+scalar JSON

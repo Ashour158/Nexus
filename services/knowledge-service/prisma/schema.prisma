@@ -20,6 +20,7 @@ model KbCategory {
   articles         KbArticle[]
 
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 model KbArticle {
@@ -35,6 +36,9 @@ model KbArticle {
   authorId   String
   version    Int           @default(1)
   viewCount  Int           @default(0)
+  helpfulCount    Int       @default(0)
+  notHelpfulCount Int       @default(0)
+  publishedAt     DateTime?
   dealStages String[]
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
@@ -42,6 +46,7 @@ model KbArticle {
 
   @@unique([tenantId, slug])
   @@index([tenantId, status])
+  @@unique([id, tenantId])
 }
 
 model KbView {
@@ -59,4 +64,25 @@ enum ArticleStatus {
   DRAFT
   PUBLISHED
   ARCHIVED
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
 }

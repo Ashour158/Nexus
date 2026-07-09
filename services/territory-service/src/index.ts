@@ -1,55 +1,97 @@
-import Fastify from 'fastify';
-import fastifyJwt from '@fastify/jwt';
+import 'dotenv/config';
+import { startTracing } from '@nexus/service-utils/tracing';
+import { createService, startService, globalErrorHandler, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
 import rateLimit from '@fastify/rate-limit';
 import { NexusConsumer, NexusProducer, TOPICS } from '@nexus/kafka';
-import { globalErrorHandler, startService } from '@nexus/service-utils';
-import { getPrisma } from './prisma.js';
+import { getPrisma, tenantAls } from './prisma.js';
 import { createTerritoriesService } from './services/territories.service.js';
 import { registerTerritoriesRoutes } from './routes/territories.routes.js';
+import { registerTerritoryInternalRoutes } from './routes/internal.routes.js';
+import { registerGraphQL } from './graphql/index.js';
 
-const app = Fastify({ logger: true });
+startTracing({ serviceName: 'territory-service' });
+const port = parseInt(process.env.PORT ?? '3019', 10);
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret || jwtSecret.length < 32) {
+  throw new Error('JWT_SECRET must be set to at least 32 characters.');
+}
+
+const app = await createService({
+  name: 'territory-service',
+  port,
+  jwtSecret,
+  corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(',').map((s) => s.trim()),
+});
+
 const prisma = getPrisma();
 const producer = new NexusProducer('territory-service');
-const consumer = new NexusConsumer('territory-service-leads');
+const consumer = new NexusConsumer('territory-service-routing');
 const territories = createTerritoriesService(prisma, producer);
 
-await app.register(fastifyJwt, { secret: process.env.JWT_SECRET ?? 'nexus-secret' });
+// Bridge Fastify request-context tenantId into Prisma tenant ALS (defense-in-depth)
+app.addHook('preHandler', async (request) => {
+  const tenantId = (request as any).requestContext?.get('tenantId');
+  if (tenantId) tenantAls.enterWith({ tenantId });
+});
+
 await app.register(rateLimit, {
   global: true,
   max: 300,
   timeWindow: '1 minute',
-  errorResponseBuilder: (_req, context) => ({
+  errorResponseBuilder: (_req: any, context: any) => ({
     success: false,
     error: 'RATE_LIMIT_EXCEEDED',
     message: `Too many requests. Retry after ${context.after}.`,
   }),
 });
+registerHealthRoutes(app, 'territory-service', [() => checkDatabase(prisma as any)]);
 app.setErrorHandler(globalErrorHandler);
 
-app.addHook('onRequest', async (request, reply) => {
+await registerTerritoriesRoutes(app, territories);
+await registerTerritoryInternalRoutes(app, territories);
+await producer.connect().catch(() => undefined);
+await consumer.subscribe([TOPICS.LEADS, TOPICS.ACCOUNTS]).catch(() => undefined);
+
+// lead.created → evaluate territory rules, assign owner, call CRM back.
+// Fail-open: any error is logged, never rethrown, so the consumer loop survives.
+consumer.on('lead.created', async (event) => {
   try {
-    await request.jwtVerify();
-  } catch {
-    return reply.code(401).send({ success: false, error: 'Unauthorized' });
+    const lead = event.payload as Record<string, unknown>;
+    // leads-service emits `leadId`; internal route passes `id`. Support both.
+    const leadId = String(lead.leadId ?? lead.id ?? '');
+    if (!leadId) return;
+    const assigned = await territories.assignRecord(event.tenantId, 'LEAD', leadId, { ...lead, id: leadId });
+    if (assigned?.assignedOwnerId) {
+      const res = await fetch(`${process.env.CRM_SERVICE_URL}/api/v1/internal/leads/${leadId}/owner`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '',
+          'x-tenant-id': event.tenantId,
+        },
+        body: JSON.stringify({ ownerId: assigned.assignedOwnerId, territoryId: assigned.territory?.id }),
+      });
+      if (!res.ok) {
+        console.warn(`[TerritoryConsumer] lead owner callback failed: ${res.status} ${await res.text().catch(() => '')}`);
+      }
+    }
+  } catch (err: any) {
+    console.warn('[TerritoryConsumer] lead.created handler error:', err?.message);
   }
 });
 
-await registerTerritoriesRoutes(app, territories);
-await producer.connect().catch(() => undefined);
-await consumer.subscribe([TOPICS.LEADS]).catch(() => undefined);
-consumer.on('lead.created', async (event) => {
-  const lead = event.payload as Record<string, unknown>;
-  const assigned = await territories.assignLead(event.tenantId, lead);
-  if (assigned?.assignedOwnerId) {
-    await fetch(`${process.env.CRM_SERVICE_URL}/api/v1/leads/${String(lead.id)}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.INTERNAL_SERVICE_TOKEN ?? ''}`,
-      },
-      body: JSON.stringify({ ownerId: assigned.assignedOwnerId }),
-      }),
-    });
+// account.created → evaluate territory rules and record the assignment.
+// crm-service has no internal account-owner endpoint yet, so we publish an
+// `account.routed` event (see assignRecord) for it to consume; this handler
+// stays additive and fail-open.
+consumer.on('account.created', async (event) => {
+  try {
+    const account = event.payload as Record<string, unknown>;
+    const accountId = String(account.accountId ?? account.id ?? '');
+    if (!accountId) return;
+    await territories.assignRecord(event.tenantId, 'ACCOUNT', accountId, { ...account, id: accountId });
+  } catch (err: any) {
+    console.warn('[TerritoryConsumer] account.created handler error:', err?.message);
   }
 });
 
@@ -57,10 +99,9 @@ await consumer.start().catch(() => undefined);
 
 app.addHook('onClose', async () => {
   try { await producer.disconnect(); } catch { /* ignore */ }
-  try { await consumer.stop(); } catch { /* ignore */ }
+  try { await consumer.disconnect(); } catch { /* ignore */ }
 });
 
-const port = parseInt(process.env.PORT ?? '3019', 10);
-await startService(app, port, async () => {
-  await prisma.$disconnect();
-});
+await registerGraphQL(app, prisma);
+
+await startService(app, port, async () => {});

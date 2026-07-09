@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { startTracing } from '@nexus/service-utils/tracing';
 import rateLimit from '@fastify/rate-limit';
 import {
   checkDatabase,
@@ -9,6 +10,7 @@ import {
 } from '@nexus/service-utils';
 import { NexusProducer } from '@nexus/kafka';
 import { PrismaClient } from '../../../node_modules/.prisma/blueprint-client/index.js';
+import { buildDatabaseUrl } from '@nexus/service-utils/db';
 import { createBlueprintPrisma } from './prisma.js';
 import { createPlaybooksService } from './services/playbooks.service.js';
 import { createTemplatesService } from './services/templates.service.js';
@@ -17,8 +19,17 @@ import { registerBlueprintInternalRoutes } from './routes/internal.routes.js';
 import { registerPlaybooksRoutes } from './routes/playbooks.routes.js';
 import { registerTemplatesRoutes } from './routes/templates.routes.js';
 import { registerValidationRoutes } from './routes/validation.routes.js';
+import { registerGraphQL } from './graphql/index.js';
+import { startDealStageConsumer } from './consumers/deal-stage.consumer.js';
 
-const rawPrisma = new PrismaClient();
+startTracing({ serviceName: 'blueprint-service' });
+const rawPrisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: buildDatabaseUrl({ connectionLimit: 5, poolTimeout: 10 }),
+    },
+  },
+});
 const prisma = createBlueprintPrisma(rawPrisma);
 const producer = new NexusProducer('blueprint-service');
 
@@ -56,9 +67,25 @@ try {
   app.log.warn({ err }, 'Kafka producer connect failed');
 }
 
+// Deal stage-change consumer: executes playbook stage entryActions on
+// `deal.stage_changed`. Guarded so a Kafka/DB outage never stops the service
+// from booting or serving HTTP.
+let dealStageConsumer: Awaited<ReturnType<typeof startDealStageConsumer>> | null = null;
+try {
+  dealStageConsumer = await startDealStageConsumer(prisma, producer, app.log);
+  app.log.info('Deal stage consumer started (playbook entry actions)');
+} catch (err) {
+  app.log.warn({ err }, 'Deal stage consumer failed to start; continuing without stage-entry actions');
+}
+
 app.addHook('onClose', async () => {
   try {
     await producer.disconnect();
+  } catch {
+    /* ignore */
+  }
+  try {
+    await dealStageConsumer?.disconnect();
   } catch {
     /* ignore */
   }
@@ -66,11 +93,13 @@ app.addHook('onClose', async () => {
 });
 
 const playbooks = createPlaybooksService(prisma, producer);
-const templates = createTemplatesService(prisma, producer);
+const templates = createTemplatesService(prisma);
 const validation = createValidationService(prisma);
 
+await registerGraphQL(app, prisma);
+
 await startService(app, port, async (a) => {
-  await registerBlueprintInternalRoutes(a, prisma);
+  await registerBlueprintInternalRoutes(a, validation);
   await registerPlaybooksRoutes(a, playbooks);
   await registerTemplatesRoutes(a, templates);
   await registerValidationRoutes(a, validation);

@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: playwright-workers
+  namespace: nexus-monitoring
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: playwright-workers
+  template:
+    metadata:
+      labels:
+        app: playwright-workers
+    spec:
+      containers:
+        - name: worker
+          image: mcr.microsoft.com/playwright:v1.44.0-jammy
+          command:
+            - npx
+            - playwright
+            - run-server
+            - --port
+            - "3000"
+          ports:
+            - containerPort: 3000
+              name: worker
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+            requests:
+              cpu: 500m
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: playwright-workers
+  namespace: nexus-monitoring
+spec:
+  selector:
+    app: playwright-workers
+  ports:
+    - port: 3000
+      targetPort: 3000

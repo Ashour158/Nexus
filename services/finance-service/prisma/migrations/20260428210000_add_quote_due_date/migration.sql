@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Quote" ADD COLUMN IF NOT EXISTS "dueDate" TIMESTAMP(3);

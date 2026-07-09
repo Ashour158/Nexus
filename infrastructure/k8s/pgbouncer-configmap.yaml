@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgbouncer-config
+  namespace: nexus
+data:
+  pgbouncer.ini: |
+    [databases]
+    nexus = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus
+    nexus_crm = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_crm
+    nexus_auth = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_auth
+    nexus_billing = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_billing
+    nexus_comm = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_comm
+    nexus_integration = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_integration
+    nexus_notification = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_notification
+    nexus_storage = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_storage
+    nexus_workflow = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_workflow
+    nexus_approval = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_approval
+    nexus_cadence = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_cadence
+    nexus_territory = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_territory
+    nexus_planning = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_planning
+    nexus_reporting = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_reporting
+    nexus_portal = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_portal
+    nexus_knowledge = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_knowledge
+    nexus_incentive = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_incentive
+    nexus_chatbot = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_chatbot
+    nexus_data = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_data
+    nexus_documents = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_documents
+    nexus_finance = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_finance
+    nexus_email_sync = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_email_sync
+    nexus_blueprint = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_blueprint
+    nexus_leads = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_leads
+    nexus_accounts = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_accounts
+    nexus_notes = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_notes
+    nexus_quotes = host=postgres.nexus.svc.cluster.local port=5432 dbname=nexus_quotes
+
+    [pgbouncer]
+    listen_port = 6432
+    listen_addr = 0.0.0.0
+    auth_type = scram-sha-256
+    auth_file = /etc/pgbouncer/userlist.txt
+    pool_mode = transaction
+    ; Prisma requires prepared statements to be disabled when using PgBouncer
+    prepare_threshold = 0
+    ; Disable server-side prepared statements to prevent Prisma errors
+    disallow_prepared_statements = 1
+    max_client_conn = 10000
+    default_pool_size = 25
+    min_pool_size = 5
+    reserve_pool_size = 5
+    reserve_pool_timeout = 3
+    max_db_connections = 100
+    max_user_connections = 100
+    server_idle_timeout = 600
+    server_lifetime = 3600
+    server_connect_timeout = 15
+    client_idle_timeout = 0
+    client_login_timeout = 60
+    query_timeout = 0
+    query_wait_timeout = 120
+    server_fast_close = 1
+    server_round_robin = 1
+    admin_users = postgres
+    stats_users = postgres
+    log_connections = 1
+    log_disconnections = 1
+    log_pooler_errors = 1
+    stats_period = 60

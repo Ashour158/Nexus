@@ -6,10 +6,13 @@ import type {
   SignContractInput,
   UpdateContractInput,
 } from '@nexus/validation';
+import { NexusProducer, TOPICS } from '@nexus/kafka';
 import { Prisma } from '../../../../node_modules/.prisma/finance-client/index.js';
 import type { Contract } from '../../../../node_modules/.prisma/finance-client/index.js';
 import type { FinancePrisma } from '../prisma.js';
-import { toPaginatedResult } from '../lib/pagination.js';
+import { toPaginatedResult } from '@nexus/shared-types';
+
+const producer = new NexusProducer('finance-service-contracts');
 
 type ContractListFilters = Omit<
   ContractListQuery,
@@ -89,7 +92,7 @@ export function createContractsService(prisma: FinancePrisma) {
       data: CreateContractInput
     ): Promise<Contract> {
       const contractNumber = await generateContractNumber(prisma, tenantId);
-      return prisma.contract.create({
+      const created = await prisma.contract.create({
         data: {
           tenantId,
           accountId: data.accountId,
@@ -108,6 +111,16 @@ export function createContractsService(prisma: FinancePrisma) {
           customFields: data.customFields as Prisma.InputJsonValue,
         },
       });
+      producer.publish(TOPICS.CONTRACTS, {
+        type: 'contract.created',
+        tenantId,
+        contractId: created.id,
+        contractNumber: created.contractNumber,
+        accountId: created.accountId,
+        totalValue: created.totalValue.toString(),
+        currency: created.currency,
+      }).catch((err: unknown) => console.error('[contracts.service] Kafka publish failed', err));
+      return created;
     },
 
     async updateContract(
@@ -160,7 +173,7 @@ export function createContractsService(prisma: FinancePrisma) {
       if (existing.status === 'EXPIRED' || existing.status === 'TERMINATED') {
         throw new BusinessRuleError('Cannot sign a closed contract');
       }
-      return prisma.contract.update({
+      const signed = await prisma.contract.update({
         where: { id },
         data: {
           status: 'ACTIVE',
@@ -170,15 +183,33 @@ export function createContractsService(prisma: FinancePrisma) {
           version: { increment: 1 },
         },
       });
+      producer.publish(TOPICS.CONTRACTS, {
+        type: 'contract.signed',
+        tenantId,
+        contractId: signed.id,
+        contractNumber: signed.contractNumber,
+        accountId: signed.accountId,
+        signedById: signed.signedById,
+        signedAt: signed.signedAt?.toISOString(),
+      }).catch((err: unknown) => console.error('[contracts.service] Kafka publish failed', err));
+      return signed;
     },
 
     async terminateContract(tenantId: string, id: string): Promise<Contract> {
       const existing = await loadOrThrow(tenantId, id);
       if (existing.status === 'TERMINATED') return existing;
-      return prisma.contract.update({
+      const terminated = await prisma.contract.update({
         where: { id },
         data: { status: 'TERMINATED', version: { increment: 1 } },
       });
+      producer.publish(TOPICS.CONTRACTS, {
+        type: 'contract.terminated',
+        tenantId,
+        contractId: terminated.id,
+        contractNumber: terminated.contractNumber,
+        accountId: terminated.accountId,
+      }).catch((err: unknown) => console.error('[contracts.service] Kafka publish failed', err));
+      return terminated;
     },
   };
 }

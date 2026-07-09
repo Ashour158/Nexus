@@ -1,0 +1,6 @@
+apiVersion: v2
+name: nexus-integration
+description: A Helm chart for nexus-integration microservice
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

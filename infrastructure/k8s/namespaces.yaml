@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nexus-system
+  labels:
+    name: nexus-system
+    app: nexus-crm
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nexus-monitoring
+  labels:
+    name: nexus-monitoring
+    app: nexus-crm

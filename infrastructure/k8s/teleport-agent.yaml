@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teleport-agent
+  namespace: teleport
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: teleport-agent
+  template:
+    metadata:
+      labels:
+        app: teleport-agent
+    spec:
+      containers:
+        - name: teleport
+          image: public.ecr.aws/gravitational/teleport-agent:15.0.0
+          command:
+            - teleport
+            - start
+            - --roles=kube
+            - --token=$(JOIN_TOKEN)
+            - --auth-server=teleport.nexus-crm.io:443
+          env:
+            - name: JOIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: teleport-join-token
+                  key: token
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi

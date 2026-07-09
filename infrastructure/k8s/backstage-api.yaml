@@ -1,0 +1,31 @@
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: nexus-graphql
+  description: Nexus CRM GraphQL API
+  tags:
+    - graphql
+    - api
+spec:
+  type: graphql
+  lifecycle: production
+  owner: team-platform
+  system: nexus-crm
+  definition:
+    $text: https://api.nexus-crm.io/graphql
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: nexus-rest
+  description: Nexus CRM REST API
+  tags:
+    - rest
+    - openapi
+spec:
+  type: openapi
+  lifecycle: production
+  owner: team-platform
+  system: nexus-crm
+  definition:
+    $text: https://api.nexus-crm.io/openapi.json

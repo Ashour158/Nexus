@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { formatCurrency, formatDate } from '@/lib/format';
 
@@ -40,7 +41,16 @@ export default async function PortalPage({ params }: { params: { token: string }
               Valid until {formatDate(String(quote.validUntil ?? ''))} · {String(quote.status ?? '')}
             </p>
           </div>
-          {ctx.branding.logoUrl ? <img src={ctx.branding.logoUrl} alt="" className="h-12 max-w-40 object-contain" /> : null}
+          {ctx.branding.logoUrl ? (
+            <Image
+              src={ctx.branding.logoUrl}
+              alt=""
+              width={160}
+              height={48}
+              unoptimized
+              className="h-12 max-w-40 object-contain"
+            />
+          ) : null}
         </div>
       </header>
 

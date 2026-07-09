@@ -5,8 +5,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClients } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { TableSkeleton } from '@/components/ui/skeleton';
-import { useUiStore } from '@/stores/ui.store';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
+import { ExportButton } from '@/components/export/ExportButton';
 import { formatCurrency, formatDate } from '@/lib/format';
+import { notify } from '@/lib/toast';
 
 interface Invoice {
   id: string;
@@ -32,7 +35,6 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function InvoicesPage(): JSX.Element {
   const qc = useQueryClient();
-  const pushToast = useUiStore((s) => s.pushToast);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   const invoicesQuery = useQuery({
@@ -48,10 +50,10 @@ export default function InvoicesPage(): JSX.Element {
       apiClients.finance.post(`/invoices/${id}/mark-paid`, {}),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['invoices'] });
-      pushToast({ variant: 'success', title: 'Invoice marked as paid' });
+      notify.success('Invoice marked as paid');
     },
     onError: () => {
-      pushToast({ variant: 'error', title: 'Failed to mark invoice paid' });
+      notify.error('Failed to mark invoice paid');
     },
   });
 
@@ -60,10 +62,10 @@ export default function InvoicesPage(): JSX.Element {
       apiClients.finance.post(`/invoices/${id}/send`, {}),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['invoices'] });
-      pushToast({ variant: 'success', title: 'Invoice sent' });
+      notify.success('Invoice sent');
     },
     onError: () => {
-      pushToast({ variant: 'error', title: 'Failed to send invoice' });
+      notify.error('Failed to send invoice');
     },
   });
 
@@ -84,6 +86,14 @@ export default function InvoicesPage(): JSX.Element {
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Invoices</h1>
           <p className="text-sm text-slate-500">{total} total invoices</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <ExportButton module="invoices" filters={{ status: statusFilter }} />
+          <SavedViewsControl
+            entityType="invoice"
+            currentFilters={{ status: statusFilter }}
+            onApply={(f) => setStatusFilter(typeof f.status === 'string' ? f.status : 'ALL')}
+          />
         </div>
       </header>
 
@@ -124,10 +134,18 @@ export default function InvoicesPage(): JSX.Element {
         {invoicesQuery.isLoading ? (
           <TableSkeleton rows={8} cols={7} />
         ) : invoices.length === 0 ? (
-          <div className="p-8 text-center text-sm text-slate-500">No invoices found.</div>
+          <EmptyState
+            icon="🧾"
+            title="No invoices found"
+            description={
+              statusFilter === 'ALL'
+                ? 'Invoices generated from accepted quotes and orders will appear here.'
+                : `No invoices with status ${statusFilter}. Try a different filter.`
+            }
+          />
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <thead className="bg-slate-50 text-start text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-4 py-3">Invoice #</th>
                 <th className="px-4 py-3">Account</th>
@@ -135,7 +153,7 @@ export default function InvoicesPage(): JSX.Element {
                 <th className="px-4 py-3">Total</th>
                 <th className="px-4 py-3">Due Date</th>
                 <th className="px-4 py-3">Created</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3 text-end">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -159,7 +177,7 @@ export default function InvoicesPage(): JSX.Element {
                     {inv.dueDate ? formatDate(inv.dueDate) : '—'}
                   </td>
                   <td className="px-4 py-3 text-slate-500">{formatDate(inv.createdAt)}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-end">
                     <div className="inline-flex gap-1">
                       {inv.status === 'DRAFT' && (
                         <Button

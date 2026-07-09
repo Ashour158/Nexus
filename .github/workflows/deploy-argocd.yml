@@ -1,0 +1,81 @@
+name: Deploy via ArgoCD
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options: [staging, production]
+      image_tag:
+        description: 'Docker image tag to deploy'
+        required: true
+        type: string
+      skip_migrations:
+        description: 'Skip database migrations'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
+  ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}
+
+jobs:
+  deploy:
+    name: ArgoCD Sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ github.event.inputs.environment }}
+    concurrency:
+      group: argocd-deploy-${{ github.event.inputs.environment }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ArgoCD CLI
+        run: |
+          curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          chmod +x argocd
+          sudo mv argocd /usr/local/bin/
+
+      - name: Update image tags in GitOps repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          IMAGE_TAG="${{ github.event.inputs.image_tag }}"
+          ENV="${{ github.event.inputs.environment }}"
+          # Update Helm values or Kustomize overlays with new image tag
+          find "infrastructure/k8s/overlays/${ENV}" -name "*.yaml" -exec \
+            sed -i -E "s|(image: ghcr.io/.*/nexus-[^:]+):[^[:space:]]+|\1:${IMAGE_TAG}|g" {} +
+          git add -A
+          git commit -m "deploy(${ENV}): bump image tag to ${IMAGE_TAG}" || true
+          git push
+
+      - name: Sync ArgoCD application
+        run: |
+          argocd app sync "nexus-crm-${{ github.event.inputs.environment }}" \
+            --server "${ARGOCD_SERVER}" \
+            --auth-token "${ARGOCD_AUTH_TOKEN}" \
+            --prune \
+            --timeout 600
+
+      - name: Wait for healthy rollout
+        run: |
+          argocd app wait "nexus-crm-${{ github.event.inputs.environment }}" \
+            --server "${ARGOCD_SERVER}" \
+            --auth-token "${ARGOCD_AUTH_TOKEN}" \
+            --health \
+            --timeout 600
+
+      - name: Run smoke tests
+        run: |
+          bash scripts/health-check.sh || {
+            echo "❌ Smoke tests failed — rolling back via ArgoCD..."
+            argocd app rollback "nexus-crm-${{ github.event.inputs.environment }}" 0 \
+              --server "${ARGOCD_SERVER}" \
+              --auth-token "${ARGOCD_AUTH_TOKEN}"
+            exit 1
+          }

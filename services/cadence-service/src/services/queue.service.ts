@@ -1,7 +1,56 @@
+import { createHash } from 'node:crypto';
 import { TOPICS, type NexusProducer } from '@nexus/kafka';
 import type { CadencePrisma } from '../prisma.js';
 
+/**
+ * Deterministically pick the A/B bucket for an enrollment.
+ *
+ * The previous implementation used `enrollment.id.length % 2`, but cuid ids are
+ * effectively fixed-length so that expression almost always resolved to the same
+ * value — the split was heavily skewed and not random. Instead we hash the
+ * enrollment id and use the low bit of the digest, which is uniformly distributed
+ * (~50/50) while remaining stable for a given enrollment (so re-processing a step
+ * never flips the variant).
+ */
+function pickVariant(enrollmentId: string): 'A' | 'B' {
+  const digest = createHash('sha256').update(enrollmentId).digest();
+  return (digest[0] & 1) === 1 ? 'B' : 'A';
+}
+
 export function createQueueService(prisma: CadencePrisma, producer: NexusProducer) {
+  async function resolveEmail(enrollment: {
+    objectType: string;
+    objectId: string;
+    tenantId: string;
+  }): Promise<string | null> {
+    const token = process.env.INTERNAL_SERVICE_TOKEN ?? '';
+    if (enrollment.objectType === 'CONTACT') {
+      const url = `${process.env.CRM_SERVICE_URL ?? 'http://localhost:3001'}/api/v1/contacts/${enrollment.objectId}`;
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }).catch(() => null);
+      if (!res?.ok) return null;
+      const json = (await res.json().catch(() => null)) as { data?: { email?: string | null } } | null;
+      return json?.data?.email ?? null;
+    }
+    if (enrollment.objectType === 'LEAD') {
+      const url = `${process.env.CRM_SERVICE_URL ?? 'http://localhost:3001'}/api/v1/leads/${enrollment.objectId}`;
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }).catch(() => null);
+      if (!res?.ok) return null;
+      const json = (await res.json().catch(() => null)) as { data?: { email?: string | null } } | null;
+      return json?.data?.email ?? null;
+    }
+    return null;
+  }
+
   async function processQueue() {
     const due = await prisma.stepExecution.findMany({
       where: { status: 'PENDING', scheduledAt: { lte: new Date() } },
@@ -26,23 +75,35 @@ export function createQueueService(prisma: CadencePrisma, producer: NexusProduce
       let result = 'ok';
       try {
         if (step.type === 'EMAIL') {
-          const useB = enrollment.id.length % 2 === 1 && step.variantB !== null;
-          const variant = useB ? 'B' : 'A';
+          // Only run the A/B split when a B variant is actually configured for
+          // this step; otherwise always use A.
+          const hasVariantB = step.variantB !== null && step.variantB !== undefined;
+          const variant = hasVariantB ? pickVariant(enrollment.id) : 'A';
+          const useB = variant === 'B';
           const payload = useB
             ? (step.variantB as { subject?: string; body?: string })
             : { subject: step.subject, body: step.body };
-          await fetch(`${process.env.COMM_SERVICE_URL}/api/v1/emails`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${process.env.INTERNAL_SERVICE_TOKEN ?? ''}`,
-            },
-            body: JSON.stringify({
-              to: [`owner+${enrollment.ownerId}@example.com`],
-              subject: payload.subject ?? 'Cadence email',
-              htmlBody: payload.body ?? '',
-            }),
-          }).catch(() => undefined);
+
+          const email = await resolveEmail(enrollment);
+          if (!email) {
+            status = 'SKIPPED';
+            result = 'no email found for contact/lead';
+          } else {
+            await fetch(`${process.env.COMM_SERVICE_URL}/api/v1/internal/outbox/email-broadcast`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '',
+              },
+              body: JSON.stringify({
+                tenantId: enrollment.tenantId,
+                recipients: [email],
+                subject: payload.subject ?? 'Cadence email',
+                htmlBody: payload.body ?? '',
+              }),
+            }).catch(() => undefined);
+          }
+
           await prisma.stepExecution.update({
             where: { id: execution.id },
             data: { variant },

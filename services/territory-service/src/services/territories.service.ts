@@ -1,31 +1,103 @@
 import { TOPICS, type NexusProducer } from '@nexus/kafka';
 import type { TerritoryPrisma } from '../prisma.js';
+import { matchTerritory, type EvalTerritory, type MatchResult } from '../rule-engine.js';
 
-function ruleMatch(
-  operator: string,
-  actual: unknown,
-  expected: string
-): boolean {
-  const a = actual ?? '';
-  switch (operator) {
-    case 'eq':
-      return String(a) === expected;
-    case 'neq':
-      return String(a) !== expected;
-    case 'contains':
-      return String(a).toLowerCase().includes(expected.toLowerCase());
-    case 'gte':
-      return Number(a) >= Number(expected);
-    case 'lte':
-      return Number(a) <= Number(expected);
-    case 'in':
-      return expected.split(',').map((x) => x.trim()).includes(String(a));
-    default:
-      return false;
-  }
-}
+/** Record kinds that can be routed to a territory. */
+export type RoutableRecordType = 'LEAD' | 'ACCOUNT';
 
 export function createTerritoriesService(prisma: TerritoryPrisma, producer: NexusProducer) {
+  /**
+   * Route a record (lead or account) to a territory using the priority-ordered
+   * rule engine, then pick an owner (single owner, or round-robin across
+   * owners), write an audit log row (recording which rules matched), and emit
+   * a `<record>.routed` event. Fail-open: on any error it records nothing and
+   * returns null rather than throwing, so the caller/consumer never crashes.
+   */
+  async function assignRecord(
+    tenantId: string,
+    recordType: RoutableRecordType,
+    recordId: string,
+    recordData: Record<string, unknown>
+  ) {
+    try {
+      const territories = await prisma.territory.findMany({
+        where: { tenantId, isActive: true },
+        include: { rules: true },
+        orderBy: { priority: 'desc' },
+      });
+
+      const match = matchTerritory(territories as unknown as EvalTerritory[], recordData) as
+        | (MatchResult & { territory: (typeof territories)[number] })
+        | null;
+
+      if (!match) {
+        await prisma.leadRoutingLog.create({
+          data: {
+            tenantId,
+            leadId: recordId,
+            recordType,
+            matchedTerritoryId: null,
+            matchedRuleIds: [],
+            viaDefault: false,
+            assignedOwnerId: null,
+          },
+        });
+        return null;
+      }
+
+      const { territory, matchedRuleIds, viaDefault } = match;
+      let assignedOwnerId: string | undefined;
+      if (territory.ownerIds.length === 1) {
+        assignedOwnerId = territory.ownerIds[0];
+      } else if (territory.ownerIds.length > 1) {
+        const rr = await prisma.roundRobinState.upsert({
+          where: { tenantId_territoryId: { tenantId, territoryId: territory.id } },
+          update: {},
+          create: { tenantId, territoryId: territory.id, lastIndex: 0 },
+        });
+        const nextIndex = (rr.lastIndex + 1) % territory.ownerIds.length;
+        assignedOwnerId = territory.ownerIds[nextIndex];
+        await prisma.roundRobinState.update({
+          where: { id: rr.id },
+          data: { lastIndex: nextIndex },
+        });
+      }
+
+      await prisma.leadRoutingLog.create({
+        data: {
+          tenantId,
+          leadId: recordId,
+          recordType,
+          matchedTerritoryId: territory.id,
+          matchedRuleIds,
+          viaDefault,
+          assignedOwnerId: assignedOwnerId ?? null,
+        },
+      });
+
+      const topic = recordType === 'ACCOUNT' ? TOPICS.ACCOUNTS : TOPICS.LEADS;
+      const type = recordType === 'ACCOUNT' ? 'account.routed' : 'lead.routed';
+      await producer
+        .publish(topic, {
+          type,
+          tenantId,
+          payload: {
+            [recordType === 'ACCOUNT' ? 'accountId' : 'leadId']: recordId,
+            territoryId: territory.id,
+            assignedOwnerId,
+            matchedRuleIds,
+            viaDefault,
+          },
+        })
+        .catch(() => undefined);
+
+      return { territory, assignedOwnerId, matchedRuleIds, viaDefault };
+    } catch (err) {
+      console.warn('[territories.assignRecord] failed, leaving record unassigned:', (err as Error)?.message);
+      return null;
+    }
+  }
+
   return {
     async listTerritories(tenantId: string) {
       const rows = await prisma.territory.findMany({
@@ -52,6 +124,7 @@ export function createTerritoriesService(prisma: TerritoryPrisma, producer: Nexu
         ownerIds: string[];
         teamId?: string;
         priority?: number;
+        isDefault?: boolean;
         rules: Array<{ field: string; operator: string; value: string }>;
       }
     ) {
@@ -65,6 +138,7 @@ export function createTerritoriesService(prisma: TerritoryPrisma, producer: Nexu
             ownerIds: input.ownerIds,
             teamId: input.teamId ?? null,
             priority: input.priority ?? 0,
+            isDefault: input.isDefault ?? false,
           },
         });
         if (input.rules.length) {
@@ -86,6 +160,7 @@ export function createTerritoriesService(prisma: TerritoryPrisma, producer: Nexu
         ownerIds: string[];
         teamId: string | null;
         priority: number;
+        isDefault: boolean;
         rules: Array<{ field: string; operator: string; value: string }>;
       }>
     ) {
@@ -109,6 +184,7 @@ export function createTerritoriesService(prisma: TerritoryPrisma, producer: Nexu
             ownerIds: input.ownerIds,
             teamId: input.teamId,
             priority: input.priority,
+            isDefault: input.isDefault,
           },
         });
       });
@@ -121,73 +197,36 @@ export function createTerritoriesService(prisma: TerritoryPrisma, producer: Nexu
       });
     },
 
+    /** Generic router: route any record (lead or account) to a territory. */
+    assignRecord,
+
+    /** Backwards-compatible lead entry point. `leadData.id` supplies the lead id. */
     async assignLead(tenantId: string, leadData: Record<string, unknown>) {
-      const territories = await prisma.territory.findMany({
-        where: { tenantId, isActive: true },
-        include: { rules: true },
-        orderBy: { priority: 'desc' },
-      });
-      for (const territory of territories) {
-        const ok = territory.rules.every((r) => ruleMatch(r.operator, leadData[r.field], r.value));
-        if (!ok) continue;
-        let assignedOwnerId: string | undefined;
-        if (territory.ownerIds.length === 1) {
-          assignedOwnerId = territory.ownerIds[0];
-        } else if (territory.ownerIds.length > 1) {
-          const rr = await prisma.roundRobinState.upsert({
-            where: { tenantId_territoryId: { tenantId, territoryId: territory.id } },
-            update: {},
-            create: { tenantId, territoryId: territory.id, lastIndex: 0 },
-          });
-          const nextIndex = (rr.lastIndex + 1) % territory.ownerIds.length;
-          assignedOwnerId = territory.ownerIds[nextIndex];
-          await prisma.roundRobinState.update({
-            where: { id: rr.id },
-            data: { lastIndex: nextIndex },
-          });
-        }
-        await prisma.leadRoutingLog.create({
-          data: {
-            tenantId,
-            leadId: String(leadData.id ?? ''),
-            matchedTerritoryId: territory.id,
-            assignedOwnerId: assignedOwnerId ?? null,
-          },
-        });
-        await producer.publish(TOPICS.LEADS, {
-          type: 'lead.routed',
-          tenantId,
-          payload: {
-            leadId: String(leadData.id ?? ''),
-            territoryId: territory.id,
-            assignedOwnerId,
-          },
-        });
-        return { territory, assignedOwnerId };
-      }
-      await prisma.leadRoutingLog.create({
-        data: {
-          tenantId,
-          leadId: String(leadData.id ?? ''),
-          matchedTerritoryId: null,
-          assignedOwnerId: null,
-        },
-      });
-      return null;
+      return assignRecord(tenantId, 'LEAD', String(leadData.id ?? ''), leadData);
     },
 
-    async testAssignment(tenantId: string, leadData: Record<string, unknown>) {
+    /** Route an account by explicit id + attribute bag. */
+    async assignAccount(tenantId: string, accountId: string, accountData: Record<string, unknown>) {
+      return assignRecord(tenantId, 'ACCOUNT', accountId, accountData);
+    },
+
+    /** Dry-run: return the territory a record WOULD route to, without side effects. */
+    async testAssignment(tenantId: string, recordData: Record<string, unknown>) {
       const territories = await prisma.territory.findMany({
         where: { tenantId, isActive: true },
         include: { rules: true },
         orderBy: { priority: 'desc' },
       });
-      for (const territory of territories) {
-        const ok = territory.rules.every((r) => ruleMatch(r.operator, leadData[r.field], r.value));
-        if (!ok) continue;
-        return { territory, assignedOwnerId: territory.ownerIds[0] ?? null };
-      }
-      return null;
+      const match = matchTerritory(territories as unknown as EvalTerritory[], recordData) as
+        | (MatchResult & { territory: (typeof territories)[number] })
+        | null;
+      if (!match) return null;
+      return {
+        territory: match.territory,
+        assignedOwnerId: match.territory.ownerIds[0] ?? null,
+        matchedRuleIds: match.matchedRuleIds,
+        viaDefault: match.viaDefault,
+      };
     },
 
     async getRoutingLogs(tenantId: string, leadId: string | undefined, page: number, limit: number) {

@@ -13,7 +13,7 @@ import type {
 import type { CrmPrisma } from '../prisma.js';
 
 export type PipelineWithStages = Prisma.PipelineGetPayload<{
-  include: { stages: true };
+  include: { stages: true; _count: { select: { deals: true } } };
 }>;
 
 function orderedStages(stages: Stage[]): Stage[] {
@@ -33,21 +33,30 @@ export function createPipelinesService(prisma: CrmPrisma) {
   ): Promise<PipelineWithStages> {
     const row = await prisma.pipeline.findFirst({
       where: { id, tenantId },
-      include: { stages: true },
+      include: {
+        stages: true,
+        _count: { select: { deals: true } },
+      },
     });
     if (!row) throw new NotFoundError('Pipeline', id);
-    row.stages = orderedStages(row.stages);
-    return row;
+    row.stages = orderedStages(row.stages).map((s) => ({ ...s, position: s.order }));
+    return row as PipelineWithStages;
   }
 
   return {
     async listPipelines(tenantId: string): Promise<PipelineWithStages[]> {
       const rows = await prisma.pipeline.findMany({
         where: { tenantId, isActive: true },
-        include: { stages: true },
+        include: {
+          stages: true,
+          _count: { select: { deals: true } },
+        },
         orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
       });
-      return rows.map((p) => ({ ...p, stages: orderedStages(p.stages) }));
+      return rows.map((p) => ({
+        ...p,
+        stages: orderedStages(p.stages).map((s) => ({ ...s, position: s.order })),
+      }));
     },
 
     async getPipelineById(tenantId: string, id: string): Promise<PipelineWithStages> {
@@ -74,6 +83,9 @@ export function createPipelinesService(prisma: CrmPrisma) {
           data: {
             tenantId,
             name: data.name,
+            type: data.type ?? 'sales',
+            description: data.description,
+            ownedBy: data.ownedBy,
             currency: data.currency,
             isDefault: data.isDefault,
             isActive: data.isActive,
@@ -81,18 +93,26 @@ export function createPipelinesService(prisma: CrmPrisma) {
               create: data.stages.map((s, idx) => ({
                 tenantId,
                 name: s.name,
-                order: s.order ?? idx,
+                order: s.order ?? s.position ?? idx,
                 probability: s.probability,
                 rottenDays: s.rottenDays,
                 requiredFields: s.requiredFields as Prisma.InputJsonValue,
                 color: s.color,
+                isWon: s.isWon ?? false,
+                isLost: s.isLost ?? false,
               })),
             },
           },
-          include: { stages: true },
+          include: {
+            stages: true,
+            _count: { select: { deals: true } },
+          },
         });
       });
-      created.stages = orderedStages(created.stages);
+      created.stages = orderedStages(created.stages).map((s) => ({
+        ...s,
+        position: s.order,
+      }));
       return created;
     },
 
@@ -111,6 +131,9 @@ export function createPipelinesService(prisma: CrmPrisma) {
         }
         const update: Prisma.PipelineUpdateInput = {};
         if (data.name !== undefined) update.name = data.name;
+        if (data.type !== undefined) update.type = data.type;
+        if (data.description !== undefined) update.description = data.description;
+        if (data.ownedBy !== undefined) update.ownedBy = data.ownedBy;
         if (data.currency !== undefined) update.currency = data.currency;
         if (data.isDefault !== undefined) update.isDefault = data.isDefault;
         if (data.isActive !== undefined) update.isActive = data.isActive;
@@ -129,7 +152,16 @@ export function createPipelinesService(prisma: CrmPrisma) {
       if (openDeals > 0) {
         throw new BusinessRuleError('Cannot delete pipeline with open deals');
       }
-      await prisma.pipeline.update({ where: { id }, data: { isActive: false } });
+      await prisma.pipeline.update({ where: { id } as any, data: { deletedAt: new Date() } as any });
+    },
+
+    async restorePipeline(tenantId: string, id: string): Promise<Pipeline> {
+      const result = await prisma.pipeline.updateMany({
+        where: { id, tenantId, deletedAt: { not: null } } as any,
+        data: { deletedAt: null } as any,
+      });
+      if (result.count === 0) throw new NotFoundError('Pipeline', id);
+      return prisma.pipeline.findFirstOrThrow({ where: { id, tenantId } });
     },
 
     // ─── Stages ────────────────────────────────────────────────────────────
@@ -153,16 +185,20 @@ export function createPipelinesService(prisma: CrmPrisma) {
       });
       if (conflict) throw new ConflictError('Stage', 'name');
 
+      const resolvedOrder =
+        data.order ?? (data as { position?: number }).position ?? 0;
       return prisma.stage.create({
         data: {
           tenantId,
           pipelineId,
           name: data.name,
-          order: data.order,
+          order: resolvedOrder,
           probability: data.probability,
           rottenDays: data.rottenDays,
           requiredFields: data.requiredFields as Prisma.InputJsonValue,
           color: data.color,
+          isWon: data.isWon ?? false,
+          isLost: data.isLost ?? false,
         },
       });
     },
@@ -182,12 +218,16 @@ export function createPipelinesService(prisma: CrmPrisma) {
       const update: Prisma.StageUpdateInput = {};
       if (data.name !== undefined) update.name = data.name;
       if (data.order !== undefined) update.order = data.order;
+      const posOnly = data as { position?: number };
+      if (posOnly.position !== undefined) update.order = posOnly.position;
       if (data.probability !== undefined) update.probability = data.probability;
       if (data.rottenDays !== undefined) update.rottenDays = data.rottenDays;
       if (data.requiredFields !== undefined) {
         update.requiredFields = data.requiredFields as Prisma.InputJsonValue;
       }
       if (data.color !== undefined) update.color = data.color;
+      if (data.isWon !== undefined) update.isWon = data.isWon;
+      if (data.isLost !== undefined) update.isLost = data.isLost;
       return prisma.stage.update({ where: { id: stageId }, data: update });
     },
 
@@ -203,7 +243,17 @@ export function createPipelinesService(prisma: CrmPrisma) {
       if (openDeals > 0) {
         throw new BusinessRuleError('Cannot delete stage with open deals');
       }
-      await prisma.stage.delete({ where: { id: stageId } });
+      await prisma.stage.update({ where: { id: stageId } as any, data: { deletedAt: new Date() } as any });
+    },
+
+    async restoreStage(tenantId: string, pipelineId: string, stageId: string): Promise<Stage> {
+      await loadPipelineOrThrow(tenantId, pipelineId);
+      const result = await prisma.stage.updateMany({
+        where: { id: stageId, tenantId, deletedAt: { not: null } } as any,
+        data: { deletedAt: null } as any,
+      });
+      if (result.count === 0) throw new NotFoundError('Stage', stageId);
+      return prisma.stage.findFirstOrThrow({ where: { id: stageId, tenantId } });
     },
   };
 }

@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notary-config
+  namespace: nexus
+data:
+  config.json: |
+    {
+      "trust_dir": "/notary",
+      "remote_server": {
+        "url": "https://notary.nexus-crm.io",
+        "root_ca": "/certs/ca.crt"
+      }
+    }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: notary-sign-image
+  namespace: nexus
+spec:
+  template:
+    spec:
+      containers:
+        - name: notary
+          image: notary:signer-0.7.0
+          command:
+            - notary
+            - sign
+            - -s
+            - https://notary.nexus-crm.io
+            - nexus-crm/nexus-crm:latest
+          volumeMounts:
+            - name: config
+              mountPath: /notary
+      volumes:
+        - name: config
+          configMap:
+            name: notary-config
+      restartPolicy: OnFailure

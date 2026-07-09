@@ -21,6 +21,7 @@ model ApprovalPolicy {
   requests    ApprovalRequest[]
 
   @@index([tenantId, module])
+  @@unique([id, tenantId])
 }
 
 model ApprovalRequest {
@@ -41,6 +42,8 @@ model ApprovalRequest {
 
   @@index([tenantId, module, recordId])
   @@index([tenantId, status])
+  @@index([tenantId, requestedBy, status])
+  @@unique([id, tenantId])
 }
 
 model ApprovalStep {
@@ -53,6 +56,11 @@ model ApprovalStep {
   comment    String?
   actionedAt DateTime?
   createdAt  DateTime        @default(now())
+  // Quorum config for the level this step belongs to (all steps sharing the
+  // same `order` form one parallel level and carry the same values). Defaults
+  // preserve legacy behavior: ALL with one step per level == all-must-approve.
+  quorumMode QuorumMode      @default(ALL)
+  quorumSize Int?
 
   @@index([requestId])
   @@index([approverId, status])
@@ -72,4 +80,31 @@ enum StepStatus {
   REJECTED
   SKIPPED
   DELEGATED
+}
+
+enum QuorumMode {
+  ALL
+  ANY
+  N_OF_M
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
 }

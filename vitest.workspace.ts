@@ -54,14 +54,6 @@ export default defineWorkspace([
     },
   },
   {
-    extends: 'services/billing-service/vitest.config.ts',
-    test: {
-      name: 'billing-service',
-      root: './services/billing-service',
-      include: ['src/**/*.test.ts'],
-    },
-  },
-  {
     extends: 'services/integration-service/vitest.config.ts',
     test: {
       name: 'integration-service',
@@ -194,6 +186,166 @@ export default defineWorkspace([
     test: {
       name: 'storage-service',
       root: './services/storage-service',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'services/graphql-gateway/vitest.config.ts',
+    test: {
+      name: 'graphql-gateway',
+      root: './services/graphql-gateway',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'services/router-coprocessor/vitest.config.ts',
+    test: {
+      name: 'router-coprocessor',
+      root: './services/router-coprocessor',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'services/accounts-service/vitest.config.ts',
+    test: {
+      name: 'accounts-service',
+      root: './services/accounts-service',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'services/activities-service/vitest.config.ts',
+    test: {
+      name: 'activities-service',
+      root: './services/activities-service',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'services/email-sync-service/vitest.config.ts',
+    test: {
+      name: 'email-sync-service',
+      root: './services/email-sync-service',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'services/leads-service/vitest.config.ts',
+    test: {
+      name: 'leads-service',
+      root: './services/leads-service',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'services/metadata-service/vitest.config.ts',
+    test: {
+      name: 'metadata-service',
+      root: './services/metadata-service',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'services/notes-service/vitest.config.ts',
+    test: {
+      name: 'notes-service',
+      root: './services/notes-service',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'services/quotes-service/vitest.config.ts',
+    test: {
+      name: 'quotes-service',
+      root: './services/quotes-service',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'services/deals-service/vitest.config.ts',
+    test: {
+      name: 'deals-service',
+      root: './services/deals-service',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'services/contacts-service/vitest.config.ts',
+    test: {
+      name: 'contacts-service',
+      root: './services/contacts-service',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'services/billing-service/vitest.config.ts',
+    test: {
+      name: 'billing-service',
+      root: './services/billing-service',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'packages/service-utils/vitest.config.ts',
+    test: {
+      name: 'service-utils',
+      root: './packages/service-utils',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'packages/kafka/vitest.config.ts',
+    test: {
+      name: 'kafka',
+      root: './packages/kafka',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'packages/queue/vitest.config.ts',
+    test: {
+      name: 'queue',
+      root: './packages/queue',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'packages/outbox/vitest.config.ts',
+    test: {
+      name: 'outbox',
+      root: './packages/outbox',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'packages/security/vitest.config.ts',
+    test: {
+      name: 'security',
+      root: './packages/security',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'packages/audit/vitest.config.ts',
+    test: {
+      name: 'audit',
+      root: './packages/audit',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'packages/feature-flags/vitest.config.ts',
+    test: {
+      name: 'feature-flags',
+      root: './packages/feature-flags',
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'packages/validation-gateway/vitest.config.ts',
+    test: {
+      name: 'validation-gateway',
+      root: './packages/validation-gateway',
       include: ['src/**/*.test.ts'],
     },
   },

@@ -22,7 +22,7 @@ describe('incentive-service smoke', () => {
     if (!available) return;
     const res = await fetch(`${BASE}/health`);
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as { status?: string };
     expect(body.status).toBe('ok');
   });
 

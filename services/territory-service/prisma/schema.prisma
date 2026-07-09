@@ -18,12 +18,15 @@ model Territory {
   teamId      String?
   priority    Int              @default(0)
   isActive    Boolean          @default(true)
+  isDefault   Boolean          @default(false)
+  currency    String?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   rules       TerritoryRule[]
   routingLogs LeadRoutingLog[]
 
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 model TerritoryRule {
@@ -40,12 +43,17 @@ model LeadRoutingLog {
   id                 String     @id @default(cuid())
   tenantId           String
   leadId             String
+  recordType         String     @default("LEAD")
   matchedTerritoryId String?
   territory          Territory? @relation(fields: [matchedTerritoryId], references: [id])
+  matchedRuleIds     String[]
+  viaDefault         Boolean    @default(false)
   assignedOwnerId    String?
   routedAt           DateTime   @default(now())
 
   @@index([tenantId, leadId])
+  @@index([tenantId, recordType])
+  @@unique([id, tenantId])
 }
 
 model RoundRobinState {
@@ -56,6 +64,7 @@ model RoundRobinState {
   updatedAt   DateTime @updatedAt
 
   @@unique([tenantId, territoryId])
+  @@unique([id, tenantId])
 }
 
 enum TerritoryType {
@@ -63,4 +72,25 @@ enum TerritoryType {
   INDUSTRY
   ACCOUNT_SIZE
   CUSTOM
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
 }

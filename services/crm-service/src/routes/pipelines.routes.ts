@@ -21,13 +21,6 @@ const PipelineStageParamsSchema = z.object({
   stageId: z.string().cuid(),
 });
 
-/**
- * Registers the `/api/v1/pipelines/*` route family — Section 34.2.
- *
- * Pipelines are reference data consumed by every deal write; reads use the
- * `SETTINGS.READ` permission so non-admin users can still fetch them for
- * dropdowns, while writes require `SETTINGS.UPDATE`.
- */
 export async function registerPipelinesRoutes(
   app: FastifyInstance,
   prisma: CrmPrisma
@@ -41,8 +34,8 @@ export async function registerPipelinesRoutes(
         { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
         async (request, reply) => {
           const jwt = request.user as JwtPayload;
-          const rows = await pipelines.listPipelines(jwt.tenantId);
-          return reply.send({ success: true, data: rows });
+          const result = await pipelines.listPipelines(jwt.tenantId);
+          return reply.send({ success: true, data: result });
         }
       );
 
@@ -51,9 +44,7 @@ export async function registerPipelinesRoutes(
         { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) },
         async (request, reply) => {
           const parsed = CreatePipelineSchema.safeParse(request.body);
-          if (!parsed.success) {
-            throw new ValidationError('Invalid body', parsed.error.flatten());
-          }
+          if (!parsed.success) throw new ValidationError('Invalid body', parsed.error.flatten());
           const jwt = request.user as JwtPayload;
           const pipeline = await pipelines.createPipeline(jwt.tenantId, parsed.data);
           return reply.code(201).send({ success: true, data: pipeline });
@@ -66,8 +57,8 @@ export async function registerPipelinesRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
-          const pipeline = await pipelines.getPipelineById(jwt.tenantId, id);
-          return reply.send({ success: true, data: pipeline });
+          const result = await pipelines.getPipelineById(jwt.tenantId, id);
+          return reply.send({ success: true, data: result });
         }
       );
 
@@ -77,15 +68,9 @@ export async function registerPipelinesRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const parsed = UpdatePipelineSchema.safeParse(request.body);
-          if (!parsed.success) {
-            throw new ValidationError('Invalid body', parsed.error.flatten());
-          }
+          if (!parsed.success) throw new ValidationError('Invalid body', parsed.error.flatten());
           const jwt = request.user as JwtPayload;
-          const pipeline = await pipelines.updatePipeline(
-            jwt.tenantId,
-            id,
-            parsed.data
-          );
+          const pipeline = await pipelines.updatePipeline(jwt.tenantId, id, parsed.data);
           return reply.send({ success: true, data: pipeline });
         }
       );
@@ -101,15 +86,25 @@ export async function registerPipelinesRoutes(
         }
       );
 
-      // ─── Stages ────────────────────────────────────────────────────────
+      r.post(
+        '/pipelines/:id/restore',
+        { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const pipeline = await pipelines.restorePipeline(jwt.tenantId, id);
+          return reply.send({ success: true, data: pipeline });
+        }
+      );
+
       r.get(
         '/pipelines/:id/stages',
         { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
-          const stages = await pipelines.listStages(jwt.tenantId, id);
-          return reply.send({ success: true, data: stages });
+          const result = await pipelines.listStages(jwt.tenantId, id);
+          return reply.send({ success: true, data: result });
         }
       );
 
@@ -119,9 +114,7 @@ export async function registerPipelinesRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const parsed = CreateStageSchema.safeParse(request.body);
-          if (!parsed.success) {
-            throw new ValidationError('Invalid body', parsed.error.flatten());
-          }
+          if (!parsed.success) throw new ValidationError('Invalid body', parsed.error.flatten());
           const jwt = request.user as JwtPayload;
           const stage = await pipelines.createStage(jwt.tenantId, id, parsed.data);
           return reply.code(201).send({ success: true, data: stage });
@@ -134,16 +127,9 @@ export async function registerPipelinesRoutes(
         async (request, reply) => {
           const { id, stageId } = PipelineStageParamsSchema.parse(request.params);
           const parsed = UpdateStageSchema.safeParse(request.body);
-          if (!parsed.success) {
-            throw new ValidationError('Invalid body', parsed.error.flatten());
-          }
+          if (!parsed.success) throw new ValidationError('Invalid body', parsed.error.flatten());
           const jwt = request.user as JwtPayload;
-          const stage = await pipelines.updateStage(
-            jwt.tenantId,
-            id,
-            stageId,
-            parsed.data
-          );
+          const stage = await pipelines.updateStage(jwt.tenantId, id, stageId, parsed.data);
           return reply.send({ success: true, data: stage });
         }
       );
@@ -156,6 +142,17 @@ export async function registerPipelinesRoutes(
           const jwt = request.user as JwtPayload;
           await pipelines.deleteStage(jwt.tenantId, id, stageId);
           return reply.send({ success: true, data: { id: stageId, deleted: true } });
+        }
+      );
+
+      r.post(
+        '/pipelines/:id/stages/:stageId/restore',
+        { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) },
+        async (request, reply) => {
+          const { id, stageId } = PipelineStageParamsSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const stage = await pipelines.restoreStage(jwt.tenantId, id, stageId);
+          return reply.send({ success: true, data: stage });
         }
       );
     },

@@ -1,13 +1,14 @@
 import type { ClickHouseClient } from '@clickhouse/client';
 import { Decimal } from 'decimal.js';
 
-interface DealRow {
+interface DealEventRow {
   deal_id: string;
   amount: string | number | null;
-  stage_probability: string | number | null;
+  probability: string | number | null;
+  event_type: string;
   owner_id: string;
-  forecast_category: string | null;
-  close_month: string | null;
+  occurred_at: string;
+  close_month?: string;
 }
 
 export interface ForecastData {
@@ -24,32 +25,43 @@ export interface ForecastData {
 export function createForecastAnalyticsService(client: ClickHouseClient) {
   return {
     async getWeightedPipeline(tenantId: string): Promise<ForecastData> {
+      // Get latest open deal events using argMax to deduplicate by deal_id
       const res = await client.query({
         query: `
           SELECT
             deal_id,
-            amount,
-            stage_probability,
-            owner_id,
-            forecast_category,
-            toStartOfMonth(expected_close_date) AS close_month
-          FROM deals
+            argMax(if(base_amount != 0, base_amount, amount), occurred_at) AS amount,
+            argMax(probability, occurred_at) AS probability,
+            argMax(owner_id, occurred_at) AS owner_id,
+            toStartOfMonth(argMax(occurred_at, occurred_at)) AS close_month
+          FROM deal_events
           WHERE tenant_id = {tenantId:String}
-            AND status = 'OPEN'
-            AND expected_close_date IS NOT NULL
+            AND event_type = 'deal.created'
+          GROUP BY deal_id
+          HAVING argMax(event_type, occurred_at) != 'deal.lost'
         `,
         format: 'JSONEachRow',
         query_params: { tenantId },
       });
-      const deals = await res.json<DealRow>();
+      const deals = await res.json<DealEventRow>();
 
       let weightedPipeline = new Decimal(0);
       let totalPipeline = new Decimal(0);
       const byMonth: Record<string, { weighted: Decimal; total: Decimal }> = {};
 
+      // Fallback probability of 25% used only when a deal has no stored
+      // per-stage probability (genuinely missing / not yet projected).
+      const defaultProbability = new Decimal(0.25);
+
       for (const deal of deals) {
         const amount = new Decimal(deal.amount ?? 0);
-        const probability = new Decimal(deal.stage_probability ?? 0).div(100);
+        // probability is stored on the 0-100 scale (per-stage win probability).
+        // Use it when present (> 0); otherwise fall back to the sane default.
+        const rawProbability = Number(deal.probability ?? 0);
+        const probability =
+          Number.isFinite(rawProbability) && rawProbability > 0
+            ? new Decimal(rawProbability).div(100)
+            : defaultProbability;
         const weighted = amount.mul(probability);
         weightedPipeline = weightedPipeline.plus(weighted);
         totalPipeline = totalPipeline.plus(amount);
@@ -65,11 +77,11 @@ export function createForecastAnalyticsService(client: ClickHouseClient) {
       const winRateResult = await client.query({
         query: `
           SELECT
-            countIf(status = 'WON') AS won,
-            countIf(status IN ('WON', 'LOST')) AS total
-          FROM deals
+            countIf(event_type = 'deal.won') AS won,
+            countIf(event_type IN ('deal.won', 'deal.lost')) AS total
+          FROM deal_events
           WHERE tenant_id = {tenantId:String}
-            AND actual_close_date >= now() - INTERVAL 12 MONTH
+            AND occurred_at >= now() - INTERVAL 12 MONTH
         `,
         format: 'JSONEachRow',
         query_params: { tenantId },

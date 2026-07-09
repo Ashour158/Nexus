@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backup-verify
+  namespace: nexus
+spec:
+  schedule: "0 6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup-verify
+              image: pgbackrest/pgbackrest:2.52
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  pgbackrest --stanza=nexus verify \
+                    && echo "Backup verification passed at $(date)"
+              env:
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backup-s3-credentials
+                      key: access-key
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backup-s3-credentials
+                      key: secret-key
+              volumeMounts:
+                - name: pgbackrest-config
+                  mountPath: /etc/pgbackrest
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+          volumes:
+            - name: pgbackrest-config
+              configMap:
+                name: pgbackrest-config

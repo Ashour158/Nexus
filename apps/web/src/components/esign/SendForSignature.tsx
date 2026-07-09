@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { FileSignature, CheckCircle, Clock, AlertCircle, ExternalLink, X } from 'lucide-react';
 
@@ -14,7 +14,7 @@ interface Props {
 
 type SignatureStatus = 'not_sent' | 'sent' | 'delivered' | 'completed' | 'declined' | 'voided';
 
-const STATUS_CONFIG: Record<SignatureStatus, { label: string; color: string; icon: React.ReactNode }> = {
+const STATUS_CONFIG: Record<SignatureStatus, { label: string; color: string; icon: ReactNode }> = {
   not_sent: { label: 'Not Sent', color: 'text-gray-500', icon: <FileSignature className="h-4 w-4" /> },
   sent: { label: 'Sent', color: 'text-blue-600', icon: <Clock className="h-4 w-4" /> },
   delivered: { label: 'Delivered', color: 'text-amber-600', icon: <Clock className="h-4 w-4" /> },

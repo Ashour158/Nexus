@@ -1,17 +1,37 @@
 import { PrismaClient } from '../../../node_modules/.prisma/notification-client/index.js';
+import { attachSlowQueryLog, buildDatabaseUrl } from '@nexus/service-utils/db';
+import { createTenantPrismaExtension } from '@nexus/service-utils/prisma-tenant';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 /**
  * Notification service Prisma client.
  *
- * Unlike the CRM and Finance services, notifications are always written from
- * Kafka consumers that already know the acting `tenantId`, so we skip the
- * ALS-based auto-injection wrapper and rely on callers to pass `tenantId`
- * explicitly on every query. This keeps the consumer code simpler and avoids
- * an implicit dependency on a Fastify request context for background work.
+ * Notifications are always written from Kafka consumers that already know the
+ * acting `tenantId` and pass it explicitly on every query. As defense-in-depth,
+ * request-path queries are additionally wrapped with the shared tenant Prisma
+ * extension. The extension is a NO-OP when there is no request context (the
+ * ALS store is empty), so background consumers are unaffected — callers still
+ * pass `tenantId` explicitly there.
  */
 
-export function createNotificationPrisma(): PrismaClient {
-  return new PrismaClient();
+export const tenantAls = new AsyncLocalStorage<{ tenantId: string }>();
+
+export function createNotificationPrisma() {
+  const base = new PrismaClient({
+    datasources: {
+      db: {
+        url: buildDatabaseUrl({ connectionLimit: 5, poolTimeout: 10, databaseUrl: process.env.NOTIFICATION_DATABASE_URL }),
+      },
+    },
+    log: [{ emit: 'event', level: 'query' }],
+  });
+  attachSlowQueryLog(base as any, 'notification-service');
+  return base.$extends(
+    createTenantPrismaExtension(base as any, {
+      getTenantId: () => tenantAls.getStore()?.tenantId,
+      skipModels: new Set([]),
+    })
+  );
 }
 
-export type NotificationPrisma = PrismaClient;
+export type NotificationPrisma = ReturnType<typeof createNotificationPrisma>;

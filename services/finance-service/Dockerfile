@@ -1,23 +1,26 @@
 # -- Stage 1: Install dependencies ------------------------------------------------
 FROM node:20-alpine AS deps
 WORKDIR /app
-RUN apk add --no-cache libc6-compat
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN apk add --no-cache libc6-compat openssl
+RUN corepack enable && corepack prepare pnpm@9.1.0 --activate
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY services/finance-service/package.json ./services/finance-service/
 
-RUN pnpm install --frozen-lockfile --filter finance-service...
+RUN pnpm install --shamefully-hoist --no-frozen-lockfile --filter @nexus/finance-service...
 
 # -- Stage 2: Build ----------------------------------------------------------------
 FROM deps AS builder
 COPY services/finance-service/ ./services/finance-service/
 COPY packages/ ./packages/
 
-RUN pnpm --filter finance-service run build
+RUN pnpm --filter @nexus/finance-service run db:generate
+RUN pnpm --filter @nexus/finance-service... run build
 
 # -- Stage 3: Production runner ----------------------------------------------------
+RUN find /app/services -path "*/src/*" -type f ! -name "*.ts" | while read f; do d="${f%/src/*}/dist/${f#*/src/}"; mkdir -p "$(dirname "$d")"; cp "$f" "$d"; done
+
 FROM node:20-alpine AS runner
 WORKDIR /app
 
@@ -29,6 +32,15 @@ COPY --from=builder --chown=service:nodejs /app/services/finance-service/package
 COPY --from=builder --chown=service:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=service:nodejs /app/packages ./packages
 
+# Chromium for Puppeteer quote-PDF rendering. finance-service launches
+# puppeteer-core with executablePath = process.env.CHROMIUM_PATH, and
+# docker-compose sets CHROMIUM_PATH=/usr/bin/chromium. The Alpine `chromium`
+# package installs the binary as /usr/bin/chromium-browser, so symlink
+# /usr/bin/chromium to it and also export the standard Puppeteer env vars.
+RUN apk add --no-cache openssl chromium nss freetype harfbuzz ttf-freefont \
+ && ln -sf /usr/bin/chromium-browser /usr/bin/chromium \
+ && ln -sf /app/node_modules /node_modules
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser PUPPETEER_SKIP_DOWNLOAD=true CHROMIUM_PATH=/usr/bin/chromium-browser
 USER service
 EXPOSE 3002
 ENV NODE_ENV=production PORT=3002

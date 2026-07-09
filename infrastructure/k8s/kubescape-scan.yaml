@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kubescape-scan
+  namespace: nexus-monitoring
+spec:
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: nexus-crm
+          containers:
+            - name: kubescape
+              image: kubescape/kubescape:v3.0
+              command:
+                - kubescape
+                - scan
+                - framework
+                - nsa
+                - --format
+                - json
+                - --output
+                - /tmp/kubescape-results.json
+              resources:
+                limits:
+                  cpu: 1000m
+                  memory: 1Gi
+                requests:
+                  cpu: 250m
+                  memory: 256Mi

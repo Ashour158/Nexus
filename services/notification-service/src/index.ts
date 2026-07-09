@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { startTracing } from '@nexus/service-utils/tracing';
 import rateLimit from '@fastify/rate-limit';
 import {
   checkDatabase,
@@ -8,15 +9,35 @@ import {
   startService,
 } from '@nexus/service-utils';
 import { PrismaClient } from '../../../node_modules/.prisma/notification-client/index.js';
-import { createNotificationPrisma } from './prisma.js';
+import { buildDatabaseUrl } from '@nexus/service-utils/db';
+import { createNotificationPrisma, tenantAls } from './prisma.js';
 import { createEmailChannel } from './channels/email.channel.js';
 import { createInAppChannel } from './channels/in-app.channel.js';
+import { createSmsChannel } from './channels/sms.channel.js';
+import { createPushChannel } from './channels/push.channel.js';
+import { createWhatsAppChannel } from './channels/whatsapp.channel.js';
 import { startDealConsumer } from './consumers/deal.consumer.js';
 import { startActivityConsumer } from './consumers/activity.consumer.js';
 import { startQuoteConsumer } from './consumers/quote.consumer.js';
+import { startLeadConsumer } from './consumers/lead.consumer.js';
+import { startNoteConsumer } from './consumers/note.consumer.js';
+import { startApprovalConsumer } from './consumers/approval.consumer.js';
+import { startSlaConsumer } from './consumers/sla.consumer.js';
 import { registerNotificationsRoutes } from './routes/notifications.routes.js';
+import { registerPreferencesRoutes } from './routes/preferences.routes.js';
+import { createPreferencesService } from './services/preferences.service.js';
+import { registerWhatsAppWebhookRoutes } from './routes/whatsapp-webhook.routes.js';
+import { registerGraphQL } from './graphql/index.js';
+import { NexusProducer } from '@nexus/kafka';
 
-const prismaHealth = new PrismaClient();
+startTracing({ serviceName: 'notification-service' });
+const prismaHealth = new PrismaClient({
+  datasources: {
+    db: {
+      url: buildDatabaseUrl({ connectionLimit: 5, poolTimeout: 10, databaseUrl: process.env.NOTIFICATION_DATABASE_URL }),
+    },
+  },
+});
 const prisma = createNotificationPrisma();
 
 const port = Number(process.env.PORT ?? 3003);
@@ -46,6 +67,25 @@ await app.register(rateLimit, {
   }),
 });
 
+// Capture raw request body for inbound WhatsApp webhook HMAC verification.
+// Scoped to /api/v1/webhooks/* so normal JSON routes are unaffected.
+app.addHook('preParsing', async (request, _reply, payload) => {
+  if (!request.url.startsWith('/api/v1/webhooks/')) return payload;
+  const chunks: Buffer[] = [];
+  for await (const chunk of payload) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  (request as unknown as { rawBody?: Buffer }).rawBody = Buffer.concat(chunks);
+  const { Readable } = await import('node:stream');
+  return Readable.from(Buffer.concat(chunks));
+});
+
+// Bridge Fastify request-context tenantId into Prisma tenant ALS
+app.addHook('preHandler', async (request) => {
+  const tenantId = (request as any).requestContext?.get('tenantId');
+  if (tenantId) tenantAls.enterWith({ tenantId });
+});
+
 registerHealthRoutes(app, 'notification-service', [
   () => checkDatabase(prismaHealth),
 ]);
@@ -53,7 +93,45 @@ registerHealthRoutes(app, 'notification-service', [
 app.setErrorHandler(globalErrorHandler);
 
 const email = createEmailChannel(app.log);
-const inApp = createInAppChannel(prisma);
+// SMS + push channels are fully env-gated. With no provider config they are
+// guarded no-ops (see sms.channel.ts / push.channel.ts) and never throw, so
+// existing email + in-app behaviour is unchanged.
+const sms = createSmsChannel(app.log);
+const push = createPushChannel(app.log);
+// WhatsApp channel — env-gated (Twilio WhatsApp or WhatsApp Cloud API). A
+// guarded no-op when unconfigured; never throws.
+const whatsapp = createWhatsAppChannel(app.log);
+
+// NOT-04: each channel factory already logs a WARN on startup when its provider
+// creds are missing (see the *.channel.ts files). Additionally surface a
+// per-channel `configured` boolean so a mis-provisioned prod is observable at a
+// glance — a `false` means the channel is a silent no-op. Public: the path is
+// under /health, so it skips JWT + rate-limiting like the other probes.
+app.get('/health/channels', async () => ({
+  service: 'notification-service',
+  channels: {
+    email: email.isConfigured(),
+    sms: sms.isConfigured(),
+    push: push.isConfigured(),
+    whatsapp: whatsapp.isConfigured(),
+  },
+}));
+
+// Kafka producer for real-time push via NOTIFICATIONS topic
+let kafkaProducer: NexusProducer | undefined;
+try {
+  kafkaProducer = new NexusProducer('notification-service');
+  await kafkaProducer.connect();
+} catch (err) {
+  app.log.warn({ err }, 'Kafka producer unavailable — real-time push disabled');
+  kafkaProducer = undefined;
+}
+
+const inApp = createInAppChannel(prisma, kafkaProducer);
+
+// Per-user notification preferences (NOT-11). Enforcement in the consumers is
+// fail-open — a preference-lookup error never drops a notification.
+const prefs = createPreferencesService(prisma);
 
 /**
  * Resolves an owner's contact info from the auth-service. Best-effort; any
@@ -62,7 +140,7 @@ const inApp = createInAppChannel(prisma);
 async function lookupOwner(
   tenantId: string,
   userId: string
-): Promise<{ email?: string; name?: string }> {
+): Promise<{ email?: string; name?: string; phone?: string; deviceToken?: string }> {
   const base = process.env.AUTH_SERVICE_URL ?? 'http://localhost:3010/api/v1';
   try {
     const controller = new AbortController();
@@ -83,10 +161,16 @@ async function lookupOwner(
       email?: string;
       firstName?: string;
       lastName?: string;
+      phone?: string;
+      phoneNumber?: string;
+      deviceToken?: string;
+      pushToken?: string;
     };
     return {
       email: body?.email,
       name: [body?.firstName, body?.lastName].filter(Boolean).join(' ') || undefined,
+      phone: body?.phone ?? body?.phoneNumber,
+      deviceToken: body?.deviceToken ?? body?.pushToken,
     };
   } catch {
     return {};
@@ -95,18 +179,38 @@ async function lookupOwner(
 
 // Start Kafka consumers. If the cluster is unavailable we log and continue —
 // the HTTP surface still works for reading / marking-read.
+let leadConsumer: Awaited<ReturnType<typeof startLeadConsumer>> | undefined;
 try {
-  await startDealConsumer({ inApp, email, lookupOwner, log: app.log });
+  await startDealConsumer({ inApp, email, sms, push, whatsapp, prefs, lookupOwner, log: app.log });
   await startActivityConsumer({ inApp, log: app.log });
-  await startQuoteConsumer({ inApp, email, lookupOwner, log: app.log });
+  await startQuoteConsumer({ inApp, email, sms, push, whatsapp, prefs, log: app.log });
+  await startNoteConsumer({ inApp, log: app.log });
+  await startApprovalConsumer({ inApp, log: app.log });
+  await startSlaConsumer({ inApp, email, sms, push, whatsapp, prefs, lookupOwner, log: app.log });
+  leadConsumer = await startLeadConsumer({ inApp, email, sms, push, whatsapp, prefs, lookupOwner, log: app.log });
 } catch (err) {
   app.log.warn({ err }, 'Kafka consumers failed to start; HTTP-only mode');
 }
 
 app.addHook('onClose', async () => {
+  // Guarded, fail-open: never let consumer teardown block shutdown.
+  if (leadConsumer) {
+    await leadConsumer.disconnect().catch((err) => {
+      app.log.warn({ err }, 'lead consumer disconnect failed');
+    });
+  }
   await prismaHealth.$disconnect();
 });
 
+await registerGraphQL(app, prisma);
+
 await startService(app, port, async (a) => {
-  await registerNotificationsRoutes(a, inApp);
+  await registerNotificationsRoutes(a, prisma);
+  // Self-service per-channel notification preferences (NOT-11). Auth-only —
+  // scoped to the caller's own tenant + user; no extra permission required.
+  await registerPreferencesRoutes(a, prefs);
+  // Inbound WhatsApp webhook (public per createService's /api/v1/webhooks/*
+  // JWT exemption; POST is HMAC-verified). Emits `whatsapp.received` on the
+  // comms topic for downstream timeline correlation. Guarded + fail-open.
+  await registerWhatsAppWebhookRoutes(a, kafkaProducer);
 });

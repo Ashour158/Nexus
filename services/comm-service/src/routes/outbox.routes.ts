@@ -19,6 +19,8 @@ const SendEmailSchema = z.object({
   htmlBody: z.string().min(1),
   textBody: z.string().optional(),
   templateId: z.string().optional(),
+  /** Optional: send through this user MailAccount instead of system SMTP. */
+  mailAccountId: z.string().optional(),
   entityType: z.string().optional(),
   entityId: z.string().optional(),
 });
@@ -72,6 +74,7 @@ export async function registerOutboxRoutes(
               htmlBody: body.htmlBody,
               textBody: body.textBody,
               templateId: body.templateId,
+              mailAccountId: body.mailAccountId,
               entityType: body.entityType,
               entityId: body.entityId,
             });

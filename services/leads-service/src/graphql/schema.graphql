@@ -1,0 +1,230 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+type Query {
+  leads(limit: Int, offset: Int): [Lead!]!
+  lead(id: ID!): Lead
+  leadScores(limit: Int, offset: Int): [LeadScore!]!
+  leadScore(id: ID!): LeadScore
+  leadScoringRules(limit: Int, offset: Int): [LeadScoringRule!]!
+  leadScoringRule(id: ID!): LeadScoringRule
+  leadRoutingEvents(limit: Int, offset: Int): [LeadRoutingEvent!]!
+  leadRoutingEvent(id: ID!): LeadRoutingEvent
+}
+
+type Mutation {
+  createLead(input: CreateLeadInput!): Lead!
+  updateLead(id: ID!, input: UpdateLeadInput!): Lead!
+  deleteLead(id: ID!): Boolean!
+  createLeadScore(input: CreateLeadScoreInput!): LeadScore!
+  updateLeadScore(id: ID!, input: UpdateLeadScoreInput!): LeadScore!
+  deleteLeadScore(id: ID!): Boolean!
+  createLeadScoringRule(input: CreateLeadScoringRuleInput!): LeadScoringRule!
+  updateLeadScoringRule(id: ID!, input: UpdateLeadScoringRuleInput!): LeadScoringRule!
+  deleteLeadScoringRule(id: ID!): Boolean!
+  createLeadRoutingEvent(input: CreateLeadRoutingEventInput!): LeadRoutingEvent!
+  updateLeadRoutingEvent(id: ID!, input: UpdateLeadRoutingEventInput!): LeadRoutingEvent!
+  deleteLeadRoutingEvent(id: ID!): Boolean!
+}
+
+type Lead @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  ownerId: ID!
+  firstName: String!
+  lastName: String!
+  email: String
+  phone: String
+  company: String
+  jobTitle: String
+  source: String!
+  status: String!
+  score: Int!
+  aiScore: Float
+  aiScoreReason: String
+  rating: String!
+  industry: String
+  website: String
+  annualRevenue: Float
+  employeeCount: Int
+  country: String
+  city: String
+  address: String
+  linkedInUrl: String
+  twitterHandle: String
+  utmSource: String
+  utmMedium: String
+  utmCampaign: String
+  utmContent: String
+  utmTerm: String
+  convertedAt: DateTime
+  convertedToId: ID
+  customFields: JSON
+  tags: [String!]!
+  doNotContact: Boolean!
+  gdprConsent: Boolean!
+  gdprConsentAt: DateTime
+  territoryId: ID
+  assignedTo: String
+  priority: String
+  dataQualityScore: Int
+  deletedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  scoreRecord: LeadScore
+}
+
+type LeadScore @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  leadId: ID!
+  score: Int!
+  aiScore: Float
+  tier: String!
+  signals: JSON
+  scoredAt: DateTime!
+  confidence: Float
+  routingDecision: JSON
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type LeadScoringRule @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  name: String!
+  signal: String!
+  points: Int!
+  condition: JSON
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type LeadRoutingEvent @key(fields: "id") {
+  id: ID!
+  tenantId: ID!
+  leadId: ID!
+  territoryId: ID!
+  salesRepId: ID!
+  priority: String!
+  reason: String!
+  confidence: Float!
+  alternativeRoutes: JSON
+  createdAt: DateTime!
+}
+
+input CreateLeadInput {
+  tenantId: ID!
+  ownerId: ID!
+  firstName: String!
+  lastName: String!
+  email: String
+  phone: String
+  company: String
+  jobTitle: String
+  source: String
+  status: String
+  rating: String
+  industry: String
+  website: String
+  annualRevenue: Float
+  employeeCount: Int
+  country: String
+  city: String
+  address: String
+  linkedInUrl: String
+  twitterHandle: String
+  customFields: JSON
+  tags: [String!]
+}
+
+input UpdateLeadInput {
+  ownerId: ID
+  firstName: String
+  lastName: String
+  email: String
+  phone: String
+  company: String
+  jobTitle: String
+  source: String
+  status: String
+  rating: String
+  industry: String
+  website: String
+  annualRevenue: Float
+  employeeCount: Int
+  country: String
+  city: String
+  address: String
+  linkedInUrl: String
+  twitterHandle: String
+  customFields: JSON
+  tags: [String!]
+  doNotContact: Boolean
+  gdprConsent: Boolean
+  territoryId: ID
+  assignedTo: String
+  priority: String
+  dataQualityScore: Int
+}
+
+input CreateLeadScoreInput {
+  tenantId: ID!
+  leadId: ID!
+  score: Int
+  aiScore: Float
+  tier: String
+  signals: JSON
+  confidence: Float
+  routingDecision: JSON
+}
+
+input UpdateLeadScoreInput {
+  score: Int
+  aiScore: Float
+  tier: String
+  signals: JSON
+  confidence: Float
+  routingDecision: JSON
+}
+
+input CreateLeadScoringRuleInput {
+  tenantId: ID!
+  name: String!
+  signal: String!
+  points: Int!
+  condition: JSON
+  isActive: Boolean
+}
+
+input UpdateLeadScoringRuleInput {
+  name: String
+  signal: String
+  points: Int
+  condition: JSON
+  isActive: Boolean
+}
+
+input CreateLeadRoutingEventInput {
+  tenantId: ID!
+  leadId: ID!
+  territoryId: ID!
+  salesRepId: ID!
+  priority: String
+  reason: String!
+  confidence: Float
+  alternativeRoutes: JSON
+}
+
+input UpdateLeadRoutingEventInput {
+  territoryId: ID
+  salesRepId: ID
+  priority: String
+  reason: String
+  confidence: Float
+  alternativeRoutes: JSON
+}
+
+scalar DateTime
+scalar JSON

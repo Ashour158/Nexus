@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tempo-config
+  namespace: nexus-monitoring
+data:
+  tempo.yaml: |
+    server:
+      http_listen_port: 3200
+    distributor:
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: 0.0.0.0:4317
+            http:
+              endpoint: 0.0.0.0:4318
+    ingester:
+      trace_idle_period: 10s
+      max_block_bytes: 1_000_000
+      max_block_duration: 5m
+    compactor:
+      compaction:
+        compaction_window: 1h
+        max_block_bytes: 100_000_000
+        block_retention: 24h
+        compacted_block_retention: 1h
+    storage:
+      trace:
+        backend: local
+        local:
+          path: /tmp/tempo/blocks
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tempo
+  namespace: nexus-monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tempo
+  template:
+    metadata:
+      labels:
+        app: tempo
+    spec:
+      containers:
+        - name: tempo
+          image: grafana/tempo:2.4.0
+          args:
+            - -config.file=/etc/tempo/tempo.yaml
+          ports:
+            - containerPort: 3200
+              name: http
+            - containerPort: 4317
+              name: otlp-grpc
+            - containerPort: 4318
+              name: otlp-http
+          volumeMounts:
+            - name: config
+              mountPath: /etc/tempo
+            - name: storage
+              mountPath: /tmp/tempo
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+      volumes:
+        - name: config
+          configMap:
+            name: tempo-config
+        - name: storage
+          persistentVolumeClaim:
+            claimName: tempo-storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo
+  namespace: nexus-monitoring
+spec:
+  selector:
+    app: tempo
+  ports:
+    - port: 3200
+      targetPort: 3200
+      name: http
+    - port: 4317
+      targetPort: 4317
+      name: otlp-grpc
+    - port: 4318
+      targetPort: 4318
+      name: otlp-http
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tempo-storage
+  namespace: nexus-monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

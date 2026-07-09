@@ -1,11 +1,16 @@
 import 'dotenv/config';
+import { startTracing } from '@nexus/service-utils/tracing';
 import rateLimit from '@fastify/rate-limit';
-import { createService, globalErrorHandler, registerHealthRoutes, startService } from '@nexus/service-utils';
+import { createService, globalErrorHandler, registerHealthRoutes, startService, type HealthCheck } from '@nexus/service-utils';
 import { createMeilisearchClient } from './meilisearch.js';
 import { setupIndexes } from './indexes/setup.js';
 import { startIndexerConsumer } from './consumers/indexer.consumer.js';
 import { registerSearchRoutes } from './routes/search.routes.js';
+import { registerSavedSearchRoutes } from './routes/saved-search.routes.js';
+import { createSearchPrisma } from './prisma.js';
+import { registerGraphQL } from './graphql/index.js';
 
+startTracing({ serviceName: 'search-service' });
 const port = Number(process.env.PORT ?? 3006);
 const jwtSecret = process.env.JWT_SECRET;
 if (!jwtSecret || jwtSecret.length < 32) {
@@ -31,9 +36,34 @@ await app.register(rateLimit, {
   }),
 });
 app.setErrorHandler(globalErrorHandler);
-registerHealthRoutes(app, 'search-service', []);
-
 const meili = createMeilisearchClient();
+// Backs saved searches (SRCH-08) + recent-search history (SRCH-09).
+const prisma = createSearchPrisma();
+
+registerHealthRoutes(app, 'search-service', [
+  async (): Promise<HealthCheck> => {
+    const start = Date.now();
+    try {
+      const health = await meili.health();
+      if (health.status !== 'available') {
+        return {
+          name: 'meilisearch',
+          ok: false,
+          latencyMs: Date.now() - start,
+          message: `Meilisearch status: ${health.status}`,
+        };
+      }
+      return { name: 'meilisearch', ok: true, latencyMs: Date.now() - start };
+    } catch (err) {
+      return {
+        name: 'meilisearch',
+        ok: false,
+        latencyMs: Date.now() - start,
+        message: err instanceof Error ? err.message : String(err),
+      };
+    }
+  },
+]);
 
 try {
   await setupIndexes(meili);
@@ -49,6 +79,9 @@ try {
   app.log.warn({ err }, 'Indexer consumer failed; real-time indexing disabled');
 }
 
+await registerGraphQL(app);
+
 await startService(app, port, async (a) => {
-  await registerSearchRoutes(a, meili);
+  await registerSearchRoutes(a, meili, prisma);
+  await registerSavedSearchRoutes(a, prisma);
 });

@@ -22,6 +22,7 @@ model QuotaPlan {
   targets   QuotaTarget[]
 
   @@index([tenantId, year])
+  @@unique([id, tenantId])
 }
 
 model QuotaTarget {
@@ -37,6 +38,7 @@ model QuotaTarget {
 
   @@unique([planId, ownerId])
   @@index([tenantId, ownerId])
+  @@unique([id, tenantId])
 }
 
 model ForecastSubmission {
@@ -53,17 +55,49 @@ model ForecastSubmission {
 
   @@unique([tenantId, ownerId, period])
   @@index([tenantId, ownerId, period])
+  @@unique([id, tenantId])
 }
 
 model ForecastReview {
-  id             String             @id @default(cuid())
+  id             String               @id @default(cuid())
   submissionId   String
-  submission     ForecastSubmission @relation(fields: [submissionId], references: [id])
+  submission     ForecastSubmission   @relation(fields: [submissionId], references: [id])
   reviewerId     String
-  adjustedCommit Decimal?           @db.Decimal(18, 2)
-  adjustedBest   Decimal?           @db.Decimal(18, 2)
+  // Lifecycle: SUBMITTED → APPROVED | ADJUSTED. Defaults to APPROVED so the
+  // pre-existing `reviewForecast` (which just records a review) keeps working.
+  status         ForecastReviewStatus @default(APPROVED)
+  adjustedCommit Decimal?             @db.Decimal(18, 2)
+  adjustedBest   Decimal?             @db.Decimal(18, 2)
   note           String?
-  reviewedAt     DateTime           @default(now())
+  reviewedAt     DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt @default(now())
+}
+
+enum ForecastReviewStatus {
+  SUBMITTED
+  APPROVED
+  ADJUSTED
+}
+
+// ─── Prompt 31 — Forecast Manager Override ───────────────────────────────────
+
+model ForecastOverride {
+  id              String   @id @default(cuid())
+  tenantId        String
+  periodKey       String
+  repId           String
+  managerId       String
+  originalValue   Decimal  @db.Decimal(18, 2)
+  overrideValue   Decimal  @db.Decimal(18, 2)
+  note            String?
+  scopePipelineId String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, periodKey, repId, scopePipelineId])
+  @@index([tenantId, periodKey])
+  @@index([tenantId, repId])
+  @@unique([id, tenantId])
 }
 
 enum QuotaType {
@@ -71,4 +105,133 @@ enum QuotaType {
   DEAL_COUNT
   ACTIVITY_COUNT
   NEW_LOGOS
+}
+
+// ─── Event-driven forecast roll-up (deals-service deal.* events) ─────────────
+//
+// `ForecastAggregate` is the live, per-owner/per-period forecast maintained by
+// the deals consumer. It is derived state: it is always recomputed as the SUM
+// over `DealForecastState` rows for that owner/period, which makes the consumer
+// fully idempotent and safe under restart / event replay.
+
+model ForecastAggregate {
+  id              String   @id @default(cuid())
+  tenantId        String
+  ownerId         String
+  period          String
+  // Forecast categories, in dollars, over currently-open deals for the period.
+  commitAmount    Decimal  @default(0) @db.Decimal(18, 2)
+  bestCaseAmount  Decimal  @default(0) @db.Decimal(18, 2)
+  pipelineAmount  Decimal  @default(0) @db.Decimal(18, 2)
+  // Probability-weighted (stage) open pipeline.
+  weightedAmount  Decimal  @default(0) @db.Decimal(18, 2)
+  // AI-adjusted open pipeline: sum(amount * per-deal AI win-probability),
+  // falling back to stage probability when no AI score is carried by the event.
+  aiWeightedAmount Decimal @default(0) @db.Decimal(18, 2)
+  // Realized attainment inputs.
+  closedWonAmount Decimal  @default(0) @db.Decimal(18, 2)
+  openDealCount   Int      @default(0)
+  wonDealCount    Int      @default(0)
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, ownerId, period])
+  @@index([tenantId, period])
+  @@unique([id, tenantId])
+}
+
+model DealForecastState {
+  id        String   @id @default(cuid())
+  tenantId  String
+  dealId    String
+  ownerId   String
+  period    String
+  amount    Decimal  @default(0) @db.Decimal(18, 2)
+  // commit | best_case | pipeline | won | lost
+  category  String   @default("pipeline")
+  // Stage probability (0-100) carried by the deal event when present.
+  probability Int    @default(0)
+  // Calibrated AI win-probability (0.0-1.0) carried by the deal event, if any.
+  aiWinProbability Float?
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, dealId])
+  @@index([tenantId, ownerId, period])
+  @@unique([id, tenantId])
+}
+
+// ─── Point-in-time forecast snapshots ────────────────────────────────────────
+//
+// Captures the ForecastAggregate for an owner (scope="owner") or a whole team
+// (scope="team", ownerId="") at a given `asOf` date, so the forecast TREND over
+// a period (e.g. how commit moved across the quarter) can be reconstructed. A
+// daily poller writes one row per (owner|team, period) per day.
+model ForecastSnapshot {
+  id               String   @id @default(cuid())
+  tenantId         String
+  scope            String   @default("owner") // "owner" | "team"
+  ownerId          String   @default("")       // owner id for owner scope, "" for team
+  period           String
+  asOf             DateTime // snapshot day (UTC midnight)
+  commitAmount     Decimal  @default(0) @db.Decimal(18, 2)
+  bestCaseAmount   Decimal  @default(0) @db.Decimal(18, 2)
+  pipelineAmount   Decimal  @default(0) @db.Decimal(18, 2)
+  weightedAmount   Decimal  @default(0) @db.Decimal(18, 2)
+  aiWeightedAmount Decimal  @default(0) @db.Decimal(18, 2)
+  closedWonAmount  Decimal  @default(0) @db.Decimal(18, 2)
+  openDealCount    Int      @default(0)
+  wonDealCount     Int      @default(0)
+  createdAt        DateTime @default(now())
+
+  @@unique([tenantId, scope, ownerId, period, asOf])
+  @@index([tenantId, period, asOf])
+  @@index([tenantId, scope, period])
+  @@unique([id, tenantId])
+}
+
+// ─── Rep per-deal forecast categorization + manager override ─────────────────
+//
+// A rep SUBMITS a forecast category per deal for a period (repCategory); a
+// manager may OVERRIDE the category (managerCategory). The effective category is
+// managerCategory ?? repCategory. Persisted + audited (managerId + updatedAt);
+// the entry rollup sums by effective category with commit ⊆ best_case ⊆ pipeline.
+model ForecastDealEntry {
+  id              String   @id @default(cuid())
+  tenantId        String
+  period          String
+  ownerId         String
+  dealId          String
+  // Base-currency amount snapshot at submission time.
+  amount          Decimal  @default(0) @db.Decimal(18, 2)
+  // commit | best_case | pipeline | omitted | closed
+  repCategory     String   @default("pipeline")
+  managerCategory String?
+  managerId       String?
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, period, dealId])
+  @@index([tenantId, period, ownerId])
+  @@unique([id, tenantId])
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
 }

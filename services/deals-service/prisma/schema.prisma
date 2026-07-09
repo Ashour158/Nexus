@@ -1,0 +1,378 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/deals-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DEALS_DATABASE_URL")
+}
+
+model Deal {
+  id                String       @id @default(cuid())
+  tenantId          String
+  ownerId           String
+  accountId         String
+  code              String?
+  pipelineId        String
+  pipeline          Pipeline     @relation(fields: [pipelineId], references: [id])
+  stageId           String
+  stage             Stage        @relation(fields: [stageId], references: [id])
+  name              String
+  amount            Decimal      @default(0) @db.Decimal(18, 2)
+  currency          String       @default("USD")
+  probability       Int          @default(0)
+  expectedCloseDate DateTime?
+  actualCloseDate   DateTime?
+  status            DealStatus   @default(OPEN)
+  lostReason        String?
+  lostDetail        String?
+  forecastCategory  ForecastCategory @default(PIPELINE)
+  meddicicScore     Int          @default(0)
+  meddicicData      Json         @default("{}")
+  aiWinProbability  Float?
+  aiInsights        Json         @default("{}")
+  competitors       String[]
+  source            String?
+  campaignId        String?
+  customFields      Json         @default("{}")
+  tags              String[]
+  version           Int          @default(1)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  contacts          DealContact[]
+  quotes            Quote[]
+  dealCompetitors   DealCompetitor[]
+  stakeholders      DealStakeholder[]
+  dealRoom          DealRoom?
+  closeReason       String?
+  dataQualityScore  Int?
+  deletedAt         DateTime?
+
+  @@index([tenantId])
+  @@index([tenantId, pipelineId, stageId])
+  @@index([tenantId, ownerId])
+  @@index([tenantId, status])
+  @@index([tenantId, accountId])
+  @@index([tenantId, name])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, updatedAt])
+  @@index([tenantId, expectedCloseDate])
+  @@unique([id, tenantId])
+}
+
+enum DealStatus {
+  OPEN
+  WON
+  LOST
+  DORMANT
+}
+
+enum ForecastCategory {
+  PIPELINE
+  BEST_CASE
+  COMMIT
+  CLOSED
+  OMITTED
+}
+
+model DealContact {
+  id        String  @id @default(cuid())
+  dealId    String
+  deal      Deal    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  contactId String
+  role      String?
+  isPrimary Boolean @default(false)
+
+  @@unique([dealId, contactId])
+}
+
+model DealStakeholder {
+  id          String   @id @default(cuid())
+  tenantId    String
+  dealId      String
+  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  contactId   String
+  role        String
+  influence   Int      @default(50)
+  sentiment   String   @default("Neutral")
+  reportsToId String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  reportsTo DealStakeholder?  @relation("StakeholderHierarchy", fields: [reportsToId], references: [id], onDelete: SetNull)
+  reports   DealStakeholder[] @relation("StakeholderHierarchy")
+
+  @@unique([dealId, contactId])
+  @@index([tenantId, dealId])
+  @@unique([id, tenantId])
+}
+
+model DealRoom {
+  id           String   @id @default(cuid())
+  tenantId     String
+  dealId       String   @unique
+  title        String
+  slug         String   @unique
+  isPublished  Boolean  @default(false)
+  buyerEmails  Json     @default("[]")
+  lastViewedAt DateTime?
+  viewCount    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  deal      Deal               @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  items     MutualActionItem[]
+  documents DealRoomDocument[]
+
+  @@index([tenantId])
+  @@unique([id, tenantId])
+}
+
+model MutualActionItem {
+  id          String    @id @default(cuid())
+  dealRoomId  String
+  title       String
+  description String?
+  owner       String
+  ownerName   String?
+  dueDate     DateTime?
+  completedAt DateTime?
+  position    Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  dealRoom DealRoom @relation(fields: [dealRoomId], references: [id], onDelete: Cascade)
+
+  @@index([dealRoomId])
+}
+
+model DealRoomDocument {
+  id         String   @id @default(cuid())
+  dealRoomId String
+  name       String
+  url        String
+  fileType   String?
+  uploadedBy String
+  createdAt  DateTime @default(now())
+
+  dealRoom DealRoom @relation(fields: [dealRoomId], references: [id], onDelete: Cascade)
+
+  @@index([dealRoomId])
+}
+
+model Pipeline {
+  id             String   @id @default(cuid())
+  tenantId       String
+  name           String
+  type           String   @default("sales")
+  currency       String   @default("USD")
+  isDefault      Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  description    String?
+  ownedBy        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  stages         Stage[]
+  deals          Deal[]
+  winLossReasons WinLossReason[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@unique([id, tenantId])
+}
+
+model Stage {
+  id              String   @id @default(cuid())
+  tenantId        String
+  pipelineId      String
+  pipeline        Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  name            String
+  order           Int
+  probability     Int      @default(0)
+  rottenDays      Int      @default(30)
+  requiredFields  Json     @default("[]")
+  entryConditions Json     @default("[]")
+  color           String   @default("#6B7280")
+  isWon           Boolean  @default(false)
+  isLost          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deals           Deal[]
+
+  @@unique([pipelineId, name])
+  @@index([tenantId, pipelineId])
+  @@unique([id, tenantId])
+}
+
+model WinLossReason {
+  id          String    @id @default(cuid())
+  tenantId    String
+  pipelineId  String?
+  pipeline    Pipeline? @relation(fields: [pipelineId], references: [id], onDelete: SetNull)
+  type        String
+  reason      String
+  isActive    Boolean   @default(true)
+  position    Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId, type])
+  @@unique([id, tenantId])
+}
+
+model Quote {
+  id              String      @id @default(cuid())
+  tenantId        String
+  dealId          String
+  deal            Deal        @relation(fields: [dealId], references: [id])
+  ownerId         String
+  quoteNumber     String
+  name            String
+  status          QuoteStatus @default(DRAFT)
+  validUntil      DateTime?
+  currency        String      @default("USD")
+  subtotal        Decimal     @default(0) @db.Decimal(18, 2)
+  discountAmount  Decimal     @default(0) @db.Decimal(18, 2)
+  taxAmount       Decimal     @default(0) @db.Decimal(18, 2)
+  total           Decimal     @default(0) @db.Decimal(18, 2)
+  approvalStatus  String?
+  approvedById    String?
+  approvedAt      DateTime?
+  sentAt          DateTime?
+  viewedAt        DateTime?
+  acceptedAt      DateTime?
+  terms           String?
+  notes           String?
+  lineItems       Json        @default("[]")
+  customFields    Json        @default("{}")
+  version         Int         @default(1)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([tenantId, quoteNumber])
+  @@index([tenantId, dealId])
+  @@index([tenantId, status])
+  @@unique([id, tenantId])
+}
+
+enum QuoteStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SENT
+  VIEWED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
+model QuoteProjection {
+  id                   String    @id @default(cuid())
+  tenantId             String
+  quoteId              String
+  accountId            String?
+  contactId            String?
+  dealId               String?
+  rfqId                String?
+  quoteNumber          String?
+  status               String
+  totalAmount          Decimal   @default(0) @db.Decimal(18, 2)
+  currency             String    @default("USD")
+  currentRevisionId    String?
+  validUntil           DateTime?
+  lastFinanceEventType String
+  sourceEventId        String
+  sourceEventVersion   Int       @default(1)
+  sourceAggregateId    String?
+  sourceAggregateType  String?
+  correlationId        String?
+  transitionLedgerId   String?
+  projectionVersion    Int       @default(1)
+  projectedAt          DateTime
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([tenantId, quoteId])
+  @@unique([tenantId, sourceEventId])
+  @@index([tenantId, accountId])
+  @@index([tenantId, contactId])
+  @@index([tenantId, dealId])
+  @@index([tenantId, status])
+  @@unique([id, tenantId])
+}
+
+model QuoteProjectionEvent {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  quoteId            String
+  sourceEventId      String
+  sourceEventVersion Int      @default(1)
+  financeEventType   String
+  sourceAggregateId  String?
+  sourceAggregateType String?
+  correlationId      String?
+  transitionLedgerId String?
+  projectionVersion  Int      @default(1)
+  projectedAt        DateTime @default(now())
+
+  @@unique([tenantId, sourceEventId])
+  @@index([tenantId, quoteId])
+  @@index([tenantId, financeEventType])
+  @@unique([id, tenantId])
+}
+
+model Competitor {
+  id             String           @id @default(uuid())
+  tenantId       String
+  name           String
+  website        String?
+  description    String?
+  strengths      String[]         @default([])
+  weaknesses     String[]         @default([])
+  winRateAgainst Float?
+  deals          DealCompetitor[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@unique([id, tenantId])
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
+}
+
+model DealCompetitor {
+  id           String     @id @default(uuid())
+  tenantId     String
+  dealId       String
+  deal         Deal       @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  competitorId String
+  competitor   Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+  outcome      String?
+  notes        String?
+  createdAt    DateTime   @default(now())
+
+  @@unique([dealId, competitorId])
+  @@index([tenantId])
+  @@unique([id, tenantId])
+}

@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
+import { useConfirm } from '@/hooks/use-confirm';
+import { OrgAssignmentPanel } from '@/components/admin/org-assignment-panel';
 
 const RESOURCES = ['contacts', 'deals', 'reports', 'workflows'] as const;
 
@@ -19,6 +21,7 @@ type UserDetail = {
 
 export default function AdminUserDetailPage({ params }: { params: { id: string } }) {
   const accessToken = useAuthStore((s) => s.accessToken);
+  const { confirm, ConfirmDialog } = useConfirm();
   const [data, setData] = useState<UserDetail | null>(null);
   const [role, setRole] = useState('ae');
   const [tenant, setTenant] = useState('Tenant 1');
@@ -62,7 +65,7 @@ export default function AdminUserDetailPage({ params }: { params: { id: string }
   }
 
   async function deleteCurrent() {
-    if (!window.confirm('Delete this user account?')) return;
+    if (!await confirm('Delete this user account?', 'Delete User')) return;
     setBanner('');
     try {
       const res = await fetch(`/api/admin/users/${params.id}`, {
@@ -115,6 +118,7 @@ export default function AdminUserDetailPage({ params }: { params: { id: string }
           ))}
         </div>
       </section>
+      <OrgAssignmentPanel userId={params.id} />
       <section className="rounded-xl border border-gray-800 bg-gray-900 p-4">
         <h3 className="mb-2 font-semibold">Login history</h3>
         <ul className="space-y-1 text-sm text-gray-300">{history.map((h) => <li key={h.id}>{new Date(h.at).toLocaleString()} - {h.action}</li>)}</ul>
@@ -130,6 +134,7 @@ export default function AdminUserDetailPage({ params }: { params: { id: string }
           <button onClick={() => void deleteCurrent()} className="rounded border border-red-700 px-3 py-1.5 text-sm text-red-300">Delete account</button>
         </div>
       </section>
+      {ConfirmDialog}
       <div className="flex justify-end">
         <button
           onClick={() => void updateCurrent({ role, tenant, permissions }, 'User permissions saved')}

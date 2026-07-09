@@ -1,0 +1,65 @@
+supergraph:
+  listen: 0.0.0.0:4000
+  introspection: true
+  preview_defer_support: false
+
+cors:
+  origins:
+    - http://localhost:3000
+    - https://app.nexus-crm.io
+  allow_credentials: true
+  allow_headers:
+    - Content-Type
+    - Authorization
+    - X-Tenant-Id
+    - X-Request-Id
+
+headers:
+  all:
+    request:
+      - propagate:
+          named: authorization
+      - propagate:
+          named: x-tenant-id
+      - propagate:
+          named: x-request-id
+
+health_check:
+  listen: 0.0.0.0:8088
+
+sandbox:
+  enabled: true
+
+telemetry:
+  exporters:
+    tracing:
+      common:
+        service_name: nexus-graphql-router
+        service_namespace: nexus
+      otlp:
+        endpoint: http://otel-collector:4317
+        protocol: grpc
+    metrics:
+      common:
+        service_name: nexus-graphql-router
+      otlp:
+        endpoint: http://otel-collector:4317
+        protocol: grpc
+
+# Authentication at the router level
+authentication:
+  router:
+    jwt:
+      jwks:
+        - url: http://auth-service:3000/.well-known/jwks.json
+      header_name: Authorization
+      # The router will validate the JWT and make claims available to subgraphs
+      # via @requires and context propagation
+
+# Rate limiting via Redis
+# Requires Apollo Router Enterprise or custom plugin
+# For OSS, implement via Kong/NGINX upstream
+
+override_subgraph_url:
+  auth: http://auth-service:3000/graphql
+  crm: http://crm-service:3001/graphql

@@ -1,17 +1,26 @@
 'use client';
 
-import { useState } from 'react';
-import { User, Users, CreditCard, Plug, Bell, Shield, Globe, Key } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { User, Users, Plug, Bell, Shield, Globe, Key, Loader2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+
+import { useUsers, useRoles } from '@/hooks/use-users';
+import { useProfile, useUpdateProfile } from '@/hooks/use-profile';
+import { useNotificationSettings, useUpdateNotificationSettings } from '@/hooks/use-notification-settings';
+import { useMfaStatus, useSetupMfa, useEnableMfa, useDisableMfa } from '@/hooks/use-security';
+import { useApiKeys, useCreateApiKey, useRevokeApiKey } from '@/hooks/use-api-keys';
+import { notify } from '@/lib/toast';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useAuthStore } from '@/stores/auth.store';
 
-type Tab = 'profile' | 'team' | 'billing' | 'integrations' | 'notifications' | 'security' | 'localization' | 'api';
+type Tab = 'profile' | 'team' | 'integrations' | 'notifications' | 'security' | 'localization' | 'api';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'profile',       label: 'Profile',       icon: <User className="w-4 h-4" /> },
   { id: 'team',          label: 'Team',           icon: <Users className="w-4 h-4" /> },
   { id: 'notifications', label: 'Notifications',  icon: <Bell className="w-4 h-4" /> },
   { id: 'security',      label: 'Security',       icon: <Shield className="w-4 h-4" /> },
-  { id: 'billing',       label: 'Billing',        icon: <CreditCard className="w-4 h-4" /> },
   { id: 'integrations',  label: 'Integrations',   icon: <Plug className="w-4 h-4" /> },
   { id: 'localization',  label: 'Localization',   icon: <Globe className="w-4 h-4" /> },
   { id: 'api',           label: 'API Keys',       icon: <Key className="w-4 h-4" /> },
@@ -42,19 +51,23 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
-function Input({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400
-        focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+      className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400
+        focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition ${className ?? ''}`}
     />
   );
 }
 
-function SaveButton({ label = 'Save changes' }: { label?: string }) {
+function SaveButton({ label = 'Save changes', onClick, disabled }: { label?: string; onClick?: () => void; disabled?: boolean }) {
   return (
-    <button className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 transition">
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
+    >
       {label}
     </button>
   );
@@ -79,9 +92,41 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
 
 /* ── tab panels ───────────────────────────────────────────────────────────── */
 function ProfileTab() {
-  const userId = useAuthStore((s) => s.userId);
-  const [name, setName] = useState(userId ?? '');
-  const [email] = useState(userId ? `${userId}@nexuscrm.app` : '');
+  const { data: profile, isLoading } = useProfile();
+  const update = useUpdateProfile();
+
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+
+  useEffect(() => {
+    if (profile) {
+      const full = `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim();
+      setName(full);
+      setPhone(profile.phone ?? '');
+    }
+  }, [profile]);
+
+  const email = profile?.email ?? '';
+
+  const handleSave = () => {
+    const parts = name.trim().split(' ');
+    const firstName = parts[0] ?? '';
+    const lastName = parts.slice(1).join(' ');
+    update.mutate({ firstName, lastName, phone });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <SectionCard title="Personal information" description="Update your name and contact details.">
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Loading profile…
+          </div>
+        </SectionCard>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -94,13 +139,13 @@ function ProfileTab() {
             <Input value={email} disabled className="opacity-60 cursor-not-allowed" />
           </Field>
           <Field label="Phone number">
-            <Input placeholder="+1 555 000 0000" />
+            <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+1 555 000 0000" />
           </Field>
           <Field label="Job title">
-            <Input placeholder="Account Executive" />
+            <Input value={profile?.profile?.jobTitle ?? ''} disabled className="opacity-60 cursor-not-allowed" placeholder="Account Executive" />
           </Field>
         </div>
-        <SaveButton />
+        <SaveButton onClick={handleSave} disabled={update.isPending} />
       </SectionCard>
 
       <SectionCard title="Profile photo" description="Upload a photo or choose an avatar.">
@@ -109,7 +154,12 @@ function ProfileTab() {
             {name?.[0]?.toUpperCase() ?? 'U'}
           </div>
           <div className="space-y-1">
-            <button className="text-sm font-medium text-blue-600 hover:text-blue-700">Upload photo</button>
+            <button
+              onClick={() => notify.success('Avatar upload is not available yet.')}
+              className="text-sm font-medium text-blue-600 hover:text-blue-700"
+            >
+              Upload photo
+            </button>
             <p className="text-xs text-gray-400">JPG, PNG or GIF · max 2 MB</p>
           </div>
         </div>
@@ -118,30 +168,32 @@ function ProfileTab() {
       <SectionCard title="Password" description="Change your account password.">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
           <Field label="Current password">
-            <Input type="password" placeholder="••••••••" />
+            <Input type="password" placeholder="••••••••" disabled className="opacity-60 cursor-not-allowed" />
           </Field>
           <div />
           <Field label="New password">
-            <Input type="password" placeholder="••••••••" />
+            <Input type="password" placeholder="••••••••" disabled className="opacity-60 cursor-not-allowed" />
           </Field>
           <Field label="Confirm new password">
-            <Input type="password" placeholder="••••••••" />
+            <Input type="password" placeholder="••••••••" disabled className="opacity-60 cursor-not-allowed" />
           </Field>
         </div>
-        <SaveButton label="Update password" />
+        <button
+          onClick={() => notify.success('Password change is managed via your identity provider.')}
+          className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 transition"
+        >
+          Update password
+        </button>
       </SectionCard>
     </div>
   );
 }
 
 function TeamTab() {
-  const members = [
-    { name: 'Sarah Chen', email: 'sarah@nexus.io', role: 'Admin', status: 'Active' },
-    { name: 'Marcus Rodriguez', email: 'marcus@nexus.io', role: 'Manager', status: 'Active' },
-    { name: 'Aisha Patel', email: 'aisha@nexus.io', role: 'Rep', status: 'Active' },
-    { name: 'Tom Wilson', email: 'tom@nexus.io', role: 'Rep', status: 'Invited' },
-  ];
-  const ROLES = ['Admin', 'Manager', 'Rep', 'Viewer'];
+  const { data: usersData, isLoading } = useUsers({ limit: 100 });
+  const { data: rolesData } = useRoles();
+  const users = usersData?.data ?? [];
+  const roles = rolesData?.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -157,36 +209,42 @@ function TeamTab() {
               </tr>
             </thead>
             <tbody>
-              {members.map(m => (
-                <tr key={m.email} className="border-b border-gray-50 last:border-0">
-                  <td className="py-3 pe-4">
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500
-                        flex items-center justify-center text-white text-xs font-semibold shrink-0">
-                        {m.name[0]}
+              {isLoading ? (
+                <tr><td colSpan={4} className="py-4 text-sm text-gray-400">Loading team members…</td></tr>
+              ) : users.length === 0 ? (
+                <tr><td colSpan={4} className="py-4 text-sm text-gray-400">No team members found.</td></tr>
+              ) : (
+                users.map((u) => (
+                  <tr key={u.id} className="border-b border-gray-50 last:border-0">
+                    <td className="py-3 pe-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500
+                          flex items-center justify-center text-white text-xs font-semibold shrink-0">
+                          {(u.firstName?.[0] ?? u.email[0]).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">{u.firstName} {u.lastName}</p>
+                          <p className="text-xs text-gray-400">{u.email}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{m.name}</p>
-                        <p className="text-xs text-gray-400">{m.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-3 pe-4">
-                    <select className="text-sm border border-gray-200 rounded-lg px-2 py-1 text-gray-700">
-                      {ROLES.map(r => <option key={r} selected={r === m.role}>{r}</option>)}
-                    </select>
-                  </td>
-                  <td className="py-3 pe-4">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                      ${m.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                      {m.status}
-                    </span>
-                  </td>
-                  <td className="py-3">
-                    <button className="text-xs text-red-500 hover:text-red-600 font-medium">Remove</button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-3 pe-4">
+                      <select className="text-sm border border-gray-200 rounded-lg px-2 py-1 text-gray-700">
+                        {roles.map((r) => <option key={r.id} selected={u.roles?.some((ur) => ur.id === r.id)}>{r.name}</option>)}
+                      </select>
+                    </td>
+                    <td className="py-3 pe-4">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                        ${u.isActive ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {u.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="py-3">
+                      <button className="text-xs text-red-500 hover:text-red-600 font-medium">Remove</button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -204,7 +262,9 @@ function TeamTab() {
             <thead>
               <tr className="border-b border-gray-100">
                 <th className="text-start font-medium text-gray-500 py-2 pe-4 w-48">Permission</th>
-                {ROLES.map(r => <th key={r} className="text-center font-medium text-gray-500 py-2 px-3">{r}</th>)}
+                {(roles.length ? roles : [{ id: 'admin', name: 'Admin' }, { id: 'manager', name: 'Manager' }, { id: 'rep', name: 'Rep' }, { id: 'viewer', name: 'Viewer' }]).map((r) => (
+                  <th key={r.id} className="text-center font-medium text-gray-500 py-2 px-3">{r.name}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -215,7 +275,7 @@ function TeamTab() {
                 ['Manage pipelines', true, true, false, false],
                 ['View reports', true, true, true, true],
                 ['Manage team', true, false, false, false],
-                ['Billing access', true, false, false, false],
+                ['Contract access', true, false, false, false],
               ].map(([label, ...perms]) => (
                 <tr key={String(label)} className="border-b border-gray-50 last:border-0">
                   <td className="py-2.5 pe-4 text-gray-700">{label}</td>
@@ -235,11 +295,25 @@ function TeamTab() {
 }
 
 function NotificationsTab() {
-  const [prefs, setPrefs] = useState({
+  const { data: prefs, isLoading } = useNotificationSettings();
+  const update = useUpdateNotificationSettings();
+
+  const [localPrefs, setLocalPrefs] = useState({
     dealWon: true, dealLost: false, taskDue: true, newLead: true,
     emailOpen: false, callMissed: true, weeklyDigest: true, systemAlerts: true,
   });
-  const toggle = (k: keyof typeof prefs) => setPrefs(p => ({ ...p, [k]: !p[k] }));
+
+  useEffect(() => {
+    if (prefs) {
+      setLocalPrefs(prev => ({ ...prev, ...prefs }));
+    }
+  }, [prefs]);
+
+  const toggle = (k: keyof typeof localPrefs) => {
+    const next = { ...localPrefs, [k]: !localPrefs[k] };
+    setLocalPrefs(next);
+    update.mutate(next);
+  };
 
   const groups = [
     {
@@ -267,6 +341,19 @@ function NotificationsTab() {
     },
   ];
 
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <SectionCard title="Deal activity">
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Loading preferences…
+          </div>
+        </SectionCard>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {groups.map(g => (
@@ -278,7 +365,7 @@ function NotificationsTab() {
                   <p className="text-sm font-medium text-gray-800">{item.label}</p>
                   <p className="text-xs text-gray-400">{item.desc}</p>
                 </div>
-                <Toggle enabled={prefs[item.key]} onChange={() => toggle(item.key)} />
+                <Toggle enabled={Boolean(localPrefs[item.key])} onChange={() => toggle(item.key)} />
               </div>
             ))}
           </div>
@@ -289,130 +376,233 @@ function NotificationsTab() {
 }
 
 function SecurityTab() {
+  const { data: mfaStatus, isLoading: mfaLoading } = useMfaStatus();
+  const setupMfa = useSetupMfa();
+  const enableMfa = useEnableMfa();
+  const disableMfa = useDisableMfa();
+
+  const [mfaDialogOpen, setMfaDialogOpen] = useState(false);
+  const [mfaDisableDialogOpen, setMfaDisableDialogOpen] = useState(false);
+  const [mfaQrUrl, setMfaQrUrl] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
+
+  const handleEnable = async () => {
+    try {
+      const setup = await setupMfa.mutateAsync();
+      setMfaQrUrl(setup.qrCodeUrl ?? '');
+      setMfaCode('');
+      setMfaDialogOpen(true);
+    } catch {
+      // errors already toasted by mutation hooks
+    }
+  };
+
+  const confirmEnable = async () => {
+    if (!mfaCode) return;
+    try {
+      await enableMfa.mutateAsync({ code: mfaCode });
+      setMfaDialogOpen(false);
+      setMfaCode('');
+    } catch {
+      // errors already toasted by mutation hooks
+    }
+  };
+
+  const handleDisable = () => {
+    setMfaCode('');
+    setMfaDisableDialogOpen(true);
+  };
+
+  const confirmDisable = async () => {
+    if (!mfaCode) return;
+    try {
+      await disableMfa.mutateAsync({ code: mfaCode });
+      setMfaDisableDialogOpen(false);
+      setMfaCode('');
+    } catch {
+      // errors already toasted by mutation hooks
+    }
+  };
+
+  const mfaEnabled = mfaStatus?.enabled ?? false;
+
   return (
     <div className="space-y-6">
       <SectionCard title="Two-factor authentication" description="Add an extra layer of security to your account.">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-800">Authenticator app</p>
-            <p className="text-xs text-gray-400 mt-0.5">Use Google Authenticator or Authy</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {mfaLoading
+                ? 'Loading MFA status…'
+                : mfaEnabled
+                  ? 'MFA is currently enabled'
+                  : 'Use Google Authenticator or Authy'}
+            </p>
           </div>
-          <button className="rounded-lg border border-gray-300 hover:border-blue-500 text-sm font-medium px-4 py-2 text-gray-700 transition">
-            Enable
+          <button
+            onClick={mfaEnabled ? handleDisable : () => void handleEnable()}
+            disabled={mfaLoading || setupMfa.isPending || enableMfa.isPending || disableMfa.isPending}
+            className="rounded-lg border border-gray-300 hover:border-blue-500 text-sm font-medium px-4 py-2 text-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {mfaLoading ? 'Loading…' : mfaEnabled ? 'Disable' : 'Enable'}
           </button>
         </div>
       </SectionCard>
 
       <SectionCard title="Active sessions" description="Manage devices currently signed in.">
-        {[
-          { device: 'Chrome on macOS', ip: '192.168.1.12', last: 'Current session', current: true },
-          { device: 'Safari on iPhone', ip: '10.0.0.5', last: '2 hours ago', current: false },
-          { device: 'Firefox on Windows', ip: '172.16.0.3', last: '3 days ago', current: false },
-        ].map(s => (
-          <div key={s.ip} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-            <div>
-              <p className="text-sm font-medium text-gray-800">{s.device}</p>
-              <p className="text-xs text-gray-400">{s.ip} · {s.last}</p>
-            </div>
-            {s.current
-              ? <span className="text-xs text-green-600 font-medium bg-green-50 px-2 py-0.5 rounded-full">Active</span>
-              : <button className="text-xs text-red-500 hover:text-red-600 font-medium">Revoke</button>
-            }
-          </div>
-        ))}
-        <button className="text-sm text-red-500 hover:text-red-600 font-medium pt-1">
-          Sign out all other sessions
-        </button>
+        <div className="text-center py-6">
+          <p className="text-sm text-gray-400">Session management is coming soon.</p>
+        </div>
       </SectionCard>
 
       <SectionCard title="Login history" description="Recent sign-in activity on your account.">
-        <div className="space-y-2">
-          {[
-            { date: 'Today, 9:41 AM', device: 'Chrome / macOS', status: 'Success' },
-            { date: 'Yesterday, 6:02 PM', device: 'iPhone / iOS 17', status: 'Success' },
-            { date: '3 days ago, 11:15 AM', device: 'Chrome / Windows', status: 'Failed' },
-          ].map(l => (
-            <div key={l.date} className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">{l.date} · {l.device}</span>
-              <span className={l.status === 'Success' ? 'text-green-600' : 'text-red-500'}>{l.status}</span>
-            </div>
-          ))}
-        </div>
-      </SectionCard>
-    </div>
-  );
-}
-
-function BillingTab() {
-  return (
-    <div className="space-y-6">
-      <SectionCard title="Current plan" description="You are on the Professional plan.">
-        <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">
-          <div>
-            <p className="text-lg font-bold text-blue-700">Professional</p>
-            <p className="text-sm text-blue-600">$49 / seat / month · 12 seats</p>
-          </div>
-          <button className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2">
-            Upgrade plan
-          </button>
-        </div>
-        <div className="grid grid-cols-3 gap-3 text-center">
-          {[['Contacts', '8,420 / 50k'], ['Storage', '12 GB / 100 GB'], ['API calls', '142k / 500k']].map(([k, v]) => (
-            <div key={k} className="rounded-lg bg-gray-50 p-3">
-              <p className="text-xs text-gray-500">{k}</p>
-              <p className="text-sm font-semibold text-gray-800 mt-0.5">{v}</p>
-            </div>
-          ))}
+        <div className="text-center py-6">
+          <p className="text-sm text-gray-400">Login history is coming soon.</p>
         </div>
       </SectionCard>
 
-      <SectionCard title="Payment method" description="Manage your payment information.">
-        <div className="flex items-center justify-between p-3 rounded-lg border border-gray-200">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-12 bg-blue-600 rounded flex items-center justify-center text-white text-xs font-bold">VISA</div>
-            <div>
-              <p className="text-sm font-medium text-gray-800">Visa ending in 4242</p>
-              <p className="text-xs text-gray-400">Expires 12/2027</p>
-            </div>
-          </div>
-          <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">Update</button>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Billing history" description="Download past invoices.">
-        <div className="space-y-2">
-          {[
-            { date: 'Apr 1, 2026', amount: '$588.00', status: 'Paid' },
-            { date: 'Mar 1, 2026', amount: '$588.00', status: 'Paid' },
-            { date: 'Feb 1, 2026', amount: '$588.00', status: 'Paid' },
-          ].map(inv => (
-            <div key={inv.date} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-              <div>
-                <p className="text-sm text-gray-800">{inv.date}</p>
-                <p className="text-xs text-gray-400">{inv.amount}</p>
+      {/* MFA Enable Dialog */}
+      <Dialog open={mfaDialogOpen} onOpenChange={setMfaDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set up two-factor authentication</DialogTitle>
+            <DialogDescription>
+              Scan the QR code with Google Authenticator or Authy, then enter the 6-digit code.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 py-2">
+            {mfaQrUrl && (
+              <div className="flex justify-center">
+                <img src={mfaQrUrl} alt="MFA QR Code" className="h-40 w-40 rounded-lg border border-gray-200" />
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full font-medium">{inv.status}</span>
-                <button className="text-xs text-blue-600 hover:text-blue-700 font-medium">Download</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </SectionCard>
+            )}
+            <Input
+              type="text"
+              inputMode="numeric"
+              placeholder="Enter 6-digit code"
+              value={mfaCode}
+              onChange={e => setMfaCode(e.target.value)}
+              maxLength={6}
+              className="text-center text-lg tracking-widest font-mono"
+              onKeyDown={e => { if (e.key === 'Enter') void confirmEnable(); }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMfaDialogOpen(false)}>Cancel</Button>
+            <Button onClick={() => void confirmEnable()} disabled={mfaCode.length < 6 || enableMfa.isPending}>Verify & Enable</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MFA Disable Dialog */}
+      <Dialog open={mfaDisableDialogOpen} onOpenChange={setMfaDisableDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Disable two-factor authentication</DialogTitle>
+            <DialogDescription>
+              Enter your current 6-digit MFA code to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              type="text"
+              inputMode="numeric"
+              placeholder="Enter 6-digit code"
+              value={mfaCode}
+              onChange={e => setMfaCode(e.target.value)}
+              maxLength={6}
+              className="text-center text-lg tracking-widest font-mono"
+              onKeyDown={e => { if (e.key === 'Enter') void confirmDisable(); }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMfaDisableDialogOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => void confirmDisable()} disabled={mfaCode.length < 6 || disableMfa.isPending}>Disable MFA</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 function IntegrationsTab() {
+  const accessToken = useAuthStore(s => s.accessToken);
+
+  const { data: emailConn, refetch: refetchEmail } = useQuery({
+    queryKey: ['email-connection'],
+    queryFn: async () => {
+      const res = await fetch('/api/email/connection', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) return { connected: false };
+      return res.json() as Promise<{ connected: boolean }>;
+    },
+    enabled: !!accessToken,
+    staleTime: 30_000,
+  });
+
+  const { data: esignConn } = useQuery({
+    queryKey: ['esign-connection'],
+    queryFn: async () => {
+      const res = await fetch('/api/esign/connection', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) return { connected: false };
+      return res.json() as Promise<{ connected: boolean }>;
+    },
+    enabled: !!accessToken,
+    staleTime: 30_000,
+  });
+
+  const emailConnected = emailConn?.connected ?? false;
+  const esignConnected = esignConn?.connected ?? false;
+
+  // Still handle the OAuth callback redirect param.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get('connected');
+    // The redirect sets the param — the next query refetch will show the real state.
+    // Remove the param from the URL to keep it clean.
+    if (connected) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('connected');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, []);
+
   const integrations = [
     { name: 'Google Calendar', desc: 'Sync meetings and follow-ups', icon: '📅', connected: true },
-    { name: 'Gmail / Google Workspace', desc: 'Track emails and conversations', icon: '✉️', connected: true },
+    {
+      name: 'Gmail',
+      desc: 'Sync your Gmail inbox to read and reply from NEXUS',
+      icon: '✉️',
+      connected: emailConnected,
+      onConnect: () => {
+        window.location.href = '/api/email/oauth/gmail/init';
+      },
+      onDisconnect: async () => {
+        await fetch('/api/email/connection', {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        void refetchEmail();
+      },
+    },
     { name: 'Slack', desc: 'Get deal alerts in your channels', icon: '💬', connected: false },
     { name: 'Microsoft Teams', desc: 'Notifications and deal updates', icon: '🔵', connected: false },
     { name: 'Outlook / Microsoft 365', desc: 'Email and calendar sync', icon: '📨', connected: false },
     { name: 'WhatsApp Business', desc: 'Message contacts from NEXUS', icon: '📱', connected: false },
-    { name: 'Stripe', desc: 'Sync invoices and payments', icon: '💳', connected: true },
-    { name: 'DocuSign', desc: 'Send contracts for e-signature', icon: '📝', connected: false },
+    {
+      name: 'DocuSign',
+      desc: 'Send contracts for e-signature directly from deals',
+      icon: '📝',
+      connected: esignConnected,
+      onConnect: () => {
+        window.location.href = '/api/esign/docusign/init';
+      },
+    },
     { name: 'Zapier', desc: 'Connect to 5,000+ apps', icon: '⚡', connected: false },
     { name: 'HubSpot', desc: 'Import contacts and deals', icon: '🔶', connected: false },
   ];
@@ -430,11 +620,22 @@ function IntegrationsTab() {
                   <p className="text-xs text-gray-400">{int.desc}</p>
                 </div>
               </div>
-              <button className={`text-xs font-medium px-3 py-1.5 rounded-lg transition ${
-                int.connected
-                  ? 'border border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-500'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
-              }`}>
+              <button
+                onClick={() => {
+                  if (int.connected && int.onDisconnect) {
+                    void int.onDisconnect();
+                    return;
+                  }
+                  if (!int.connected && int.onConnect) {
+                    int.onConnect();
+                  }
+                }}
+                className={`text-xs font-medium px-3 py-1.5 rounded-lg transition ${
+                  int.connected
+                    ? 'border border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-500'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
                 {int.connected ? 'Disconnect' : 'Connect'}
               </button>
             </div>
@@ -489,7 +690,7 @@ function LocalizationTab() {
         <SaveButton />
       </SectionCard>
 
-      <SectionCard title="Layout direction" description="RTL support for Arabic and other right-to-left languages.">
+      <SectionCard title="Layout direction" description="RTL support for Arabic and other end-to-left languages.">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-800">Right-to-left (RTL) mode</p>
@@ -503,108 +704,165 @@ function LocalizationTab() {
 }
 
 function ApiKeysTab() {
-  const keys = [
-    { name: 'Production API Key', created: 'Jan 15, 2026', last: '2 hours ago', key: 'nxs_live_••••••••••••4f2a' },
-    { name: 'Development API Key', created: 'Feb 3, 2026', last: '5 days ago', key: 'nxs_test_••••••••••••9c1b' },
-  ];
+  const { data: apiKeysData, isLoading } = useApiKeys();
+  const create = useCreateApiKey();
+  const revoke = useRevokeApiKey();
+  const [newKeyName, setNewKeyName] = useState('');
+  const [newKeyDialogOpen, setNewKeyDialogOpen] = useState(false);
+  const [createdKey, setCreatedKey] = useState('');
+  const apiKeys = apiKeysData?.data ?? [];
+
+  const handleCreate = async () => {
+    const name = newKeyName.trim();
+    if (!name) {
+      notify.error('Please enter a name for the API key');
+      return;
+    }
+    try {
+      const created = await create.mutateAsync({ name });
+      setNewKeyName('');
+      setCreatedKey(created.key ?? '');
+      setNewKeyDialogOpen(true);
+    } catch {
+      // error already toasted
+    }
+  };
 
   return (
     <div className="space-y-6">
       <SectionCard title="API keys" description="Use these keys to authenticate requests to the NEXUS API.">
-        <div className="space-y-3">
-          {keys.map(k => (
-            <div key={k.name} className="p-4 rounded-xl border border-gray-200">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-gray-800">{k.name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Created {k.created} · Last used {k.last}</p>
-                </div>
-                <button className="text-xs text-red-500 hover:text-red-600 font-medium">Revoke</button>
-              </div>
-              <div className="mt-2 flex items-center gap-2">
-                <code className="flex-1 text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 font-mono text-gray-600">
-                  {k.key}
-                </code>
-                <button className="text-xs text-blue-600 hover:text-blue-700 font-medium px-2 py-1.5 border border-blue-200 rounded-lg">
-                  Copy
-                </button>
-              </div>
-            </div>
-          ))}
+        <div className="flex items-center gap-3">
+          <Input
+            placeholder="Key name (e.g. Production)"
+            value={newKeyName}
+            onChange={(e) => setNewKeyName(e.target.value)}
+            className="max-w-xs"
+          />
+          <button
+            onClick={handleCreate}
+            disabled={create.isPending}
+            className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            {create.isPending ? 'Creating…' : 'Generate key'}
+          </button>
         </div>
-        <button className="rounded-lg border border-gray-300 hover:border-blue-500 text-sm font-medium px-4 py-2 text-gray-700 transition">
-          Generate new API key
-        </button>
+
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-gray-400 py-4">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Loading API keys…
+          </div>
+        ) : apiKeys.length === 0 ? (
+          <div className="text-center py-6">
+            <p className="text-sm text-gray-400">No API keys yet.</p>
+            <p className="mt-1 text-xs text-gray-500">Generate a key above to get started.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-start font-medium text-gray-500 py-2 pe-4">Name</th>
+                  <th className="text-start font-medium text-gray-500 py-2 pe-4">Prefix</th>
+                  <th className="text-start font-medium text-gray-500 py-2 pe-4">Scopes</th>
+                  <th className="text-start font-medium text-gray-500 py-2 pe-4">Expires</th>
+                  <th className="text-start font-medium text-gray-500 py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {apiKeys.map((key) => (
+                  <tr key={key.id} className="border-b border-gray-50 last:border-0">
+                    <td className="py-3 pe-4 font-medium text-gray-900">{key.name}</td>
+                    <td className="py-3 pe-4 text-gray-500 font-mono text-xs">{key.keyPrefix}…</td>
+                    <td className="py-3 pe-4 text-gray-500">{key.scopes.join(', ') || 'All'}</td>
+                    <td className="py-3 pe-4 text-gray-500">
+                      {key.expiresAt ? new Date(key.expiresAt).toLocaleDateString() : 'Never'}
+                    </td>
+                    <td className="py-3">
+                      <button
+                        onClick={() => revoke.mutate(key.id)}
+                        disabled={revoke.isPending}
+                        className="text-xs text-red-500 hover:text-red-600 font-medium disabled:opacity-50"
+                      >
+                        Revoke
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </SectionCard>
 
       <SectionCard title="Webhooks" description="Receive real-time event notifications to your endpoints.">
-        <div className="space-y-3">
-          <div className="p-3 rounded-lg border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-800">https://app.example.com/webhooks/nexus</p>
-                <p className="text-xs text-gray-400 mt-0.5">deal.won, deal.lost, contact.created</p>
-              </div>
-              <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full font-medium">Active</span>
-            </div>
-          </div>
-          <button className="rounded-lg border border-gray-300 hover:border-blue-500 text-sm font-medium px-4 py-2 text-gray-700 transition">
-            Add webhook endpoint
-          </button>
+        <div className="text-center py-6">
+          <p className="text-sm text-gray-400">Webhook management is coming soon.</p>
         </div>
       </SectionCard>
+
+      <Dialog open={newKeyDialogOpen} onOpenChange={setNewKeyDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>API key created</DialogTitle>
+            <DialogDescription>
+              Copy this key now — it won't be shown again.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+              <code className="flex-1 font-mono text-sm break-all text-gray-800">{createdKey}</code>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => { void navigator.clipboard.writeText(createdKey); notify.success('Copied!'); }}
+              >
+                Copy
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => { setNewKeyDialogOpen(false); setCreatedKey(''); }}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-/* ── main page ────────────────────────────────────────────────────────────── */
+const TAB_COMPONENTS: Record<Tab, React.FC> = {
+  profile: ProfileTab,
+  team: TeamTab,
+  notifications: NotificationsTab,
+  security: SecurityTab,
+  integrations: IntegrationsTab,
+  localization: LocalizationTab,
+  api: ApiKeysTab,
+};
+
 export default function SettingsPage() {
-  const [active, setActive] = useState<Tab>('profile');
-
-  const panel = {
-    profile:       <ProfileTab />,
-    team:          <TeamTab />,
-    notifications: <NotificationsTab />,
-    security:      <SecurityTab />,
-    billing:       <BillingTab />,
-    integrations:  <IntegrationsTab />,
-    localization:  <LocalizationTab />,
-    api:           <ApiKeysTab />,
-  }[active];
-
+  const [activeTab, setActiveTab] = useState<Tab>('profile');
+  const ActiveComponent = TAB_COMPONENTS[activeTab];
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="mt-1 text-sm text-gray-500">Manage your account, team, billing and integrations.</p>
+    <div className="mx-auto max-w-5xl px-4 py-6">
+      <h1 className="mb-4 text-2xl font-bold text-gray-900">Settings</h1>
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-gray-200 pb-2">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as Tab)}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition ${
+              activeTab === tab.id
+                ? 'bg-slate-900 text-white'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
       </div>
-
-      <div className="flex flex-col sm:flex-row gap-6">
-        {/* sidebar nav */}
-        <nav className="sm:w-48 shrink-0">
-          <ul className="space-y-0.5">
-            {TABS.map(t => (
-              <li key={t.id}>
-                <button
-                  onClick={() => setActive(t.id)}
-                  className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition
-                    ${active === t.id
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
-                >
-                  {t.icon}
-                  {t.label}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </nav>
-
-        {/* content */}
-        <div className="flex-1 min-w-0">
-          {panel}
-        </div>
-      </div>
+      <ActiveComponent />
     </div>
   );
 }

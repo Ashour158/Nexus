@@ -14,7 +14,7 @@ import type {
   CreateActivityInput,
   UpdateActivityInput,
 } from '@nexus/validation';
-import { api } from '@/lib/api-client';
+import { api, apiClients } from '@/lib/api-client';
 
 /**
  * React Query hooks for the Activities domain — Section 39.1.
@@ -66,7 +66,7 @@ export function useActivities(filters: ActivityListFilters = {}) {
   return useQuery<ActivityListResponse>({
     queryKey: activityKeys.list(normalized),
     queryFn: () =>
-      api.get<ActivityListResponse>('/activities', { params: normalized }),
+      apiClients.activities.get<ActivityListResponse>('/activities', { params: normalized }),
     staleTime: 30_000,
     placeholderData: (prev) => prev,
   });
@@ -75,7 +75,7 @@ export function useActivities(filters: ActivityListFilters = {}) {
 export function useActivity(id: string) {
   return useQuery<Activity>({
     queryKey: activityKeys.detail(id),
-    queryFn: () => api.get<Activity>(`/activities/${id}`),
+    queryFn: () => apiClients.activities.get<Activity>(`/activities/${id}`),
     enabled: Boolean(id),
   });
 }
@@ -84,7 +84,7 @@ export function useUpcomingActivities(ownerId: string, daysAhead = 7) {
   return useQuery<Activity[]>({
     queryKey: activityKeys.upcoming(ownerId, daysAhead),
     queryFn: () =>
-      api.get<Activity[]>('/activities/upcoming', {
+      apiClients.activities.get<Activity[]>('/activities/upcoming', {
         params: { ownerId, daysAhead },
       }),
     enabled: Boolean(ownerId),
@@ -113,7 +113,7 @@ export function useDealActivities(
 export function useCreateActivity() {
   const qc = useQueryClient();
   return useMutation<Activity, Error, CreateActivityInput>({
-    mutationFn: (data) => api.post<Activity>('/activities', data),
+    mutationFn: (data) => apiClients.activities.post<Activity>('/activities', data),
     onSuccess: (activity) => {
       qc.invalidateQueries({ queryKey: activityKeys.lists() });
       if (activity.dealId) {
@@ -130,7 +130,7 @@ export function useUpdateActivity() {
     Error,
     { id: string; data: UpdateActivityInput }
   >({
-    mutationFn: ({ id, data }) => api.patch<Activity>(`/activities/${id}`, data),
+    mutationFn: ({ id, data }) => apiClients.activities.patch<Activity>(`/activities/${id}`, data),
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: activityKeys.detail(id) });
       qc.invalidateQueries({ queryKey: activityKeys.lists() });
@@ -144,7 +144,7 @@ export function useDeleteActivity() {
     previous: Array<[QueryKey, ActivityListResponse | undefined]>;
   }
   return useMutation<void, Error, string, DelCtx>({
-    mutationFn: (id) => api.delete<void>(`/activities/${id}`),
+    mutationFn: (id) => apiClients.activities.delete<void>(`/activities/${id}`),
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: activityKeys.lists() });
       const previous = qc.getQueriesData<ActivityListResponse>({
@@ -179,7 +179,7 @@ export function useCompleteActivity() {
     { id: string; outcome: string }
   >({
     mutationFn: ({ id, outcome }) =>
-      api.post<Activity>(`/activities/${id}/complete`, { outcome }),
+      apiClients.activities.post<Activity>(`/activities/${id}/complete`, { outcome }),
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: activityKeys.detail(id) });
       qc.invalidateQueries({ queryKey: activityKeys.all });
@@ -195,7 +195,7 @@ export function useRescheduleActivity() {
     { id: string; dueDate: string }
   >({
     mutationFn: ({ id, dueDate }) =>
-      api.patch<Activity>(`/activities/${id}/reschedule`, { dueDate }),
+      apiClients.activities.patch<Activity>(`/activities/${id}/reschedule`, { dueDate }),
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: activityKeys.detail(id) });
       qc.invalidateQueries({ queryKey: activityKeys.all });

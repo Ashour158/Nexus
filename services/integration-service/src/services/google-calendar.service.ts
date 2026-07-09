@@ -1,10 +1,21 @@
+import { createHttpClient } from '@nexus/service-utils';
 import type { IntegrationPrisma } from '../prisma.js';
+import type { createFieldCrypto } from '../lib/crypto.js';
+
+type FieldCrypto = ReturnType<typeof createFieldCrypto>;
+
+const client = createHttpClient({
+  baseURL: 'https://www.googleapis.com/calendar/v3',
+  timeoutMs: 10000,
+  maxRetries: 3,
+  circuitBreaker: { failureThreshold: 5, resetTimeoutMs: 30000 },
+});
 
 function authHeader(accessToken: string): Record<string, string> {
   return { Authorization: `Bearer ${accessToken}` };
 }
 
-export function createGoogleCalendarService(prisma: IntegrationPrisma) {
+export function createGoogleCalendarService(prisma: IntegrationPrisma, crypto: FieldCrypto) {
   return {
     async syncGoogleCalendar(tenantId: string, userId: string) {
       const conn = await prisma.oAuthConnection.findFirst({
@@ -12,30 +23,35 @@ export function createGoogleCalendarService(prisma: IntegrationPrisma) {
       });
       if (!conn) return { synced: 0 };
       const timeMin = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      const res = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&maxResults=250`,
-        { headers: authHeader(conn.accessToken) }
-      );
-      if (!res.ok) return { synced: 0 };
-      const body = (await res.json()) as { items?: Array<{ id: string; etag?: string; description?: string }> };
-      let synced = 0;
-      for (const e of body.items ?? []) {
-        const activityId = e.description?.match(/activityId:([a-zA-Z0-9]+)/)?.[1];
-        if (!activityId) continue;
-        await prisma.syncedCalendarEvent.upsert({
-          where: { activityId },
-          update: { externalId: e.id, etag: e.etag ?? null, syncedAt: new Date() },
-          create: {
-            tenantId,
-            activityId,
-            provider: 'google',
-            externalId: e.id,
-            etag: e.etag ?? null,
-          },
-        });
-        synced += 1;
+      try {
+        const accessToken = crypto.decrypt(conn.accessToken);
+        const body = await client.get<{
+          items?: Array<{ id: string; etag?: string; description?: string }>;
+        }>(
+          `/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&maxResults=250`,
+          authHeader(accessToken)
+        );
+        let synced = 0;
+        for (const e of body.items ?? []) {
+          const activityId = e.description?.match(/activityId:([a-zA-Z0-9]+)/)?.[1];
+          if (!activityId) continue;
+          await prisma.syncedCalendarEvent.upsert({
+            where: { activityId },
+            update: { externalId: e.id, etag: e.etag ?? null, syncedAt: new Date() },
+            create: {
+              tenantId,
+              activityId,
+              provider: 'google',
+              externalId: e.id,
+              etag: e.etag ?? null,
+            },
+          });
+          synced += 1;
+        }
+        return { synced };
+      } catch {
+        return { synced: 0 };
       }
-      return { synced };
     },
 
     async pushCrmActivityToGoogle(
@@ -64,35 +80,43 @@ export function createGoogleCalendarService(prisma: IntegrationPrisma) {
       const existing = await prisma.syncedCalendarEvent.findUnique({
         where: { activityId: activity.id },
       });
-      const url = existing
-        ? `https://www.googleapis.com/calendar/v3/calendars/primary/events/${existing.externalId}`
-        : 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
-      const res = await fetch(url, {
-        method: existing ? 'PATCH' : 'POST',
-        headers: {
-          ...authHeader(conn.accessToken),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          summary: activity.subject ?? 'CRM Activity',
-          description: `${activity.description ?? ''}\n\nactivityId:${activity.id}`.trim(),
-          start: { dateTime: startDate.toISOString() },
-          end: { dateTime: endDate.toISOString() },
-        }),
-      });
-      if (!res.ok) return null;
-      const body = (await res.json()) as { id: string; etag?: string };
-      return prisma.syncedCalendarEvent.upsert({
-        where: { activityId: activity.id },
-        update: { externalId: body.id, etag: body.etag ?? null, syncedAt: new Date() },
-        create: {
-          tenantId,
-          activityId: activity.id,
-          provider: 'google',
-          externalId: body.id,
-          etag: body.etag ?? null,
-        },
-      });
+      try {
+        const accessToken = crypto.decrypt(conn.accessToken);
+        const body = existing
+          ? await client.patch<{ id: string; etag?: string }>(
+              `/calendars/primary/events/${existing.externalId}`,
+              {
+                summary: activity.subject ?? 'CRM Activity',
+                description: `${activity.description ?? ''}\n\nactivityId:${activity.id}`.trim(),
+                start: { dateTime: startDate.toISOString() },
+                end: { dateTime: endDate.toISOString() },
+              },
+              authHeader(accessToken)
+            )
+          : await client.post<{ id: string; etag?: string }>(
+              '/calendars/primary/events',
+              {
+                summary: activity.subject ?? 'CRM Activity',
+                description: `${activity.description ?? ''}\n\nactivityId:${activity.id}`.trim(),
+                start: { dateTime: startDate.toISOString() },
+                end: { dateTime: endDate.toISOString() },
+              },
+              authHeader(accessToken)
+            );
+        return prisma.syncedCalendarEvent.upsert({
+          where: { activityId: activity.id },
+          update: { externalId: body.id, etag: body.etag ?? null, syncedAt: new Date() },
+          create: {
+            tenantId,
+            activityId: activity.id,
+            provider: 'google',
+            externalId: body.id,
+            etag: body.etag ?? null,
+          },
+        });
+      } catch {
+        return null;
+      }
     },
   };
 }

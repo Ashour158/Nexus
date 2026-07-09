@@ -1,0 +1,35 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: nexus
+spec:
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-nothing
+  namespace: nexus
+spec:
+  {}
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-nexus-services
+  namespace: nexus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nexus-crm
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/nexus/sa/nexus-crm"]
+      to:
+        - operation:
+            methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+            paths: ["/*"]

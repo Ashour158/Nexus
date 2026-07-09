@@ -9,7 +9,7 @@ datasource db {
 }
 
 model Lead {
-  id               String       @id @default(cuid())
+  id               String             @id @default(cuid())
   tenantId         String
   ownerId          String
   firstName        String
@@ -18,15 +18,13 @@ model Lead {
   phone            String?
   company          String?
   jobTitle         String?
-  source           LeadSource   @default(MANUAL)
-  status           LeadStatus   @default(NEW)
-  score            Int          @default(0)
-  aiScore          Float?
-  aiScoreReason    String?
-  rating           LeadRating   @default(COLD)
+  source           LeadSource         @default(MANUAL)
+  status           LeadStatus         @default(NEW)
+  score            Int                @default(0)
+  rating           LeadRating         @default(COLD)
   industry         String?
   website          String?
-  annualRevenue    Decimal?     @db.Decimal(18, 2)
+  annualRevenue    Decimal?           @db.Decimal(18, 2)
   employeeCount    Int?
   country          String?
   city             String?
@@ -40,18 +38,44 @@ model Lead {
   utmTerm          String?
   convertedAt      DateTime?
   convertedToId    String?
-  customFields     Json         @default("{}")
+  customFields     Json               @default("{}")
   tags             String[]
-  doNotContact     Boolean      @default(false)
-  gdprConsent      Boolean      @default(false)
+  doNotContact     Boolean            @default(false)
+  gdprConsent      Boolean            @default(false)
   gdprConsentAt    DateTime?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  // Rule-based routing fields
+  territoryId      String?
+  territory        Territory?         @relation("LeadTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
+  assignedTo       String?
+  priority         String?            @default("medium") // urgent, high, medium, low
+  deletedAt        DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
   activities       Activity[]
   notes            Note[]
+  scoreRecord      LeadScore?
+  routingEvents    LeadRoutingEvent[]
+  dataQualityScore Int?
+  // ─── Explainable predictive AI layer (additive, nullable, fail-open) ──────
+  // Calibrated conversion probability (0.0-1.0) from the in-tenant model.
+  aiConversionProbability Float?
+  // Convenience 0-100 integer projection of aiConversionProbability.
+  aiScore                 Int?
+  // Explanation blob: { probability, confidence, lowData, topFactors[],
+  // nextBestActions[] }.
+  aiInsights              Json?
+  aiScoredAt              DateTime?
+
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([tenantId, ownerId])
+  @@index([tenantId, email])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, updatedAt])
+  @@index([territoryId])
+  @@index([assignedTo])
+  @@index([priority])
 }
 
 enum LeadSource {
@@ -84,86 +108,228 @@ enum LeadRating {
 }
 
 model Contact {
-  id             String       @id @default(cuid())
-  tenantId       String
-  ownerId        String
-  accountId      String?
-  account        Account?     @relation(fields: [accountId], references: [id])
-  firstName      String
-  lastName       String
-  email          String?
-  phone          String?
-  mobile         String?
-  jobTitle       String?
-  department     String?
-  linkedInUrl    String?
-  twitterHandle  String?
-  country        String?
-  city           String?
-  address        String?
-  timezone       String?
+  id               String            @id @default(cuid())
+  tenantId         String
+  ownerId          String
+  accountId        String
+  account          Account           @relation(fields: [accountId], references: [id])
+  firstName        String
+  lastName         String
+  email            String?
+  phone            String?
+  mobile           String?
+  jobTitle         String?
+  department       String?
+  linkedInUrl      String?
+  twitterHandle    String?
+  country          String?
+  city             String?
+  address          String?
+  timezone         String?
   preferredChannel String?
-  doNotEmail     Boolean      @default(false)
-  doNotCall      Boolean      @default(false)
-  gdprConsent    Boolean      @default(false)
-  gdprConsentAt  DateTime?
-  lastContactedAt DateTime?
-  customFields   Json         @default("{}")
-  tags           String[]
-  isActive       Boolean      @default(true)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  deals          DealContact[]
-  activities     Activity[]
-  notes          Note[]
-  emailThreads   EmailThread[]
+  doNotEmail       Boolean           @default(false)
+  doNotCall        Boolean           @default(false)
+  gdprConsent      Boolean           @default(false)
+  gdprConsentAt    DateTime?
+  lastContactedAt  DateTime?
+  customFields     Json              @default("{}")
+  tags             String[]
+  isActive         Boolean           @default(true)
+  dataQualityScore Int?
+  deletedAt        DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  deals            DealContact[]
+  dealStakeholders DealStakeholder[]
+  activities       Activity[]
+  notes            Note[]
+  emailThreads     EmailThread[]
+  consents         ConsentRecord[]
+
+  emails           ContactEmail[]
+  addresses        ContactAddress[]
+  accountRelations AccountContactRelation[]
+
   @@unique([tenantId, email])
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, accountId])
   @@index([tenantId, ownerId])
+  @@index([tenantId, isActive])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, updatedAt])
+  @@index([tenantId, email])
+}
+
+model ContactEmail {
+  id        String   @id @default(cuid())
+  contactId String
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  email     String
+  label     String   @default("work") // work | personal | other
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([contactId])
+  @@unique([contactId, email])
+}
+
+model ContactAddress {
+  id         String   @id @default(cuid())
+  contactId  String
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  label      String   @default("work") // work | home | billing | shipping
+  street     String?
+  city       String?
+  state      String?
+  postalCode String?
+  country    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([contactId])
+}
+
+model ConsentRecord {
+  id          String    @id @default(cuid())
+  tenantId    String
+  contactId   String
+  channel     String
+  status      String
+  grantedAt   DateTime?
+  withdrawnAt DateTime?
+  expiresAt   DateTime?
+  source      String?
+  ipAddress   String?
+  notes       String?
+  recordedBy  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, contactId, channel])
+  @@unique([id, tenantId])
+  @@index([tenantId, contactId])
+  @@index([tenantId, status])
+}
+
+/// Account-Contact Relationship (ACR) + account-level buying committee.
+/// Lets a contact relate to many accounts (many-to-many, beyond the scalar
+/// Contact.accountId) AND models the committee (role/influence/sentiment/reportsTo).
+model AccountContactRelation {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  accountId           String
+  contactId           String
+  role                String // Decision Maker | Champion | Influencer | Blocker | Evaluator | ...
+  isPrimary           Boolean  @default(false)
+  isDirect            Boolean  @default(true)
+  influence           String? // HIGH | MEDIUM | LOW
+  sentiment           String? // POSITIVE | NEUTRAL | NEGATIVE
+  reportsToContactId  String? // contactId of the person this contact reports to (no FK)
+  isChampion          Boolean  @default(false)
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, accountId, contactId])
+  @@index([tenantId, accountId])
+  @@index([tenantId, contactId])
 }
 
 model Account {
-  id                String        @id @default(cuid())
-  tenantId          String
-  ownerId           String
-  parentAccountId   String?
-  parentAccount     Account?      @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
-  childAccounts     Account[]     @relation("AccountHierarchy")
-  name              String
-  website           String?
-  phone             String?
-  email             String?
-  industry          String?
-  type              AccountType   @default(PROSPECT)
-  tier              AccountTier   @default(SMB)
-  status            AccountStatus @default(ACTIVE)
-  annualRevenue     Decimal?      @db.Decimal(18, 2)
-  employeeCount     Int?
-  country           String?
-  city              String?
-  address           String?
-  zipCode           String?
-  linkedInUrl       String?
-  description       String?
-  sicCode           String?
-  naicsCode         String?
-  healthScore       Int?
-  npsScore          Int?
-  customFields      Json          @default("{}")
-  lat               Float?
-  lng               Float?
-  tags              String[]
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  contacts          Contact[]
-  deals             Deal[]
-  notes             Note[]
-  activities        Activity[]
-  emailThreads      EmailThread[]
+  id               String              @id @default(cuid())
+  tenantId         String
+  ownerId          String
+  parentAccountId  String?
+  parentAccount    Account?            @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
+  childAccounts    Account[]           @relation("AccountHierarchy")
+  code             String?
+  name             String
+  legalName        String?
+  tradeName        String?
+  website          String?
+  phone            String?
+  fax              String?
+  email            String?
+  industry         String?
+  subIndustry      String?
+  type             AccountType         @default(PROSPECT)
+  tier             AccountTier         @default(SMB)
+  status           AccountStatus       @default(ACTIVE)
+  lifecycleStage   String?
+  annualRevenue    Decimal?            @db.Decimal(18, 2)
+  employeeCount    Int?
+  foundedYear      Int?
+  country          String?
+  city             String?
+  address          String?
+  zipCode          String?
+  linkedInUrl      String?
+  description      String?
+  sicCode          String?
+  naicsCode        String?
+  taxId            String?
+  vatNumber        String?
+  commercialRegistrationNumber String?
+  paymentTerms     String?
+  creditLimit      Decimal?            @db.Decimal(18, 2)
+  currency         String?             @default("USD")
+  priceBookId      String?
+  territoryId      String?
+  healthScore      Int?
+  npsScore         Int?
+  riskLevel        String?
+  lastActivityAt   DateTime?
+  billingAddressLine1 String?
+  billingAddressLine2 String?
+  billingCity      String?
+  billingState     String?
+  billingPostalCode String?
+  billingCountry   String?
+  billingLatitude  Float?
+  billingLongitude Float?
+  shippingAddressLine1 String?
+  shippingAddressLine2 String?
+  shippingCity     String?
+  shippingState    String?
+  shippingPostalCode String?
+  shippingCountry  String?
+  shippingLatitude Float?
+  shippingLongitude Float?
+  shippingInstructions String?
+  sameAsBilling    Boolean             @default(false)
+  customFields     Json                @default("{}")
+  lat              Float?
+  lng              Float?
+  tags             String[]
+  deletedAt        DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  contacts         Contact[]
+  deals            Deal[]
+  notes            Note[]
+  activities       Activity[]
+  emailThreads     EmailThread[]
+  healthRecord     AccountHealthScore?
+  dataQualityScore Int?
+  contactRelations AccountContactRelation[]
+
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, type])
   @@index([tenantId, ownerId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, updatedAt])
+  @@index([tenantId, parentAccountId])
+  @@index([tenantId, code])
+  @@index([tenantId, taxId])
+  @@index([tenantId, vatNumber])
 }
 
 enum AccountType {
@@ -190,45 +356,83 @@ enum AccountStatus {
 }
 
 model Deal {
-  id               String       @id @default(cuid())
-  tenantId         String
-  ownerId          String
-  accountId        String
-  account          Account      @relation(fields: [accountId], references: [id])
-  pipelineId       String
-  pipeline         Pipeline     @relation(fields: [pipelineId], references: [id])
-  stageId          String
-  stage            Stage        @relation(fields: [stageId], references: [id])
-  name             String
-  amount           Decimal      @default(0) @db.Decimal(18, 2)
-  currency         String       @default("USD")
-  probability      Int          @default(0)
+  id                String            @id @default(cuid())
+  tenantId          String
+  ownerId           String
+  accountId         String
+  account           Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  pipelineId        String
+  pipeline          Pipeline          @relation(fields: [pipelineId], references: [id])
+  stageId           String
+  stage             Stage             @relation(fields: [stageId], references: [id])
+  name              String
+  amount            Decimal           @default(0) @db.Decimal(18, 2)
+  currency          String            @default("USD")
+  probability       Int               @default(0)
   expectedCloseDate DateTime?
-  actualCloseDate  DateTime?
-  status           DealStatus   @default(OPEN)
-  lostReason       String?
-  lostDetail       String?
-  forecastCategory ForecastCategory @default(PIPELINE)
-  meddicicScore    Int          @default(0)
-  meddicicData     Json         @default("{}")
-  aiWinProbability Float?
-  aiInsights       Json         @default("{}")
-  competitors      String[]
-  source           String?
-  campaignId       String?
-  customFields     Json         @default("{}")
-  tags             String[]
-  version          Int          @default(1)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  contacts         DealContact[]
-  activities       Activity[]
-  notes            Note[]
-  quotes           Quote[]
+  actualCloseDate   DateTime?
+  status            DealStatus        @default(OPEN)
+  lostReason        String?
+  lostDetail        String?
+  forecastCategory  ForecastCategory  @default(PIPELINE)
+  meddicicScore     Int               @default(0)
+  meddicicData      Json              @default("{}")
+  competitors       String[]
+  source            String?
+  campaignId        String?
+  customFields      Json              @default("{}")
+  tags              String[]
+  version           Int               @default(1)
+  deletedAt         DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  contacts          DealContact[]
+  activities        Activity[]
+  notes             Note[]
+  quotes            Quote[]
+  dealCompetitors   DealCompetitor[]
+  stakeholders      DealStakeholder[]
+  products          DealProduct[]
+  team              DealTeam[]
+  dealRoom          DealRoom?
+  closeReason       String?
+  dataQualityScore  Int?
+  // ─── Explainable predictive AI layer (additive, nullable, fail-open) ──────
+  // Calibrated win probability (0.0-1.0) from the in-tenant logistic model.
+  aiWinProbability  Float?
+  // Convenience 0-100 integer projection of aiWinProbability.
+  aiScore           Int?
+  // Full explanation blob: { probability, confidence, lowData, topFactors[],
+  // nextBestActions[] }. Plain-language, derived from feature contributions.
+  aiInsights        Json?
+  // When the AI prediction was last computed.
+  aiScoredAt        DateTime?
+
+  // ─── Renewal / recurring-revenue layer (additive, nullable, no data loss) ──
+  // Contract end date for the current subscription/term — drives renewal surfacing.
+  contractEndDate    DateTime?
+  // Likelihood (0-100) this deal renews. Distinct from win `probability`.
+  renewalProbability Int?
+  // True when this deal was created as the renewal of an earlier deal.
+  isRenewal          Boolean   @default(false)
+  // The source deal this renewal was spun off from. Stored as a plain indexed
+  // string (NOT a Prisma self-relation) to keep the migration low-risk.
+  renewedFromDealId  String?
+  // Monthly / annual recurring revenue. Nullable; arr auto-derives from mrr
+  // (and vice-versa) on create/update when only one side is supplied.
+  mrr                Decimal?  @db.Decimal(18, 2)
+  arr                Decimal?  @db.Decimal(18, 2)
+
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, pipelineId, stageId])
   @@index([tenantId, ownerId])
   @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, updatedAt])
+  @@index([tenantId, isRenewal])
+  @@index([tenantId, contractEndDate])
+  @@index([tenantId, renewedFromDealId])
 }
 
 enum DealStatus {
@@ -248,57 +452,259 @@ enum ForecastCategory {
 
 model DealContact {
   id        String  @id @default(cuid())
+  tenantId  String
   dealId    String
   deal      Deal    @relation(fields: [dealId], references: [id], onDelete: Cascade)
   contactId String
   contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
   role      String?
   isPrimary Boolean @default(false)
+
   @@unique([dealId, contactId])
+  @@index([tenantId])
+}
+
+model DealStakeholder {
+  id          String    @id @default(cuid())
+  tenantId    String
+  dealId      String
+  contactId   String
+  role        String
+  influence   Int       @default(50)
+  sentiment   String    @default("Neutral")
+  reportsToId String?
+  notes       String?
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  deal      Deal              @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  contact   Contact           @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  reportsTo DealStakeholder?  @relation("StakeholderHierarchy", fields: [reportsToId], references: [id], onDelete: SetNull)
+  reports   DealStakeholder[] @relation("StakeholderHierarchy")
+
+  @@unique([dealId, contactId])
+  @@unique([id, tenantId])
+  @@index([tenantId, dealId])
+}
+
+/// Line item on a deal. Deal.amount rolls up as sum(lineTotal). Products
+/// optionally reference the finance-service pricebook (productId) but a free
+/// name+unitPrice is always accepted so crm-service never hard-depends on it.
+model DealProduct {
+  id              String   @id @default(cuid())
+  tenantId        String
+  dealId          String
+  productId       String?
+  name            String
+  quantity        Decimal  @default(1) @db.Decimal(18, 4)
+  unitPrice       Decimal  @default(0) @db.Decimal(18, 2)
+  discountPercent Decimal  @default(0) @db.Decimal(5, 2)
+  lineTotal       Decimal  @default(0) @db.Decimal(18, 2)
+  currency        String   @default("USD")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@unique([id, tenantId])
+  @@index([tenantId, dealId])
+}
+
+/// Deal split / deal team member. Feeds the incentive-service commission
+/// engine: revenue splits (should sum ≤ 100 per deal) plus overlay credits.
+model DealTeam {
+  id          String   @id @default(cuid())
+  tenantId    String
+  dealId      String
+  userId      String
+  role        String
+  splitPercent Decimal @default(0) @db.Decimal(5, 2)
+  splitType   String   @default("revenue")
+  createdAt   DateTime @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dealId, userId, splitType])
+  @@unique([id, tenantId])
+  @@index([tenantId, dealId])
+}
+
+model DealRoom {
+  id           String    @id @default(cuid())
+  tenantId     String
+  dealId       String    @unique
+  title        String
+  slug         String    @unique
+  isPublished  Boolean   @default(false)
+  buyerEmails  Json      @default("[]")
+  lastViewedAt DateTime?
+  viewCount    Int       @default(0)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  deal      Deal               @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  items     MutualActionItem[]
+  documents DealRoomDocument[]
+
+  @@unique([id, tenantId])
+  @@index([tenantId])
+}
+
+model MutualActionItem {
+  id          String    @id @default(cuid())
+  tenantId    String
+  dealRoomId  String
+  title       String
+  description String?
+  owner       String
+  ownerName   String?
+  dueDate     DateTime?
+  completedAt DateTime?
+  position    Int       @default(0)
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  dealRoom DealRoom @relation(fields: [dealRoomId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([dealRoomId])
+}
+
+model DealRoomDocument {
+  id         String    @id @default(cuid())
+  tenantId   String
+  dealRoomId String
+  name       String
+  url        String
+  fileType   String?
+  uploadedBy String
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  dealRoom DealRoom @relation(fields: [dealRoomId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([dealRoomId])
 }
 
 model Pipeline {
-  id         String   @id @default(cuid())
-  tenantId   String
-  name       String
-  currency   String   @default("USD")
-  isDefault  Boolean  @default(false)
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  stages     Stage[]
-  deals      Deal[]
+  id             String          @id @default(cuid())
+  tenantId       String
+  name           String
+  type           String          @default("sales") // sales | renewal | cs | sdr
+  currency       String          @default("USD")
+  isDefault      Boolean         @default(false)
+  isActive       Boolean         @default(true)
+  description    String?
+  ownedBy        String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  stages         Stage[]
+  deals          Deal[]
+  winLossReasons WinLossReason[]
+  deletedAt      DateTime?
+
   @@unique([tenantId, name])
+  @@unique([id, tenantId])
   @@index([tenantId])
 }
 
 model Stage {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   tenantId        String
   pipelineId      String
-  pipeline        Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  pipeline        Pipeline  @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   name            String
   order           Int
-  probability     Int      @default(0)
-  rottenDays      Int      @default(30)
-  requiredFields  Json     @default("[]")
-  entryConditions Json     @default("[]")
-  color           String   @default("#6B7280")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  probability     Int       @default(0)
+  rottenDays      Int       @default(30)
+  requiredFields  Json      @default("[]")
+  entryConditions Json      @default("[]")
+  color           String    @default("#6B7280")
+  isWon           Boolean   @default(false)
+  isLost          Boolean   @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   deals           Deal[]
+
   @@unique([pipelineId, name])
+  @@unique([id, tenantId])
   @@index([tenantId, pipelineId])
 }
 
+model FieldChangeLog {
+  id            String   @id @default(cuid())
+  tenantId      String
+  objectType    String
+  objectId      String
+  fieldName     String
+  oldValue      String?
+  newValue      String?
+  changedBy     String
+  changedByName String?
+  changedAt     DateTime @default(now())
+
+  @@unique([id, tenantId])
+  @@index([tenantId, objectType, objectId])
+  @@index([tenantId, changedAt])
+}
+
+model WinLossReason {
+  id         String    @id @default(cuid())
+  tenantId   String
+  pipelineId String?
+  pipeline   Pipeline? @relation(fields: [pipelineId], references: [id], onDelete: SetNull)
+  type       String // won | lost
+  reason     String
+  isActive   Boolean   @default(true)
+  position   Int       @default(0)
+  createdAt  DateTime  @default(now())
+
+  @@unique([id, tenantId])
+  @@index([tenantId, type])
+}
+
+model FieldPermission {
+  id           String    @id @default(cuid())
+  tenantId     String
+  objectType   String
+  fieldName    String
+  allowedRoles Json
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@unique([tenantId, objectType, fieldName])
+  @@unique([id, tenantId])
+  @@index([tenantId, objectType])
+}
+
+model ValidationRule {
+  id           String    @id @default(cuid())
+  tenantId     String
+  objectType   String
+  name         String
+  condition    Json
+  requirement  Json
+  errorMessage String
+  isActive     Boolean   @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@unique([id, tenantId])
+  @@index([tenantId, objectType])
+}
+
 model Activity {
-  id           String         @id @default(cuid())
+  id           String           @id @default(cuid())
   tenantId     String
   ownerId      String
   type         ActivityType
   subject      String
   description  String?
-  status       ActivityStatus @default(PLANNED)
+  status       ActivityStatus   @default(PLANNED)
   priority     ActivityPriority @default(NORMAL)
   dueDate      DateTime?
   startDate    DateTime?
@@ -306,20 +712,28 @@ model Activity {
   duration     Int?
   outcome      String?
   leadId       String?
-  lead         Lead?          @relation(fields: [leadId], references: [id])
+  lead         Lead?            @relation(fields: [leadId], references: [id])
   contactId    String?
-  contact      Contact?       @relation(fields: [contactId], references: [id])
+  contact      Contact?         @relation(fields: [contactId], references: [id])
   accountId    String?
-  account      Account?       @relation(fields: [accountId], references: [id])
+  account      Account?         @relation(fields: [accountId], references: [id])
   dealId       String?
-  deal         Deal?          @relation(fields: [dealId], references: [id])
-  customFields Json           @default("{}")
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  deal         Deal?            @relation(fields: [dealId], references: [id])
+  customFields Json             @default("{}")
+  deletedAt    DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, ownerId])
   @@index([tenantId, dealId])
+  @@index([tenantId, contactId])
+  @@index([tenantId, accountId])
+  @@index([tenantId, type])
+  @@index([tenantId, status])
   @@index([tenantId, dueDate])
+  @@index([tenantId, ownerId, dueDate, status])
 }
 
 enum ActivityType {
@@ -352,69 +766,143 @@ enum ActivityPriority {
 }
 
 model Note {
-  id         String   @id @default(cuid())
-  tenantId   String
-  authorId   String
-  content    String
-  isPinned   Boolean  @default(false)
-  leadId     String?
-  lead       Lead?    @relation(fields: [leadId], references: [id])
-  contactId  String?
-  contact    Contact? @relation(fields: [contactId], references: [id])
-  accountId  String?
-  account    Account? @relation(fields: [accountId], references: [id])
-  dealId     String?
-  deal       Deal?    @relation(fields: [dealId], references: [id])
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String    @id @default(cuid())
+  tenantId  String
+  authorId  String
+  content   String
+  mentions  String[]  @default([])
+  isPinned  Boolean   @default(false)
+  deletedAt DateTime?
+  leadId    String?
+  lead      Lead?     @relation(fields: [leadId], references: [id])
+  contactId String?
+  contact   Contact?  @relation(fields: [contactId], references: [id])
+  accountId String?
+  account   Account?  @relation(fields: [accountId], references: [id])
+  dealId    String?
+  deal      Deal?     @relation(fields: [dealId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, dealId])
+  @@index([tenantId, contactId])
+  @@index([tenantId, accountId])
+  @@index([tenantId, leadId])
+  @@index([tenantId, authorId])
+  @@index([tenantId, createdAt])
 }
 
 model Quote {
-  id              String      @id @default(cuid())
-  tenantId        String
-  dealId          String
-  deal            Deal        @relation(fields: [dealId], references: [id])
-  ownerId         String
-  quoteNumber     String
-  name            String
-  status          QuoteStatus @default(DRAFT)
-  validUntil      DateTime?
-  currency        String      @default("USD")
-  subtotal        Decimal     @default(0) @db.Decimal(18, 2)
-  discountAmount  Decimal     @default(0) @db.Decimal(18, 2)
-  taxAmount       Decimal     @default(0) @db.Decimal(18, 2)
-  total           Decimal     @default(0) @db.Decimal(18, 2)
-  approvalStatus  String?
-  approvedById    String?
-  approvedAt      DateTime?
-  sentAt          DateTime?
-  viewedAt        DateTime?
-  acceptedAt      DateTime?
-  terms           String?
-  notes           String?
-  lineItems       Json        @default("[]")
-  customFields    Json        @default("{}")
-  version         Int         @default(1)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id             String      @id @default(cuid())
+  tenantId       String
+  dealId         String
+  deal           Deal        @relation(fields: [dealId], references: [id])
+  ownerId        String
+  quoteNumber    String
+  name           String
+  status         QuoteStatus @default(DRAFT)
+  validUntil     DateTime?
+  currency       String      @default("USD")
+  subtotal       Decimal     @default(0) @db.Decimal(18, 2)
+  discountAmount Decimal     @default(0) @db.Decimal(18, 2)
+  taxAmount      Decimal     @default(0) @db.Decimal(18, 2)
+  total          Decimal     @default(0) @db.Decimal(18, 2)
+  approvalStatus String?
+  approvedById   String?
+  approvedAt     DateTime?
+  sentAt         DateTime?
+  viewedAt       DateTime?
+  acceptedAt     DateTime?
+  terms          String?
+  notes          String?
+  lineItems      Json        @default("[]")
+  deletedAt      DateTime?
+  customFields   Json        @default("{}")
+  version        Int         @default(1)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
   @@unique([tenantId, quoteNumber])
+  @@unique([id, tenantId])
   @@index([tenantId, dealId])
 }
 
-model Attachment {
-  id          String   @id @default(cuid())
-  tenantId    String
-  module      String
-  recordId    String
-  fileName    String
-  fileSize    Int
-  mimeType    String
-  storageKey  String
-  uploadedBy  String
-  createdAt   DateTime @default(now())
+// Read-model of finance quote lifecycle events, projected from TOPICS.QUOTES.
+// Migrated from deals-service (consumer group crm-service.quote-projections).
+// Powers the deal-detail Quotes tab. Kept tenant-scoped to match CRM RLS.
+model QuoteProjection {
+  id                   String    @id @default(cuid())
+  tenantId             String
+  quoteId              String
+  accountId            String?
+  contactId            String?
+  dealId               String?
+  rfqId                String?
+  quoteNumber          String?
+  status               String
+  totalAmount          Decimal   @default(0) @db.Decimal(18, 2)
+  currency             String    @default("USD")
+  currentRevisionId    String?
+  validUntil           DateTime?
+  lastFinanceEventType String
+  sourceEventId        String
+  sourceEventVersion   Int       @default(1)
+  sourceAggregateId    String?
+  sourceAggregateType  String?
+  correlationId        String?
+  transitionLedgerId   String?
+  projectionVersion    Int       @default(1)
+  projectedAt          DateTime
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
+  @@unique([tenantId, quoteId])
+  @@unique([tenantId, sourceEventId])
+  @@index([tenantId, accountId])
+  @@index([tenantId, contactId])
+  @@index([tenantId, dealId])
+  @@index([tenantId, status])
+  @@unique([id, tenantId])
+}
+
+// Append-only ledger of projected quote source events, used for idempotent
+// dedupe (unique on tenantId+sourceEventId) and as a future replay source.
+model QuoteProjectionEvent {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  quoteId             String
+  sourceEventId       String
+  sourceEventVersion  Int      @default(1)
+  financeEventType    String
+  sourceAggregateId   String?
+  sourceAggregateType String?
+  correlationId       String?
+  transitionLedgerId  String?
+  projectionVersion   Int      @default(1)
+  projectedAt         DateTime @default(now())
+
+  @@unique([tenantId, sourceEventId])
+  @@index([tenantId, quoteId])
+  @@index([tenantId, financeEventType])
+  @@unique([id, tenantId])
+}
+
+model Attachment {
+  id         String    @id @default(cuid())
+  tenantId   String
+  module     String
+  recordId   String
+  fileName   String
+  fileSize   Int
+  mimeType   String
+  storageKey String
+  uploadedBy String
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@unique([id, tenantId])
   @@index([tenantId, module, recordId])
 }
 
@@ -432,11 +920,13 @@ model EmailThread {
   messageCount  Int            @default(1)
   isRead        Boolean        @default(false)
   snippet       String?
+  deletedAt     DateTime?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   messages      EmailMessage[]
 
   @@unique([tenantId, provider, externalId])
+  @@unique([id, tenantId])
   @@index([tenantId, contactId])
   @@index([tenantId, accountId])
 }
@@ -469,4 +959,362 @@ enum QuoteStatus {
   REJECTED
   EXPIRED
   CONVERTED
+}
+
+model CustomFieldDefinition {
+  id         String    @id @default(cuid())
+  tenantId   String
+  entityType String
+  name       String
+  apiKey     String
+  fieldType  String
+  options    Json      @default("[]")
+  required   Boolean   @default(false)
+  showOnCard Boolean   @default(false)
+  position   Int       @default(0)
+  isActive   Boolean   @default(true)
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([tenantId, entityType, apiKey])
+  @@unique([id, tenantId])
+  @@index([tenantId, entityType])
+}
+
+model DuplicateGroup {
+  id             String            @id @default(cuid())
+  tenantId       String
+  entityType     String
+  status         String            @default("pending")
+  masterRecordId String?
+  createdAt      DateTime          @default(now())
+  resolvedAt     DateTime?
+  resolvedBy     String?
+  records        DuplicateRecord[]
+  deletedAt      DateTime?
+
+  @@unique([id, tenantId])
+  @@index([tenantId, entityType, status])
+}
+
+model DuplicateRecord {
+  id       String         @id @default(cuid())
+  groupId  String
+  group    DuplicateGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  recordId String
+  score    Float          @default(0)
+  isMaster Boolean        @default(false)
+  snapshot Json           @default("{}")
+
+  @@unique([groupId, recordId])
+  @@index([groupId])
+}
+
+model LeadScore {
+  id              String    @id @default(uuid())
+  tenantId        String
+  leadId          String    @unique
+  lead            Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  score           Int       @default(0)
+  tier            String    @default("cold")
+  signals         Json      @default("{}")
+  scoredAt        DateTime  @default(now())
+  confidence      Float?
+  deletedAt       DateTime?
+  routingDecision Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([id, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, tier])
+}
+
+model AccountHealthScore {
+  id               String    @id @default(uuid())
+  tenantId         String
+  accountId        String    @unique
+  account          Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  score            Int       @default(0)
+  riskLevel        String    @default("low")
+  churnProbability Float     @default(0.0)
+  signals          Json      @default("{}")
+  lastActivityDays Int?
+  openDealsCount   Int       @default(0)
+  wonDealsCount    Int       @default(0)
+  lostDealsCount   Int       @default(0)
+  scoredAt         DateTime  @default(now())
+  deletedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([id, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, riskLevel])
+}
+
+model LeadScoringRule {
+  id        String    @id @default(uuid())
+  tenantId  String
+  name      String
+  signal    String
+  points    Int
+  condition Json      @default("{}")
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([tenantId, signal, name])
+  @@unique([id, tenantId])
+  @@index([tenantId])
+}
+
+/// Per-tenant, per-kind, versioned model store for the explainable predictive
+/// AI layer. Coefficients are trained locally from the tenant's own history
+/// (or seeded from priors when data is thin). One tenant's data never trains
+/// another's — every query is tenant-scoped. `isActive` marks the version the
+/// scoring service uses; older versions are retained for audit / rollback.
+model AiModel {
+  id          String    @id @default(uuid())
+  tenantId    String
+  // "deal_win" | "lead_conversion"
+  kind        String
+  version     Int       @default(1)
+  // feature→weight map plus an "__intercept" bias term.
+  coefficients Json     @default("{}")
+  // Standardization means/stds per feature (for z-scoring at predict time).
+  featureMeans Json?
+  featureStds  Json?
+  // Rows the model was trained on. 0 => priors-only (lowData).
+  sampleSize  Int       @default(0)
+  // { auc, logloss, accuracy, positiveRate } — null for priors-only models.
+  metrics     Json?
+  isActive    Boolean   @default(true)
+  trainedAt   DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([tenantId, kind, version])
+  @@index([tenantId])
+  @@index([tenantId, kind, isActive])
+}
+
+model EnrichmentJob {
+  id            String           @id @default(uuid())
+  tenantId      String
+  entityType    String
+  entityId      String
+  status        EnrichmentStatus @default(PENDING)
+  provider      String           @default("clearbit")
+  confidence    Float?
+  rawData       Json?
+  appliedFields Json             @default("{}")
+  errorMessage  String?
+  deletedAt     DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([id, tenantId])
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, status])
+}
+
+enum EnrichmentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+model Competitor {
+  id             String           @id @default(uuid())
+  tenantId       String
+  name           String
+  website        String?
+  description    String?
+  strengths      String[]         @default([])
+  weaknesses     String[]         @default([])
+  winRateAgainst Float?
+  deals          DealCompetitor[]
+  deletedAt      DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([tenantId, name])
+  @@unique([id, tenantId])
+  @@index([tenantId])
+}
+
+model DealCompetitor {
+  id           String     @id @default(uuid())
+  tenantId     String
+  dealId       String
+  deal         Deal       @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  competitorId String
+  competitor   Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+  outcome      String?
+  notes        String?
+  deletedAt    DateTime?
+  createdAt    DateTime   @default(now())
+
+  @@unique([dealId, competitorId])
+  @@unique([id, tenantId])
+  @@index([tenantId])
+}
+
+model Territory {
+  id             String             @id @default(uuid())
+  tenantId       String
+  name           String
+  description    String?
+  isActive       Boolean            @default(true)
+  // Geographic criteria
+  countries      String[]           @default([])
+  states         String[]           @default([])
+  cities         String[]           @default([])
+  postalCodes    String[]           @default([])
+  // Company criteria
+  industries     String[]           @default([])
+  minCompanySize Int?
+  maxCompanySize Int?
+  minRevenue     Decimal?           @db.Decimal(18, 2)
+  maxRevenue     Decimal?           @db.Decimal(18, 2)
+  // Assignment rules
+  assignmentMode String             @default("manual") // manual, auto, round_robin
+  // Relationships
+  salesReps      SalesRep[]
+  leads          Lead[]             @relation("LeadTerritory")
+  routingEvents  LeadRoutingEvent[]
+  deletedAt      DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([id, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+}
+
+model SalesRep {
+  id            String             @id @default(uuid())
+  tenantId      String
+  userId        String             @unique
+  user          User               @relation(fields: [userId], references: [id])
+  territoryId   String?
+  territory     Territory?         @relation(fields: [territoryId], references: [id])
+  capacity      Int                @default(10) // Max leads they can handle
+  isActive      Boolean            @default(true)
+  // Performance metrics
+  totalLeads    Int                @default(0)
+  activeLeads   Int                @default(0)
+  wonDeals      Int                @default(0)
+  lostDeals     Int                @default(0)
+  // Routing events
+  routingEvents LeadRoutingEvent[]
+  deletedAt     DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@unique([id, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+  @@index([territoryId])
+}
+
+model LeadRoutingEvent {
+  id                String    @id @default(uuid())
+  tenantId          String
+  leadId            String
+  lead              Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  territoryId       String
+  territory         Territory @relation(fields: [territoryId], references: [id])
+  salesRepId        String
+  salesRep          SalesRep  @relation(fields: [salesRepId], references: [id])
+  priority          String    @default("medium") // urgent, high, medium, low
+  reason            String
+  confidence        Float     @default(0.5)
+  alternativeRoutes Json? // Array of alternative territory/salesRep combinations
+  createdAt         DateTime  @default(now())
+  deletedAt         DateTime?
+
+  @@unique([id, tenantId])
+  @@index([tenantId])
+  @@index([leadId])
+  @@index([territoryId])
+  @@index([salesRepId])
+  @@index([priority])
+}
+
+model OutboxMessage {
+  id            String    @id @default(cuid())
+  topic         String
+  tenantId      String?
+  key           String?
+  payload       Json
+  aggregateId   String?
+  eventType     String?
+  correlationId String?
+  headers       Json      @default("{}")
+  status        String    @default("PENDING")
+  error         String?
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
+}
+
+model User {
+  id        String    @id @default(uuid())
+  tenantId  String
+  email     String
+  firstName String
+  lastName  String
+  role      String    @default("user")
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  // Relationships
+  salesRep  SalesRep?
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([isActive])
+}
+
+/// Follow / subscribe: a user follows a record (account | contact | ...) so its
+/// recent activity surfaces in their personal feed. Additive + tenant-scoped.
+model RecordFollower {
+  id         String   @id @default(cuid())
+  tenantId   String
+  userId     String
+  entityType String
+  entityId   String
+  createdAt  DateTime @default(now())
+
+  @@unique([tenantId, userId, entityType, entityId])
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, userId])
+}
+
+/// Saved view / segmentation: a persisted list configuration (filters + columns)
+/// owned by a user, optionally shared with the tenant. Additive + tenant-scoped.
+model SavedView {
+  id         String   @id @default(cuid())
+  tenantId   String
+  ownerId    String
+  entityType String
+  name       String
+  filters    Json     @default("{}")
+  columns    Json?
+  isShared   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([tenantId, ownerId, entityType])
+  @@index([tenantId, entityType, isShared])
 }

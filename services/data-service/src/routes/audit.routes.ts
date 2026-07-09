@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
 import type { DataPrisma } from '../prisma.js';
 import { createAuditService } from '../services/audit.service.js';
 
@@ -24,10 +25,10 @@ const CreateAuditSchema = z.object({
 export async function registerAuditRoutes(app: FastifyInstance, prisma: DataPrisma) {
   const service = createAuditService(prisma);
 
-  app.get('/api/v1/audit/:module/:recordId', async (request, reply) => {
+  app.get('/api/v1/audit/:module/:recordId', { preHandler: requirePermission(PERMISSIONS.DATA.READ) }, async (request, reply) => {
     const p = ParamsSchema.parse(request.params);
     const q = PageSchema.parse(request.query);
-    const user = request.user as { tenantId: string };
+    const user = (request as any).user as { tenantId: string };
     const data = await service.getHistory(
       user.tenantId,
       p.module,
@@ -38,9 +39,9 @@ export async function registerAuditRoutes(app: FastifyInstance, prisma: DataPris
     return reply.send({ success: true, data });
   });
 
-  app.post('/api/v1/audit', async (request, reply) => {
+  app.post('/api/v1/audit', { preHandler: requirePermission(PERMISSIONS.DATA.READ) }, async (request, reply) => {
     const body = CreateAuditSchema.parse(request.body);
-    const user = request.user as { tenantId: string; sub?: string; userId?: string };
+    const user = (request as any).user as { tenantId: string; sub?: string; userId?: string };
     const changedBy = user.userId ?? user.sub ?? 'unknown';
     const data = await service.log(
       user.tenantId,

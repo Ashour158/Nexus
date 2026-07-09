@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/outbox-relay-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("OUTBOX_RELAY_DATABASE_URL")
+}
+
+// Mirrors the OutboxMessage table written by @nexus/outbox in every service DB
+// (status/sentAt convention). This one model is used to read all service outbox
+// tables, so it must match the shared shape exactly.
+model OutboxMessage {
+  id             String    @id @default(cuid())
+  topic          String
+  payload        Json
+  headers        Json      @default("{}")
+  status         String    @default("PENDING")
+  aggregateId    String?
+  correlationId  String?
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, createdAt])
+}

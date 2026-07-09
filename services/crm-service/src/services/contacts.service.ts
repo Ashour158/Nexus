@@ -1,5 +1,5 @@
 import type { PaginatedResult, TimelineEvent } from '@nexus/shared-types';
-import { ConflictError, NotFoundError } from '@nexus/service-utils';
+import { BusinessRuleError, ConflictError, NotFoundError } from '@nexus/service-utils';
 import type {
   ContactListQuery,
   CreateContactInput,
@@ -9,7 +9,22 @@ import { NexusProducer, TOPICS } from '@nexus/kafka';
 import { Prisma } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { Contact, Deal } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { CrmPrisma } from '../prisma.js';
-import { toPaginatedResult } from '../lib/pagination.js';
+import { toPaginatedResult } from '@nexus/shared-types';
+import {
+  recordFieldChanges,
+  recordCreateSnapshot,
+  recordSingleChange,
+} from '../lib/field-history.js';
+import { validateCustomFields } from '../lib/custom-field-validation.js';
+import { updateContactDataQuality } from '../lib/data-quality.js';
+import { enrichContact } from '../lib/enrichment.engine.js';
+import {
+  enforceValidationRules,
+  applyFieldPermissions,
+  maskFieldPermissions,
+  mergeForValidation,
+} from '../lib/write-guards.js';
+import type { ReadAccessContext } from './deals.service.js';
 
 type ContactListFilters = Omit<
   ContactListQuery,
@@ -63,9 +78,14 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
     async listContacts(
       tenantId: string,
       filters: ContactListFilters,
-      pagination: ListPagination
+      pagination: ListPagination,
+      access?: ReadAccessContext
     ): Promise<PaginatedResult<Contact>> {
-      const where = buildWhere(tenantId, filters);
+      // Ownership scope is intersected into the tenant+filter where (additive).
+      const where = {
+        ...buildWhere(tenantId, filters),
+        ...(access?.ownershipWhere ?? {}),
+      } as Prisma.ContactWhereInput;
       const sortField = resolveSortField(pagination.sortBy);
       const orderBy: Prisma.ContactOrderByWithRelationInput = {
         [sortField]: pagination.sortDir,
@@ -79,26 +99,52 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
           orderBy,
         }),
       ]);
-      return toPaginatedResult(rows, total, pagination.page, pagination.limit);
+      const masked = (await maskFieldPermissions(
+        prisma,
+        tenantId,
+        'contact',
+        rows as unknown as Record<string, unknown>[],
+        access?.roles
+      )) as unknown as Contact[];
+      return toPaginatedResult(masked, total, pagination.page, pagination.limit);
     },
 
-    async getContactById(tenantId: string, id: string): Promise<Contact> {
-      return loadOrThrow(tenantId, id);
+    async getContactById(tenantId: string, id: string, access?: ReadAccessContext): Promise<Contact & { emails: unknown[]; addresses: unknown[] }> {
+      const contact = await prisma.contact.findFirst({
+        where: { id, tenantId },
+        include: { emails: true, addresses: true },
+      });
+      if (!contact) throw new NotFoundError('Contact', id);
+      return (await maskFieldPermissions(
+        prisma,
+        tenantId,
+        'contact',
+        contact as unknown as Record<string, unknown>,
+        access?.roles
+      )) as unknown as Contact & { emails: unknown[]; addresses: unknown[] };
     },
 
-    async createContact(tenantId: string, data: CreateContactInput): Promise<Contact> {
-      if (data.accountId) {
-        const account = await prisma.account.findFirst({
-          where: { id: data.accountId, tenantId },
-        });
-        if (!account) throw new NotFoundError('Account', data.accountId);
-      }
+    async createContact(tenantId: string, data: CreateContactInput & { emails?: Array<{ email: string; label?: string; isPrimary?: boolean }>; addresses?: Array<{ label?: string; street?: string; city?: string; state?: string; postalCode?: string; country?: string }> }): Promise<Contact> {
+      if (!data.accountId) throw new NotFoundError('Account', 'required');
+      const account = await prisma.account.findFirst({
+        where: { id: data.accountId, tenantId },
+      });
+      if (!account) throw new NotFoundError('Account', data.accountId);
       if (data.email) {
         const existing = await prisma.contact.findFirst({
           where: { email: data.email, tenantId },
         });
         if (existing) throw new ConflictError('Contact', 'email');
       }
+
+      // Enforce active validation rules (fail-open: no rules / eval error => allow).
+      await enforceValidationRules(prisma, tenantId, 'contact', data as Record<string, unknown>);
+      // Low-code governance: validate customFields against CustomFieldDefinition (422 on violation, fail-open).
+      await validateCustomFields(prisma, tenantId, 'contact', data.customFields);
+
+      const emails = data.emails && data.emails.length > 0 ? data.emails : (data.email ? [{ email: data.email, label: 'work', isPrimary: true }] : []);
+      const hasPrimary = emails.some((e) => e.isPrimary);
+      if (emails.length > 0 && !hasPrimary) emails[0].isPrimary = true;
 
       const created = await prisma.contact.create({
         data: {
@@ -125,6 +171,8 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
           gdprConsentAt: data.gdprConsent ? new Date() : null,
           customFields: data.customFields as Prisma.InputJsonValue,
           tags: data.tags,
+          emails: { create: emails.map((e) => ({ email: e.email, label: e.label ?? 'work', isPrimary: e.isPrimary ?? false })) },
+          addresses: { create: (data.addresses ?? []).map((a) => ({ label: a.label ?? 'work', street: a.street ?? null, city: a.city ?? null, state: a.state ?? null, postalCode: a.postalCode ?? null, country: a.country ?? null })) },
         },
       });
 
@@ -133,12 +181,35 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
           type: 'contact.created',
           tenantId,
           payload: {
+            id: created.id,
             contactId: created.id,
+            firstName: created.firstName,
+            lastName: created.lastName,
             email: created.email ?? undefined,
             accountId: created.accountId ?? undefined,
+            ownerId: created.ownerId,
           },
         })
         .catch(() => undefined);
+
+      // Full history: initial snapshot on CREATE (oldValue=null per tracked field).
+      await recordCreateSnapshot(
+        prisma,
+        tenantId,
+        'contact',
+        created.id,
+        created as unknown as Record<string, unknown>,
+        created.ownerId,
+        'system'
+      );
+
+      updateContactDataQuality(prisma, created.id).catch(() => undefined);
+
+      // Auto-enrichment (fire-and-forget): only when a provider key is configured
+      // so we never churn EnrichmentJob rows or block the create otherwise.
+      if (process.env.CLEARBIT_API_KEY || process.env.APOLLO_API_KEY) {
+        void enrichContact(prisma, tenantId, created.id, producer).catch(() => undefined);
+      }
 
       return created;
     },
@@ -146,7 +217,10 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
     async updateContact(
       tenantId: string,
       id: string,
-      data: UpdateContactInput
+      data: UpdateContactInput,
+      changedBy?: string,
+      changedByName?: string,
+      roles?: string[]
     ): Promise<Contact> {
       const existing = await loadOrThrow(tenantId, id);
 
@@ -163,6 +237,7 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
         if (dup) throw new ConflictError('Contact', 'email');
       }
 
+      const oldValues: Record<string, unknown> = {};
       const update: Prisma.ContactUpdateInput = {};
       const fields: (keyof UpdateContactInput)[] = [
         'firstName',
@@ -187,29 +262,186 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
       for (const f of fields) {
         if (data[f] !== undefined) {
           (update as Record<string, unknown>)[f] = data[f];
+          (oldValues as Record<string, unknown>)[f] = (existing as Record<string, unknown>)[f];
         }
       }
       if (data.accountId !== undefined) {
-        update.account = data.accountId
-          ? { connect: { id: data.accountId } }
-          : { disconnect: true };
+        if (!data.accountId) {
+          throw new BusinessRuleError('Contact must remain linked to an account');
+        }
+        oldValues.accountId = existing.accountId;
+        update.account = { connect: { id: data.accountId } };
       }
       if (data.gdprConsent !== undefined) {
+        oldValues.gdprConsent = existing.gdprConsent;
+        oldValues.gdprConsentAt = existing.gdprConsentAt;
         update.gdprConsent = data.gdprConsent;
         if (data.gdprConsent) update.gdprConsentAt = new Date();
       }
       if (data.customFields !== undefined) {
         update.customFields = data.customFields as Prisma.InputJsonValue;
+        oldValues.customFields = existing.customFields;
       }
-      if (data.tags !== undefined) update.tags = data.tags;
+      if (data.tags !== undefined) { update.tags = data.tags; oldValues.tags = existing.tags; }
 
-      return prisma.contact.update({ where: { id }, data: update });
+      // FieldPermission: strip fields the caller may not write (fail-open).
+      const permResult = await applyFieldPermissions(
+        prisma,
+        tenantId,
+        'contact',
+        update as Record<string, unknown>,
+        roles
+      );
+      const safeUpdate = permResult.update as Prisma.ContactUpdateInput;
+
+      // Validation rules run against the post-write record (existing + patch).
+      await enforceValidationRules(
+        prisma,
+        tenantId,
+        'contact',
+        mergeForValidation(existing as Record<string, unknown>, safeUpdate as Record<string, unknown>)
+      );
+
+      // Low-code governance: validate incoming customFields (422 on violation, fail-open).
+      if (data.customFields !== undefined) {
+        await validateCustomFields(prisma, tenantId, 'contact', data.customFields);
+      }
+
+      const updated = await prisma.contact.update({ where: { id }, data: safeUpdate });
+      if (changedBy) {
+        await recordFieldChanges(prisma, tenantId, 'contact', id, oldValues, data as Record<string, unknown>, changedBy, changedByName);
+      }
+      await producer
+        .publish(TOPICS.CONTACTS, {
+          type: 'contact.updated',
+          tenantId,
+          payload: {
+            id: updated.id,
+            contactId: updated.id,
+            firstName: updated.firstName,
+            lastName: updated.lastName,
+            email: updated.email ?? undefined,
+            accountId: updated.accountId ?? undefined,
+            ownerId: updated.ownerId,
+            changedFields: Object.keys(oldValues),
+          },
+        })
+        .catch(() => undefined);
+      updateContactDataQuality(prisma, id).catch(() => undefined);
+      return updated;
     },
 
-    /** Soft-deletes by flipping `isActive=false`. */
+    async mergeContacts(
+      tenantId: string,
+      primaryId: string,
+      secondaryId: string,
+      fieldChoices: Record<string, string>,
+      changedBy?: string
+    ): Promise<Contact> {
+      const [primary, secondary] = await Promise.all([
+        loadOrThrow(tenantId, primaryId),
+        loadOrThrow(tenantId, secondaryId),
+      ]);
+      const mergedData: Prisma.ContactUpdateInput = {};
+      for (const [field, sourceId] of Object.entries(fieldChoices)) {
+        if (sourceId === primaryId) {
+          (mergedData as Record<string, unknown>)[field] = (primary as Record<string, unknown>)[field];
+        } else if (sourceId === secondaryId) {
+          (mergedData as Record<string, unknown>)[field] = (secondary as Record<string, unknown>)[field];
+        }
+      }
+      await prisma.$transaction([
+        prisma.activity.updateMany({ where: { contactId: secondaryId, tenantId }, data: { contactId: primaryId } }),
+        prisma.note.updateMany({ where: { contactId: secondaryId, tenantId }, data: { contactId: primaryId } }),
+        prisma.dealContact.updateMany({ where: { contactId: secondaryId }, data: { contactId: primaryId } }),
+        prisma.contact.update({ where: { id: primaryId }, data: mergedData }),
+        prisma.contact.update({ where: { id: secondaryId }, data: { deletedAt: new Date(), isActive: false } }),
+      ]);
+      // Full history: mark the merge on the surviving (primary) record.
+      await recordSingleChange(
+        prisma,
+        tenantId,
+        'contact',
+        primaryId,
+        'merged',
+        null,
+        secondaryId,
+        changedBy ?? primary.ownerId,
+        changedBy ? undefined : 'system'
+      );
+      await producer
+        .publish(TOPICS.CONTACTS, {
+          type: 'contact.merged',
+          tenantId,
+          payload: {
+            contactId: primaryId,
+            mergedFromId: secondaryId,
+            accountId: primary.accountId ?? undefined,
+          },
+        })
+        .catch(() => undefined);
+      return prisma.contact.findFirstOrThrow({ where: { id: primaryId, tenantId } });
+    },
+
+    /** Soft-deletes by setting `deletedAt`. */
     async deleteContact(tenantId: string, id: string): Promise<void> {
-      await loadOrThrow(tenantId, id);
-      await prisma.contact.update({ where: { id }, data: { isActive: false } });
+      const existing = await loadOrThrow(tenantId, id);
+      if (existing.deletedAt) return;
+      await prisma.contact.update({ where: { id }, data: { deletedAt: new Date(), isActive: false } });
+      await recordSingleChange(
+        prisma,
+        tenantId,
+        'contact',
+        id,
+        'status',
+        'active',
+        'archived',
+        existing.ownerId,
+        'system'
+      );
+      await producer
+        .publish(TOPICS.CONTACTS, {
+          type: 'contact.archived',
+          tenantId,
+          payload: {
+            contactId: existing.id,
+            accountId: existing.accountId ?? undefined,
+            ownerId: existing.ownerId,
+          },
+        })
+        .catch(() => undefined);
+    },
+
+    async restoreContact(tenantId: string, id: string): Promise<Contact> {
+      const result = await prisma.contact.updateMany({
+        where: { id, tenantId, deletedAt: { not: null } },
+        data: { deletedAt: null, isActive: true },
+      });
+      if (result.count === 0) throw new NotFoundError('Contact', id);
+      const restored = await prisma.contact.findFirstOrThrow({ where: { id, tenantId } });
+      await recordSingleChange(
+        prisma,
+        tenantId,
+        'contact',
+        id,
+        'status',
+        'archived',
+        'active',
+        restored.ownerId,
+        'system'
+      );
+      await producer
+        .publish(TOPICS.CONTACTS, {
+          type: 'contact.restored',
+          tenantId,
+          payload: {
+            contactId: restored.id,
+            accountId: restored.accountId ?? undefined,
+            ownerId: restored.ownerId,
+          },
+        })
+        .catch(() => undefined);
+      return restored;
     },
 
     async listContactDeals(

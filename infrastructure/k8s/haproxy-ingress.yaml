@@ -1,0 +1,38 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nexus-crm-haproxy
+  namespace: nexus
+  annotations:
+    haproxy-ingress.github.io/ssl-redirect: "true"
+    haproxy-ingress.github.io/rate-limit: "100"
+    haproxy-ingress.github.io/rate-limit-period: "1m"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: haproxy
+  tls:
+    - hosts:
+        - app.nexus-crm.io
+        - api.nexus-crm.io
+      secretName: nexus-crm-tls
+  rules:
+    - host: app.nexus-crm.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 3000
+    - host: api.nexus-crm.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nexus-crm
+                port:
+                  number: 3000

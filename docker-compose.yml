@@ -1,17 +1,18 @@
-version: '3.9'
-
 services:
   # ─── Infrastructure ─────────────────────────────────────────────────────────
   postgres:
+    # NOTE: Backend services should connect via PgBouncer (pgbouncer:6432) instead of directly
     image: postgres:16-alpine
     container_name: nexus-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: nexus
-      POSTGRES_PASSWORD: nexus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexus}
       POSTGRES_DB: nexus
     ports:
-      - '5432:5432'
+      # Bound to loopback — not reachable from the public internet. Internal services
+      # use the `postgres`/`pgbouncer` docker-network DNS (unaffected by this binding).
+      - '127.0.0.1:5433:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -21,17 +22,32 @@ services:
       timeout: 5s
       retries: 10
 
+  # PgBouncer connection pooler — all backend services should connect via port 6432
+  pgbouncer:
+    build: ./infrastructure/postgres/pgbouncer
+    container_name: nexus-pgbouncer
+    restart: unless-stopped
+    ports:
+      # Datastore bound to loopback — never reachable from the public internet.
+      # Internal services reach it over the docker network via the `pgbouncer` DNS name (unaffected).
+      - '127.0.0.1:6432:6432'
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@postgres:5432/nexus
+
   redis:
     image: redis:7-alpine
     container_name: nexus-redis
     restart: unless-stopped
-    command: ['redis-server', '--requirepass', 'nexus']
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:-nexus}']
     ports:
-      - '6379:6379'
+      # Loopback only — internal services reach it via the `redis` docker DNS name.
+      - '127.0.0.1:6379:6379'
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ['CMD', 'redis-cli', '-a', 'nexus', 'ping']
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD:-nexus}', 'ping']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -45,6 +61,11 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     volumes:
       - zookeeper_data:/var/lib/zookeeper/data
+    healthcheck:
+      test: ['CMD-SHELL', 'echo ruok | nc localhost 2181 || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   kafka:
     image: confluentinc/cp-kafka:7.6.0
@@ -53,7 +74,8 @@ services:
     depends_on:
       - zookeeper
     ports:
-      - '9092:9092'
+      # Loopback only — internal brokers/clients use the `kafka:29092` internal listener.
+      - '127.0.0.1:9092:9092'
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
@@ -67,15 +89,22 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
     volumes:
       - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ['CMD-SHELL', 'kafka-topics --bootstrap-server localhost:9092 --list || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   meilisearch:
     image: getmeili/meilisearch:v1.8
     container_name: nexus-meilisearch
     restart: unless-stopped
     ports:
-      - '7700:7700'
+      # Loopback only — internal services reach it via the `meilisearch` docker DNS name.
+      - '127.0.0.1:7700:7700'
     environment:
-      MEILI_MASTER_KEY: nexus-dev
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-nexus-dev}
       MEILI_ENV: development
     volumes:
       - meilisearch_data:/meili_data
@@ -86,11 +115,12 @@ services:
     restart: unless-stopped
     command: ['server', '/data', '--console-address', ':9001']
     ports:
-      - '9000:9000'
-      - '9001:9001'
+      # Loopback only — internal services reach MinIO via the `minio` docker DNS name.
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:9001:9001'
     environment:
-      MINIO_ROOT_USER: nexus
-      MINIO_ROOT_PASSWORD: nexus-minio
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-nexus}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-nexus-minio}
     volumes:
       - minio_data:/data
 
@@ -102,15 +132,40 @@ services:
     ports:
       - '8080:8080'
     environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/nexus
+      KC_DB_URL: jdbc:postgresql://pgbouncer:6432/nexus
       KC_DB_USERNAME: nexus
-      KC_DB_PASSWORD: nexus
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-nexus}
     depends_on:
       postgres:
         condition: service_healthy
+
+  kong:
+    image: kong:3.7
+    container_name: nexus-kong
+    restart: unless-stopped
+    ports:
+      - '8000:8000'  # Proxy port (public — the API gateway)
+      - '8443:8443'  # SSL proxy port (public)
+      - '127.0.0.1:8001:8001'  # Admin API — loopback only (was internet-exposed)
+      - '127.0.0.1:8444:8444'  # SSL admin API — loopback only
+    environment:
+      KONG_DATABASE: 'off'
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001, 0.0.0.0:8444 ssl
+      KONG_PLUGINS: bundled,cors,rate-limiting,request-transformer,key-auth,jwt,oauth2
+    volumes:
+      - ./infrastructure/kong/kong.yml:/kong/declarative/kong.yml:ro
+    depends_on:
+      - auth-service
+      - crm-service
+      - finance-service
 
   # ─── App Services ───────────────────────────────────────────────────────────
   auth-service:
@@ -122,9 +177,15 @@ services:
     ports:
       - '3000:3000'
     environment:
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       PORT: '3000'
-    env_file:
-      - ./services/auth-service/.env.example
+      APP_URL: http://localhost:3000
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_auth
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -141,8 +202,21 @@ services:
     restart: unless-stopped
     ports:
       - '3001:3001'
-    env_file:
-      - ./services/crm-service/.env.example
+    environment:
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_crm
+      METADATA_SERVICE_URL: http://metadata-service:3004
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+      # Blueprint stage-transition validation (governance). Without these the
+      # client fell back to localhost:3013 (conn refused) and an unset token,
+      # so EVERY deal stage move was blocked fail-closed. Share the internal
+      # mesh token; blueprint-service compares against the same value.
+      BLUEPRINT_SERVICE_URL: http://blueprint-service:3013
+      BLUEPRINT_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -157,72 +231,15 @@ services:
     restart: unless-stopped
     ports:
       - '3002:3002'
-    env_file:
-      - ./services/finance-service/.env.example
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_started
-
-  notification-service:
-    build:
-      context: .
-      dockerfile: ./services/notification-service/Dockerfile
-    container_name: nexus-notifications
-    restart: unless-stopped
-    ports:
-      - '3003:3003'
-    env_file:
-      - ./services/notification-service/.env.example
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_started
-
-  realtime-service:
-    build:
-      context: .
-      dockerfile: ./services/realtime-service/Dockerfile
-    container_name: nexus-realtime
-    restart: unless-stopped
-    ports:
-      - '3005:3005'
-    env_file:
-      - ./services/realtime-service/.env.example
-    depends_on:
-      kafka:
-        condition: service_started
-      redis:
-        condition: service_healthy
-
-  search-service:
-    build:
-      context: .
-      dockerfile: ./services/search-service/Dockerfile
-    container_name: nexus-search
-    restart: unless-stopped
-    ports:
-      - '3006:3006'
-    env_file:
-      - ./services/search-service/.env.example
-    depends_on:
-      kafka:
-        condition: service_started
-      meilisearch:
-        condition: service_started
-
-  workflow-service:
-    build:
-      context: .
-      dockerfile: ./services/workflow-service/Dockerfile
-    container_name: nexus-workflow
-    restart: unless-stopped
-    ports:
-      - '3007:3007'
-    env_file:
-      - ./services/workflow-service/.env.example
+    environment:
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      CHROMIUM_PATH: /usr/bin/chromium
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_finance
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -237,8 +254,199 @@ services:
     restart: unless-stopped
     ports:
       - '3011:3011'
-    env_file:
-      - ./services/billing-service/.env.example
+    environment:
+      PORT: '3011'
+      BILLING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_billing
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      KAFKA_CLIENT_ID: billing-service
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      # node is guaranteed present (node:20-alpine); exits on response headers so it
+      # can't hang on Fastify keep-alive, and 127.0.0.1 avoids localhost->::1 (Fastify binds 0.0.0.0).
+      test: ["CMD", "node", "-e", "const r=require('http').get('http://127.0.0.1:3011/health',s=>process.exit(s.statusCode<400?0:1));r.on('error',()=>process.exit(1));r.setTimeout(5000,()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+  # accounts-service DECOMMISSIONED — orphaned duplicate of crm-service (the wired
+  # authority for accounts; web BFF → CRM_SERVICE_URL). It ran a split-brain
+  # account-health.consumer writing a duplicate AccountHealthScore into nexus_accounts
+  # while crm-service owns the real one. Removed to end the split-brain.
+  # See services/accounts-service/DEPRECATED.md.
+
+  # leads-service DECOMMISSIONED — orphaned duplicate of crm-service (the wired
+  # authority for leads). Nothing routed to it (BFF → crm-service:3001), it ran no
+  # Kafka consumers, and its lead.* outbox duplicated crm-service. Removed to end
+  # the split-brain. See services/leads-service/DEPRECATED.md.
+
+  # contacts-service DECOMMISSIONED — orphaned duplicate of crm-service (the wired
+  # authority for contacts; web BFF → CRM_SERVICE_URL). Nothing routed to it and its
+  # contact.* outbox duplicated crm-service. Removed to end the split-brain.
+  # See services/contacts-service/DEPRECATED.md.
+
+  # deals-service DECOMMISSIONED — orphaned duplicate of crm-service (the wired deal
+  # authority). Deal CRUD was served by crm-service; its only remaining live feature,
+  # the TOPICS.QUOTES quote-projection read-model behind the deal-detail Quotes tab,
+  # was migrated into crm-service (QuoteProjection model + crm-service.quote-projections
+  # consumer + GET /deals/:id/quotes). Removed to end the split-brain.
+  # See services/deals-service/DEPRECATED.md.
+
+  activities-service:
+    build:
+      context: .
+      dockerfile: ./services/activities-service/Dockerfile
+    container_name: nexus-activities
+    restart: unless-stopped
+    ports:
+      - '3043:3043'
+    environment:
+      PORT: '3043'
+      ACTIVITIES_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_activities
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      # node is guaranteed present (node:20-alpine); exits on response headers so it
+      # can't hang on Fastify keep-alive, and 127.0.0.1 avoids localhost->::1 (Fastify binds 0.0.0.0).
+      test: ["CMD", "node", "-e", "const r=require('http').get('http://127.0.0.1:3043/health',s=>process.exit(s.statusCode<400?0:1));r.on('error',()=>process.exit(1));r.setTimeout(5000,()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+  notes-service:
+    build:
+      context: .
+      dockerfile: ./services/notes-service/Dockerfile
+    container_name: nexus-notes
+    restart: unless-stopped
+    ports:
+      - '3032:3032'
+    environment:
+      PORT: '3032'
+      NOTES_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_notes
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      # node is guaranteed present (node:20-alpine); exits on response headers so it
+      # can't hang on Fastify keep-alive, and 127.0.0.1 avoids localhost->::1 (Fastify binds 0.0.0.0).
+      test: ["CMD", "node", "-e", "const r=require('http').get('http://127.0.0.1:3032/health',s=>process.exit(s.statusCode<400?0:1));r.on('error',()=>process.exit(1));r.setTimeout(5000,()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+  # quotes-service DECOMMISSIONED — per its own DEPRECATED.md, quote authority moved
+  # to finance-service (the wired backend: BFF → finance-service:3002). It ran no
+  # Kafka consumers; its quote lifecycle events + expiry poller duplicated
+  # finance-service. Removed to end the dual-quote-table split. See
+  # services/quotes-service/DEPRECATED.md.
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: ./services/notification-service/Dockerfile
+    container_name: nexus-notifications
+    restart: unless-stopped
+    ports:
+      - '3003:3003'
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_notification
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  realtime-service:
+    build:
+      context: .
+      dockerfile: ./services/realtime-service/Dockerfile
+    container_name: nexus-realtime
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+    restart: unless-stopped
+    ports:
+      - '3005:3005'
+    depends_on:
+      kafka:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  search-service:
+    build:
+      context: .
+      dockerfile: ./services/search-service/Dockerfile
+    container_name: nexus-search
+    restart: unless-stopped
+    ports:
+      - '3006:3006'
+    environment:
+      PORT: '3006'
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      MEILISEARCH_URL: http://meilisearch:7700
+      MEILISEARCH_KEY: ${MEILI_MASTER_KEY:-nexus-dev}
+      # Saved/recent searches (SRCH-08/09) persist to their own small DB.
+      SEARCH_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_search
+    depends_on:
+      kafka:
+        condition: service_started
+      meilisearch:
+        condition: service_started
+
+  workflow-service:
+    build:
+      context: .
+      dockerfile: ./services/workflow-service/Dockerfile
+    container_name: nexus-workflow
+    restart: unless-stopped
+    ports:
+      - '3007:3007'
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_workflow
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -253,8 +461,14 @@ services:
     restart: unless-stopped
     ports:
       - '3012:3012'
-    env_file:
-      - ./services/integration-service/.env.example
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_integration
+      INTEGRATION_SECRET_KEY: nexus_integration_secret_key_32b
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -269,8 +483,17 @@ services:
     restart: unless-stopped
     ports:
       - '3013:3013'
-    env_file:
-      - ./services/blueprint-service/.env.example
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_blueprint
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      # Must equal crm-service's BLUEPRINT_SERVICE_TOKEN so the internal
+      # validate-transition call authenticates (timingSafeEqual).
+      BLUEPRINT_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -285,8 +508,15 @@ services:
     restart: unless-stopped
     ports:
       - '3008:3008'
-    env_file:
-      - ./services/analytics-service/.env.example
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: default
+      CRM_SERVICE_URL: http://crm-service:3001
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
     depends_on:
       kafka:
         condition: service_started
@@ -297,37 +527,113 @@ services:
     image: clickhouse/clickhouse-server:24.3
     container_name: nexus-clickhouse
     restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: nexus_analytics
     ports:
-      - '8123:8123'
+      # Analytics datastore bound to loopback — not publicly reachable. Services use the
+      # `clickhouse` docker DNS name internally, which is unaffected by the host binding.
+      - '127.0.0.1:8123:8123'
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - ./services/analytics-service/src/ddl/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./clickhouse/users-network.xml:/etc/clickhouse-server/users.d/zz-network.xml:ro
 
   web:
     build:
       context: .
       dockerfile: ./apps/web/Dockerfile
     container_name: nexus-web
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      # The Next.js /api/* route handlers proxy to services via these env vars.
+      # Without them they fall back to localhost (unreachable in-container) and
+      # every reporting/analytics/forecast/etc call 500'd. Internal DNS names.
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      AUTH_SERVICE_URL: http://auth-service:3000
+      CRM_SERVICE_URL: http://crm-service:3001
+      FINANCE_SERVICE_URL: http://finance-service:3002
+      NOTIFICATION_SERVICE_URL: http://notification-service:3003
+      METADATA_SERVICE_URL: http://metadata-service:3004
+      REALTIME_SERVICE_URL: http://realtime-service:3005
+      SEARCH_SERVICE_URL: http://search-service:3006
+      WORKFLOW_SERVICE_URL: http://workflow-service:3007
+      ANALYTICS_SERVICE_URL: http://analytics-service:3008
+      COMM_SERVICE_URL: http://comm-service:3009
+      STORAGE_SERVICE_URL: http://storage-service:3010
+      BILLING_SERVICE_URL: http://billing-service:3011
+      INTEGRATION_SERVICE_URL: http://integration-service:3012
+      BLUEPRINT_SERVICE_URL: http://blueprint-service:3013
+      APPROVAL_SERVICE_URL: http://approval-service:3014
+      DATA_SERVICE_URL: http://data-service:3015
+      DOCUMENT_SERVICE_URL: http://document-service:3016
+      CHATBOT_SERVICE_URL: http://chatbot-service:3017
+      CADENCE_SERVICE_URL: http://cadence-service:3018
+      TERRITORY_SERVICE_URL: http://territory-service:3019
+      PLANNING_SERVICE_URL: http://planning-service:3020
+      REPORTING_SERVICE_URL: http://reporting-service:3021
+      PORTAL_SERVICE_URL: http://portal-service:3022
+      KNOWLEDGE_SERVICE_URL: http://knowledge-service:3023
+      INCENTIVE_SERVICE_URL: http://incentive-service:3024
+      EMAIL_SYNC_SERVICE_URL: http://email-sync-service:3026
+      AUDIT_CONSUMER_URL: http://audit-consumer:3028
+      ACCOUNTS_SERVICE_URL: http://accounts-service:3031
+      NOTES_SERVICE_URL: http://notes-service:3032
+      CONTACTS_SERVICE_URL: http://crm-service:3001
+      ACTIVITIES_SERVICE_URL: http://activities-service:3043
+      DEALS_SERVICE_URL: http://crm-service:3001
+      QUOTES_SERVICE_URL: http://finance-service:3002
     restart: unless-stopped
     ports:
       - '3100:3000'
-    env_file:
-      - ./apps/web/.env.example
     depends_on:
       - auth-service
       - crm-service
       - finance-service
-      - notification-service
-      - realtime-service
-      - search-service
+
+  graphql-gateway:
+    build:
+      context: .
+      dockerfile: ./services/graphql-gateway/Dockerfile
+    container_name: nexus-graphql
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+    restart: unless-stopped
+    ports:
+      - '4000:4000'
+    volumes:
+      - ./services/graphql-gateway/router.yaml:/dist/config/router.yaml:ro
+      - ./services/graphql-gateway/supergraph.graphql:/dist/config/supergraph.graphql:ro
+    depends_on:
+      - auth-service
+      - crm-service
+      - finance-service
+      - comm-service
       - workflow-service
       - analytics-service
-      - comm-service
+      - realtime-service
+      - search-service
       - storage-service
-      - billing-service
+      - approval-service
+      - data-service
+      - document-service
+      - chatbot-service
+      - cadence-service
+      - territory-service
+      - planning-service
+      - reporting-service
+      - portal-service
+      - knowledge-service
+      - incentive-service
       - integration-service
       - blueprint-service
-
+      - email-sync-service
+      - notification-service
   comm-service:
     build:
       context: .
@@ -336,8 +642,18 @@ services:
     restart: unless-stopped
     ports:
       - '3009:3009'
-    env_file:
-      - ./services/comm-service/.env.example
+    environment:
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_comm
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+      AUTH_SERVICE_URL: http://auth-service:3000
+      # Sequence enroll validates the contact against crm's internal route via
+      # the shared mesh token (x-service-token). Must match crm's value.
+      CRM_SERVICE_URL: http://crm-service:3001
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -352,8 +668,18 @@ services:
     restart: unless-stopped
     ports:
       - '3010:3010'
-    env_file:
-      - ./services/storage-service/.env.example
+    environment:
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: '9000'
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: nexus-files
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_storage
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -367,9 +693,14 @@ services:
     ports:
       - '3014:3014'
     environment:
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       PORT: '3014'
-    env_file:
-      - ./services/approval-service/.env.example
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_approval
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -386,8 +717,22 @@ services:
       - '3015:3015'
     environment:
       PORT: '3015'
-    env_file:
-      - ./services/data-service/.env.example
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_data
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+      # CSV export streams source rows from each module's owning service; without
+      # these the client fell back to localhost (nothing in-container) → export
+      # 500'd / 404'd. crm→crm modules, finance→quotes/rfqs/invoices/orders/
+      # products/contracts, ticket→tickets, campaign→campaigns, knowledge→articles.
+      CRM_SERVICE_URL: http://crm-service:3001
+      FINANCE_SERVICE_URL: http://finance-service:3002
+      TICKET_SERVICE_URL: http://ticket-service:3029
+      CAMPAIGN_SERVICE_URL: http://campaign-service:3025
+      KNOWLEDGE_SERVICE_URL: http://knowledge-service:3023
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -403,9 +748,15 @@ services:
     ports:
       - '3016:3016'
     environment:
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      KAFKA_BROKERS: kafka:29092
       PORT: '3016'
-    env_file:
-      - ./services/document-service/.env.example
+      # schema.prisma datasource reads DOCUMENT_DATABASE_URL; it was absent from
+      # this block entirely, so every DB query failed and /health returned 503.
+      DOCUMENT_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_document
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
     depends_on:
       - finance-service
 
@@ -418,9 +769,16 @@ services:
     ports:
       - '3017:3017'
     environment:
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      KAFKA_BROKERS: kafka:29092
       PORT: '3017'
-    env_file:
-      - ./services/chatbot-service/.env.example
+      # Public chat widget maps embed key → tenant. Format: key1:tenantA,key2:tenantB.
+      # Set in the droplet .env; without it the widget reaches the handler but
+      # returns 403 embed_key_required (by design) rather than the old 401.
+      CHAT_EMBED_KEYS: ${CHAT_EMBED_KEYS:-}
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_chatbot
     depends_on:
       postgres:
         condition: service_healthy
@@ -437,8 +795,12 @@ services:
       - '3018:3018'
     environment:
       PORT: '3018'
-    env_file:
-      - ./services/cadence-service/.env.example
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_cadence
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -455,8 +817,11 @@ services:
       - '3019:3019'
     environment:
       PORT: '3019'
-    env_file:
-      - ./services/territory-service/.env.example
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_territory
+      KAFKA_BROKERS: kafka:29092
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
     depends_on:
       postgres:
         condition: service_healthy
@@ -473,8 +838,14 @@ services:
       - '3020:3020'
     environment:
       PORT: '3020'
-    env_file:
-      - ./services/planning-service/.env.example
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_planning
+      CRM_SERVICE_URL: http://crm-service:3001
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -491,8 +862,15 @@ services:
       - '3021:3021'
     environment:
       PORT: '3021'
-    env_file:
-      - ./services/reporting-service/.env.example
+      REPORTING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_reporting
+      CRM_SERVICE_URL: http://crm-service:3001
+      ANALYTICS_SERVICE_URL: http://analytics-service:3008/api/v1/analytics
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -506,9 +884,14 @@ services:
     ports:
       - '3022:3022'
     environment:
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       PORT: '3022'
-    env_file:
-      - ./services/portal-service/.env.example
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_portal
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -523,8 +906,12 @@ services:
       - '3023:3023'
     environment:
       PORT: '3023'
-    env_file:
-      - ./services/knowledge-service/.env.example
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_knowledge
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -539,33 +926,152 @@ services:
       - '3024:3024'
     environment:
       PORT: '3024'
-    env_file:
-      - ./services/incentive-service/.env.example
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_incentive
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
         condition: service_started
 
-  ai-service:
+  email-sync-service:
     build:
       context: .
-      dockerfile: ./services/ai-service/Dockerfile
-    container_name: nexus-ai
+      dockerfile: ./services/email-sync-service/Dockerfile
+    container_name: nexus-email-sync
     restart: unless-stopped
     ports:
-      - '3025:8000'
-    env_file:
-      - ./services/ai-service/.env.example
+      - '3026:3026'
+    environment:
+      EMAIL_SYNC_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_email_sync
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  metadata-service:
+    build:
+      context: .
+      dockerfile: ./services/metadata-service/Dockerfile
+    container_name: nexus-metadata
+    restart: unless-stopped
+    ports:
+      - '3004:3004'
+    environment:
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      KAFKA_BROKERS: kafka:29092
+      PORT: '3004'
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_metadata
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  router-coprocessor:
+    build:
+      context: ./services/router-coprocessor
+      dockerfile: Dockerfile
+    container_name: nexus-router-coprocessor
+    restart: unless-stopped
+    ports:
+      - '4001:4001'
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      PORT: '4001'
+
+  audit-consumer:
+    build:
+      context: .
+      dockerfile: ./services/audit-consumer/Dockerfile
+    container_name: nexus-audit-consumer
+    restart: unless-stopped
+    ports:
+      - '3028:3028'
+    environment:
+      PORT: '3028'
+      AUDIT_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_audit
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      KAFKA_CLIENT_ID: audit-consumer
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  outbox-relay:
+    build:
+      context: .
+      dockerfile: ./services/outbox-relay/Dockerfile
+    container_name: nexus-outbox-relay
+    restart: unless-stopped
+    ports:
+      - '3027:3027'
+    environment:
+      PORT: '3027'
+      KAFKA_BROKERS: kafka:29092
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      KAFKA_CLIENT_ID: outbox-relay
+      AUTH_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_auth
+      CRM_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_crm
+      APPROVAL_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_approval
+      # analytics-service is ClickHouse-backed with no Postgres/OutboxMessage table —
+      # do NOT poll it (was causing continuous "table does not exist" relay errors).
+      INTEGRATION_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_integration
+      REPORTING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_reporting
+      TERRITORY_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_territory
+      FINANCE_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_finance
+      NOTIFICATION_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_notification
+      WORKFLOW_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_workflow
+      COMM_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_comm
+      DOCUMENT_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_document
+      CADENCE_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_cadence
+      PLANNING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_planning
+      PORTAL_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_portal
+      KNOWLEDGE_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_knowledge
+      INCENTIVE_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_incentive
+      EMAIL_SYNC_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_email_sync
+      CONTACTS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_contacts
+      # deals-service & leads-service decommissioned (merged into crm-service) — not polled.
+      ACCOUNTS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_accounts
+      OUTBOX_RELAY_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_auth
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
 
   prometheus:
-    image: prom/prometheus:v2.51.0
+    image: prom/prometheus:v2.53.0
     container_name: nexus-prometheus
     restart: unless-stopped
     ports:
-      - '9090:9090'
+      # Monitoring bound to loopback — reach via SSH tunnel or the prod Caddy reverse proxy.
+      - '127.0.0.1:9090:9090'
     volumes:
       - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -575,39 +1081,104 @@ services:
       - '--storage.tsdb.retention.time=15d'
       - '--web.enable-lifecycle'
 
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.104.0
+    container_name: nexus-otel-collector
+    restart: unless-stopped
+    ports:
+      - '4317:4317'   # OTLP gRPC
+      - '4318:4318'   # OTLP HTTP
+    volumes:
+      - ./infrastructure/otel/otel-collector-config.yml:/etc/otelcol-contrib/config.yaml:ro
+
   grafana:
-    image: grafana/grafana:10.4.0
+    image: grafana/grafana:10.4.4
     container_name: nexus-grafana
     restart: unless-stopped
     ports:
-      - '3200:3000'
+      # Monitoring bound to loopback — reach via SSH tunnel or the prod Caddy reverse proxy.
+      - '127.0.0.1:3034:3000'
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: nexus-grafana
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-nexus_grafana}
       GF_USERS_ALLOW_SIGN_UP: 'false'
-      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infrastructure/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./infrastructure/grafana/datasources:/etc/grafana/provisioning/datasources:ro
     depends_on:
       - prometheus
 
-  nginx:
-    image: nginx:1.25-alpine
-    container_name: nexus-nginx
+  ticket-service:
+    build:
+      context: .
+      dockerfile: ./services/ticket-service/Dockerfile
+    container_name: nexus-ticket
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:3029:3029'
+    environment:
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      PORT: '3029'
+      TICKET_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_ticket
+      KAFKA_BROKERS: kafka:29092
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  campaign-service:
+    build:
+      context: .
+      dockerfile: ./services/campaign-service/Dockerfile
+    container_name: nexus-campaign
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:3025:3025'
+    environment:
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      PORT: '3025'
+      CAMPAIGN_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_campaign
+      KAFKA_BROKERS: kafka:29092
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
+      AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  # Production TLS reverse proxy. Off by default — only starts under the `prod`
+  # profile once DOMAIN is set and DNS points here:
+  #   DOMAIN=crm.example.com docker compose --profile prod up -d caddy
+  caddy:
+    image: caddy:2-alpine
+    container_name: nexus-caddy
+    profiles: ['prod']
     restart: unless-stopped
     ports:
       - '80:80'
       - '443:443'
+    environment:
+      DOMAIN: ${DOMAIN:-}
     volumes:
-      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./infrastructure/nginx/certs:/etc/nginx/certs:ro
+      - ./infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     depends_on:
       - web
-      - auth-service
-      - crm-service
 
 volumes:
+  caddy_data:
+  caddy_config:
   postgres_data:
   redis_data:
   zookeeper_data:

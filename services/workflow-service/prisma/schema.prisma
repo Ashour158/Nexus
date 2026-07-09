@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("WORKFLOW_DATABASE_URL")
 }
 
 model WorkflowTemplate {
@@ -19,12 +19,37 @@ model WorkflowTemplate {
   edges             Json
   isActive          Boolean             @default(false)
   version           Int                 @default(1)
+  // Schedule bookkeeping (used only when trigger === 'schedule'). Tracked so a
+  // service restart cannot double-fire a due schedule.
+  lastRunAt         DateTime?
+  nextRunAt         DateTime?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   executions        WorkflowExecution[]
+  versions          WorkflowVersion[]
 
   @@index([tenantId])
   @@index([tenantId, trigger, isActive])
+  @@index([trigger, isActive, nextRunAt])
+  @@unique([id, tenantId])
+}
+
+model WorkflowVersion {
+  id           String           @id @default(cuid())
+  tenantId     String
+  workflowId   String
+  workflow     WorkflowTemplate @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  version      Int
+  nodes        Json
+  edges        Json
+  name         String
+  description  String?
+  createdBy    String
+  createdAt    DateTime         @default(now())
+
+  @@index([tenantId, workflowId])
+  @@unique([workflowId, version])
+  @@unique([id, tenantId])
 }
 
 model WorkflowExecution {
@@ -49,8 +74,10 @@ model WorkflowExecution {
 
   @@index([tenantId])
   @@index([tenantId, status])
+  @@index([tenantId, status, resumeAt])
   @@index([status, resumeAt])
   @@index([parentExecId])
+  @@unique([id, tenantId])
 }
 
 model WorkflowForkTracker {
@@ -96,4 +123,238 @@ enum StepStatus {
   COMPLETED
   FAILED
   SKIPPED
+}
+
+model Journey {
+  id            String            @id @default(cuid())
+  tenantId      String
+  name          String
+  description   String?
+  status        JourneyStatus     @default(DRAFT)
+  entryTrigger  String            // FORM_SUBMIT, TAG_ADDED, MANUAL, API
+  entryConfig   Json              @default("{}") // segment rules, form id, tag name
+  nodes         Json              // React Flow compatible node array
+  edges         Json              // React Flow compatible edge array
+  settings      Json              @default("{}") // exit conditions, re-entry rules
+  version       Int               @default(1)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  enrollments   JourneyEnrollment[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@unique([id, tenantId])
+}
+
+model JourneyEnrollment {
+  id          String        @id @default(cuid())
+  tenantId    String
+  journeyId   String
+  journey     Journey       @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  contactId   String
+  currentNodeId String?
+  status      EnrollmentStatus @default(ACTIVE)
+  enteredAt   DateTime      @default(now())
+  exitedAt    DateTime?
+  exitReason  String?       // COMPLETED, GOAL_REACHED, UNSUBSCRIBED, ERROR
+  metadata    Json          @default("{}")
+
+  @@index([tenantId])
+  @@index([journeyId, status])
+  @@index([contactId])
+  @@unique([journeyId, contactId], name: "journeyId_contactId")
+}
+
+enum JourneyStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  EXITED
+}
+
+// ─── CommandCenter — Customer Journey Orchestration ─────────────────────────
+//
+// Higher-level than WorkflowTemplate (one-off automations): a CommandJourney is
+// a long-running, per-record, step-based orchestration. Records (lead / contact
+// / account / deal) are enrolled and progress through ordered steps over time
+// and events. Named `Command*` to stay additive alongside the existing
+// marketing-flavoured Journey model (contact-only, nodes/edges) which is left
+// untouched.
+
+model CommandJourney {
+  id           String                     @id @default(cuid())
+  tenantId     String
+  name         String
+  description  String?
+  entityType   String                     // lead | contact | account | deal
+  status       CommandJourneyStatus       @default(DRAFT)
+  // { event?: string, conditions?: [{ field, operator, value }], match?: 'all'|'any' }
+  entryTrigger Json                       @default("{}")
+  // Ordered steps: [{ id, type, config, nextStepId?, branches?: [{condition,nextStepId}] }]
+  steps        Json                       @default("[]")
+  // Optional early-exit rule: { conditions?: [...], match?: 'all'|'any' }
+  exitCriteria Json?
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+  enrollments  CommandJourneyEnrollment[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  // entryTrigger event matching: scan ACTIVE journeys for a tenant
+  @@index([tenantId, entityType, status])
+  @@unique([id, tenantId])
+}
+
+model CommandJourneyEnrollment {
+  id            String                       @id @default(cuid())
+  tenantId      String
+  journeyId     String
+  journey       CommandJourney               @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  entityType    String
+  entityId      String
+  currentStepId String?
+  status        CommandEnrollmentStatus      @default(ACTIVE)
+  context       Json                         @default("{}")
+  enteredAt     DateTime                     @default(now())
+  resumeAt      DateTime?
+  lastStepAt    DateTime?
+  error         String?
+  updatedAt     DateTime                     @updatedAt
+
+  // A record is never double-enrolled in the same journey.
+  @@unique([tenantId, journeyId, entityId])
+  // Scheduler: pick up ACTIVE enrollments whose resumeAt is due.
+  @@index([status, resumeAt])
+  @@index([tenantId, journeyId])
+  @@index([tenantId, entityType, entityId])
+}
+
+enum CommandJourneyStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum CommandEnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  EXITED
+  FAILED
+}
+
+// ─── Automation Rules — cross-module declarative automation ─────────────────
+//
+// A simpler, admin-configurable layer than WorkflowTemplate. One row = one rule:
+// "when <triggerEvent> happens on <module> (with optional AND conditions), run
+// <actions>". Evaluated by the Kafka automation consumer against every relevant
+// domain event; matched rules execute their actions via the existing engine node
+// handlers. Each firing records an AutomationRuleRun for audit/idempotency.
+
+model AutomationRule {
+  id           String              @id @default(cuid())
+  tenantId     String
+  name         String
+  description  String?
+  module       String              // lead | contact | account | deal | quote | ticket | campaign | invoice | ...
+  triggerEvent String              // e.g. 'deal.created', 'deal.stage_changed', 'ticket.sla.breached'
+  // [{ field, operator, value }] — AND-combined, evaluated against the event payload
+  conditions   Json                @default("[]")
+  // [{ type, config }] — type ∈ engine action types (SEND_NOTIFICATION/CREATE_TASK/…)
+  actions      Json                @default("[]")
+  isActive     Boolean             @default(true)
+  runCount     Int                 @default(0)
+  lastRunAt    DateTime?
+  createdBy    String
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  runs         AutomationRuleRun[]
+
+  @@index([tenantId, module, triggerEvent])
+  @@index([tenantId, isActive])
+  @@unique([id, tenantId])
+}
+
+model AutomationRuleRun {
+  id        String         @id @default(cuid())
+  tenantId  String
+  ruleId    String
+  rule      AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  eventId   String         // source domain-event id — dedupe key
+  status    String         @default("RUNNING") // RUNNING | SUCCESS | PARTIAL | FAILED | SKIPPED
+  error     String?
+  ranAt     DateTime       @default(now())
+
+  // One run per (rule, event) — the idempotency guard for the consumer.
+  @@unique([ruleId, eventId])
+  @@index([tenantId, ruleId])
+  @@index([ruleId, ranAt])
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
+}
+
+// ─── SLA Engine ─────────────────────────────────────────────────────────────
+
+model SlaDefinition {
+  id            String       @id @default(cuid())
+  tenantId      String
+  name          String
+  description   String?
+  entityType    String       // deal, lead, ticket, etc.
+  stageId       String?      // optional: specific pipeline stage
+  condition     Json         @default("{}") // JSON filter conditions
+  timeLimitHours Int         @default(24)
+  businessHoursOnly Boolean  @default(true)
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  breaches      SlaBreach[]
+
+  @@index([tenantId])
+  @@index([tenantId, entityType, isActive])
+  @@unique([id, tenantId])
+}
+
+model SlaBreach {
+  id             String        @id @default(cuid())
+  tenantId       String
+  slaId          String
+  sla            SlaDefinition @relation(fields: [slaId], references: [id], onDelete: Cascade)
+  entityId       String        // the deal/lead/ticket ID that breached
+  entityType     String
+  status         String        @default("BREACHED") // BREACHED, ESCALATED, RESOLVED
+  breachedAt     DateTime      @default(now())
+  resolvedAt     DateTime?
+  escalationLevel Int          @default(1)
+  metadata       Json          @default("{}")
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([slaId, entityId])
+  @@unique([id, tenantId])
 }

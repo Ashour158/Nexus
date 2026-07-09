@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
+import { useConfirm } from '@/hooks/use-confirm';
 
 type TenantDetail = {
   id: string;
@@ -17,6 +18,7 @@ type TenantDetail = {
 
 export default function AdminTenantDetailPage({ params }: { params: { id: string } }) {
   const accessToken = useAuthStore((s) => s.accessToken);
+  const { confirm: confirmDialog, ConfirmDialog } = useConfirm();
   const [data, setData] = useState<TenantDetail | null>(null);
   const [maxUsers, setMaxUsers] = useState(250);
   const [maxContacts, setMaxContacts] = useState(50000);
@@ -59,7 +61,7 @@ export default function AdminTenantDetailPage({ params }: { params: { id: string
   }
 
   async function deleteTenant() {
-    if (!window.confirm('Delete all tenant data?')) return;
+    if (!await confirmDialog('Delete all tenant data?', 'Delete Tenant')) return;
     setBanner('');
     try {
       const res = await fetch(`/api/admin/tenants/${params.id}`, {
@@ -80,13 +82,13 @@ export default function AdminTenantDetailPage({ params }: { params: { id: string
       <section className="grid gap-3 md:grid-cols-4">
         <Card label="Users" value={String(data?.users ?? 0)} />
         <Card label="Active deals" value={String(data?.activeDeals ?? 0)} />
-        <Card label="Revenue tracked" value={typeof data?.revenueTracked === 'number' ? `$${data.revenueTracked.toLocaleString()}` : '—'} />
-        <Card label="Storage used" value={data?.storageUsed ?? '—'} />
+        <Card label="Revenue tracked" value={typeof data?.revenueTracked === 'number' ? `$${data.revenueTracked.toLocaleString()}` : 'Â—'} />
+        <Card label="Storage used" value={data?.storageUsed ?? 'Â—'} />
       </section>
 
       <section className="rounded-xl border border-gray-800 bg-gray-900 p-4">
         <h3 className="mb-3 font-semibold">Subscription</h3>
-        <p className="text-sm text-gray-300">Plan: {data?.plan ?? '—'} · Renewal: {data?.renewalDate ?? '—'} · Usage limits editable below.</p>
+        <p className="text-sm text-gray-300">Plan: {data?.plan ?? 'Â—'} Â· Renewal: {data?.renewalDate ?? 'Â—'} Â· Usage limits editable below.</p>
       </section>
 
       <section className="rounded-xl border border-gray-800 bg-gray-900 p-4">
@@ -111,6 +113,7 @@ export default function AdminTenantDetailPage({ params }: { params: { id: string
           <button onClick={() => void deleteTenant()} disabled={confirm !== (data?.name ?? '')} className="rounded border border-red-700 px-3 py-1.5 text-red-300 disabled:opacity-50">Delete all data</button>
         </div>
       </section>
+      {ConfirmDialog}
       <div className="flex justify-end">
         <button
           onClick={() => void patchTenant({ limits: { maxUsers, maxContacts, maxStorageGb: maxStorage, maxApiCallsPerDay: maxApi } }, 'Tenant limits saved')}

@@ -1,494 +1,408 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Funnel,
-  FunnelChart,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import { Skeleton } from '@/components/ui/skeleton';
-import { formatCurrency } from '@/lib/format';
-import {
-  useActivityByType,
-  useActivitySummary,
-  useDealVelocity,
-  useForecast,
-  usePipelineFunnel,
-  usePipelineSummary,
-  useRevenueByRep,
-  useRevenueSummary,
-} from '@/hooks/use-analytics';
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  HelpCircle,
+  MoreVertical,
+  RefreshCw,
+  Search,
+  Share2,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react';
+import { cn } from '@/lib/cn';
+import { formatCurrency, formatDate } from '@/lib/format';
+import { useUsers } from '@/hooks/use-users';
 
-const PRESETS = ['This Month', 'Last Quarter', 'This Year', 'Custom'] as const;
-const STAGE_COLORS = ['#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#EF4444'];
+type DealStatus = 'CLOSED WON' | 'IN PROGRESS' | 'PENDING APPROVAL' | 'CLOSED LOST';
 
-function periodBounds(
-  preset: (typeof PRESETS)[number],
-  ref: Date
-): { from: string; to: string; year: number; quarter?: number } {
-  const y = ref.getFullYear();
-  const m = ref.getMonth();
-  const d = ref.getDate();
-  const startOfMonth = new Date(y, m, 1);
-  const endOfMonth = new Date(y, m + 1, 0, 23, 59, 59, 999);
-  const currentQ = Math.floor(m / 3) + 1;
-
-  if (preset === 'This Month') {
-    return {
-      from: startOfMonth.toISOString(),
-      to: endOfMonth.toISOString(),
-      year: y,
-      quarter: currentQ,
-    };
-  }
-  if (preset === 'Last Quarter') {
-    const q0 = Math.floor(m / 3);
-    const prevQ0 = q0 === 0 ? 3 : q0 - 1;
-    const yearForQ = q0 === 0 ? y - 1 : y;
-    return {
-      from: `${yearForQ}-01-01T00:00:00Z`,
-      to: `${yearForQ}-12-31T23:59:59Z`,
-      year: yearForQ,
-      quarter: prevQ0 + 1,
-    };
-  }
-  if (preset === 'This Year') {
-    return {
-      from: `${y}-01-01T00:00:00Z`,
-      to: `${y}-12-31T23:59:59Z`,
-      year: y,
-    };
-  }
-  const start = new Date(ref);
-  start.setDate(d - 30);
-  return {
-    from: start.toISOString(),
-    to: ref.toISOString(),
-    year: y,
-  };
+interface PerformanceRow {
+  id: string;
+  date: string;
+  customer: string;
+  customerSubtitle: string;
+  ownerName: string;
+  dealValue: number;
+  status: DealStatus;
 }
 
-function funnelRows(
-  data: Array<{
-    stageId: string;
-    stageName: string;
-    count: number;
-    value: number;
-    conversionRate: number;
-  }>
-) {
-  return data.map((row) => ({
-    ...row,
-    label: row.stageName?.trim()
-      ? row.stageName
-      : (row.stageId ? `${row.stageId.slice(0, 8)}…` : 'Stage'),
-    value: row.value,
-  }));
+interface TerritoryRow {
+  name: string;
+  value: number;
+  delta: number;
 }
 
-export default function AnalyticsPage(): JSX.Element {
-  const [preset, setPreset] = useState<(typeof PRESETS)[number]>('This Year');
-  const now = useMemo(() => new Date(), []);
+interface EventRow {
+  id: string;
+  actor: string;
+  action: string;
+  timestamp: string;
+}
 
-  const period = useMemo(() => periodBounds(preset, now), [preset, now]);
-
-  const pipelineSummary = usePipelineSummary();
-  const funnel = usePipelineFunnel(period.from, period.to);
-  const revenueSummary = useRevenueSummary(period.year, period.quarter);
-  const revenueByRep = useRevenueByRep(period.year, period.quarter);
-  const activitySummary = useActivitySummary();
-  const activityByType = useActivityByType(period.from, period.to);
-  const dealVelocity = useDealVelocity(period.from, period.to);
-  const forecast = useForecast();
-
-  const funnelChartData = useMemo(
-    () => funnelRows(funnel.data ?? []),
-    [funnel.data]
-  );
-
-  const velocityBars = useMemo(() => {
-    const m = dealVelocity.data?.avgDaysPerStage ?? {};
-    return Object.entries(m).map(([stageId, days]) => ({
-      stage: stageId.slice(0, 8),
-      days: Number(days) || 0,
-    }));
-  }, [dealVelocity.data]);
-  const forecastByMonth = useMemo(
-    () =>
-      (forecast.data?.forecastByMonth ?? []).map((row) => ({
-        month: row.month,
-        weighted: Number(row.weighted),
-        total: Number(row.total),
-      })),
-    [forecast.data]
-  );
-
-  const kpis = {
-    totalRevenue: revenueSummary.data?.totalRevenue ?? 0,
-    winRate: revenueSummary.data?.winRate ?? 0,
-    avgDealSize: revenueSummary.data?.avgSalePrice ?? 0,
-    avgDays: pipelineSummary.data?.avgDaysInPipeline ?? 0,
-    openPipeline: pipelineSummary.data?.totalValue ?? 0,
-    dealsCreated: pipelineSummary.data?.totalDeals ?? 0,
-    actVolume: activitySummary.data?.volume ?? 0,
-    actComplete: activitySummary.data?.completionRate ?? 0,
-    actOverdue: activitySummary.data?.overdueRate ?? 0,
+interface PerformanceReport {
+  kpis?: {
+    revenueDelta?: number;
+    conversionDelta?: number;
+    activeDealsDelta?: number;
+    avgDealSizeDelta?: number;
+    revenueSparkline?: number[];
+    conversionSparkline?: number[];
+    activeDealsSparkline?: number[];
+    avgDealSizeSparkline?: number[];
   };
+  performance: PerformanceRow[];
+  territory: TerritoryRow[];
+  events: EventRow[];
+}
+
+const STATUS_STYLES: Record<DealStatus, string> = {
+  'CLOSED WON': 'bg-emerald-100 text-emerald-700',
+  'IN PROGRESS': 'bg-blue-100 text-blue-700',
+  'PENDING APPROVAL': 'bg-amber-100 text-amber-700',
+  'CLOSED LOST': 'bg-rose-100 text-rose-700',
+};
+
+const avatarTones = [
+  'bg-blue-100 text-blue-600',
+  'bg-purple-100 text-purple-600',
+  'bg-amber-100 text-amber-600',
+  'bg-indigo-100 text-indigo-600',
+  'bg-rose-100 text-rose-600',
+];
+
+export default function AnalyticsPage(): ReactElement {
+  const [dateRange, setDateRange] = useState('last-30');
+  const [team, setTeam] = useState('all');
+  const [user, setUser] = useState('all');
+  const [search, setSearch] = useState('');
+  const { data: usersData } = useUsers();
+
+  const { data, isLoading, error, refetch, isFetching } = useQuery<PerformanceReport>({
+    queryKey: ['analytics', 'stitch-performance', { dateRange, team, user }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateRange) params.set('dateRange', dateRange);
+      if (team !== 'all') params.set('team', team);
+      if (user !== 'all') params.set('user', user);
+      const query = params.toString();
+      const res = await fetch(`/api/reports/performance${query ? `?${query}` : ''}`);
+      if (!res.ok) throw new Error('Analytics data is not available');
+      return res.json();
+    },
+    retry: false,
+  });
+
+  const rows = useMemo(() => {
+    const source = data?.performance ?? [];
+    const q = search.trim().toLowerCase();
+    return source.filter((row) => {
+      if (!q) return true;
+      return (
+        row.customer.toLowerCase().includes(q) ||
+        row.customerSubtitle.toLowerCase().includes(q) ||
+        row.ownerName.toLowerCase().includes(q) ||
+        row.status.toLowerCase().includes(q)
+      );
+    });
+  }, [data?.performance, search]);
+
+  const totalRevenue = rows.reduce((sum, row) => sum + row.dealValue, 0);
+  const won = rows.filter((row) => row.status === 'CLOSED WON').length;
+  const activeDeals = rows.filter((row) => row.status === 'IN PROGRESS' || row.status === 'PENDING APPROVAL').length;
+  const conversion = rows.length ? (won / rows.length) * 100 : 0;
+  const avgDealSize = rows.length ? totalRevenue / rows.length : 0;
+  const maxTerritory = Math.max(...(data?.territory ?? []).map((row) => row.value), 1);
+
+  if (isLoading) {
+    return <div className="rounded-xl border border-slate-100 bg-white p-10 text-center text-sm text-slate-500">Loading analytics...</div>;
+  }
+
+  if (error || !data) {
+    return (
+      <div className="rounded-xl border border-red-100 bg-red-50 p-8 text-sm text-red-700">
+        Analytics data is not available. Please check the reporting preview API.
+      </div>
+    );
+  }
 
   return (
-    <main className="space-y-5 px-6 py-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Analytics</h1>
-          <p className="text-sm text-slate-600">
-            Revenue, pipeline, activities, and velocity for the selected period.
-          </p>
+    <main className="space-y-8">
+      <section className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-end gap-3">
+          <SelectControl label="Date Range" value={dateRange} onChange={setDateRange} options={[
+            ['last-30', 'Last 30 Days'],
+            ['quarter', 'This Quarter'],
+            ['ytd', 'Year to Date'],
+            ['custom', 'Custom Range'],
+          ]} />
+          <SelectControl label="Team" value={team} onChange={setTeam} options={[
+            ['all', 'All Teams'],
+            ['north', 'Sales North'],
+            ['west', 'Sales West'],
+            ['enterprise', 'Enterprise'],
+          ]} />
+          <SelectControl label="User" value={user} onChange={setUser} options={[
+            ['all', 'All Users'],
+            ...(usersData?.data ?? []).map((u) => [u.id, `${u.firstName} ${u.lastName}`] as [string, string]),
+          ]} />
         </div>
-        <select
-          value={preset}
-          onChange={(e) => setPreset(e.target.value as (typeof PRESETS)[number])}
-          className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
-        >
-          {PRESETS.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-      </header>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-9">
-        <Metric label="Total Revenue" value={formatCurrency(kpis.totalRevenue)} />
-        <Metric label="Win Rate" value={`${kpis.winRate.toFixed(1)}%`} />
-        <Metric label="Avg Deal Size" value={formatCurrency(kpis.avgDealSize)} />
-        <Metric label="Avg Days in Pipeline" value={`${kpis.avgDays.toFixed(1)}d`} />
-        <Metric label="Open Pipeline" value={formatCurrency(kpis.openPipeline)} />
-        <Metric label="Deals (summary)" value={String(kpis.dealsCreated)} />
-        <Metric label="Activity volume" value={String(kpis.actVolume)} />
-        <Metric label="Activity completion" value={`${kpis.actComplete.toFixed(0)}%`} />
-        <Metric label="Overdue rate" value={`${kpis.actOverdue.toFixed(0)}%`} />
+        <div className="flex items-center gap-2">
+          <button className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500 transition hover:border-blue-200 hover:text-blue-600" title="More filters">
+            <Filter className="h-5 w-5" />
+          </button>
+          <button
+            className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500 transition hover:border-blue-200 hover:text-blue-600"
+            title="Refresh"
+            onClick={() => void refetch()}
+          >
+            <RefreshCw className={cn('h-5 w-5', isFetching && 'animate-spin')} />
+          </button>
+          <button className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:inline-flex">
+            <Share2 className="h-4 w-4" />
+            Share
+          </button>
+          <button className="hidden items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 sm:inline-flex">
+            Export
+          </button>
+        </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Card title="Pipeline value by stage">
-          {funnel.isLoading ? (
-            <Skeleton className="h-72" />
-          ) : (
-            <ChartBar data={funnelChartData} />
-          )}
-        </Card>
-        <Card title="Win / loss mix">
-          {revenueSummary.isLoading ? (
-            <Skeleton className="h-72" />
-          ) : (
-            <PieWrap
-              won={revenueSummary.data?.wonDeals ?? 0}
-              lost={revenueSummary.data?.lostDeals ?? 0}
-              dormant={Math.max(
-                0,
-                (pipelineSummary.data?.totalDeals ?? 0) -
-                  (revenueSummary.data?.wonDeals ?? 0) -
-                  (revenueSummary.data?.lostDeals ?? 0)
-              )}
-            />
-          )}
-        </Card>
+      <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <SparkMetric label="Total Revenue" value={formatCurrency(totalRevenue)} tone="blue" sparkline={data.kpis?.revenueSparkline ?? []} />
+        <SparkMetric label="Conversion Rate" value={`${conversion.toFixed(1)}%`} tone="emerald" sparkline={data.kpis?.conversionSparkline ?? []} />
+        <SparkMetric label="Active Deals" value={String(activeDeals)} tone="amber" sparkline={data.kpis?.activeDealsSparkline ?? []} />
+        <SparkMetric label="Avg Deal Size" value={formatCurrency(avgDealSize)} tone="indigo" sparkline={data.kpis?.avgDealSizeSparkline ?? []} />
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Card title="Stage funnel (counts)">
-          {funnel.isLoading ? <Skeleton className="h-72" /> : <FunnelWrap data={funnelChartData} />}
-        </Card>
-        <Card title="Revenue by rep">
-          {revenueByRep.isLoading ? <Skeleton className="h-72" /> : <RepBar data={revenueByRep.data ?? []} />}
-        </Card>
-      </section>
+      <section className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+        <div className="flex flex-col gap-4 border-b border-slate-100 p-6 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h1 className="text-lg font-bold text-slate-900">Detailed Performance Log</h1>
+            <p className="text-sm text-slate-500">
+              Showing {rows.length.toLocaleString()} transactions across {(data.territory ?? []).length} territories
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="h-10 w-full rounded-lg border border-slate-200 bg-slate-100 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100 sm:w-64"
+                placeholder="Search performance..."
+              />
+            </label>
+            <span className="text-xs font-semibold text-slate-400">Rows per page: 25</span>
+            <div className="flex rounded-lg border border-slate-200">
+              <button className="border-r border-slate-200 p-2 hover:bg-slate-50" title="Previous">
+                <ChevronLeft className="h-4 w-4 text-slate-500" />
+              </button>
+              <button className="p-2 hover:bg-slate-50" title="Next">
+                <ChevronRight className="h-4 w-4 text-slate-500" />
+              </button>
+            </div>
+          </div>
+        </div>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Card title="Activities by type">
-          {activityByType.isLoading ? (
-            <Skeleton className="h-72" />
-          ) : (
-            <ActivityTypeChart data={activityByType.data ?? []} />
-          )}
-        </Card>
-        <Card title="Avg days per stage (velocity)">
-          {dealVelocity.isLoading ? (
-            <Skeleton className="h-72" />
-          ) : (
-            <VelocityLine data={velocityBars} avgClose={dealVelocity.data?.avgDaysToClose ?? 0} />
-          )}
-        </Card>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Card title="Forecast by month">
-          {forecast.isLoading ? (
-            <Skeleton className="h-72" />
-          ) : (
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={forecastByMonth}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis tickFormatter={(v) => `$${Number(v) / 1000}k`} />
-                <Tooltip formatter={(v) => formatCurrency(Number(v))} />
-                <Legend />
-                <Bar dataKey="total" name="Total Pipeline" fill="#94a3b8" />
-                <Bar dataKey="weighted" name="Weighted Pipeline" fill="#2563eb" />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </Card>
-        <Card title="Activity volume trend (by type)">
-          {activityByType.isLoading ? (
-            <Skeleton className="h-72" />
-          ) : (
-            <ActivityArea data={activityByType.data ?? []} />
-          )}
-        </Card>
-        <Card title="Funnel conversion %">
-          {funnel.isLoading ? (
-            <Skeleton className="h-72" />
-          ) : (
-            <ConversionLine data={funnelChartData} />
-          )}
-        </Card>
-      </section>
-
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Rep performance</h2>
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
-              <tr>
-                <th className="px-3 py-2 text-left">Rep</th>
-                <th className="px-3 py-2 text-right">Revenue</th>
-                <th className="px-3 py-2 text-right">Won deals</th>
-                <th className="px-3 py-2 text-right">Lost deals</th>
-                <th className="px-3 py-2 text-right">Win rate</th>
-                <th className="px-3 py-2 text-right">Avg deal</th>
-                <th className="px-3 py-2 text-right">Quota attainment</th>
+          <table className="w-full min-w-[820px] border-collapse text-left">
+            <thead>
+              <tr className="bg-slate-50/80">
+                <TableHead>Date</TableHead>
+                <TableHead>Customer</TableHead>
+                <TableHead>Owner</TableHead>
+                <TableHead>Deal Value</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </tr>
             </thead>
-            <tbody>
-              {(revenueByRep.data ?? []).map((r) => (
-                <tr key={r.ownerId} className="border-b border-gray-50 even:bg-gray-50/50 transition-colors hover:bg-blue-50/40">
-                  <td className="px-3 py-2">{r.ownerId.slice(0, 8)}…</td>
-                  <td className="px-3 py-2 text-right">{formatCurrency(r.totalRevenue)}</td>
-                  <td className="px-3 py-2 text-right">{r.wonDeals}</td>
-                  <td className="px-3 py-2 text-right">—</td>
-                  <td className="px-3 py-2 text-right">{r.winRate.toFixed(1)}%</td>
-                  <td className="px-3 py-2 text-right">
-                    {formatCurrency(r.wonDeals > 0 ? r.totalRevenue / r.wonDeals : 0)}
+            <tbody className="divide-y divide-slate-100">
+              {rows.map((row, index) => (
+                <tr key={row.id} className="transition-colors hover:bg-slate-50/80">
+                  <td className="p-4 text-sm font-medium text-slate-600">{formatDate(row.date)}</td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className={cn('flex h-8 w-8 items-center justify-center rounded text-xs font-bold', avatarTones[index % avatarTones.length])}>
+                        {initials(row.customer)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">{row.customer}</p>
+                        <p className="text-xs text-slate-400">{row.customerSubtitle}</p>
+                      </div>
+                    </div>
                   </td>
-                  <td className="px-3 py-2 text-right">
-                    {((r.totalRevenue / 100000) * 100).toFixed(1)}%
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-bold text-white">
+                        {initials(row.ownerName)}
+                      </div>
+                      <span className="text-sm text-slate-600">{row.ownerName}</span>
+                    </div>
+                  </td>
+                  <td className="p-4 text-sm font-bold text-slate-900">{formatCurrency(row.dealValue)}</td>
+                  <td className="p-4">
+                    <span className={cn('rounded px-2 py-1 text-[10px] font-bold uppercase tracking-tight', STATUS_STYLES[row.status])}>
+                      {row.status}
+                    </span>
+                  </td>
+                  <td className="p-4 text-right">
+                    <button className="text-slate-400 hover:text-blue-600" title="Actions">
+                      <MoreVertical className="h-5 w-5" />
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs font-medium text-slate-500">Page 1 of 1</p>
+          <div className="flex items-center gap-2">
+            <button className="rounded border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-600 opacity-50" disabled>
+              Previous
+            </button>
+            <button className="h-6 w-6 rounded bg-blue-600 text-[10px] font-bold text-white">1</button>
+            <button className="rounded border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50">
+              Next
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm lg:col-span-2">
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-900">Revenue by Territory</h2>
+            <span className="text-xs font-bold text-blue-600">View Map</span>
+          </div>
+          <div className="space-y-5">
+            {data.territory.map((territory) => {
+              const width = Math.max(8, Math.round((territory.value / maxTerritory) * 100));
+              return (
+                <div key={territory.name} className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">{territory.name}</span>
+                    <span className="font-bold text-slate-900">
+                      {formatCurrency(territory.value)}
+                      <span className={cn('ml-1 text-xs font-normal', territory.delta >= 0 ? 'text-emerald-500' : 'text-rose-500')}>
+                        {territory.delta >= 0 ? <TrendingUp className="inline h-3 w-3" /> : <TrendingDown className="inline h-3 w-3" />} {Math.abs(territory.delta)}%
+                      </span>
+                    </span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full rounded-full bg-blue-500" style={{ width: `${width}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="relative overflow-hidden rounded-xl bg-slate-900 p-6 text-white shadow-lg">
+          <HelpCircle className="absolute right-4 top-4 h-16 w-16 text-white opacity-10" />
+          <h2 className="mb-6 text-lg font-bold text-white">Recent Events</h2>
+          <div className="relative z-10 space-y-4">
+            {data.events.slice(0, 4).map((event, index) => (
+              <div key={event.id} className={cn('flex gap-3 border-l-2 pl-4 py-1', index === 0 ? 'border-blue-500' : 'border-slate-700')}>
+                <div className={cn('w-14 text-[10px] font-bold uppercase', index === 0 ? 'text-blue-400' : 'text-slate-500')}>
+                  {index === 0 ? '2m ago' : event.timestamp}
+                </div>
+                <p className="flex-1 text-xs leading-5 text-slate-300">
+                  <span className="font-bold text-white">{event.actor}</span> {event.action}
+                </p>
+              </div>
+            ))}
+          </div>
+          <button className="mt-6 w-full rounded-lg bg-slate-800 py-2 text-xs font-bold text-slate-300 transition-colors hover:bg-slate-700">
+            View Audit Log
+          </button>
+        </div>
       </section>
     </main>
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-bold text-slate-900">{value}</p>
-    </div>
-  );
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
-      <h2 className="mb-2 text-sm font-semibold text-slate-900">{title}</h2>
-      <div className="h-72">{children}</div>
-    </div>
-  );
-}
-
-function ChartBar({
-  data,
+function SelectControl({
+  label,
+  value,
+  onChange,
+  options,
 }: {
-  data: Array<{ label: string; value: number }>;
-}) {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<[string, string]>;
+}): ReactElement {
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-        <YAxis />
-        <Tooltip />
-        <Bar dataKey="value" fill="#0f172a" />
-      </BarChart>
-    </ResponsiveContainer>
+    <label className="flex flex-col gap-1">
+      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-w-[150px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
+      >
+        {options.map(([optionValue, optionLabel]) => (
+          <option key={optionValue} value={optionValue}>{optionLabel}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 
-function PieWrap({ won, lost, dormant }: { won: number; lost: number; dormant: number }) {
-  const data = [
-    { name: 'WON', value: won, color: '#059669' },
-    { name: 'LOST', value: lost, color: '#dc2626' },
-    { name: 'DORMANT', value: dormant, color: '#d97706' },
-  ];
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <PieChart>
-        <Pie data={data} dataKey="value" nameKey="name" outerRadius={90}>
-          {data.map((d) => (
-            <Cell key={d.name} fill={d.color} />
-          ))}
-        </Pie>
-        <Tooltip />
-      </PieChart>
-    </ResponsiveContainer>
-  );
-}
-
-function FunnelWrap({
-  data,
+function SparkMetric({
+  label,
+  value,
+  tone,
+  sparkline,
 }: {
-  data: Array<{ label: string; value: number; count: number }>;
-}) {
-  const shaped = data.map((d) => ({ name: d.label, value: d.count }));
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <FunnelChart>
-        <Tooltip />
-        <Funnel dataKey="value" data={shaped} isAnimationActive>
-          {shaped.map((_, index) => (
-            <Cell key={`funnel-cell-${index}`} fill={STAGE_COLORS[index % STAGE_COLORS.length]} />
-          ))}
-        </Funnel>
-      </FunnelChart>
-    </ResponsiveContainer>
-  );
-}
+  label: string;
+  value: string;
+  tone: 'blue' | 'emerald' | 'amber' | 'indigo';
+  sparkline: number[];
+}): ReactElement {
+  const colors = {
+    blue: 'bg-blue-50 from-blue-400/20 to-blue-600/40',
+    emerald: 'bg-emerald-50 from-emerald-400/20 to-emerald-600/40',
+    amber: 'bg-amber-50 from-amber-400/20 to-amber-600/40',
+    indigo: 'bg-indigo-50 from-indigo-400/20 to-indigo-600/40',
+  }[tone];
+  const points = sparkline.length ? sparkline : [10, 20, 16, 32, 24, 40];
+  const max = Math.max(...points, 1);
+  const polygon = points
+    .map((point, index) => `${Math.round((index / Math.max(points.length - 1, 1)) * 100)}% ${Math.round(100 - (point / max) * 85)}%`)
+    .join(', ');
 
-function RepBar({
-  data,
-}: {
-  data: Array<{ ownerId: string; totalRevenue: number }>;
-}) {
-  const rows = [...data].sort((a, b) => b.totalRevenue - a.totalRevenue);
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={rows}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="ownerId" tickFormatter={(v: string | number) => String(v).slice(0, 6)} />
-        <YAxis />
-        <Tooltip />
-        <Bar dataKey="totalRevenue" fill="#1d4ed8" />
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
-function ActivityTypeChart({
-  data,
-}: {
-  data: Array<{ activityType: string; count: number; completionRate: number }>;
-}) {
-  const rows = [...data].sort((a, b) => b.count - a.count);
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={rows} layout="vertical" margin={{ left: 8, right: 8 }}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis type="number" />
-        <YAxis dataKey="activityType" type="category" width={100} tick={{ fontSize: 10 }} />
-        <Tooltip />
-        <Bar dataKey="count" fill="#0369a1" name="Count" />
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
-function ActivityArea({
-  data,
-}: {
-  data: Array<{ activityType: string; count: number; completionRate: number }>;
-}) {
-  const rows = data.map((d) => ({
-    type: d.activityType,
-    count: d.count,
-  }));
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={rows}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="type" tick={{ fontSize: 10 }} interval={0} angle={-20} height={60} />
-        <YAxis />
-        <Tooltip />
-        <Legend />
-        <Area type="monotone" dataKey="count" stroke="#0ea5e9" fill="#7dd3fc" name="Created" />
-      </AreaChart>
-    </ResponsiveContainer>
-  );
-}
-
-function VelocityLine({
-  data,
-  avgClose,
-}: {
-  data: Array<{ stage: string; days: number }>;
-  avgClose: number;
-}) {
-  const withAvg = data.map((d) => ({ ...d, avgClose }));
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={withAvg.length ? withAvg : [{ stage: 'n/a', days: 0, avgClose }]}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="stage" tick={{ fontSize: 10 }} />
-        <YAxis />
-        <Tooltip />
-        <Legend />
-        <Line type="stepAfter" dataKey="days" stroke="#0f172a" name="Days in stage" dot />
-        <Line
-          type="monotone"
-          dataKey="avgClose"
-          stroke="#ea580c"
-          strokeDasharray="4 4"
-          name="Avg days to close (deal)"
-          dot={false}
+    <div className="flex h-32 flex-col justify-between rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
+        <h3 className="mt-1 text-2xl font-bold text-slate-900">{value}</h3>
+      </div>
+      <div className={cn('relative h-8 w-full overflow-hidden rounded', colors.split(' ')[0])}>
+        <div
+          className={cn('absolute inset-0 bg-gradient-to-r', colors.split(' ').slice(1).join(' '))}
+          style={{ clipPath: `polygon(${polygon}, 100% 100%, 0% 100%)` }}
         />
-      </LineChart>
-    </ResponsiveContainer>
+      </div>
+    </div>
   );
 }
 
-function ConversionLine({
-  data,
-}: {
-  data: Array<{ label: string; conversionRate: number }>;
-}) {
+function TableHead({ children, className }: { children: React.ReactNode; className?: string }): ReactElement {
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-        <YAxis unit="%" />
-        <Tooltip />
-        <Line type="monotone" dataKey="conversionRate" stroke="#4f46e5" name="Conversion %" dot />
-      </LineChart>
-    </ResponsiveContainer>
+    <th className={cn('border-b border-slate-100 p-4 text-xs font-semibold uppercase tracking-wider text-slate-500', className)}>
+      {children}
+    </th>
   );
+}
+
+function initials(value: string): string {
+  const parts = value.split(/\s+/).filter(Boolean);
+  return `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? parts[0]?.[1] ?? ''}`.toUpperCase() || 'NX';
 }

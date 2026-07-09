@@ -1,0 +1,47 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  notifications(limit: Int, offset: Int, isRead: Boolean): [Notification!]!
+  notification(id: ID!): Notification
+}
+
+type Mutation {
+  createNotification(input: CreateNotificationInput!): Notification!
+  markNotificationRead(id: ID!): Notification!
+  markAllNotificationsRead: Boolean!
+  deleteNotification(id: ID!): Boolean!
+}
+
+type Notification @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  userId: String!
+  type: String!
+  title: String!
+  body: String!
+  entityType: String
+  entityId: String
+  actionUrl: String
+  channel: String!
+  isRead: Boolean!
+  readAt: DateTime
+  metadata: JSON!
+  createdAt: DateTime!
+}
+
+input CreateNotificationInput {
+  tenantId: String!
+  userId: String!
+  type: String!
+  title: String!
+  body: String!
+  entityType: String
+  entityId: String
+  actionUrl: String
+  channel: String
+  metadata: JSON
+}

@@ -23,6 +23,7 @@ model Contest {
   entries          ContestEntry[]
 
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 model ContestEntry {
@@ -37,6 +38,7 @@ model ContestEntry {
 
   @@unique([contestId, ownerId])
   @@index([contestId, currentValue])
+  @@unique([id, tenantId])
 }
 
 model Badge {
@@ -50,6 +52,7 @@ model Badge {
   awardedTo   BadgeAward[]
 
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 model BadgeAward {
@@ -62,6 +65,7 @@ model BadgeAward {
 
   @@unique([badgeId, tenantId, ownerId])
   @@index([tenantId, ownerId])
+  @@unique([id, tenantId])
 }
 
 enum ContestMetric {
@@ -70,4 +74,135 @@ enum ContestMetric {
   ACTIVITIES_COMPLETED
   LEADS_CONVERTED
   NEW_LOGOS
+}
+
+/// Per-tenant/owner cumulative counters that drive event-based badge metrics
+/// (e.g. LEADS_CREATED, ACTIVITY_STREAK) which have no other source of truth.
+/// Additive: existing deal.won badge path does not depend on this table.
+model MetricCounter {
+  id                String   @id @default(cuid())
+  tenantId          String
+  ownerId           String
+  metric            String
+  value             Decimal  @default(0) @db.Decimal(18, 2)
+  /// Streak bookkeeping (used by ACTIVITY_STREAK). Nullable for non-streak metrics.
+  lastEventDate     String?
+  streakValue       Int      @default(0)
+  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now())
+
+  @@unique([tenantId, ownerId, metric])
+  @@index([tenantId, ownerId])
+}
+
+/// A commission plan groups a set of rules and an effective window. A won deal
+/// is matched against the active plan for its tenant; the highest-priority
+/// scoped+tiered rule that applies determines the commission rate.
+model CommissionPlan {
+  id            String           @id @default(cuid())
+  tenantId      String
+  name          String
+  description   String?
+  isActive      Boolean          @default(true)
+  basis         CommissionBasis  @default(REVENUE)
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  rules         CommissionRule[]
+
+  @@index([tenantId, isActive])
+  @@unique([id, tenantId])
+}
+
+/// A single rate rule inside a plan. Optional scoping columns narrow which deals
+/// the rule applies to (by rep role, deal owner, or product). Optional tier
+/// bounds support tiered rates keyed off the base amount. Higher `priority`
+/// wins when multiple rules match.
+model CommissionRule {
+  id           String         @id @default(cuid())
+  planId       String
+  plan         CommissionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  tenantId     String
+  appliesToRole String?
+  ownerId      String?
+  productId    String?
+  ratePercent  Decimal        @db.Decimal(6, 3)
+  tierMinAmount Decimal?      @db.Decimal(18, 2)
+  tierMaxAmount Decimal?      @db.Decimal(18, 2)
+  priority     Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([planId])
+  @@index([tenantId])
+  @@unique([id, tenantId])
+}
+
+/// The computed commission owed to a rep for a specific won deal. Unique on
+/// [tenantId, dealId, ownerId] so a replayed `deal.won` event cannot
+/// double-write, while still allowing one statement per deal-team member when a
+/// deal is split across multiple reps (revenue/overlay splits). For a plain
+/// single-owner deal this collapses to exactly one statement per (tenant, deal).
+model CommissionStatement {
+  id               String                    @id @default(cuid())
+  tenantId         String
+  ownerId          String
+  dealId           String
+  planId           String?
+  ruleId           String?
+  /// Split attribution. null/REVENUE/OVERLAY. null = legacy single-owner (100%).
+  splitType        String?
+  /// The rep's revenue-split percentage (0-100) for this deal. null for legacy
+  /// single-owner statements (implicit 100%).
+  splitPercent     Decimal?                  @db.Decimal(6, 3)
+  baseAmount       Decimal                   @db.Decimal(18, 2)
+  ratePercent      Decimal                   @db.Decimal(6, 3)
+  commissionAmount Decimal                   @db.Decimal(18, 2)
+  currency         String                    @default("USD")
+  status           CommissionStatementStatus @default(PENDING)
+  periodMonth      String
+  approvedAt       DateTime?
+  approvedBy       String?
+  paidAt           DateTime?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  @@unique([tenantId, dealId, ownerId])
+  @@index([tenantId, ownerId])
+  @@index([tenantId, status])
+  @@index([tenantId, periodMonth])
+  @@unique([id, tenantId])
+}
+
+enum CommissionBasis {
+  REVENUE
+  MARGIN
+}
+
+enum CommissionStatementStatus {
+  PENDING
+  APPROVED
+  PAID
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
 }

@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-agent-config
+  namespace: nexus
+data:
+  vault-agent-config.hcl: |
+    auto_auth {
+      method "kubernetes" {
+        mount_path = "auth/kubernetes"
+        config = {
+          role = "nexus-crm"
+        }
+      }
+      sink "file" {
+        config = {
+          path = "/vault/token"
+        }
+      }
+    }
+    # Render secrets as a sourceable env file so the app container can read
+    # real values — not filesystem paths.
+    template {
+      destination = "/vault/secrets/app.env"
+      contents = <<EOT
+    {{ with secret "database/creds/nexus-crm" -}}
+    DATABASE_URL=postgresql://{{ .Data.username }}:{{ .Data.password }}@postgres:5432/nexus?pgbouncer=true
+    {{- end }}
+    EOT
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus-crm-with-vault
+  namespace: nexus
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nexus-crm
+  template:
+    metadata:
+      labels:
+        app: nexus-crm
+    spec:
+      serviceAccountName: nexus-crm
+      initContainers:
+        # Step 1: vault-agent renders secrets to /vault/secrets/app.env
+        - name: vault-agent
+          image: hashicorp/vault:1.16
+          args:
+            - agent
+            - -config=/vault/config/vault-agent-config.hcl
+            - -exit-after-auth=true   # run once, write secrets, then exit
+          volumeMounts:
+            - name: vault-config
+              mountPath: /vault/config
+            - name: vault-token
+              mountPath: /vault/token
+            - name: shared-data
+              mountPath: /vault/secrets
+
+        # Step 2: export the rendered env vars into a shell-sourceable script
+        # so the main container can `source /vault/env/setup.sh` before exec.
+        - name: env-exporter
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              # Convert KEY=value lines into export statements
+              sed 's/^/export /' /vault/secrets/app.env > /vault/env/setup.sh
+              chmod 444 /vault/env/setup.sh
+          volumeMounts:
+            - name: shared-data
+              mountPath: /vault/secrets
+              readOnly: true
+            - name: env-scripts
+              mountPath: /vault/env
+
+      containers:
+        - name: nexus-crm
+          image: nexus-crm/nexus-crm:latest
+          # Source the vault env file before starting the app so that
+          # DATABASE_URL (and any future secrets) are real values, not paths.
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              . /vault/env/setup.sh
+              exec node /app/dist/index.js
+          volumeMounts:
+            - name: env-scripts
+              mountPath: /vault/env
+              readOnly: true
+
+      volumes:
+        - name: vault-config
+          configMap:
+            name: vault-agent-config
+        - name: vault-token
+          emptyDir: {}
+        - name: shared-data
+          emptyDir: {}
+        - name: env-scripts
+          emptyDir: {}

@@ -3,6 +3,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { Sidebar } from './sidebar';
 import { Topbar } from './topbar';
+import { MobileNav } from './mobile-nav';
 import { cn } from '@/lib/cn';
 import { useUiStore } from '@/stores/ui.store';
 
@@ -19,26 +20,24 @@ export interface AppShellProps {
  * its full width.
  */
 export function AppShell({ children, className }: AppShellProps): ReactElement {
-  const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const mobileOpen = useUiStore((s) => s.sidebarOpenOnMobile);
   const setMobileOpen = useUiStore((s) => s.setSidebarOpenOnMobile);
 
   return (
     <div
-      data-sidebar-collapsed={collapsed || undefined}
-      className="min-h-screen bg-slate-50 text-slate-900"
+      className="min-h-screen bg-[#f9f9ff] text-slate-900 dark:bg-slate-950 dark:text-slate-100"
     >
       <Sidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
       <div
         className={cn(
-          'flex min-h-screen flex-col transition-[padding] duration-200',
-          collapsed ? 'lg:ps-16' : 'lg:ps-60'
+          'flex min-h-screen flex-col transition-[padding] duration-200 md:ps-80'
         )}
       >
         <Topbar />
-        <main className={cn('flex-1 px-4 py-6 sm:px-6 lg:px-8', className)}>
+        <main className={cn('flex-1 px-4 py-6 pb-24 sm:px-6 md:pb-6 lg:px-8', className)}>
           {children}
         </main>
+        <MobileNav />
       </div>
     </div>
   );

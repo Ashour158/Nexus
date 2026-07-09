@@ -33,15 +33,7 @@ docker compose ${COMPOSE_FILE} --env-file "${ENV_FILE}" pull --ignore-pull-failu
 
 # ── Run DB migrations ─────────────────────────────────────────────────────────
 echo "🗄️  Running database migrations..."
-for svc in auth-service crm-service finance-service workflow-service billing-service \
-           integration-service blueprint-service approval-service cadence-service \
-           territory-service planning-service reporting-service portal-service \
-           knowledge-service incentive-service data-service chatbot-service; do
-  echo "  → Migrating ${svc}..."
-  docker compose ${COMPOSE_FILE} --env-file "${ENV_FILE}" \
-    run --rm --no-deps "${svc}" \
-    sh -c "npx prisma migrate deploy 2>/dev/null || true" || true
-done
+MODE=deploy bash scripts/migrate-all.sh
 
 # ── Rolling restart — infra first, then services ──────────────────────────────
 echo "🔄  Starting infrastructure..."
@@ -49,8 +41,11 @@ docker compose ${COMPOSE_FILE} --env-file "${ENV_FILE}" up -d \
   postgres redis kafka zookeeper meilisearch minio keycloak clickhouse
 
 echo "⏳  Waiting for Postgres to be ready..."
-until docker compose ${COMPOSE_FILE} --env-file "${ENV_FILE}" exec -T postgres \
-  pg_isready -U nexus -d nexus > /dev/null 2>&1; do
+for _ in {1..30}; do
+  if docker compose ${COMPOSE_FILE} --env-file "${ENV_FILE}" exec -T postgres \
+    pg_isready -U nexus -d nexus > /dev/null 2>&1; then
+    break
+  fi
   sleep 2
 done
 
@@ -58,9 +53,9 @@ echo "🔄  Starting application services..."
 docker compose ${COMPOSE_FILE} --env-file "${ENV_FILE}" up -d \
   auth-service crm-service finance-service notification-service realtime-service \
   search-service workflow-service analytics-service comm-service storage-service \
-  billing-service integration-service blueprint-service approval-service data-service \
+  integration-service blueprint-service approval-service data-service \
   document-service chatbot-service cadence-service territory-service planning-service \
-  reporting-service portal-service knowledge-service incentive-service ai-service
+  reporting-service portal-service knowledge-service incentive-service
 
 echo "🔄  Starting web frontend..."
 docker compose ${COMPOSE_FILE} --env-file "${ENV_FILE}" up -d web
@@ -68,12 +63,13 @@ docker compose ${COMPOSE_FILE} --env-file "${ENV_FILE}" up -d web
 # ── Health check ──────────────────────────────────────────────────────────────
 echo "🏥  Checking service health..."
 sleep 10
+
 FAILED=0
-for svc_port in "auth-service:3010" "crm-service:3001" "finance-service:3002" \
+for svc_port in "auth-service:3000" "crm-service:3001" "finance-service:3002" \
                 "workflow-service:3007" "notification-service:3003"; do
   svc="${svc_port%%:*}"
   port="${svc_port##*:}"
-  status=$(curl -sf "http://localhost:${port}/health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "unreachable")
+  status=$(curl -sf --max-time 10 "http://localhost:${port}/health" 2>/dev/null || echo "unreachable")
   if [ "${status}" = "ok" ]; then
     echo "  ✅  ${svc}"
   else
@@ -86,6 +82,8 @@ if [ $FAILED -gt 0 ]; then
   echo ""
   echo "⚠️  ${FAILED} service(s) failed health check. Check logs with:"
   echo "     docker compose ${COMPOSE_FILE} logs --tail=50 <service-name>"
+  echo ""
+  echo "To rollback: docker compose ${COMPOSE_FILE} down && docker compose ${COMPOSE_FILE} up -d"
   exit 1
 fi
 

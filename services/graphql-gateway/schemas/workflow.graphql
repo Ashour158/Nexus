@@ -1,0 +1,233 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  workflowTemplates(limit: Int, offset: Int): [WorkflowTemplate!]!
+  workflowTemplate(id: ID!): WorkflowTemplate
+  workflowExecutions(limit: Int, offset: Int): [WorkflowExecution!]!
+  workflowExecution(id: ID!): WorkflowExecution
+  journeys(limit: Int, offset: Int): [Journey!]!
+  journey(id: ID!): Journey
+  journeyEnrollments(limit: Int, offset: Int): [JourneyEnrollment!]!
+  journeyEnrollment(id: ID!): JourneyEnrollment
+}
+
+type Mutation {
+  createWorkflowTemplate(input: CreateWorkflowTemplateInput!): WorkflowTemplate!
+  updateWorkflowTemplate(id: ID!, input: UpdateWorkflowTemplateInput!): WorkflowTemplate!
+  deleteWorkflowTemplate(id: ID!): Boolean!
+  createWorkflowExecution(input: CreateWorkflowExecutionInput!): WorkflowExecution!
+  updateWorkflowExecution(id: ID!, input: UpdateWorkflowExecutionInput!): WorkflowExecution!
+  deleteWorkflowExecution(id: ID!): Boolean!
+  createJourney(input: CreateJourneyInput!): Journey!
+  updateJourney(id: ID!, input: UpdateJourneyInput!): Journey!
+  deleteJourney(id: ID!): Boolean!
+  createJourneyEnrollment(input: CreateJourneyEnrollmentInput!): JourneyEnrollment!
+  updateJourneyEnrollment(id: ID!, input: UpdateJourneyEnrollmentInput!): JourneyEnrollment!
+  deleteJourneyEnrollment(id: ID!): Boolean!
+}
+
+type WorkflowTemplate @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  description: String
+  trigger: String!
+  triggerConditions: JSON!
+  nodes: JSON!
+  edges: JSON!
+  isActive: Boolean!
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  executions: [WorkflowExecution!]!
+}
+
+type WorkflowExecution @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  workflowId: String!
+  workflow: WorkflowTemplate!
+  triggerType: String!
+  triggerPayload: JSON!
+  status: ExecutionStatus!
+  currentNodeId: String
+  resumeAt: DateTime
+  startedAt: DateTime!
+  completedAt: DateTime
+  error: String
+  parentForkId: String
+  parentExecId: String
+  steps: [WorkflowStep!]!
+  branchChildren: [WorkflowExecution!]!
+}
+
+type WorkflowStep {
+  id: ID!
+  executionId: String!
+  nodeId: String!
+  nodeType: String!
+  status: StepStatus!
+  input: JSON!
+  output: JSON
+  error: String
+  startedAt: DateTime!
+  completedAt: DateTime
+}
+
+type Journey @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  description: String
+  status: JourneyStatus!
+  entryTrigger: String!
+  entryConfig: JSON!
+  nodes: JSON!
+  edges: JSON!
+  settings: JSON!
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  enrollments: [JourneyEnrollment!]!
+}
+
+type JourneyEnrollment @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  journeyId: String!
+  journey: Journey!
+  contactId: String!
+  currentNodeId: String
+  status: EnrollmentStatus!
+  enteredAt: DateTime!
+  exitedAt: DateTime
+  exitReason: String
+  metadata: JSON!
+}
+
+enum ExecutionStatus {
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+  PENDING
+  EXECUTED
+  SKIPPED
+}
+
+enum StepStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+  APPROVED
+  REJECTED
+  DELEGATED
+}
+
+enum JourneyStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  EXITED
+}
+
+input CreateWorkflowTemplateInput {
+  tenantId: String!
+  name: String!
+  description: String
+  trigger: String!
+  triggerConditions: JSON
+  nodes: JSON!
+  edges: JSON!
+  isActive: Boolean
+}
+
+input UpdateWorkflowTemplateInput {
+  name: String
+  description: String
+  trigger: String
+  triggerConditions: JSON
+  nodes: JSON
+  edges: JSON
+  isActive: Boolean
+}
+
+input CreateWorkflowExecutionInput {
+  tenantId: String!
+  workflowId: ID!
+  triggerType: String!
+  triggerPayload: JSON!
+  status: ExecutionStatus
+  currentNodeId: String
+  resumeAt: DateTime
+  startedAt: DateTime
+  completedAt: DateTime
+  error: String
+  parentForkId: String
+  parentExecId: String
+}
+
+input UpdateWorkflowExecutionInput {
+  status: ExecutionStatus
+  currentNodeId: String
+  resumeAt: DateTime
+  completedAt: DateTime
+  error: String
+}
+
+input CreateJourneyInput {
+  tenantId: String!
+  name: String!
+  description: String
+  status: JourneyStatus
+  entryTrigger: String!
+  entryConfig: JSON
+  nodes: JSON!
+  edges: JSON!
+  settings: JSON
+}
+
+input UpdateJourneyInput {
+  name: String
+  description: String
+  status: JourneyStatus
+  entryTrigger: String
+  entryConfig: JSON
+  nodes: JSON
+  edges: JSON
+  settings: JSON
+}
+
+input CreateJourneyEnrollmentInput {
+  tenantId: String!
+  journeyId: ID!
+  contactId: String!
+  currentNodeId: String
+  status: EnrollmentStatus
+  enteredAt: DateTime
+  exitedAt: DateTime
+  exitReason: String
+  metadata: JSON
+}
+
+input UpdateJourneyEnrollmentInput {
+  currentNodeId: String
+  status: EnrollmentStatus
+  exitedAt: DateTime
+  exitReason: String
+  metadata: JSON
+}

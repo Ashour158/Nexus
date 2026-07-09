@@ -1,8 +1,18 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
+import { createHttpClient, PERMISSIONS, requirePermission } from '@nexus/service-utils';
 import type { IntegrationPrisma } from '../prisma.js';
 import type { createGoogleCalendarService } from '../services/google-calendar.service.js';
+import type { createFieldCrypto } from '../lib/crypto.js';
+
+type FieldCrypto = ReturnType<typeof createFieldCrypto>;
+
+const calendarClient = createHttpClient({
+  baseURL: 'https://www.googleapis.com/calendar/v3',
+  timeoutMs: 10000,
+  maxRetries: 3,
+  circuitBreaker: { failureThreshold: 5, resetTimeoutMs: 30000 },
+});
 
 const RangeQuery = z.object({
   start: z.string().datetime().optional(),
@@ -20,7 +30,8 @@ const CreateCalendarEvent = z.object({
 export async function registerCalendarRoutes(
   app: FastifyInstance,
   prisma: IntegrationPrisma,
-  calendar: ReturnType<typeof createGoogleCalendarService>
+  calendar: ReturnType<typeof createGoogleCalendarService>,
+  crypto: FieldCrypto
 ) {
   app.get(
     '/api/v1/integrations/calendar/events',
@@ -53,32 +64,34 @@ export async function registerCalendarRoutes(
     }
   );
 
-  app.post('/api/v1/integrations/calendar/events', async (request, reply) => {
-    const body = CreateCalendarEvent.parse(request.body);
-    const maybeUser = (request as unknown as { user?: { tenantId?: string; sub?: string } }).user;
-    const tenantId = body.tenantId ?? maybeUser?.tenantId ?? 'public';
-    const userId = body.userId ?? maybeUser?.sub ?? 'public';
+  app.post(
+    '/api/v1/integrations/calendar/events',
+    { preHandler: requirePermission(PERMISSIONS.INTEGRATIONS.MANAGE) },
+    async (request, reply) => {
+      const body = CreateCalendarEvent.parse(request.body);
+      const user = (request as unknown as { user: { tenantId: string; sub: string } }).user;
+      const tenantId = user.tenantId;
+      const userId = user.sub;
     const connection = await prisma.oAuthConnection.findFirst({
       where: { tenantId, userId, provider: 'google' },
     });
     let externalId = `local-${body.activityId}`;
     if (connection) {
-      const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${connection.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          summary: body.summary,
-          start: { dateTime: body.start },
-          end: { dateTime: body.end },
-          description: `activityId:${body.activityId}`,
-        }),
-      }).catch(() => null);
-      if (res?.ok) {
-        const created = (await res.json()) as { id?: string; etag?: string };
+      try {
+        const accessToken = crypto.decrypt(connection.accessToken);
+        const created = await calendarClient.post<{ id?: string; etag?: string }>(
+          '/calendars/primary/events',
+          {
+            summary: body.summary,
+            start: { dateTime: body.start },
+            end: { dateTime: body.end },
+            description: `activityId:${body.activityId}`,
+          },
+          { Authorization: `Bearer ${accessToken}` }
+        );
         externalId = created.id ?? externalId;
+      } catch (err: any) {
+        app.log.warn({ status: err?.status, statusText: err?.statusText }, 'Google Calendar API error');
       }
     }
     const data = await prisma.syncedCalendarEvent.upsert({

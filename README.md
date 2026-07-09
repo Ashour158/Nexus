@@ -1,6 +1,6 @@
 # NEXUS CRM
 
-NEXUS CRM is a microservices-first sales platform built as a pnpm monorepo with a Next.js frontend and TypeScript Fastify backend services. It includes CRM core flows, quoting/billing, cadences, approvals, analytics, reporting, portal, and operational tooling for production readiness.
+NEXUS CRM is a microservices-first sales platform built as a pnpm monorepo with a Next.js frontend and TypeScript Fastify backend services. It includes CRM core flows, CPQ/quoting, cadences, approvals, analytics, reporting, portal, and operational tooling for production readiness.
 
 ## Architecture Overview
 
@@ -11,7 +11,7 @@ NEXUS CRM is a microservices-first sales platform built as a pnpm monorepo with 
     |
  [ Next.js Web ] -----> [ Auth Service ]
     |
-    +--> [ CRM ] [ Finance ] [ Billing ] [ Workflow ] [ Reporting ]
+    +--> [ CRM ] [ Finance ] [ Workflow ] [ Reporting ]
     +--> [ Cadence ] [ Approval ] [ Knowledge ] [ Portal ] [ Document ]
     +--> [ Integration ] [ Storage ] [ Notification ] [ Realtime ]
                  |
@@ -58,7 +58,6 @@ pnpm dev            # Start all services in dev mode
 | analytics-service | 3008 | KPI and forecast analytics |
 | comm-service | 3009 | Outbound/inbound comm channels |
 | storage-service | 3010 | Object upload/download |
-| billing-service | 3011 | Plans, invoices, subscriptions |
 | integration-service | 3012 | OAuth/sync/calendar integrations |
 | blueprint-service | 3013 | Validation/playbooks |
 | approval-service | 3014 | Discount/policy approvals |

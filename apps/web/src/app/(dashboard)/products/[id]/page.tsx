@@ -1,43 +1,216 @@
 'use client';
 
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { apiClients } from '@/lib/api-client';
-
-interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  description?: string | null;
-  category?: string | null;
-  type: string;
-  listPrice: string | number;
-  currency: string;
-  isActive: boolean;
-}
+import { Button } from '@/components/ui/button';
+import { TableSkeleton } from '@/components/ui/skeleton';
+import { useProduct, useUpdateProduct } from '@/hooks/use-products';
+import { formatCurrency } from '@/lib/format';
+import { notify } from '@/lib/toast';
+import { useState, useEffect } from 'react';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function ProductDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? '';
-  const query = useQuery({ queryKey: ['product-detail', id], queryFn: () => apiClients.finance.get<Product>(`/products/${id}`), enabled: Boolean(id) });
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canRead = hasPermission('products:read');
+  const query = useProduct(id);
+  const updateMutation = useUpdateProduct();
   const p = query.data;
 
+  const [form, setForm] = useState({
+    name: '',
+    nameAr: '' as string | null,
+    description: '' as string | null,
+    descriptionAr: '' as string | null,
+    unitAr: '' as string | null,
+    category: '' as string | null,
+  });
+
+  useEffect(() => {
+    if (!p) return;
+    setForm({
+      name: p.name,
+      nameAr: p.nameAr ?? '',
+      description: p.description ?? '',
+      descriptionAr: p.descriptionAr ?? '',
+      unitAr: p.unitAr ?? '',
+      category: p.category ?? '',
+    });
+  }, [p]);
+
+  if (!canRead) {
+    return (
+      <main className="p-6">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          You do not have permission to view products.
+        </div>
+      </main>
+    );
+  }
+
+  if (query.isLoading) {
+    return (
+      <main className="p-6">
+        <TableSkeleton rows={6} cols={3} />
+      </main>
+    );
+  }
+
+  if (!p) {
+    return (
+      <main className="p-6">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Product not found.
+        </div>
+      </main>
+    );
+  }
+
+  function onSave() {
+    updateMutation.mutate(
+      {
+        id,
+        data: {
+          name: form.name,
+          nameAr: form.nameAr || undefined,
+          description: form.description || undefined,
+          descriptionAr: form.descriptionAr || undefined,
+          unitAr: form.unitAr || undefined,
+          category: form.category || undefined,
+        },
+      },
+      {
+        onSuccess: () => notify.success('Product saved'),
+        onError: (err) => notify.error('Failed to save product', err.message),
+      }
+    );
+  }
+
   return (
-    <main className="space-y-4 p-4">
-      <h1 className="text-2xl font-bold text-slate-900">Product {id}</h1>
-      {!p ? <p className="text-sm text-slate-500">{query.isLoading ? 'Loading...' : 'Not found.'}</p> : (
-        <>
-          <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-2 text-sm">
-            <h2 className="font-semibold">Product info</h2>
-            <p>Name: {p.name}</p><p>SKU: {p.sku}</p><p>Category: {p.category ?? '—'}</p><p>Type: {p.type}</p><p>Description: {p.description ?? '—'}</p>
-          </section>
-          <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-2 text-sm">
-            <h2 className="font-semibold">Pricing</h2>
-            <p>List price: {p.currency} {Number(p.listPrice).toFixed(2)}</p>
-            <button className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white">Add to deal</button>
-          </section>
-        </>
-      )}
+    <main className="mx-auto max-w-4xl space-y-6 p-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="text-sm text-slate-500">
+            <Link href="/products" className="hover:text-slate-800">
+              Products
+            </Link>
+            <span> / </span>
+            <span className="font-mono text-xs">{p.sku}</span>
+          </div>
+          <h1 className="mt-1 text-2xl font-bold text-slate-900">{p.name}</h1>
+          <p className="text-sm text-slate-600">
+            {p.category ?? 'Uncategorized'} Â· {p.currency}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={onSave} disabled={updateMutation.isPending}>
+            {updateMutation.isPending ? 'Savingâ€¦' : 'Save changes'}
+          </Button>
+        </div>
+      </header>
+
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric label="List Price" value={formatCurrency(Number(p.listPrice), p.currency)} />
+        <Metric label="Cost" value={formatCurrency(Number(p.cost ?? 0), p.currency)} />
+        <Metric label="SKU" value={p.sku} />
+        <Metric label="Status" value={p.isActive ?? true ? 'Active' : 'Archived'} />
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+        <h2 className="text-sm font-semibold text-slate-900">Product details</h2>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Name (EN)</label>
+            <input
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Name (AR)</label>
+            <input
+              dir="rtl"
+              value={form.nameAr ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, nameAr: e.target.value }))}
+              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Description (EN)</label>
+            <textarea
+              rows={3}
+              value={form.description ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Description (AR)</label>
+            <textarea
+              dir="rtl"
+              rows={3}
+              value={form.descriptionAr ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, descriptionAr: e.target.value }))}
+              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Category</label>
+            <input
+              value={form.category ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">List Price</label>
+            <input
+              disabled
+              value={`${p.currency} ${Number(p.listPrice).toFixed(2)}`}
+              className="w-full rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Unit (AR)</label>
+            <input
+              dir="rtl"
+              value={form.unitAr ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, unitAr: e.target.value }))}
+              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-6">
+        <h2 className="text-sm font-semibold text-slate-900">Related records</h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="rounded border border-slate-100 bg-slate-50 p-4">
+            <p className="text-xs font-medium uppercase text-slate-500">Quotes</p>
+            <p className="mt-1 text-sm text-slate-600">Quotes that include this product will be shown here.</p>
+          </div>
+          <div className="rounded border border-slate-100 bg-slate-50 p-4">
+            <p className="text-xs font-medium uppercase text-slate-500">Invoices</p>
+            <p className="mt-1 text-sm text-slate-600">Invoices that include this product will be shown here.</p>
+          </div>
+        </div>
+      </section>
     </main>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
+    </div>
   );
 }

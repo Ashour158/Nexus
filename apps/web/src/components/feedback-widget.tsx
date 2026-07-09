@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { EVENTS, trackEvent } from '@/lib/posthog';
 
 type FeedbackType = 'bug' | 'feature' | 'general';
@@ -39,6 +39,15 @@ export function FeedbackWidget() {
     }
   }
 
+  useEffect(() => {
+    if (!isOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setIsOpen(false);
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isOpen]);
+
   return (
     <>
       <button
@@ -53,7 +62,7 @@ export function FeedbackWidget() {
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-end p-6">
+        <div className="fixed inset-0 z-50 flex items-end justify-end p-6" role="dialog" aria-modal="true" aria-labelledby="feedback-title">
           <div className="fixed inset-0 bg-black/20" onClick={() => setIsOpen(false)} />
           <div className="relative w-full max-w-sm rounded-xl border border-gray-200 bg-white p-5 shadow-xl">
             {submitted ? (

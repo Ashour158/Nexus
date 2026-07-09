@@ -1,0 +1,6 @@
+apiVersion: v2
+name: nexus-document
+description: A Helm chart for nexus-document microservice
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

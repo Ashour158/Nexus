@@ -5,8 +5,10 @@ import { alsStore } from '../request-context.js';
 
 export function createTemplatesService(prisma: BlueprintPrisma) {
   return {
-    async list() {
-      return prisma.dealTemplate.findMany({ orderBy: { updatedAt: 'desc' } });
+    async list(opts: { page?: number; limit?: number } = {}) {
+      const page = Math.max(1, opts.page ?? 1);
+      const limit = Math.min(100, opts.limit ?? 50);
+      return prisma.dealTemplate.findMany({ orderBy: { updatedAt: 'desc' }, skip: (page - 1) * limit, take: limit });
     },
 
     async getById(id: string) {

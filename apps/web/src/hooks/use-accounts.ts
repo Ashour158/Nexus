@@ -17,7 +17,7 @@ import type {
   CreateAccountInput,
   UpdateAccountInput,
 } from '@nexus/validation';
-import { api } from '@/lib/api-client';
+import { api, apiClients } from '@/lib/api-client';
 
 /**
  * React Query hooks for the Accounts domain — Prompt 1.10.
@@ -59,6 +59,12 @@ interface ContactsForAccountFilters {
   page?: number;
 }
 
+interface CommercialForAccountFilters {
+  status?: string;
+  limit?: number;
+  page?: number;
+}
+
 interface TimelineFilters {
   /** Page size for infinite-scroll fetches. Defaults to 20. */
   pageSize?: number;
@@ -80,6 +86,10 @@ export const accountKeys = {
     [...accountKeys.detail(id), 'deals', filters] as const,
   contacts: (id: string, filters: Record<string, unknown> = {}) =>
     [...accountKeys.detail(id), 'contacts', filters] as const,
+  quotes: (id: string, filters: Record<string, unknown> = {}) =>
+    [...accountKeys.detail(id), 'quotes', filters] as const,
+  orders: (id: string, filters: Record<string, unknown> = {}) =>
+    [...accountKeys.detail(id), 'orders', filters] as const,
   health: (id: string) => [...accountKeys.detail(id), 'health'] as const,
 };
 
@@ -104,7 +114,9 @@ function normalizeFilters<T extends Record<string, unknown>>(
 export function useAccounts(filters: AccountListFilters = {}) {
   const params = normalizeFilters({
     page: filters.page ?? 1,
-    limit: filters.limit ?? 20,
+    // crm-service caps the accounts list at 100; callers that ask for more
+    // (e.g. picker dropdowns requesting 200) otherwise get a 422.
+    limit: Math.min(filters.limit ?? 20, 100),
     search: filters.search,
     ownerId: filters.ownerId,
     type: filters.type,
@@ -117,7 +129,7 @@ export function useAccounts(filters: AccountListFilters = {}) {
   return useQuery<PaginatedResult<Account>>({
     queryKey: accountKeys.list(params),
     queryFn: () =>
-      api.get<PaginatedResult<Account>>('/accounts', { params }),
+      apiClients.accounts.get<PaginatedResult<Account>>('/accounts', { params }),
     staleTime: 30_000,
     placeholderData: (prev) => prev,
   });
@@ -127,7 +139,7 @@ export function useAccounts(filters: AccountListFilters = {}) {
 export function useAccount(id: string) {
   return useQuery<Account>({
     queryKey: accountKeys.detail(id),
-    queryFn: () => api.get<Account>(`/accounts/${id}`),
+    queryFn: () => apiClients.accounts.get<Account>(`/accounts/${id}`),
     enabled: Boolean(id),
   });
 }
@@ -206,6 +218,48 @@ export function useAccountContacts(
   });
 }
 
+export function useAccountQuotes(
+  id: string,
+  filters: CommercialForAccountFilters = {}
+) {
+  const params = normalizeFilters({
+    page: filters.page ?? 1,
+    limit: filters.limit ?? 50,
+    status: filters.status,
+  });
+  return useQuery<PaginatedResult<Record<string, unknown>>>({
+    queryKey: accountKeys.quotes(id, params),
+    queryFn: () =>
+      api.get<PaginatedResult<Record<string, unknown>>>(`/accounts/${id}/quotes`, {
+        params,
+      }),
+    enabled: Boolean(id),
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function useAccountOrders(
+  id: string,
+  filters: CommercialForAccountFilters = {}
+) {
+  const params = normalizeFilters({
+    page: filters.page ?? 1,
+    limit: filters.limit ?? 50,
+    status: filters.status,
+  });
+  return useQuery<PaginatedResult<Record<string, unknown>>>({
+    queryKey: accountKeys.orders(id, params),
+    queryFn: () =>
+      api.get<PaginatedResult<Record<string, unknown>>>(`/accounts/${id}/orders`, {
+        params,
+      }),
+    enabled: Boolean(id),
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+  });
+}
+
 /** Composite account health snapshot (Section 32 / 34.2). */
 export function useAccountHealth(id: string) {
   return useQuery<AccountHealthInsight>({
@@ -222,7 +276,7 @@ export function useAccountHealth(id: string) {
 export function useCreateAccount() {
   const qc = useQueryClient();
   return useMutation<Account, Error, CreateAccountInput>({
-    mutationFn: (data) => api.post<Account>('/accounts', data),
+    mutationFn: (data) => apiClients.accounts.post<Account>('/accounts', data),
     onSuccess: (account) => {
       qc.setQueryData(accountKeys.detail(account.id), account);
       qc.invalidateQueries({ queryKey: accountKeys.lists() });
@@ -245,7 +299,7 @@ interface UpdateAccountContext {
 export function useUpdateAccount() {
   const qc = useQueryClient();
   return useMutation<Account, Error, UpdateAccountVars, UpdateAccountContext>({
-    mutationFn: ({ id, data }) => api.patch<Account>(`/accounts/${id}`, data),
+    mutationFn: ({ id, data }) => apiClients.accounts.patch<Account>(`/accounts/${id}`, data),
     onMutate: async ({ id, data }) => {
       await qc.cancelQueries({ queryKey: accountKeys.detail(id) });
       const previous = qc.getQueryData<Account>(accountKeys.detail(id));
@@ -276,7 +330,7 @@ export function useUpdateAccount() {
 export function useDeleteAccount() {
   const qc = useQueryClient();
   return useMutation<void, Error, string>({
-    mutationFn: (id) => api.delete<void>(`/accounts/${id}`),
+    mutationFn: (id) => apiClients.accounts.delete<void>(`/accounts/${id}`),
     onSuccess: (_d, id) => {
       qc.removeQueries({ queryKey: accountKeys.detail(id) });
       qc.invalidateQueries({ queryKey: accountKeys.lists() });

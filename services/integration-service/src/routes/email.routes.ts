@@ -49,7 +49,7 @@ export async function registerEmailRoutes(
       const res = await fetch(`${crmUrl}/api/v1/email-threads/${id}`, {
         headers: { Authorization: token },
       });
-      if (!res.ok) return reply.code(404).send({ success: false, error: 'Not found' });
+      if (!res.ok) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found', requestId: request.id } });
       return reply.send(await res.json());
     }
   );

@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { CheckCircle2, FileSpreadsheet, X } from 'lucide-react';
+import { ImportProgress } from '@/components/data/ImportProgress';
 
 interface FieldMapping {
   csvColumn: string;
@@ -31,6 +32,7 @@ export function CsvImportDialog({ onClose }: { onClose: () => void }) {
   const [fileName, setFileName] = useState('');
   const [importResult, setImportResult] = useState({ imported: 0, skipped: 0, errors: 0 });
   const [error, setError] = useState('');
+  const [importJobId, setImportJobId] = useState<string | null>(null);
 
   function parseCSV(text: string) {
     const lines = text.trim().split('\n');
@@ -56,14 +58,7 @@ export function CsvImportDialog({ onClose }: { onClose: () => void }) {
     }));
   }
 
-  const onDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (!file || !file.name.endsWith('.csv')) return;
-    readFile(file);
-  }, []);
-
-  function readFile(file: File) {
+  const readFile = useCallback((file: File) => {
     setFileName(file.name);
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -75,7 +70,17 @@ export function CsvImportDialog({ onClose }: { onClose: () => void }) {
       setStep('map');
     };
     reader.readAsText(file);
-  }
+  }, []);
+
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const file = e.dataTransfer.files[0];
+      if (!file || !file.name.endsWith('.csv')) return;
+      readFile(file);
+    },
+    [readFile]
+  );
 
   function updateMapping(index: number, nexusField: string) {
     setMappings((prev) => prev.map((m, i) => (i === index ? { ...m, nexusField } : m)));
@@ -106,17 +111,19 @@ export function CsvImportDialog({ onClose }: { onClose: () => void }) {
         )
       );
 
-      const res = await fetch('/api/contacts/import', { method: 'POST', body: formData });
-      const result = (await res.json()) as { imported?: number; errors?: unknown[]; error?: string };
+      const res = await fetch('/api/data/imports', { method: 'POST', body: formData });
+      const result = (await res.json()) as { jobId?: string; error?: string };
       if (!res.ok) {
         setError(result.error ?? 'Import failed');
         setStep('map');
         return;
       }
-      const imported = result.imported ?? 0;
-      const errorsCount = (result.errors ?? []).length;
-      setImportResult({ imported, skipped: Math.max(csvRows.length - imported, 0), errors: errorsCount });
-      setStep('done');
+      if (!result.jobId) {
+        setError('Import job was not created');
+        setStep('map');
+        return;
+      }
+      setImportJobId(result.jobId);
     } catch {
       setError('Import failed');
       setStep('map');
@@ -155,7 +162,9 @@ export function CsvImportDialog({ onClose }: { onClose: () => void }) {
                   }}
                 />
               </label>
-              <p className="mt-4 text-xs text-gray-400">Any column names are accepted - you'll map them next</p>
+              <p className="mt-4 text-xs text-gray-400">
+                Any column names are accepted — you&apos;ll map them next
+              </p>
             </div>
           ) : null}
 
@@ -200,6 +209,33 @@ export function CsvImportDialog({ onClose }: { onClose: () => void }) {
               <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
               <p className="font-medium text-gray-700">Importing contacts...</p>
               <p className="mt-1 text-sm text-gray-400">Checking for duplicates and validating emails</p>
+              {importJobId ? (
+                <div className="mt-5 text-start">
+                  <ImportProgress
+                    jobId={importJobId}
+                    onComplete={() => {
+                      void fetch(`/api/data/imports/${importJobId}`)
+                        .then((r) => r.json())
+                        .then((d) => {
+                          const job = d?.data;
+                          const imported = Number(job?.imported ?? 0);
+                          const errorsCount = Number(job?.failed ?? 0);
+                          setImportResult({
+                            imported,
+                            skipped: Math.max(csvRows.length - imported, 0),
+                            errors: errorsCount,
+                          });
+                          setStep('done');
+                          setImportJobId(null);
+                        })
+                        .catch(() => {
+                          setStep('done');
+                          setImportJobId(null);
+                        });
+                    }}
+                  />
+                </div>
+              ) : null}
             </div>
           ) : null}
 

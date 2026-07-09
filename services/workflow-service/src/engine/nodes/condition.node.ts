@@ -1,5 +1,5 @@
 import { BusinessRuleError } from '@nexus/service-utils';
-import type { ExecutionContext, NodeResult, WorkflowNode } from '../types.js';
+import type { ExecutionContext, NodeResult, WorkflowEdge, WorkflowNode } from '../types.js';
 
 const ALLOWED = new Set(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains']);
 
@@ -12,14 +12,13 @@ function readField(payload: Record<string, unknown>, path: string): unknown {
 
 export async function handleConditionNode(
   node: WorkflowNode,
-  context: ExecutionContext
+  context: ExecutionContext,
+  edges: WorkflowEdge[]
 ): Promise<NodeResult> {
   const cfg = (node.config ?? {}) as {
     field?: string;
     operator?: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains';
     value?: unknown;
-    trueNodeId?: string;
-    falseNodeId?: string;
   };
   const fieldValue = cfg.field ? readField(context.triggerPayload, cfg.field) : undefined;
   if (cfg.operator !== undefined && cfg.operator !== null && !ALLOWED.has(String(cfg.operator))) {
@@ -51,6 +50,7 @@ export async function handleConditionNode(
     default:
       matched = false;
   }
-  const nextNodeId = matched ? (cfg.trueNodeId ?? null) : (cfg.falseNodeId ?? null);
-  return { nextNodeId, output: { matched, field: cfg.field, operator: cfg.operator, value: cfg.value } };
+  const outgoing = edges.filter((e) => e.from === node.id);
+  const targetEdge = outgoing.find((e) => e.condition === (matched ? 'true' : 'false'));
+  return { nextNodeId: targetEdge?.to ?? null, output: { matched, field: cfg.field, operator: cfg.operator, value: cfg.value } };
 }

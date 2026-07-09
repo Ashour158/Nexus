@@ -1,0 +1,146 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  playbooks(limit: Int, offset: Int): [Playbook!]!
+  playbook(id: ID!): Playbook
+  playbookStages(playbookId: ID!): [PlaybookStage!]!
+  dealTemplates(limit: Int, offset: Int): [DealTemplate!]!
+  dealTemplate(id: ID!): DealTemplate
+  stageTransitionRules(limit: Int, offset: Int): [StageTransitionRule!]!
+  stageTransitionRule(id: ID!): StageTransitionRule
+}
+
+type Mutation {
+  createPlaybook(input: CreatePlaybookInput!): Playbook!
+  updatePlaybook(id: ID!, input: UpdatePlaybookInput!): Playbook!
+  deletePlaybook(id: ID!): Boolean!
+  createPlaybookStage(input: CreatePlaybookStageInput!): PlaybookStage!
+  updatePlaybookStage(id: ID!, input: UpdatePlaybookStageInput!): PlaybookStage!
+  deletePlaybookStage(id: ID!): Boolean!
+  createDealTemplate(input: CreateDealTemplateInput!): DealTemplate!
+  updateDealTemplate(id: ID!, input: UpdateDealTemplateInput!): DealTemplate!
+  deleteDealTemplate(id: ID!): Boolean!
+  createStageTransitionRule(input: CreateStageTransitionRuleInput!): StageTransitionRule!
+  updateStageTransitionRule(id: ID!, input: UpdateStageTransitionRuleInput!): StageTransitionRule!
+  deleteStageTransitionRule(id: ID!): Boolean!
+}
+
+type Playbook @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  description: String
+  pipelineId: String
+  isActive: Boolean!
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  stages: [PlaybookStage!]!
+}
+
+type PlaybookStage @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  playbookId: String!
+  playbook: Playbook
+  stageId: String!
+  stageName: String!
+  position: Int!
+  entryActions: JSON!
+  exitCriteria: JSON!
+  requiredFields: [String!]!
+  talkingPoints: [String!]!
+  resources: JSON!
+}
+
+type DealTemplate @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  description: String
+  pipelineId: String
+  fields: JSON!
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type StageTransitionRule @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  pipelineId: String!
+  fromStageId: String!
+  toStageId: String!
+  rules: JSON!
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+input CreatePlaybookInput {
+  tenantId: String!
+  name: String!
+  description: String
+  pipelineId: String
+}
+
+input UpdatePlaybookInput {
+  name: String
+  description: String
+  pipelineId: String
+  isActive: Boolean
+}
+
+input CreatePlaybookStageInput {
+  tenantId: String!
+  playbookId: String!
+  stageId: String!
+  stageName: String!
+  position: Int!
+  entryActions: JSON
+  exitCriteria: JSON
+  requiredFields: [String!]
+  talkingPoints: [String!]
+  resources: JSON
+}
+
+input UpdatePlaybookStageInput {
+  stageName: String
+  position: Int
+  entryActions: JSON
+  exitCriteria: JSON
+  requiredFields: [String!]
+  talkingPoints: [String!]
+  resources: JSON
+}
+
+input CreateDealTemplateInput {
+  tenantId: String!
+  name: String!
+  description: String
+  pipelineId: String
+  fields: JSON
+}
+
+input UpdateDealTemplateInput {
+  name: String
+  description: String
+  pipelineId: String
+  fields: JSON
+}
+
+input CreateStageTransitionRuleInput {
+  tenantId: String!
+  pipelineId: String!
+  fromStageId: String!
+  toStageId: String!
+  rules: JSON!
+}
+
+input UpdateStageTransitionRuleInput {
+  rules: JSON
+}

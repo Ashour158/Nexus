@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import type { JwtPayload } from '@nexus/shared-types';
 import { PERMISSIONS, requirePermission, ValidationError } from '@nexus/service-utils';
 import {
@@ -9,6 +10,7 @@ import {
   UserListQuerySchema,
 } from '@nexus/validation';
 import type { AuthPrisma } from '../prisma.js';
+import type { UnifiedAuditLogger } from '../lib/unified-audit.js';
 import { createUsersService } from '../services/users.service.js';
 
 /**
@@ -16,7 +18,8 @@ import { createUsersService } from '../services/users.service.js';
  */
 export async function registerUsersRoutes(
   app: FastifyInstance,
-  prisma: AuthPrisma
+  prisma: AuthPrisma,
+  unifiedAudit: UnifiedAuditLogger
 ): Promise<void> {
   const users = createUsersService(prisma);
 
@@ -64,16 +67,8 @@ export async function registerUsersRoutes(
         }
       );
 
-      r.get(
-        '/users/:id/permissions',
-        { preHandler: requirePermission(PERMISSIONS.USERS.READ) },
-        async (request, reply) => {
-          const { id } = IdParamSchema.parse(request.params);
-          const jwt = request.user as JwtPayload;
-          const permissions = await users.getUserPermissions(jwt.tenantId, id);
-          return reply.send({ success: true, data: permissions });
-        }
-      );
+      // NOTE: GET /users/:id/permissions is registered in permissions.routes.ts
+      // (with Redis caching). Kept there to avoid a duplicate-route registration.
 
       r.patch(
         '/users/:id/roles',
@@ -99,6 +94,16 @@ export async function registerUsersRoutes(
               userAgent: request.headers['user-agent'],
             },
           });
+          void unifiedAudit.log({
+            tenantId: jwt.tenantId,
+            actorId: jwt.sub,
+            action: 'UPDATE',
+            resource: 'UserRoles',
+            resourceId: id,
+            metadata: { newValue: { roleIds: parsed.data.roleIds } },
+            ipAddress: request.ip,
+            userAgent: request.headers['user-agent'],
+          });
           return reply.send({ success: true, data: row });
         }
       );
@@ -121,7 +126,7 @@ export async function registerUsersRoutes(
               timezone: true,
             },
           });
-          if (!user) return reply.code(404).send({ success: false, error: 'Rep not found' });
+          if (!user) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Rep not found', requestId: request.id } });
           const slots: string[] = [];
           const cursor = new Date();
           cursor.setHours(9, 0, 0, 0);
@@ -206,4 +211,17 @@ export async function registerUsersRoutes(
     },
     { prefix: '/api/v1' }
   );
+
+  // Public booking token validation (used by CRM scheduler)
+  app.get('/api/v1/users/by-booking-token/:token', async (request, reply) => {
+    const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
+    const user = await prisma.user.findFirst({
+      where: { bookingToken: token, isActive: true },
+      select: { id: true, tenantId: true, firstName: true, lastName: true, email: true, timezone: true },
+    });
+    if (!user) {
+      return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Invalid booking token', requestId: request.id } });
+    }
+    return reply.send({ success: true, data: user });
+  });
 }

@@ -1,0 +1,36 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: generate-slsa-provenance
+  namespace: nexus
+spec:
+  params:
+    - name: image
+      type: string
+    - name: digest
+      type: string
+  steps:
+    - name: generate-provenance
+      image: gcr.io/projectsigstore/cosign:v2.2.0
+      script: |
+        cosign attest \
+          --predicate <(echo '{
+            "_type": "https://in-toto.io/Statement/v0.1",
+            "predicateType": "https://slsa.dev/provenance/v0.2",
+            "subject": [{
+              "name": "$(params.image)",
+              "digest": {"sha256": "$(params.digest)"}
+            }],
+            "predicate": {
+              "builder": {"id": "https://github.com/nexus-crm/nexus-crm"},
+              "buildType": "https://tekton.dev/attestations/chains@v2",
+              "invocation": {
+                "configSource": {
+                  "uri": "https://github.com/nexus-crm/nexus-crm",
+                  "digest": {"sha1": "$(git rev-parse HEAD)"}
+                }
+              }
+            }
+          }') \
+          --type slsaprovenance \
+          $(params.image)@$(params.digest)

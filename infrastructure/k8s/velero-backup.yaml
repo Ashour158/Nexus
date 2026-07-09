@@ -1,0 +1,30 @@
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: nexus-daily-backup
+  namespace: velero
+spec:
+  schedule: "0 2 * * *"
+  template:
+    includedNamespaces:
+      - nexus
+      - nexus-monitoring
+    excludedResources:
+      - events
+      - pods
+    ttl: 720h0m0s
+    storageLocation: default
+    volumeSnapshotLocations:
+      - aws-default
+---
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: default
+  namespace: velero
+spec:
+  provider: aws
+  objectStorage:
+    bucket: nexus-crm-velero-backups
+  config:
+    region: us-east-1

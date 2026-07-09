@@ -2,12 +2,27 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Gauge, GitMerge, ShieldCheck } from 'lucide-react';
 
 const TABS = [
-  { href: '/settings/pipelines', label: 'Pipelines' },
-  { href: '/settings/users', label: 'Users' },
   { href: '/settings/profile', label: 'Profile' },
+  { href: '/settings/company', label: 'Company' },
+  { href: '/settings/org-structure', label: 'Org Structure' },
+  { href: '/settings/integrations', label: 'Integrations' },
+  { href: '/settings/users', label: 'Users' },
+  { href: '/settings/pipelines', label: 'Pipelines' },
+  { href: '/settings/data-privacy', label: 'Data Privacy' },
+  { href: '/settings/gdpr', label: 'GDPR' },
+  { href: '/settings/duplicates', label: 'Duplicate Records', icon: GitMerge },
+  { href: '/settings/data-quality', label: 'Data Quality', icon: Gauge },
+  { href: '/settings/sso', label: 'Single Sign-On' },
   { href: '/settings/workflows', label: 'Workflows' },
+  { href: '/settings/quote-automation', label: 'Quote Automation' },
+  { href: '/settings/scoring-rules', label: 'Scoring Rules' },
+  { href: '/settings/custom-fields', label: 'Custom Fields' },
+  { href: '/settings/field-permissions', label: 'Field Permissions', icon: ShieldCheck },
+  { href: '/settings/notifications', label: 'Notifications' },
+  { href: '/settings/migration', label: 'Migration' },
 ];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
@@ -25,7 +40,10 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
                 : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
             }`}
           >
-            {tab.label}
+            <span className="inline-flex items-center gap-1.5">
+              {'icon' in tab && tab.icon ? <tab.icon className="h-3.5 w-3.5" /> : null}
+              {tab.label}
+            </span>
           </Link>
         ))}
       </nav>

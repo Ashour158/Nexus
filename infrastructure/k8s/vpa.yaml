@@ -1,0 +1,25 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: nexus-crm-vpa
+  namespace: nexus
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nexus-crm
+  # Use "Initial" to apply recommendations only at pod creation.
+  # "Auto" can evict pods at any time and is dangerous for stateful or latency-sensitive workloads.
+  updatePolicy:
+    updateMode: "Initial"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: '*'
+        minAllowed:
+          cpu: 50m
+          memory: 64Mi
+        maxAllowed:
+          cpu: 4000m
+          memory: 8Gi
+        controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsAndLimits

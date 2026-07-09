@@ -14,8 +14,11 @@ export class NexusError extends Error {
 }
 
 export class NotFoundError extends NexusError {
-  constructor(resource: string, id: string) {
-    super('NOT_FOUND', `${resource} '${id}' not found`, 404);
+  constructor(resource: string, id?: string) {
+    // Two call conventions are in use: NotFoundError('Account', id) →
+    // "Account '<id>' not found", and NotFoundError('Subscription not found')
+    // where the caller passes a complete message. Support both.
+    super('NOT_FOUND', id ? `${resource} '${id}' not found` : resource, 404);
   }
 }
 
@@ -61,7 +64,11 @@ export function globalErrorHandler(
   request: FastifyRequest,
   reply: FastifyReply
 ): void {
-  if (!error.statusCode || error.statusCode >= 500) {
+  const isZodError =
+    (error as { name?: string }).name === 'ZodError' &&
+    Array.isArray((error as { issues?: unknown }).issues);
+  // ZodError is malformed client input (→ 400), never a server fault; skip Sentry.
+  if (!isZodError && (!error.statusCode || error.statusCode >= 500)) {
     Sentry.captureException(error, {
       extra: {
         url: request.url,
@@ -76,8 +83,31 @@ export function globalErrorHandler(
   if (error instanceof NexusError) {
     reply.code(error.statusCode).send({
       success: false,
-      error: error.code,
-      message: error.message,
+      error: {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        requestId: request.id,
+      },
+    });
+    return;
+  }
+
+  // Raw ZodError from manual `Schema.parse(request.params/body/query)` inside a
+  // handler (as opposed to Fastify schema validation, handled via
+  // `error.validation` below). Detected by shape rather than `instanceof` so it
+  // survives multiple zod copies hoisted under pnpm. Malformed client input is a
+  // 400 — NOT a 500 — and must not be reported to Sentry as a server error.
+  const zodIssues = (error as { name?: string; issues?: unknown }).issues;
+  if ((error as { name?: string }).name === 'ZodError' && Array.isArray(zodIssues)) {
+    reply.code(400).send({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Validation failed',
+        details: zodIssues,
+        requestId: request.id,
+      },
     });
     return;
   }
@@ -85,8 +115,11 @@ export function globalErrorHandler(
   if ((error as { code?: string }).code === 'P2002') {
     reply.code(409).send({
       success: false,
-      error: 'CONFLICT',
-      message: 'Resource already exists',
+      error: {
+        code: 'CONFLICT',
+        message: 'Resource already exists',
+        requestId: request.id,
+      },
     });
     return;
   }
@@ -94,8 +127,11 @@ export function globalErrorHandler(
   if ((error as { code?: string }).code === 'P2025') {
     reply.code(404).send({
       success: false,
-      error: 'NOT_FOUND',
-      message: 'Record not found',
+      error: {
+        code: 'NOT_FOUND',
+        message: 'Record not found',
+        requestId: request.id,
+      },
     });
     return;
   }
@@ -103,15 +139,21 @@ export function globalErrorHandler(
   if (error.validation) {
     reply.code(422).send({
       success: false,
-      error: 'VALIDATION_ERROR',
-      message: 'Validation failed',
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Validation failed',
+        requestId: request.id,
+      },
     });
     return;
   }
 
   reply.code(500).send({
     success: false,
-    error: 'INTERNAL_ERROR',
-    message: 'An unexpected error occurred',
+    error: {
+      code: 'INTERNAL_ERROR',
+      message: 'An unexpected error occurred',
+      requestId: request.id,
+    },
   });
 }

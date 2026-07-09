@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("COMM_DATABASE_URL")
 }
 
 model EmailTemplate {
@@ -22,6 +22,7 @@ model EmailTemplate {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 model SmsTemplate {
@@ -35,6 +36,7 @@ model SmsTemplate {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 model EmailSequence {
@@ -48,6 +50,7 @@ model EmailSequence {
   createdAt    DateTime               @default(now())
 
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 model SequenceStep {
@@ -75,9 +78,10 @@ model SequenceEnrollment {
   @@index([tenantId])
   @@index([status, nextSendAt])
   @@index([sequenceId])
+  @@unique([id, tenantId])
 }
 
-model OutboxMessage {
+model CommOutbox {
   id           String    @id @default(cuid())
   tenantId     String
   channel      String
@@ -86,6 +90,9 @@ model OutboxMessage {
   body         String    @db.Text
   status       String    @default("QUEUED")
   templateId   String?
+  /// Optional per-user MailAccount to send THROUGH (SMTP/OAuth of the user's own
+  /// mail provider). Null → send via the global/system SMTP transport.
+  mailAccountId String?
   entityType   String?
   entityId     String?
   sentAt       DateTime?
@@ -96,4 +103,124 @@ model OutboxMessage {
 
   @@index([tenantId])
   @@index([tenantId, status])
+  @@unique([id, tenantId])
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
+}
+
+/// CTI telephony call log (click-to-call + automatic call logging).
+/// One row per placed/received call; updated by the provider status webhook.
+model CallLog {
+  id              String    @id @default(cuid())
+  tenantId        String
+  provider        String    @default("twilio")
+  providerCallSid String?
+  direction       String    @default("OUTBOUND")
+  fromNumber      String
+  toNumber        String
+  agentUserId     String
+  contactId       String?
+  dealId          String?
+  accountId       String?
+  status          String    @default("INITIATED")
+  outcome         String?
+  durationSec     Int?
+  recordingUrl    String?
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, contactId])
+  @@index([providerCallSid])
+  @@unique([id, tenantId])
+}
+
+/// WhatsApp Business API outbound/inbound thread (Prompt 32).
+model WhatsAppMessage {
+  id          String   @id @default(cuid())
+  tenantId    String
+  contactId   String?
+  dealId      String?
+  direction   String
+  /// WhatsApp Phone Number ID or sender id (outbound metadata).
+  from        String
+  to          String
+  body        String   @db.Text
+  status      String
+  externalId  String?
+  sentBy      String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, contactId])
+  @@index([externalId])
+  @@unique([id, tenantId])
+}
+
+/// Per-user / per-tenant mail-provider account. Lets a user register their OWN
+/// mail account (SMTP/IMAP creds or an OAuth Gmail/Outlook token) so outbound
+/// email can be sent FROM their address instead of the global system SMTP.
+///
+/// Secrets are NEVER stored in cleartext: SMTP passwords and OAuth tokens are
+/// encrypted at rest with AES-256-GCM (same field-crypto mechanism as
+/// integration-service) using the platform ENCRYPTION_MASTER_KEY. API responses
+/// always mask them.
+model MailAccount {
+  id          String    @id @default(cuid())
+  tenantId    String
+  /// Owner (JWT sub). A user manages only their own accounts.
+  userId      String
+  /// SMTP | GMAIL | OUTLOOK
+  provider    String    @default("SMTP")
+  displayName String
+  fromEmail   String
+  fromName    String?
+  isDefault   Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  /// Set when a successful connection test (SMTP verify / OAuth token check) ran.
+  verifiedAt  DateTime?
+  /// Last verify/send error, surfaced to the UI. Cleared on success.
+  lastError   String?
+
+  // ── SMTP provider config (encrypted secret) ──────────────────────────────
+  smtpHost        String?
+  smtpPort        Int?
+  smtpSecure      Boolean?
+  smtpUsername    String?
+  /// AES-256-GCM encrypted SMTP password blob (base64url iv|tag|ciphertext).
+  smtpPasswordEnc String?   @db.Text
+
+  // ── OAuth provider config (encrypted tokens) — Gmail / Outlook ───────────
+  /// AES-256-GCM encrypted OAuth access token blob.
+  oauthAccessTokenEnc  String?   @db.Text
+  /// AES-256-GCM encrypted OAuth refresh token blob.
+  oauthRefreshTokenEnc String?   @db.Text
+  oauthExpiresAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, userId])
+  @@unique([tenantId, userId, fromEmail])
+  @@unique([id, tenantId])
 }

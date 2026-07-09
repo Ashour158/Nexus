@@ -1,87 +1,29 @@
-'use client';
+﻿'use client';
 
-import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-
-type ExportRow = { id: string; requestedAt: string; status: 'PENDING' | 'PROCESSING' | 'READY'; expiresAt?: string };
-type ConsentRow = { id: string; name: string; consent: string; updatedAt: string; audit: string };
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useAuthStore } from '@/stores/auth.store';
+import { notify } from '@/lib/toast';
+import { ShieldAlert } from 'lucide-react';
 
 export default function DataPrivacyPage() {
-  const [contactQuery, setContactQuery] = useState('');
-  const [residencyRegion, setResidencyRegion] = useState('eu-central-1');
+  const token = useAuthStore((s) => s.accessToken);
+  const roles = useAuthStore((s) => s.roles);
+  const role = roles[0]?.toLowerCase() ?? '';
+  const [transferFrom, setTransferFrom] = useState('');
+  const [transferTo, setTransferTo] = useState('');
+  const [modules, setModules] = useState<string[]>(['all']);
+  const [gdprEmail, setGdprEmail] = useState('');
+  const [gdprReason, setGdprReason] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
 
-  const exportsQuery = useQuery({
-    queryKey: ['privacy-exports'],
-    queryFn: async () => {
-      const res = await fetch('/api/privacy/exports');
-      return (await res.json()) as { data: ExportRow[] };
-    },
-  });
+  const { data: teamData } = useQuery({ queryKey: ['team'], queryFn: () => fetch('/api/auth/profile/team', { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()) });
 
-  const requestExport = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/privacy/exports', { method: 'POST' });
-      return (await res.json()) as { data: ExportRow };
-    },
-    onSuccess: () => exportsQuery.refetch(),
-  });
+  const transfer = useMutation({ mutationFn: () => fetch('/api/auth/data-ownership/transfer', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ fromUserId: transferFrom, toUserId: transferTo, modules }) }).then((r) => r.json()), onSuccess: (res) => res.success ? notify.success(res.message || 'Transfer initiated') : notify.error('Transfer failed', res.error) });
+  const gdprErase = useMutation({ mutationFn: () => fetch('/api/auth/data-ownership/gdpe-erasure', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ contactEmail: gdprEmail, reason: gdprReason }) }).then((r) => r.json()), onSuccess: (res) => res.success ? notify.success(res.message || 'Erasure request submitted') : notify.error('Request failed', res.error) });
 
-  const erasure = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/privacy/erasure', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: contactQuery }),
-      });
-      return (await res.json()) as { data: { certificatePdfUrl: string } };
-    },
-  });
+  if (role !== 'admin') return <div className="flex flex-col items-center justify-center py-20"><ShieldAlert className="mb-4 h-12 w-12 text-gray-300" /><h2 className="text-lg font-semibold text-gray-500">Admin Access Required</h2></div>;
 
-  const consents = useQuery({
-    queryKey: ['privacy-consents'],
-    queryFn: async () => {
-      const res = await fetch('/api/privacy/consents');
-      return (await res.json()) as { data: ConsentRow[] };
-    },
-  });
+  const users = (teamData?.data || []) as Array<{ id: string; firstName: string; lastName: string; email: string }>;
 
-  const exportRows = exportsQuery.data?.data ?? [];
-
-  return (
-    <main className="max-w-5xl space-y-4 p-4">
-      <h1 className="text-2xl font-bold text-slate-900">GDPR & Data Privacy</h1>
-
-      <section className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="font-semibold">My data export (Art. 20)</h2>
-        <p className="text-sm text-slate-600">Includes contacts, deals, activities, emails, notes and attachments. ZIP with JSON + CSV summary.</p>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => requestExport.mutate()} className="rounded bg-blue-600 px-3 py-2 text-sm text-white" disabled={requestExport.isPending}>Request export</button>
-          <span className="rounded bg-slate-100 px-2 py-1 text-sm">Status: {exportRows[0]?.status ?? 'PENDING'}</span>
-          {exportRows[0]?.status === 'READY' ? <button className="rounded border border-slate-300 px-3 py-2 text-sm">Download (expires in 24h)</button> : null}
-        </div>
-        <ul className="text-sm text-slate-600">{exportRows.map((row) => <li key={row.id}>{new Date(row.requestedAt).toLocaleString()} - {row.status} {row.expiresAt ? `(expires ${new Date(row.expiresAt).toLocaleString()})` : ''}</li>)}</ul>
-      </section>
-
-      <section className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="font-semibold">Right to erasure (Art. 17)</h2>
-        <input value={contactQuery} onChange={(e) => setContactQuery(e.target.value)} placeholder="Search contact" className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
-        <p className="text-sm text-slate-600">Records found for {contactQuery || 'selected contact'}: deals, activities, notes, documents.</p>
-        <button onClick={() => erasure.mutate()} className="rounded border border-red-300 px-3 py-2 text-sm text-red-700" disabled={!contactQuery.trim() || erasure.isPending}>Erase all data</button>
-        {erasure.data?.data?.certificatePdfUrl ? <p className="text-xs text-slate-500">Certificate: {erasure.data.data.certificatePdfUrl}</p> : null}
-      </section>
-
-      <section className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="font-semibold">Consent management</h2>
-        <button className="rounded border border-slate-300 px-3 py-2 text-sm">Bulk update consent from CSV</button>
-        <table className="min-w-full text-sm"><thead className="text-left text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-2 py-2">Contact</th><th className="px-2 py-2">Consent</th><th className="px-2 py-2">Audit trail</th></tr></thead><tbody>{(consents.data?.data ?? []).map((row) => <tr key={row.id} className="border-t border-slate-100"><td className="px-2 py-2">{row.name}</td><td className="px-2 py-2">{row.consent}</td><td className="px-2 py-2">{row.audit} ({new Date(row.updatedAt).toLocaleDateString()})</td></tr>)}</tbody></table>
-      </section>
-
-      <section className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="font-semibold">Data residency (admin)</h2>
-        <p className="text-sm">Region: <strong>{residencyRegion}</strong></p>
-        <select value={residencyRegion} onChange={(e) => setResidencyRegion(e.target.value)} className="rounded border border-slate-300 px-3 py-2 text-sm"><option>eu-central-1</option><option>us-east-1</option><option>me-central-1</option></select>
-        <div className="grid gap-2 text-sm md:grid-cols-2"><label className="block">Leads retention (days)<input defaultValue={365} className="mt-1 w-full rounded border border-slate-300 px-3 py-2" /></label><label className="block">Closed deals retention (days)<input defaultValue={2555} className="mt-1 w-full rounded border border-slate-300 px-3 py-2" /></label><label className="block">Emails retention (days)<input defaultValue={730} className="mt-1 w-full rounded border border-slate-300 px-3 py-2" /></label><label className="block">Call logs retention (days)<input defaultValue={365} className="mt-1 w-full rounded border border-slate-300 px-3 py-2" /></label></div>
-      </section>
-    </main>
-  );
-}
+  return <div className="mx-auto max-w-3xl space-y-8 px-4 py-6"><div><h1 className="text-2xl font-bold text-gray-900">Data Ownership & Privacy</h1></div><div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"><div className="grid grid-cols-2 gap-4"><select value={transferFrom} onChange={(e) => setTransferFrom(e.target.value)} className="rounded-lg border px-3 py-2 text-sm"><option value="">Transfer FROM</option>{users.map((u) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}</select><select value={transferTo} onChange={(e) => setTransferTo(e.target.value)} className="rounded-lg border px-3 py-2 text-sm"><option value="">Transfer TO</option>{users.filter((u) => u.id !== transferFrom).map((u) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}</select></div><div className="mt-3 flex flex-wrap gap-2">{['all', 'contacts', 'deals', 'leads', 'accounts', 'activities'].map((mod) => <button key={mod} type="button" onClick={() => { if (mod === 'all') setModules(['all']); else setModules((prev) => prev.includes(mod) ? prev.filter((m) => m !== mod && m !== 'all') : [...prev.filter((m) => m !== 'all'), mod]); }} className={`rounded-lg px-3 py-1.5 text-sm ${modules.includes(mod) || (mod !== 'all' && modules.includes('all')) ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>{mod}</button>)}</div><button onClick={() => transfer.mutate()} disabled={!transferFrom || !transferTo} className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">{transfer.isPending ? 'Initiating transfer...' : 'Transfer Records'}</button></div><div className="rounded-2xl border border-red-200 bg-white p-6 shadow-sm"><input type="email" value={gdprEmail} onChange={(e) => setGdprEmail(e.target.value)} placeholder="person@example.com" className="w-full rounded-lg border px-3 py-2 text-sm" /><textarea value={gdprReason} onChange={(e) => setGdprReason(e.target.value)} rows={2} placeholder="Reason" className="mt-3 w-full resize-none rounded-lg border px-3 py-2 text-sm" /><label className="mt-3 flex items-start gap-3"><input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} /><span className="text-sm text-gray-600">I confirm this erasure is legally required and irreversible.</span></label><button onClick={() => gdprErase.mutate()} disabled={!gdprEmail || !confirmed} className="mt-4 w-full rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">{gdprErase.isPending ? 'Submitting...' : 'Submit Erasure Request'}</button></div></div>;}

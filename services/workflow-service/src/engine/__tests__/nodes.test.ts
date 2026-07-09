@@ -13,7 +13,7 @@ describe('handleConditionNode', () => {
     currentNodeId: 'n1',
   };
 
-  it('returns trueNodeId when condition evaluates to true', async () => {
+  it('returns true edge when condition evaluates to true', async () => {
     const res = await handleConditionNode(
       {
         id: 'c1',
@@ -22,16 +22,18 @@ describe('handleConditionNode', () => {
           field: 'amount',
           operator: 'gt',
           value: 50,
-          trueNodeId: 'yes',
-          falseNodeId: 'no',
         },
       },
-      ctx
+      ctx,
+      [
+        { from: 'c1', to: 'yes', condition: 'true' },
+        { from: 'c1', to: 'no', condition: 'false' },
+      ]
     );
     expect(res.nextNodeId).toBe('yes');
   });
 
-  it('returns falseNodeId when condition evaluates to false', async () => {
+  it('returns false edge when condition evaluates to false', async () => {
     const res = await handleConditionNode(
       {
         id: 'c1',
@@ -40,11 +42,13 @@ describe('handleConditionNode', () => {
           field: 'amount',
           operator: 'lt',
           value: 50,
-          trueNodeId: 'yes',
-          falseNodeId: 'no',
         },
       },
-      ctx
+      ctx,
+      [
+        { from: 'c1', to: 'yes', condition: 'true' },
+        { from: 'c1', to: 'no', condition: 'false' },
+      ]
     );
     expect(res.nextNodeId).toBe('no');
   });
@@ -52,7 +56,8 @@ describe('handleConditionNode', () => {
   it('supports eq/neq/gt/lt/contains operators', async () => {
     const eq = await handleConditionNode(
       { id: 'c', type: 'CONDITION', config: { field: 'name', operator: 'eq', value: 'Acme' } },
-      ctx
+      ctx,
+      [{ from: 'c', to: 'next', condition: 'true' }]
     );
     expect(eq.output?.matched).toBe(true);
 
@@ -62,7 +67,8 @@ describe('handleConditionNode', () => {
         type: 'CONDITION',
         config: { field: 'name', operator: 'contains', value: 'cm' },
       },
-      ctx
+      ctx,
+      [{ from: 'c', to: 'next', condition: 'true' }]
     );
     expect(contains.output?.matched).toBe(true);
   });
@@ -75,7 +81,8 @@ describe('handleConditionNode', () => {
           type: 'CONDITION',
           config: { field: 'amount', operator: 'bogus' as never, value: 1 },
         },
-        ctx
+        ctx,
+        [{ from: 'c', to: 'next', condition: 'true' }]
       )
     ).rejects.toBeInstanceOf(BusinessRuleError);
   });
@@ -94,9 +101,11 @@ describe('handleWaitNode', () => {
     const before = Date.now();
     const res = await handleWaitNode(
       { id: 'w', type: 'WAIT', config: { delayDays: 2 } },
-      ctx
+      ctx,
+      [{ from: 'w', to: 'next' }]
     );
     expect(res.pauseUntil).toBeDefined();
+    expect(res.nextNodeId).toBe('next');
     expect(res.output?.status).toBe('PAUSED');
     const resume = new Date(String(res.output?.resumeAt)).getTime();
     expect(resume).toBeGreaterThanOrEqual(before + 2 * 86400_000 - 1000);
@@ -106,7 +115,8 @@ describe('handleWaitNode', () => {
     const before = Date.now();
     const res = await handleWaitNode(
       { id: 'w', type: 'WAIT', config: { delayDays: 5, delayHours: 1 } },
-      ctx
+      ctx,
+      [{ from: 'w', to: 'next' }]
     );
     const resume = new Date(String(res.output?.resumeAt)).getTime();
     expect(resume - before).toBeLessThan(5 * 86400_000);

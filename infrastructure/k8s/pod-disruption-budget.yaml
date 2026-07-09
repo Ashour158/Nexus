@@ -1,0 +1,11 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nexus-crm-pdb
+  namespace: nexus
+spec:
+  # With 3+ replicas, ensure at least 2 are available during disruptions
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nexus-crm

@@ -1,0 +1,309 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/metadata-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("METADATA_DATABASE_URL")
+}
+
+model CustomFieldDefinition {
+  id         String   @id @default(cuid())
+  tenantId   String
+  entityType String
+  name       String
+  apiKey     String
+  fieldType  String
+  options    Json     @default("[]")
+  required   Boolean  @default(false)
+  showOnCard Boolean  @default(false)
+  position   Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantId, entityType, apiKey])
+  @@index([tenantId, entityType])
+  @@unique([id, tenantId])
+}
+
+model FieldPermission {
+  id           String   @id @default(cuid())
+  tenantId     String
+  objectType   String
+  fieldName    String
+  allowedRoles Json
+  createdAt    DateTime @default(now())
+
+  @@unique([tenantId, objectType, fieldName])
+  @@index([tenantId, objectType])
+  @@unique([id, tenantId])
+}
+
+model ValidationRule {
+  id           String   @id @default(cuid())
+  tenantId     String
+  objectType   String
+  name         String
+  condition    Json
+  requirement  Json
+  errorMessage String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, objectType])
+  @@unique([id, tenantId])
+}
+
+model FieldChangeLog {
+  id             String   @id @default(cuid())
+  tenantId       String
+  objectType     String
+  objectId       String
+  fieldName      String
+  oldValue       String?
+  newValue       String?
+  changedBy      String
+  changedByName  String?
+  changedAt      DateTime @default(now())
+
+  @@index([tenantId, objectType, objectId])
+  @@index([tenantId, changedAt])
+  @@unique([id, tenantId])
+}
+
+model DuplicateGroup {
+  id             String            @id @default(cuid())
+  tenantId       String
+  entityType     String
+  status         String            @default("pending")
+  masterRecordId String?
+  createdAt      DateTime          @default(now())
+  resolvedAt     DateTime?
+  resolvedBy     String?
+  records        DuplicateRecord[]
+
+  @@index([tenantId, entityType, status])
+  @@unique([id, tenantId])
+}
+
+model Tag {
+  id         String   @id @default(cuid())
+  tenantId   String
+  name       String
+  color      String   @default("#6B7280")
+  entityType String?
+  usageCount Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, entityType])
+  @@unique([id, tenantId])
+}
+
+model DuplicateRecord {
+  id       String         @id @default(cuid())
+  groupId  String
+  group    DuplicateGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  recordId String
+  score    Float          @default(0)
+  isMaster Boolean        @default(false)
+  snapshot Json           @default("{}")
+
+  @@unique([groupId, recordId])
+  @@index([groupId])
+}
+
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  tenantId       String?
+  key            String?
+  payload        Json
+  aggregateId    String?
+  eventType      String?
+  correlationId  String?
+  headers        Json     @default("{}")
+  status         String   @default("PENDING")
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@index([tenantId])
+}
+
+model CodingRule {
+  id                     String   @id @default(cuid())
+  tenantId               String
+  entityType             String
+  name                   String
+  prefix                 String   @default("")
+  pattern                String
+  separator              String   @default("-")
+  sequenceScope          String   @default("TENANT")
+  resetPolicy            String   @default("NEVER")
+  nextSequence           Int      @default(1)
+  isManualOverrideAllowed Boolean @default(false)
+  isRequired             Boolean  @default(true)
+  lockedAfterCreate      Boolean  @default(true)
+  fallbackStrategy       String   @default("USE_DEFAULT")
+  effectiveFrom          DateTime?
+  isActive               Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@unique([tenantId, entityType, isActive, effectiveFrom])
+  @@index([tenantId, entityType])
+  @@index([tenantId, isActive])
+  @@unique([id, tenantId])
+}
+
+model CodingRuleVersion {
+  id            String   @id @default(cuid())
+  tenantId      String
+  codingRuleId  String
+  version       Int
+  pattern       String
+  prefix        String
+  separator     String
+  sequenceScope String
+  resetPolicy   String
+  effectiveFrom DateTime
+  createdBy     String
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, codingRuleId])
+  @@unique([id, tenantId])
+}
+
+model CodingSequence {
+  id         String   @id @default(cuid())
+  tenantId   String
+  entityType String
+  scopeKey   String
+  nextValue  Int      @default(1)
+  resetAt    DateTime?
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantId, entityType, scopeKey])
+  @@index([tenantId, entityType])
+}
+
+// ─── Low-code platform layer (custom modules + Canvas layouts + records) ─────
+// Additive, tenant-scoped. Admins define custom objects with fields and page
+// layouts and store records for them, with FORMULA fields computed by the safe
+// (no-IO, no-eval) formula engine in src/services/formula-engine.ts.
+
+model CustomModule {
+  id          String   @id @default(cuid())
+  tenantId    String
+  apiName     String
+  label       String
+  pluralLabel String
+  description String?
+  icon        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, apiName])
+  @@index([tenantId])
+  @@unique([id, tenantId])
+}
+
+model CustomModuleField {
+  id           String   @id @default(cuid())
+  tenantId     String
+  moduleId     String
+  apiName      String
+  label        String
+  // TEXT|NUMBER|BOOLEAN|DATE|DATETIME|PICKLIST|MULTISELECT|EMAIL|PHONE|CURRENCY|FORMULA|LOOKUP
+  type         String
+  required     Boolean  @default(false)
+  unique       Boolean  @default(false)
+  options      Json?    // picklist / multiselect options
+  formula      String?  // for FORMULA type
+  lookupModule String?  // apiName of the referenced module (for LOOKUP)
+  defaultValue Json?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([tenantId, moduleId, apiName])
+  @@index([tenantId, moduleId])
+  @@unique([id, tenantId])
+}
+
+model CustomModuleLayout {
+  id        String   @id @default(cuid())
+  tenantId  String
+  moduleId  String
+  name      String
+  // Canvas sections: [{ title, columns, fields: [fieldApiName] }]
+  sections  Json     @default("[]")
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, moduleId])
+  @@unique([id, tenantId])
+}
+
+model CustomRecord {
+  id        String   @id @default(cuid())
+  tenantId  String
+  moduleId  String
+  // fieldApiName -> value
+  data      Json     @default("{}")
+  ownerId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, moduleId])
+  @@unique([id, tenantId])
+}
+
+// ─── Feature flags (PC-25) ───────────────────────────────────────────────────
+// Durable, tenant-scoped replacement for the web app's file-based flag store.
+// One row per (tenant, key). The rich shape (rollout / tenants / users) mirrors
+// the admin Feature Flags page contract so nothing regresses. Missing keys fall
+// back to code-defined defaults in the web BFF.
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  tenantId    String
+  key         String
+  enabled     Boolean  @default(false)
+  description String?
+  rollout     Int      @default(0)
+  tenants     Json     @default("[]")
+  users       String   @default("")
+  updatedBy   String   @default("system")
+  updatedAt   DateTime @updatedAt @default(now())
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@unique([id, tenantId])
+}
+
+model CodingAllocationLog {
+  id               String   @id @default(cuid())
+  tenantId         String
+  entityType       String
+  entityId         String
+  code             String
+  ruleId           String
+  scopeKey         String
+  allocatedBy      String
+  allocatedAt      DateTime @default(now())
+  isManualOverride Boolean  @default(false)
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, code])
+  @@unique([tenantId, entityType, code])
+}

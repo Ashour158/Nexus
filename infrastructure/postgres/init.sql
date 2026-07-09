@@ -23,6 +23,9 @@ CREATE DATABASE nexus_knowledge;
 CREATE DATABASE nexus_incentive;
 CREATE DATABASE nexus_data;
 CREATE DATABASE nexus_chatbot;
+CREATE DATABASE nexus_document;
+CREATE DATABASE nexus_email_sync;
+CREATE DATABASE nexus_audit;
 
 GRANT ALL PRIVILEGES ON DATABASE nexus_auth TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_crm TO nexus;
@@ -36,6 +39,7 @@ GRANT ALL PRIVILEGES ON DATABASE nexus_integration TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_blueprint TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_approval TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_cadence TO nexus;
+GRANT ALL PRIVILEGES ON DATABASE nexus_audit TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_territory TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_planning TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_reporting TO nexus;
@@ -45,6 +49,7 @@ GRANT ALL PRIVILEGES ON DATABASE nexus_incentive TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_data TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_chatbot TO nexus;
 GRANT ALL PRIVILEGES ON DATABASE nexus_document TO nexus;
+GRANT ALL PRIVILEGES ON DATABASE nexus_email_sync TO nexus;
 
 -- Enable required extensions in each database
 \c nexus_auth;
@@ -111,4 +116,66 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 \c nexus_document;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+\c nexus_email_sync;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+\c postgres;
+CREATE DATABASE nexus_metadata;
+GRANT ALL PRIVILEGES ON DATABASE nexus_metadata TO nexus;
+\c nexus_metadata;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+\c postgres;
+CREATE DATABASE nexus_deals;
+GRANT ALL PRIVILEGES ON DATABASE nexus_deals TO nexus;
+\c nexus_deals;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+\c postgres;
+CREATE DATABASE nexus_contacts;
+GRANT ALL PRIVILEGES ON DATABASE nexus_contacts TO nexus;
+\c nexus_contacts;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+\c postgres;
+CREATE DATABASE nexus_activities;
+GRANT ALL PRIVILEGES ON DATABASE nexus_activities TO nexus;
+\c nexus_activities;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+\c postgres;
+CREATE DATABASE nexus_leads;
+GRANT ALL PRIVILEGES ON DATABASE nexus_leads TO nexus;
+\c nexus_leads;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+\c postgres;
+CREATE DATABASE nexus_notes;
+GRANT ALL PRIVILEGES ON DATABASE nexus_notes TO nexus;
+\c nexus_notes;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+\c postgres;
+CREATE DATABASE nexus_accounts;
+GRANT ALL PRIVILEGES ON DATABASE nexus_accounts TO nexus;
+\c nexus_accounts;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+\c postgres;
+CREATE DATABASE nexus_quotes;
+GRANT ALL PRIVILEGES ON DATABASE nexus_quotes TO nexus;
+\c nexus_quotes;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+\c postgres;
+CREATE DATABASE nexus_ticket;
+GRANT ALL PRIVILEGES ON DATABASE nexus_ticket TO nexus;
+\c nexus_ticket;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+\c postgres;
+CREATE DATABASE nexus_campaign;
+GRANT ALL PRIVILEGES ON DATABASE nexus_campaign TO nexus;
+\c nexus_campaign;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

@@ -12,8 +12,9 @@ import {
   deleteKeycloakRealmUser,
   setKeycloakRealmUserEnabled,
 } from '../lib/keycloak-admin.js';
-import { toPaginatedResult } from '../lib/pagination.js';
+import { toPaginatedResult } from '@nexus/shared-types';
 import { resolveUserPermissions } from '../lib/permissions.js';
+import { randomBytes } from 'node:crypto';
 
 /** User row with role assignments (Section 31.1 relations). */
 export type UserWithRoles = Prisma.UserGetPayload<{
@@ -131,6 +132,7 @@ export function createUsersService(prisma: AuthPrisma) {
               firstName: data.firstName,
               lastName: data.lastName,
               keycloakId,
+              bookingToken: randomBytes(16).toString('hex'),
               userRoles: {
                 create: uniqueRoleIds.map((roleId) => ({
                   role: { connect: { id: roleId } },
@@ -160,7 +162,7 @@ export function createUsersService(prisma: AuthPrisma) {
     ): Promise<UserWithRoles> {
       await getUserById(tenantId, id);
       const updated = await prisma.user.update({
-        where: { id },
+        where: { id_tenantId: { id, tenantId } },
         data,
         include: { userRoles: { include: { role: true } } },
       });
@@ -189,7 +191,7 @@ export function createUsersService(prisma: AuthPrisma) {
       }
       await prisma.$transaction([
         prisma.user.update({
-          where: { id },
+          where: { id_tenantId: { id, tenantId } },
           data: { isActive: false },
         }),
         prisma.session.deleteMany({ where: { userId: id } }),
@@ -208,8 +210,12 @@ export function createUsersService(prisma: AuthPrisma) {
       if (roleRows.length !== uniqueRoleIds.length) {
         throw new NotFoundError('Role', 'invalid');
       }
+      const existingRoles = await prisma.userRole.findMany({
+        where: { userId, user: { tenantId } },
+        select: { id: true },
+      });
       await prisma.$transaction([
-        prisma.userRole.deleteMany({ where: { userId } }),
+        prisma.userRole.deleteMany({ where: { id: { in: existingRoles.map((r) => r.id) } } }),
         prisma.userRole.createMany({
           data: uniqueRoleIds.map((roleId) => ({ userId, roleId })),
         }),

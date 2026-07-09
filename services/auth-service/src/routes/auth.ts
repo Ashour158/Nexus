@@ -7,28 +7,108 @@ import {
   RefreshTokenBodySchema,
   ResetPasswordSchema,
 } from '@nexus/validation';
+import { hashPassword, validatePasswordStrength } from '@nexus/security';
 import type { AuthPrisma } from '../prisma.js';
-import { loginWithKeycloak, refreshTokens, revokeSession } from '../services/session-auth.js';
+import { loginWithKeycloak, loginWithPassword, refreshTokens, revokeSession } from '../services/session-auth.js';
+import { z } from 'zod';
+import type { JwksKeyStore } from '../lib/jwt.js';
+import type { NexusProducer } from '@nexus/kafka';
+import type { UnifiedAuditLogger } from '../lib/unified-audit.js';
+import { setKeycloakUserPassword } from '../lib/keycloak-admin.js';
+import { clearLoginFailures, getLoginLock, recordLoginFailure } from '../lib/login-throttle.js';
+
+const PasswordLoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
 
 /**
  * Registers `/api/v1/auth/*` routes (Section 34.1).
  */
 export async function registerAuthRoutes(
   app: FastifyInstance,
-  prisma: AuthPrisma
+  prisma: AuthPrisma,
+  keyStore: JwksKeyStore,
+  producer: NexusProducer,
+  unifiedAudit: UnifiedAuditLogger
 ): Promise<void> {
+  void producer;
   await app.register(
     async (r) => {
       r.post('/auth/login', async (request, reply) => {
+        // Polymorphic login: email+password (local credential flow used by the web
+        // form) OR keycloakAccessToken (SSO). Password path is tried first when the
+        // body carries credentials.
+        const pw = PasswordLoginSchema.safeParse(request.body);
+        if (pw.success) {
+          // Brute-force lockout: reject before touching the credential store once
+          // an email has too many recent consecutive failures.
+          const lock = await getLoginLock(pw.data.email);
+          if (lock.locked) {
+            reply.header('Retry-After', String(lock.retryAfterSec));
+            return reply.code(429).send({
+              success: false,
+              error: {
+                code: 'ACCOUNT_LOCKED',
+                message: `Too many failed login attempts. Try again in ${Math.ceil(lock.retryAfterSec / 60)} minute(s).`,
+                requestId: request.id,
+              },
+            });
+          }
+          let result;
+          try {
+            result = await loginWithPassword(
+              keyStore, prisma, request, pw.data.email, pw.data.password,
+              { userAgent: request.headers['user-agent'], ip: request.ip }
+            );
+          } catch (err) {
+            await recordLoginFailure(pw.data.email);
+            throw err;
+          }
+          await clearLoginFailures(pw.data.email);
+          if ('mfaRequired' in result && result.mfaRequired) {
+            return reply.send({ success: true, data: { mfaRequired: true, mfaToken: result.mfaToken } });
+          }
+          return reply.send({ success: true, data: result });
+        }
         const parsed = KeycloakLoginSchema.safeParse(request.body);
         if (!parsed.success) {
           throw new ValidationError('Invalid body', parsed.error.flatten());
         }
-        const tokens = await loginWithKeycloak(app, prisma, request, parsed.data.keycloakAccessToken, {
+        const result = await loginWithKeycloak(keyStore, prisma, request, parsed.data.keycloakAccessToken, {
           userAgent: request.headers['user-agent'],
           ip: request.ip,
         });
-        return reply.send({ success: true, data: tokens });
+        if (result.mfaRequired) {
+          return reply.send({ success: true, data: { mfaRequired: true, mfaToken: result.mfaToken } });
+        }
+        try {
+          const parts = result.accessToken.split('.');
+          if (parts.length === 3) {
+            const claims = JSON.parse(Buffer.from(parts[1]!, 'base64url').toString('utf-8')) as { sub?: string; tenantId?: string };
+            if (claims.sub && claims.tenantId) {
+              void prisma.auditLog.create({
+                data: {
+                  tenantId: claims.tenantId,
+                  userId: claims.sub,
+                  action: 'auth.login',
+                  resource: 'session',
+                  ipAddress: request.ip,
+                  userAgent: request.headers['user-agent'] ?? null,
+                },
+              });
+              void unifiedAudit.log({
+                tenantId: claims.tenantId,
+                actorId: claims.sub,
+                action: 'auth.login',
+                resource: 'session',
+                ipAddress: request.ip,
+                userAgent: request.headers['user-agent'],
+              });
+            }
+          }
+        } catch { /* non-blocking */ }
+        return reply.send({ success: true, data: result });
       });
 
       r.post('/auth/refresh', async (request, reply) => {
@@ -36,7 +116,7 @@ export async function registerAuthRoutes(
         if (!parsed.success) {
           throw new ValidationError('Invalid body', parsed.error.flatten());
         }
-        const tokens = await refreshTokens(app, prisma, parsed.data.refreshToken);
+        const tokens = await refreshTokens(keyStore, prisma, parsed.data.refreshToken);
         return reply.send({ success: true, data: tokens });
       });
 
@@ -45,6 +125,17 @@ export async function registerAuthRoutes(
         const user = request.user as JwtPayload | undefined;
         if (user?.sub) {
           await revokeSession(prisma, body.refreshToken, user.sub);
+          if (user.tenantId) {
+            void prisma.auditLog.create({
+              data: {
+                tenantId: user.tenantId,
+                userId: user.sub,
+                action: 'auth.logout',
+                resource: 'session',
+                ipAddress: request.ip,
+              },
+            });
+          }
         }
         return reply.send({ success: true, data: { loggedOut: true } });
       });
@@ -54,6 +145,70 @@ export async function registerAuthRoutes(
         if (!parsed.success) {
           throw new ValidationError('Invalid body', parsed.error.flatten());
         }
+        const { email } = parsed.data;
+        const user = await prisma.user.findFirst({ where: { email: email.toLowerCase().trim() } });
+        if (user) {
+          const resetToken = crypto.randomUUID();
+          const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
+          await prisma.passwordReset.create({
+            data: { userId: user.id, token: resetToken, expiresAt },
+          });
+
+          const baseUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+          const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
+
+          // Attempt to queue email via comm-service internal endpoint
+          const commUrl = process.env.COMM_SERVICE_URL ?? 'http://localhost:3009';
+          const internalToken = process.env.INTERNAL_SERVICE_TOKEN ?? '';
+          let emailQueued = false;
+
+          try {
+            const resp = await fetch(`${commUrl}/api/v1/internal/outbox/email-broadcast`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-service-token': internalToken,
+              },
+              body: JSON.stringify({
+                tenantId: user.tenantId,
+                recipients: [user.email],
+                subject: 'Password reset requested',
+                htmlBody: `<p>Click the link below to reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>This link expires in 1 hour.</p>`,
+              }),
+            });
+            if (resp.ok) {
+              emailQueued = true;
+              request.log.info({ userId: user.id }, 'Password reset email queued via comm-service');
+            }
+          } catch (err) {
+            request.log.warn({ err, userId: user.id }, 'comm-service unreachable for password reset email');
+          }
+
+          // Fallback: write to local outbox so a relay can pick it up later
+          if (!emailQueued) {
+            try {
+              await prisma.outboxMessage.create({
+                data: {
+                  topic: 'comm.email.send',
+                  payload: {
+                    to: user.email,
+                    subject: 'Password reset requested',
+                    htmlBody: `<p>Click the link below to reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>This link expires in 1 hour.</p>`,
+                    tenantId: user.tenantId,
+                  },
+                  aggregateId: user.id,
+                  status: 'PENDING',
+                },
+              });
+              request.log.info({ userId: user.id }, 'Password reset email written to local outbox');
+            } catch (outboxErr) {
+              request.log.error({ outboxErr, userId: user.id }, 'Failed to write password reset to outbox');
+            }
+          }
+
+          request.log.info({ userId: user.id }, 'Password reset email queued');
+        }
+        // Always return same message to prevent user enumeration
         return reply.send({
           success: true,
           data: { message: 'If an account exists, password reset instructions were sent.' },
@@ -65,9 +220,62 @@ export async function registerAuthRoutes(
         if (!parsed.success) {
           throw new ValidationError('Invalid body', parsed.error.flatten());
         }
+        const { token, newPassword } = parsed.data as { token: string; newPassword: string };
+
+        const strength = validatePasswordStrength(newPassword);
+        if (!strength.valid) {
+          throw new ValidationError('Password too weak', { fieldErrors: { newPassword: strength.errors } });
+        }
+
+        const resetRecord = await prisma.passwordReset.findFirst({
+          where: { token, usedAt: null, expiresAt: { gt: new Date() } },
+        });
+        if (!resetRecord) {
+          throw new ValidationError('Invalid or expired reset token');
+        }
+
+        const targetUser = await prisma.user.findFirst({
+          where: { id: resetRecord.userId },
+          select: { id: true, tenantId: true },
+        });
+        if (!targetUser) {
+          throw new ValidationError('Invalid or expired reset token');
+        }
+
+        const passwordHash = await hashPassword(newPassword);
+        const user = await prisma.user.update({
+          where: { id_tenantId: { id: targetUser.id, tenantId: targetUser.tenantId } },
+          data: { passwordHash },
+        });
+        await prisma.passwordReset.update({
+          where: { id: resetRecord.id },
+          data: { usedAt: new Date() },
+        });
+        // Invalidate all existing sessions for the user
+        await prisma.session.deleteMany({ where: { userId: user.id } });
+        // Sync password to Keycloak
+        if (user.keycloakId) {
+          try {
+            await setKeycloakUserPassword(user.keycloakId, newPassword);
+          } catch (kcErr) {
+            request.log.warn({ err: kcErr, userId: user.id }, 'Keycloak password sync failed');
+          }
+        }
+        // Audit log
+        await prisma.auditLog.create({
+          data: {
+            tenantId: user.tenantId,
+            userId: user.id,
+            action: 'PASSWORD_RESET',
+            resource: 'user',
+            resourceId: user.id,
+            newValue: { resetAt: new Date().toISOString() },
+          },
+        });
+
         return reply.send({
           success: true,
-          data: { message: 'Password reset is not yet configured for this environment.' },
+          data: { message: 'Password reset successfully. Please log in with your new password.' },
         });
       });
     },

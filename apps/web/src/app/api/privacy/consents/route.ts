@@ -1,11 +1,30 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
-  return NextResponse.json({
-    success: true,
-    data: [
-      { id: 'c1', name: 'John Smith', consent: 'GRANTED', updatedAt: '2026-04-10T00:00:00.000Z', audit: 'Updated by import' },
-      { id: 'c2', name: 'Sara Lee', consent: 'REVOKED', updatedAt: '2026-04-22T00:00:00.000Z', audit: 'Updated manually' },
-    ],
+const CRM_SERVICE = process.env.CRM_SERVICE_URL || 'http://localhost:3001';
+
+function fwd(req: NextRequest): HeadersInit {
+  return {
+    'x-tenant-id': req.headers.get('x-tenant-id') ?? 'default',
+    authorization: req.headers.get('authorization') ?? '',
+    'Content-Type': 'application/json',
+  };
+}
+
+export async function GET(req: NextRequest) {
+  const qs = req.nextUrl.searchParams.toString();
+  const res = await fetch(`${CRM_SERVICE}/api/v1/consents/re-consent-required${qs ? `?${qs}` : ''}`, {
+    headers: fwd(req),
+    cache: 'no-store',
   });
+  return NextResponse.json(await res.json(), { status: res.status });
+}
+
+export async function POST(req: NextRequest) {
+  const body = await req.text();
+  const res = await fetch(`${CRM_SERVICE}/api/v1/consents/bulk`, {
+    method: 'POST',
+    headers: fwd(req),
+    body,
+  });
+  return NextResponse.json(await res.json(), { status: res.status });
 }

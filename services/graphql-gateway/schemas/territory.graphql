@@ -1,0 +1,146 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  territories(limit: Int, offset: Int): [Territory!]!
+  territory(id: ID!): Territory
+  territoryRules(limit: Int, offset: Int): [TerritoryRule!]!
+  territoryRule(id: ID!): TerritoryRule
+  leadRoutingLogs(limit: Int, offset: Int): [LeadRoutingLog!]!
+  leadRoutingLog(id: ID!): LeadRoutingLog
+  roundRobinStates(limit: Int, offset: Int): [RoundRobinState!]!
+  roundRobinState(id: ID!): RoundRobinState
+}
+
+type Mutation {
+  createTerritory(input: CreateTerritoryInput!): Territory!
+  updateTerritory(id: ID!, input: UpdateTerritoryInput!): Territory!
+  deleteTerritory(id: ID!): Boolean!
+  createTerritoryRule(input: CreateTerritoryRuleInput!): TerritoryRule!
+  updateTerritoryRule(id: ID!, input: UpdateTerritoryRuleInput!): TerritoryRule!
+  deleteTerritoryRule(id: ID!): Boolean!
+  createLeadRoutingLog(input: CreateLeadRoutingLogInput!): LeadRoutingLog!
+  updateLeadRoutingLog(id: ID!, input: UpdateLeadRoutingLogInput!): LeadRoutingLog!
+  deleteLeadRoutingLog(id: ID!): Boolean!
+  createRoundRobinState(input: CreateRoundRobinStateInput!): RoundRobinState!
+  updateRoundRobinState(id: ID!, input: UpdateRoundRobinStateInput!): RoundRobinState!
+  deleteRoundRobinState(id: ID!): Boolean!
+}
+
+type Territory @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  description: String
+  type: TerritoryType!
+  ownerIds: [String!]!
+  teamId: String
+  priority: Int!
+  isActive: Boolean!
+  currency: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  rules: [TerritoryRule!]!
+  routingLogs: [LeadRoutingLog!]!
+}
+
+type TerritoryRule {
+  id: ID!
+  territoryId: String!
+  territory: Territory!
+  field: String!
+  operator: String!
+  value: String!
+  createdAt: DateTime!
+}
+
+type LeadRoutingLog @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  leadId: String!
+  matchedTerritoryId: String
+  territory: Territory
+  assignedOwnerId: String
+  routedAt: DateTime!
+}
+
+type RoundRobinState @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  territoryId: String!
+  lastIndex: Int!
+  updatedAt: DateTime!
+}
+
+enum TerritoryType {
+  GEOGRAPHIC
+  INDUSTRY
+  ACCOUNT_SIZE
+  CUSTOM
+}
+
+input CreateTerritoryInput {
+  tenantId: String!
+  name: String!
+  description: String
+  type: TerritoryType
+  ownerIds: [String!]
+  teamId: String
+  priority: Int
+  isActive: Boolean
+  currency: String
+}
+
+input UpdateTerritoryInput {
+  name: String
+  description: String
+  type: TerritoryType
+  ownerIds: [String!]
+  teamId: String
+  priority: Int
+  isActive: Boolean
+  currency: String
+}
+
+input CreateTerritoryRuleInput {
+  territoryId: ID!
+  field: String!
+  operator: String!
+  value: String!
+}
+
+input UpdateTerritoryRuleInput {
+  territoryId: ID
+  field: String
+  operator: String
+  value: String
+}
+
+input CreateLeadRoutingLogInput {
+  tenantId: String!
+  leadId: String!
+  matchedTerritoryId: ID
+  assignedOwnerId: String
+  routedAt: DateTime
+}
+
+input UpdateLeadRoutingLogInput {
+  leadId: String
+  matchedTerritoryId: ID
+  assignedOwnerId: String
+  routedAt: DateTime
+}
+
+input CreateRoundRobinStateInput {
+  tenantId: String!
+  territoryId: String!
+  lastIndex: Int
+}
+
+input UpdateRoundRobinStateInput {
+  territoryId: String
+  lastIndex: Int
+}

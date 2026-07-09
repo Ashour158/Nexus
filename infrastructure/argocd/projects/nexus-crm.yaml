@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: nexus-crm
+  namespace: argocd
+spec:
+  description: Nexus CRM microservices
+  sourceRepos:
+    - https://github.com/nexus-crm/nexus-crm.git
+  destinations:
+    - namespace: nexus
+      server: https://kubernetes.default.svc
+    - namespace: nexus-monitoring
+      server: https://kubernetes.default.svc
+    - namespace: nexus-staging
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  orphanedResources:
+    warn: true

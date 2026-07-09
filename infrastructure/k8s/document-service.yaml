@@ -1,0 +1,84 @@
+﻿apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: document-service
+  namespace: nexus
+  labels:
+    app.kubernetes.io/name: nexus-document-service
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nexus-document-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nexus-document-service
+        app.kubernetes.io/component: backend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+      - name: document-service
+        image: ghcr.io/nexus-crm/nexus-document-service:latest
+        ports:
+        - containerPort: 3016
+          name: http
+        env:
+        - name: PORT
+          value: "3016"
+        - name: SERVICE_DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: nexus-secrets
+              key: document-service-database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: nexus-secrets
+              key: redis-url
+        - name: KAFKA_BROKERS
+          valueFrom:
+            configMapKeyRef:
+              name: nexus-config
+              key: KAFKA_BROKERS
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3016
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3016
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        securityContext:
+          readOnlyRootFilesystem: false
+          allowPrivilegeEscalation: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: document-service
+  namespace: nexus
+  labels:
+    app.kubernetes.io/name: nexus-document-service
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: nexus-document-service
+  ports:
+  - name: http
+    port: 3016
+    targetPort: 3016

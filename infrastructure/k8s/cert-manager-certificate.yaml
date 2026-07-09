@@ -1,0 +1,13 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nexus-crm-tls
+  namespace: nexus
+spec:
+  secretName: nexus-crm-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - app.nexus-crm.io
+    - api.nexus-crm.io

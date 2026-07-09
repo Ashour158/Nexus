@@ -10,7 +10,9 @@ import type {
   PaginatedResult,
 } from '@nexus/shared-types';
 import type { CreateLeadInput, UpdateLeadInput } from '@nexus/validation';
-import { api } from '@/lib/api-client';
+import { api, apiClients } from '@/lib/api-client';
+import { notify } from '@/lib/toast';
+import type { AiPredictionInsights } from '@/hooks/use-deals';
 
 /**
  * React Query hooks for the Leads domain — Section 39.1.
@@ -39,9 +41,34 @@ export const leadKeys = {
   list: (f: Record<string, unknown>) => [...leadKeys.lists(), f] as const,
   details: () => [...leadKeys.all, 'detail'] as const,
   detail: (id: string) => [...leadKeys.details(), id] as const,
+  aiPrediction: (id: string) => [...leadKeys.detail(id), 'ai-prediction'] as const,
 };
 
 type LeadListResponse = PaginatedResult<Lead>;
+
+/**
+ * Explainable AI lead prediction returned by `GET /leads/:id/ai-prediction`.
+ * `aiScore` is the 0-100 projection of `probability`; `insights` carries the
+ * confidence, low-data honesty flag and the "why" factor list.
+ */
+export interface LeadAiPrediction {
+  probability: number;
+  aiScore: number;
+  insights: AiPredictionInsights;
+}
+
+/**
+ * Fetches the explainable AI prediction for a lead. The endpoint returns the
+ * standard `{ success, data }` envelope; the typed client unwraps `data`.
+ */
+export function useLeadAiPrediction(id: string, enabled = true) {
+  return useQuery<LeadAiPrediction>({
+    queryKey: leadKeys.aiPrediction(id),
+    queryFn: () => api.get<LeadAiPrediction>(`/leads/${id}/ai-prediction`),
+    enabled: Boolean(id) && enabled,
+    staleTime: 5 * 60_000,
+  });
+}
 
 export function useLeads(filters: LeadListFilters = {}) {
   const normalized = {
@@ -57,7 +84,7 @@ export function useLeads(filters: LeadListFilters = {}) {
   return useQuery<LeadListResponse>({
     queryKey: leadKeys.list(normalized),
     queryFn: () =>
-      api.get<LeadListResponse>('/leads', { params: normalized }),
+      apiClients.leads.get<LeadListResponse>('/leads', { params: normalized }),
     staleTime: 30_000,
     placeholderData: (prev) => prev,
   });
@@ -66,7 +93,7 @@ export function useLeads(filters: LeadListFilters = {}) {
 export function useLead(id: string) {
   return useQuery<Lead>({
     queryKey: leadKeys.detail(id),
-    queryFn: () => api.get<Lead>(`/leads/${id}`),
+    queryFn: () => apiClients.leads.get<Lead>(`/leads/${id}`),
     enabled: Boolean(id),
   });
 }
@@ -74,9 +101,13 @@ export function useLead(id: string) {
 export function useCreateLead() {
   const qc = useQueryClient();
   return useMutation<Lead, Error, CreateLeadInput>({
-    mutationFn: (data) => api.post<Lead>('/leads', data),
+    mutationFn: (data) => apiClients.leads.post<Lead>('/leads', data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: leadKeys.lists() });
+      notify.success('Lead created');
+    },
+    onError: (err) => {
+      notify.error('Failed to create lead', err.message);
     },
   });
 }
@@ -84,10 +115,14 @@ export function useCreateLead() {
 export function useUpdateLead() {
   const qc = useQueryClient();
   return useMutation<Lead, Error, { id: string; data: UpdateLeadInput }>({
-    mutationFn: ({ id, data }) => api.patch<Lead>(`/leads/${id}`, data),
+    mutationFn: ({ id, data }) => apiClients.leads.patch<Lead>(`/leads/${id}`, data),
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: leadKeys.detail(id) });
       qc.invalidateQueries({ queryKey: leadKeys.lists() });
+      notify.success('Lead updated');
+    },
+    onError: (err) => {
+      notify.error('Failed to update lead', err.message);
     },
   });
 }
@@ -100,7 +135,7 @@ export function useDeleteLead() {
   }
 
   return useMutation<void, Error, string, DeleteLeadContext>({
-    mutationFn: (id) => api.delete<void>(`/leads/${id}`),
+    mutationFn: (id) => apiClients.leads.delete<void>(`/leads/${id}`),
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: leadKeys.lists() });
       const previous = qc.getQueriesData<LeadListResponse>({
@@ -123,10 +158,12 @@ export function useDeleteLead() {
       ctx?.previous.forEach(([key, data]) => {
         if (data !== undefined) qc.setQueryData(key, data);
       });
+      notify.error('Failed to delete lead');
     },
     onSettled: (_d, _e, id) => {
       qc.removeQueries({ queryKey: leadKeys.detail(id) });
       qc.invalidateQueries({ queryKey: leadKeys.lists() });
+      if (!_e) notify.success('Lead deleted');
     },
   });
 }
@@ -149,10 +186,14 @@ export function useConvertLead() {
   }
   return useMutation<ConvertLeadResult, Error, ConvertLeadVars>({
     mutationFn: ({ id, ...body }) =>
-      api.post<ConvertLeadResult>(`/leads/${id}/convert`, body),
+      apiClients.leads.post<ConvertLeadResult>(`/leads/${id}/convert`, body),
     onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: leadKeys.detail(id) });
       qc.invalidateQueries({ queryKey: leadKeys.lists() });
+      notify.success('Lead converted');
+    },
+    onError: (err) => {
+      notify.error('Failed to convert lead', err.message);
     },
   });
 }
@@ -174,7 +215,7 @@ export function useUpdateLeadStatus() {
 
   return useMutation<Lead, Error, UpdateStatusVars, UpdateStatusContext>({
     mutationFn: ({ id, status }) =>
-      api.patch<Lead>(`/leads/${id}/status`, { status }),
+      apiClients.leads.patch<Lead>(`/leads/${id}/status`, { status }),
     onMutate: async ({ id, status }) => {
       await qc.cancelQueries({ queryKey: leadKeys.all });
       const previous = qc.getQueriesData<LeadListResponse>({
@@ -196,10 +237,12 @@ export function useUpdateLeadStatus() {
       ctx?.previous.forEach(([key, data]) => {
         if (data !== undefined) qc.setQueryData(key, data);
       });
+      notify.error('Failed to update lead status');
     },
     onSettled: (_d, _e, { id }) => {
       qc.invalidateQueries({ queryKey: leadKeys.detail(id) });
       qc.invalidateQueries({ queryKey: leadKeys.all });
+      if (!_e) notify.success('Lead status updated');
     },
   });
 }

@@ -1,0 +1,87 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  conversations(limit: Int, offset: Int, channel: String): [Conversation!]!
+  conversation(id: ID!): Conversation
+  conversationMessages(conversationId: ID!): [ConversationMessage!]!
+}
+
+type Mutation {
+  createConversation(input: CreateConversationInput!): Conversation!
+  updateConversation(id: ID!, input: UpdateConversationInput!): Conversation!
+  deleteConversation(id: ID!): Boolean!
+  createConversationMessage(input: CreateConversationMessageInput!): ConversationMessage!
+}
+
+type Conversation @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  channel: Channel!
+  externalId: String!
+  state: ConversationState!
+  contactId: String
+  draftQuoteId: String
+  context: JSON!
+  lastMessageAt: DateTime!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  messages: [ConversationMessage!]!
+}
+
+type ConversationMessage @key(fields: "id") {
+  id: ID!
+  conversationId: String!
+  conversation: Conversation
+  direction: Direction!
+  body: String!
+  metadata: JSON!
+  createdAt: DateTime!
+}
+
+enum Channel {
+  WHATSAPP
+  TELEGRAM
+}
+
+enum Direction {
+  INBOUND
+  OUTBOUND
+}
+
+enum ConversationState {
+  IDLE
+  GREETING
+  COLLECTING_INFO
+  PRODUCT_SEARCH
+  QUOTE_BUILDING
+  QUOTE_REVIEW
+  QUOTE_SENT
+  COMPLETE
+}
+
+input CreateConversationInput {
+  tenantId: String!
+  channel: Channel!
+  externalId: String!
+  contactId: String
+  draftQuoteId: String
+  context: JSON
+}
+
+input UpdateConversationInput {
+  state: ConversationState
+  contactId: String
+  draftQuoteId: String
+  context: JSON
+}
+
+input CreateConversationMessageInput {
+  conversationId: String!
+  direction: Direction!
+  body: String!
+  metadata: JSON
+}

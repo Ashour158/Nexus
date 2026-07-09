@@ -1,0 +1,84 @@
+﻿apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: incentive-service
+  namespace: nexus
+  labels:
+    app.kubernetes.io/name: nexus-incentive-service
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nexus-incentive-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nexus-incentive-service
+        app.kubernetes.io/component: backend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+      - name: incentive-service
+        image: ghcr.io/nexus-crm/nexus-incentive-service:latest
+        ports:
+        - containerPort: 3024
+          name: http
+        env:
+        - name: PORT
+          value: "3024"
+        - name: SERVICE_DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: nexus-secrets
+              key: incentive-service-database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: nexus-secrets
+              key: redis-url
+        - name: KAFKA_BROKERS
+          valueFrom:
+            configMapKeyRef:
+              name: nexus-config
+              key: KAFKA_BROKERS
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3024
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3024
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        securityContext:
+          readOnlyRootFilesystem: false
+          allowPrivilegeEscalation: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: incentive-service
+  namespace: nexus
+  labels:
+    app.kubernetes.io/name: nexus-incentive-service
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: nexus-incentive-service
+  ports:
+  - name: http
+    port: 3024
+    targetPort: 3024

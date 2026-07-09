@@ -6,9 +6,12 @@ import { apiClients } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useUiStore } from '@/stores/ui.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { formatCurrency, formatDate } from '@/lib/format';
+import SendForSignature from '@/components/esign/SendForSignature';
+import { ExportButton } from '@/components/export/ExportButton';
 
 interface Contract {
   id: string;
@@ -114,9 +117,12 @@ export default function ContractsPage(): JSX.Element {
 
   return (
     <main className="space-y-4 p-4">
-      <header>
-        <h1 className="text-xl font-semibold">Contracts</h1>
-        <p className="text-sm text-slate-500">Track lifecycle and signatures for customer contracts.</p>
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">Contracts</h1>
+          <p className="text-sm text-slate-500">Track lifecycle and signatures for customer contracts.</p>
+        </div>
+        <ExportButton module="contracts" />
       </header>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4">
@@ -151,11 +157,19 @@ export default function ContractsPage(): JSX.Element {
         {query.isLoading ? (
           <div className="space-y-2 p-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10" />)}</div>
         ) : contracts.length === 0 ? (
-          <p className="p-8 text-center text-sm text-slate-500">No contracts found.</p>
+          <EmptyState
+            icon="📄"
+            title="No contracts found"
+            description={
+              status === 'ALL'
+                ? 'Create a contract above to track its lifecycle and signatures.'
+                : `No contracts with status ${status}. Try a different filter.`
+            }
+          />
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-              <tr><th className="px-3 py-2">Title</th><th>Account</th><th>Status</th><th>Value</th><th>Start Date</th><th>End Date</th><th className="pr-3 text-right">Actions</th></tr>
+            <thead className="bg-slate-50 text-start text-xs uppercase text-slate-500">
+              <tr><th className="px-3 py-2">Title</th><th>Account</th><th>Status</th><th>Value</th><th>Start Date</th><th>End Date</th><th className="pe-3 text-end">Actions</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {contracts.map((contract) => (
@@ -166,7 +180,10 @@ export default function ContractsPage(): JSX.Element {
                   <td>{contract.currency} {formatCurrency(Number(contract.totalValue))}</td>
                   <td>{contract.startDate ? formatDate(contract.startDate) : '—'}</td>
                   <td>{contract.endDate ? formatDate(contract.endDate) : '—'}</td>
-                  <td className="pr-3 text-right">{contract.status === 'DRAFT' ? <Button variant="secondary" onClick={() => sign.mutate(contract.id)} disabled={sign.isPending}>Sign</Button> : null}</td>
+                  <td className="space-y-2 pe-3 text-end">
+                    {contract.status === 'DRAFT' ? <Button variant="secondary" onClick={() => sign.mutate(contract.id)} disabled={sign.isPending}>Sign</Button> : null}
+                    <SendForSignature contractId={contract.id} documentName={contract.name} />
+                  </td>
                 </tr>
               ))}
             </tbody>

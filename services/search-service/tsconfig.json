@@ -3,7 +3,10 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "baseUrl": "."
+    "baseUrl": ".",
+    "paths": {
+      "@prisma/search-client": ["../../node_modules/.prisma/search-client"]
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts"]
 }

@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
+import { useConfirm } from '@/hooks/use-confirm';
 
 type Status = 'Active' | 'Suspended' | 'Invited';
 type UserRow = { id: string; name: string; email: string; role: string; tenant: string; status: Status; joined: string; lastActive: string };
@@ -10,6 +11,7 @@ type UsersResponse = { data: UserRow[]; page: number; limit: number; total: numb
 
 export default function AdminUsersPage() {
   const accessToken = useAuthStore((s) => s.accessToken);
+  const { confirm, ConfirmDialog } = useConfirm();
   const [qInput, setQInput] = useState('');
   const [q, setQ] = useState('');
   const [tenant, setTenant] = useState('all');
@@ -27,19 +29,28 @@ export default function AdminUsersPage() {
     return () => clearTimeout(t);
   }, [qInput]);
 
-  function loadUsers() {
-    const params = new URLSearchParams({ q, tenant, role, status, page: String(page), limit: '50' });
+  const loadUsers = useCallback(() => {
+    const params = new URLSearchParams({
+      q,
+      tenant,
+      role,
+      status,
+      page: String(page),
+      limit: '50',
+    });
     return fetch(`/api/admin/users?${params.toString()}`, {
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
     })
       .then((r) => r.json())
       .then((json) => setResult(json))
-      .catch(() => setResult({ data: [], page: 1, limit: 50, total: 0, totalPages: 1 }));
-  }
+      .catch(() =>
+        setResult({ data: [], page: 1, limit: 50, total: 0, totalPages: 1 })
+      );
+  }, [accessToken, page, q, role, status, tenant]);
 
   useEffect(() => {
     void loadUsers();
-  }, [accessToken, page, q, role, status, tenant]);
+  }, [loadUsers]);
 
   const tenants = useMemo(() => Array.from(new Set((result?.data ?? []).map((u) => u.tenant))), [result?.data]);
 
@@ -85,7 +96,7 @@ export default function AdminUsersPage() {
   }
 
   async function deleteUser(id: string) {
-    if (!window.confirm('Delete this user?')) return;
+    if (!await confirm('Delete this user?', 'Delete User')) return;
     setBusyId(id);
     setBanner('');
     try {
@@ -150,8 +161,9 @@ export default function AdminUsersPage() {
         </table>
       </div>
 
+      {ConfirmDialog}
       <div className="flex items-center justify-between text-sm text-gray-400">
-        <span>Page {result?.page ?? page} of {result?.totalPages ?? 1} ∑ {result?.total ?? 0} users</span>
+        <span>Page {result?.page ?? page} of {result?.totalPages ?? 1} ¬ù {result?.total ?? 0} users</span>
         <div className="space-x-2">
           <button disabled={(result?.page ?? page) <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-gray-700 px-3 py-1 disabled:opacity-50">Prev</button>
           <button disabled={(result?.page ?? page) >= (result?.totalPages ?? 1)} onClick={() => setPage((p) => p + 1)} className="rounded border border-gray-700 px-3 py-1 disabled:opacity-50">Next</button>

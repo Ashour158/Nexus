@@ -1,0 +1,92 @@
+type Query {
+  me: User @auth
+  users(limit: Int, offset: Int): [User!]! @auth
+  user(id: ID!): User @auth
+  tenants: [Tenant!]! @auth
+  tenant(id: ID!): Tenant @auth
+}
+
+type Mutation {
+  login(email: String!, password: String!): AuthResponse!
+  logout: Boolean! @auth
+  refreshToken: AuthResponse! @auth
+  createUser(input: CreateUserInput!): User! @auth
+  updateUser(id: ID!, input: UpdateUserInput!): User! @auth
+  deleteUser(id: ID!): Boolean! @auth
+  createTenant(input: CreateTenantInput!): Tenant! @auth
+  updateTenant(id: ID!, input: UpdateTenantInput!): Tenant! @auth
+}
+
+type User @key(fields: "id") {
+  id: ID!
+  email: String!
+  firstName: String
+  lastName: String
+  avatar: String
+  role: Role!
+  tenant: Tenant!
+  isActive: Boolean!
+  lastLogin: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Tenant @key(fields: "id") {
+  id: ID!
+  name: String!
+  domain: String
+  logo: String
+  settings: JSON
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Role {
+  id: ID!
+  name: String!
+  permissions: [String!]!
+}
+
+type AuthResponse {
+  accessToken: String!
+  refreshToken: String!
+  user: User!
+  expiresIn: Int!
+  mfaRequired: Boolean
+  mfaToken: String
+}
+
+input CreateUserInput {
+  email: String!
+  password: String!
+  firstName: String
+  lastName: String
+  roleId: ID!
+  tenantId: ID!
+}
+
+input UpdateUserInput {
+  firstName: String
+  lastName: String
+  roleId: ID
+  isActive: Boolean
+}
+
+input CreateTenantInput {
+  name: String!
+  domain: String
+  settings: JSON
+}
+
+input UpdateTenantInput {
+  name: String
+  domain: String
+  settings: JSON
+  isActive: Boolean
+}
+
+scalar DateTime
+scalar JSON
+
+directive @auth on FIELD_DEFINITION

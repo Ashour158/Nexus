@@ -1,0 +1,17 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: nexus-retry
+  namespace: nexus
+spec:
+  hosts:
+    - "*.nexus.svc.cluster.local"
+  http:
+    - route:
+        - destination:
+            host: nexus-crm
+      retries:
+        attempts: 3
+        perTryTimeout: 2s
+        retryOn: gateway-error,connect-failure,refused-stream
+      timeout: 10s

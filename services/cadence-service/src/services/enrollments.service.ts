@@ -104,5 +104,46 @@ export function createEnrollmentsService(prisma: CadencePrisma, producer: NexusP
         data: { status: 'EXITED', exitReason: reason, exitedAt: new Date() },
       });
     },
+
+    /**
+     * Exit every ACTIVE enrollment for the given contact/lead whose cadence
+     * template has the matching exit flag enabled.
+     *
+     * `flag` selects which template setting gates the exit ('exitOnReply' or
+     * 'exitOnMeeting'). Fully guarded: any DB error is swallowed so a Kafka
+     * consumer or internal endpoint driving this never crashes the service.
+     * Returns the number of enrollments that were exited.
+     */
+    async exitEnrollmentsForObject(
+      tenantId: string,
+      objectId: string,
+      flag: 'exitOnReply' | 'exitOnMeeting',
+      reason: string
+    ): Promise<number> {
+      if (!tenantId || !objectId) return 0;
+      try {
+        const rows = await prisma.cadenceEnrollment.findMany({
+          where: {
+            tenantId,
+            objectId,
+            status: 'ACTIVE',
+            cadence: { [flag]: true },
+          },
+          select: { id: true },
+        });
+        if (rows.length === 0) return 0;
+        const result = await prisma.cadenceEnrollment.updateMany({
+          where: {
+            tenantId,
+            id: { in: rows.map((r) => r.id) },
+            status: 'ACTIVE',
+          },
+          data: { status: 'EXITED', exitReason: reason, exitedAt: new Date() },
+        });
+        return result.count;
+      } catch {
+        return 0;
+      }
+    },
   };
 }

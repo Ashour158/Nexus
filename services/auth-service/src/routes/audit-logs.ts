@@ -3,7 +3,7 @@ import type { JwtPayload } from '@nexus/shared-types';
 import { NotFoundError, PERMISSIONS, requirePermission } from '@nexus/service-utils';
 import { IdParamSchema, PaginationSchema } from '@nexus/validation';
 import type { AuthPrisma } from '../prisma.js';
-import { toPaginatedResult } from '../lib/pagination.js';
+import { toPaginatedResult } from '@nexus/shared-types';
 
 /**
  * Registers `/api/v1/audit-logs/*` routes (Section 34.1).
@@ -16,7 +16,7 @@ export async function registerAuditLogsRoutes(
     async (r) => {
       r.get(
         '/audit-logs',
-        { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
+        { preHandler: requirePermission(PERMISSIONS.AUDIT.READ) },
         async (request, reply) => {
           const q = PaginationSchema.parse(request.query);
           const jwt = request.user as JwtPayload;
@@ -39,10 +39,11 @@ export async function registerAuditLogsRoutes(
 
       r.get(
         '/audit-logs/:id',
-        { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
+        { preHandler: requirePermission(PERMISSIONS.AUDIT.READ) },
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
-          const row = await prisma.auditLog.findUnique({ where: { id } });
+          const jwt = request.user as JwtPayload;
+          const row = await prisma.auditLog.findFirst({ where: { id, tenantId: jwt.tenantId } });
           if (!row) throw new NotFoundError('AuditLog', id);
           return reply.send({ success: true, data: row });
         }

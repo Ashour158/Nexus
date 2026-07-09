@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 
+const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://auth-service:3010/api/v1';
+
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     await requireAdmin(req);
-    return NextResponse.json({
-      id: params.id,
-      name: `Tenant ${params.id}`,
-      plan: 'Enterprise',
-      users: 145,
-      activeDeals: 893,
-      revenueTracked: 2800000,
-      storageUsed: '96 GB',
-      renewalDate: '2026-12-01',
-      limits: { maxUsers: 250, maxContacts: 50000, maxStorageGb: 250, maxApiCallsPerDay: 250000 },
+    const auth = req.headers.get('authorization') ?? '';
+    const res = await fetch(`${AUTH_URL}/tenants/${params.id}`, {
+      headers: { Authorization: auth },
     });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: 'Upstream error' }));
+      return NextResponse.json(error, { status: res.status });
+    }
+    const data = await res.json();
+    return NextResponse.json(data);
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -24,7 +25,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   try {
     await requireAdmin(req);
     const body = await req.json();
-    return NextResponse.json({ id: params.id, ...body, updatedAt: new Date().toISOString() });
+    const auth = req.headers.get('authorization') ?? '';
+    const res = await fetch(`${AUTH_URL}/tenants/${params.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: auth },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    return NextResponse.json(data, { status: res.status });
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -33,7 +41,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     await requireAdmin(req);
-    return NextResponse.json({ deleted: true, id: params.id });
+    const auth = req.headers.get('authorization') ?? '';
+    const res = await fetch(`${AUTH_URL}/tenants/${params.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: auth },
+    });
+    return NextResponse.json({ success: res.ok }, { status: res.status });
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

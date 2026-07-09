@@ -35,7 +35,7 @@ export function createPipelineAnalyticsService(client: ClickHouseClient) {
               GROUP BY deal_id
             ),
             deal_amount AS (
-              SELECT deal_id, argMax(amount, occurred_at) AS amount
+              SELECT deal_id, argMax(if(base_amount != 0, base_amount, amount), occurred_at) AS amount
               FROM deal_events
               WHERE tenant_id = {tenantId:String} ${filter}
               GROUP BY deal_id
@@ -79,7 +79,7 @@ export function createPipelineAnalyticsService(client: ClickHouseClient) {
     > {
       const res = await client.query({
         query: `
-          SELECT stage_id AS stageId, countDistinct(deal_id) AS count, sum(amount) AS value
+          SELECT stage_id AS stageId, countDistinct(deal_id) AS count, sum(if(base_amount != 0, base_amount, amount)) AS value
           FROM deal_events
           WHERE tenant_id = {tenantId:String}
             AND occurred_at >= parseDateTime64BestEffort({from:String})

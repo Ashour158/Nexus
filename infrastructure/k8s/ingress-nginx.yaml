@@ -1,0 +1,55 @@
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: nginx
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "true"
+spec:
+  controller: k8s.io/ingress-nginx
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nexus-crm-ingress
+  namespace: nexus
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "50"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - app.nexus-crm.io
+        - api.nexus-crm.io
+      secretName: nexus-crm-tls
+  rules:
+    - host: app.nexus-crm.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 3000
+    - host: api.nexus-crm.io
+      http:
+        paths:
+          - path: /graphql
+            pathType: Prefix
+            backend:
+              service:
+                name: graphql-gateway
+                port:
+                  number: 4000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nexus-crm
+                port:
+                  number: 3000

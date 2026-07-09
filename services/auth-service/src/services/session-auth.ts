@@ -1,10 +1,13 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyRequest } from 'fastify';
 import type { JwtPayload } from '@nexus/shared-types';
 import { NotFoundError, UnauthorizedError } from '@nexus/service-utils';
 import type { AuthPrisma } from '../prisma.js';
 import { verifyKeycloakAccessToken } from '../lib/keycloak.js';
+import { verifyPassword } from '@nexus/security';
 import { randomToken } from '../lib/crypto-utils.js';
 import { resolveUserPermissions } from '../lib/permissions.js';
+import type { JwksKeyStore } from '../lib/jwt.js';
+import { isMfaEnabled } from './mfa.service.js';
 
 function refreshExpiry(): Date {
   const raw = process.env.REFRESH_TOKEN_EXPIRY ?? '7d';
@@ -17,13 +20,27 @@ function accessExpiresIn(): string {
   return process.env.JWT_EXPIRY ?? '15m';
 }
 
+export interface LoginResult {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: string;
+  mfaRequired: false;
+}
+
+export interface MfaChallengeResult {
+  mfaRequired: true;
+  mfaToken: string;
+}
+
+export type AuthResult = LoginResult | MfaChallengeResult;
+
 export async function loginWithKeycloak(
-  app: FastifyInstance,
+  keyStore: JwksKeyStore,
   prisma: AuthPrisma,
   request: FastifyRequest,
   keycloakAccessToken: string,
   meta: { userAgent?: string; ip?: string }
-): Promise<{ accessToken: string; refreshToken: string; expiresIn: string }> {
+): Promise<AuthResult> {
   const claims = await verifyKeycloakAccessToken(keycloakAccessToken);
   const keycloakId = claims.sub;
   const email =
@@ -44,7 +61,7 @@ export async function loginWithKeycloak(
     throw new NotFoundError('Tenant', tenantSlug);
   }
 
-  (request.requestContext as { set: (key: string, value: string) => void }).set('tenantId', tenant.id);
+  ((request as any).requestContext as { set: (key: string, value: string) => void }).set('tenantId', tenant.id);
 
   const firstName =
     (typeof claims.given_name === 'string' && claims.given_name) || email.split('@')[0] || 'User';
@@ -68,6 +85,62 @@ export async function loginWithKeycloak(
     },
   });
 
+  // Check MFA
+  return finalizeSession(keyStore, prisma, user, meta);
+}
+
+/**
+ * Email/password login against the local user store (passwordHash). This is the
+ * interim credential flow the web login form uses; Keycloak SSO layers on top via
+ * loginWithKeycloak. Returns the same session shape so both paths are interchangeable.
+ */
+export async function loginWithPassword(
+  keyStore: JwksKeyStore,
+  prisma: AuthPrisma,
+  request: FastifyRequest,
+  email: string,
+  password: string,
+  meta: { userAgent?: string; ip?: string }
+): Promise<AuthResult> {
+  const normalizedEmail = email.toLowerCase().trim();
+  const user = await prisma.user.findFirst({
+    where: { email: normalizedEmail, isActive: true },
+  });
+  // Uniform error + a verify against a dummy hash to reduce timing/user-enumeration signal.
+  if (!user || !user.passwordHash) {
+    await verifyPassword(password, '$2b$10$0000000000000000000000000000000000000000000000000000').catch(() => false);
+    throw new UnauthorizedError('Invalid email or password');
+  }
+  const ok = await verifyPassword(password, user.passwordHash);
+  if (!ok) {
+    throw new UnauthorizedError('Invalid email or password');
+  }
+
+  ((request as any).requestContext as { set: (key: string, value: string) => void }).set('tenantId', user.tenantId);
+  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+
+  return finalizeSession(keyStore, prisma, user, meta);
+}
+
+/**
+ * Shared session issuance: MFA gate → resolve roles (default SALES_REP) → persist
+ * refresh session → mint access token. Used by both Keycloak and password login.
+ */
+async function finalizeSession(
+  keyStore: JwksKeyStore,
+  prisma: AuthPrisma,
+  user: { id: string; tenantId: string; email: string },
+  meta: { userAgent?: string; ip?: string }
+): Promise<AuthResult> {
+  const mfaRequired = await isMfaEnabled(prisma, user.id);
+  if (mfaRequired) {
+    const mfaToken = await keyStore.sign(
+      { sub: user.id, type: 'mfa_challenge', tenantId: user.tenantId },
+      { expiresIn: '5m' }
+    );
+    return { mfaRequired: true, mfaToken };
+  }
+
   const withRoles = await prisma.user.findUnique({
     where: { id: user.id },
     include: { userRoles: { include: { role: true } } },
@@ -77,7 +150,7 @@ export async function loginWithKeycloak(
   let roles = withRoles.userRoles.map((ur: { role: { name: string; permissions: unknown } }) => ur.role);
   if (roles.length === 0) {
     const defaultRole = await prisma.role.findFirst({
-      where: { tenantId: tenant.id, name: 'SALES_REP' },
+      where: { tenantId: user.tenantId, name: 'SALES_REP' },
     });
     if (defaultRole) {
       await prisma.userRole.create({
@@ -102,6 +175,7 @@ export async function loginWithKeycloak(
       expiresAt: refreshExpiry(),
       userAgent: meta.userAgent,
       ipAddress: meta.ip,
+      mfaVerified: false,
     },
   });
 
@@ -113,15 +187,15 @@ export async function loginWithKeycloak(
     permissions,
   };
 
-  const accessToken = app.jwt.sign({ ...payload } as Record<string, unknown>, {
+  const accessToken = await keyStore.sign({ ...payload } as Record<string, unknown>, {
     expiresIn: accessExpiresIn(),
   });
 
-  return { accessToken, refreshToken, expiresIn: accessExpiresIn() };
+  return { accessToken, refreshToken, expiresIn: accessExpiresIn(), mfaRequired: false };
 }
 
 export async function refreshTokens(
-  app: FastifyInstance,
+  keyStore: JwksKeyStore,
   prisma: AuthPrisma,
   refreshToken: string
 ): Promise<{ accessToken: string; refreshToken: string; expiresIn: string }> {
@@ -151,7 +225,7 @@ export async function refreshTokens(
     permissions,
   };
 
-  const accessToken = app.jwt.sign({ ...payload } as Record<string, unknown>, {
+  const accessToken = await keyStore.sign({ ...payload } as Record<string, unknown>, {
     expiresIn: accessExpiresIn(),
   });
 

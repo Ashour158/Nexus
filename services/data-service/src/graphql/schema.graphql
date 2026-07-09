@@ -1,0 +1,165 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  recycleBinItems(limit: Int, offset: Int): [RecycleBinItem!]!
+  recycleBinItem(id: ID!): RecycleBinItem
+  fieldAuditLogs(limit: Int, offset: Int): [FieldAuditLog!]!
+  fieldAuditLog(id: ID!): FieldAuditLog
+  savedViews(limit: Int, offset: Int): [SavedView!]!
+  savedView(id: ID!): SavedView
+  recentRecords(limit: Int, offset: Int): [RecentRecord!]!
+  recentRecord(id: ID!): RecentRecord
+  importJobs(limit: Int, offset: Int): [ImportJob!]!
+  importJob(id: ID!): ImportJob
+}
+
+type Mutation {
+  createRecycleBinItem(input: CreateRecycleBinItemInput!): RecycleBinItem!
+  deleteRecycleBinItem(id: ID!): Boolean!
+  createFieldAuditLog(input: CreateFieldAuditLogInput!): FieldAuditLog!
+  createSavedView(input: CreateSavedViewInput!): SavedView!
+  updateSavedView(id: ID!, input: UpdateSavedViewInput!): SavedView!
+  deleteSavedView(id: ID!): Boolean!
+  createRecentRecord(input: CreateRecentRecordInput!): RecentRecord!
+  deleteRecentRecord(id: ID!): Boolean!
+  createImportJob(input: CreateImportJobInput!): ImportJob!
+  updateImportJob(id: ID!, input: UpdateImportJobInput!): ImportJob!
+}
+
+type RecycleBinItem @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  module: String!
+  recordId: String!
+  recordSnapshot: JSON!
+  deletedBy: String!
+  deletedAt: DateTime!
+  expiresAt: DateTime!
+}
+
+type FieldAuditLog @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  module: String!
+  recordId: String!
+  fieldName: String!
+  oldValue: String
+  newValue: String
+  changedBy: String!
+  changedAt: DateTime!
+}
+
+type SavedView @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  userId: String!
+  module: String!
+  name: String!
+  filters: JSON!
+  columns: JSON!
+  sortBy: String
+  sortDir: String!
+  isDefault: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type RecentRecord @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  userId: String!
+  module: String!
+  recordId: String!
+  viewedAt: DateTime!
+}
+
+type ImportJob @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  module: String!
+  status: ImportStatus!
+  fileName: String!
+  totalRows: Int!
+  imported: Int!
+  failed: Int!
+  errors: JSON!
+  fieldMap: JSON!
+  createdBy: String!
+  createdAt: DateTime!
+  completedAt: DateTime
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+input CreateRecycleBinItemInput {
+  tenantId: String!
+  module: String!
+  recordId: String!
+  recordSnapshot: JSON!
+  deletedBy: String!
+  expiresAt: DateTime!
+}
+
+input CreateFieldAuditLogInput {
+  tenantId: String!
+  module: String!
+  recordId: String!
+  fieldName: String!
+  oldValue: String
+  newValue: String
+  changedBy: String!
+}
+
+input CreateSavedViewInput {
+  tenantId: String!
+  userId: String!
+  module: String!
+  name: String!
+  filters: JSON
+  columns: JSON
+  sortBy: String
+  sortDir: String
+  isDefault: Boolean
+}
+
+input UpdateSavedViewInput {
+  name: String
+  filters: JSON
+  columns: JSON
+  sortBy: String
+  sortDir: String
+  isDefault: Boolean
+}
+
+input CreateRecentRecordInput {
+  tenantId: String!
+  userId: String!
+  module: String!
+  recordId: String!
+}
+
+input CreateImportJobInput {
+  tenantId: String!
+  module: String!
+  fileName: String!
+  fieldMap: JSON
+  createdBy: String!
+}
+
+input UpdateImportJobInput {
+  status: ImportStatus
+  totalRows: Int
+  imported: Int
+  failed: Int
+  errors: JSON
+  completedAt: DateTime
+}

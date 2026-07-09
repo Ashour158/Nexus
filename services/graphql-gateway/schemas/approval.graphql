@@ -1,0 +1,143 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  approvalPolicies(limit: Int, offset: Int): [ApprovalPolicy!]!
+  approvalPolicy(id: ID!): ApprovalPolicy
+  approvalRequests(limit: Int, offset: Int): [ApprovalRequest!]!
+  approvalRequest(id: ID!): ApprovalRequest
+  approvalSteps(limit: Int, offset: Int): [ApprovalStep!]!
+  approvalStep(id: ID!): ApprovalStep
+}
+
+type Mutation {
+  createApprovalPolicy(input: CreateApprovalPolicyInput!): ApprovalPolicy!
+  updateApprovalPolicy(id: ID!, input: UpdateApprovalPolicyInput!): ApprovalPolicy!
+  deleteApprovalPolicy(id: ID!): Boolean!
+  createApprovalRequest(input: CreateApprovalRequestInput!): ApprovalRequest!
+  updateApprovalRequest(id: ID!, input: UpdateApprovalRequestInput!): ApprovalRequest!
+  deleteApprovalRequest(id: ID!): Boolean!
+  createApprovalStep(input: CreateApprovalStepInput!): ApprovalStep!
+  updateApprovalStep(id: ID!, input: UpdateApprovalStepInput!): ApprovalStep!
+  deleteApprovalStep(id: ID!): Boolean!
+}
+
+type ApprovalPolicy @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  module: String!
+  conditions: JSON!
+  steps: JSON!
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  requests: [ApprovalRequest!]!
+}
+
+type ApprovalRequest @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  policyId: String!
+  policy: ApprovalPolicy!
+  module: String!
+  recordId: String!
+  requestedBy: String!
+  status: ApprovalStatus!
+  currentStep: Int!
+  data: JSON!
+  comment: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  steps: [ApprovalStep!]!
+}
+
+type ApprovalStep {
+  id: ID!
+  requestId: String!
+  order: Int!
+  approverId: String!
+  status: StepStatus!
+  comment: String
+  actionedAt: DateTime
+  createdAt: DateTime!
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ESCALATED
+  CANCELLED
+}
+
+enum StepStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED
+  DELEGATED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+input CreateApprovalPolicyInput {
+  tenantId: String!
+  name: String!
+  module: String!
+  conditions: JSON
+  steps: JSON
+  isActive: Boolean
+}
+
+input UpdateApprovalPolicyInput {
+  name: String
+  module: String
+  conditions: JSON
+  steps: JSON
+  isActive: Boolean
+}
+
+input CreateApprovalRequestInput {
+  tenantId: String!
+  policyId: ID!
+  module: String!
+  recordId: String!
+  requestedBy: String!
+  status: ApprovalStatus
+  currentStep: Int
+  data: JSON
+  comment: String
+}
+
+input UpdateApprovalRequestInput {
+  policyId: ID
+  module: String
+  recordId: String
+  requestedBy: String
+  status: ApprovalStatus
+  currentStep: Int
+  data: JSON
+  comment: String
+}
+
+input CreateApprovalStepInput {
+  requestId: ID!
+  order: Int!
+  approverId: String!
+  status: StepStatus
+  comment: String
+  actionedAt: DateTime
+}
+
+input UpdateApprovalStepInput {
+  order: Int
+  approverId: String
+  status: StepStatus
+  comment: String
+  actionedAt: DateTime
+}

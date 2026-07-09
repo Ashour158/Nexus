@@ -1,0 +1,47 @@
+{
+  "name": "@nexus/security",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./rls": {
+      "import": "./dist/rls.js",
+      "types": "./dist/rls.d.ts"
+    },
+    "./encryption": {
+      "import": "./dist/encryption.js",
+      "types": "./dist/encryption.d.ts"
+    },
+    "./residency": {
+      "import": "./dist/residency.js",
+      "types": "./dist/residency.d.ts"
+    },
+    "./ip-restriction": {
+      "import": "./dist/ip-restriction.js",
+      "types": "./dist/ip-restriction.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "@types/bcryptjs": "^3.0.0",
+    "bcryptjs": "^3.0.3",
+    "crypto-js": "^4.2.0"
+  },
+  "devDependencies": {
+    "@types/crypto-js": "^4.2.2",
+    "@types/node": "^20.14.9",
+    "typescript": "^5.5.3",
+    "vitest": "^1.6.0"
+  }
+}

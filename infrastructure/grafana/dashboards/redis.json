@@ -1,0 +1,66 @@
+{
+  "title": "Redis Metrics",
+  "tags": [
+    "redis",
+    "cache"
+  ],
+  "timezone": "UTC",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Memory Usage",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "redis_memory_used_bytes",
+          "legendFormat": "used"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 2,
+      "title": "Commands/sec",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "rate(redis_commands_processed_total[5m])",
+          "legendFormat": "cmd/s"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      }
+    },
+    {
+      "id": 3,
+      "title": "Cache Hit Rate",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))",
+          "legendFormat": "hit %"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      }
+    }
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "30s"
+}

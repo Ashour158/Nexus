@@ -1,0 +1,24 @@
+{
+  "name": "@nexus/domain-core",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsc --project tsconfig.json --watch",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.3",
+    "vitest": "^1.6.0"
+  }
+}

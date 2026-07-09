@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
 import type { createOauthService } from '../services/oauth.service.js';
 
-const Provider = z.enum(['google', 'microsoft']);
+const Provider = z.enum(['google', 'microsoft', 'slack']);
 
 export async function registerOauthRoutes(
   app: FastifyInstance,
@@ -15,31 +15,61 @@ export async function registerOauthRoutes(
     async (request, reply) => {
       const { provider } = z.object({ provider: Provider }).parse(request.params);
       const user = (request as unknown as { user: { tenantId: string; sub: string } }).user;
+      // Carry tenant + user in a signed, time-bounded state so the unauthenticated
+      // callback can recover them (and reject forged/expired state).
+      const state = oauth.signState({ tenantId: user.tenantId, userId: user.sub });
+      (reply as any).setCookie('oauth_state', state, {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 600, // 10 minutes
+        signed: true,
+      });
       const scope =
         provider === 'google'
           ? 'openid email profile https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send'
-          : 'offline_access User.Read Mail.Read Mail.Send Calendars.ReadWrite';
-      const url = oauth.buildConnectUrl(provider, scope, `${user.tenantId}:${user.sub}`);
+          : provider === 'slack'
+            ? 'chat:write,users:read,users:read.email,channels:read,groups:read,im:read,mpim:read'
+            : 'offline_access User.Read Mail.Read Mail.Send Calendars.ReadWrite';
+      const url = oauth.buildConnectUrl(provider, scope, state);
       return reply.redirect(url);
     }
   );
 
-  app.get('/api/v1/integrations/oauth/:provider/callback', async (request, reply) => {
-    const { provider } = z.object({ provider: Provider }).parse(request.params);
-    const query = z.object({ code: z.string().min(1), state: z.string().optional() }).parse(request.query);
-    const tokens = await oauth.exchangeCode(provider, query.code);
-    const user = (request as unknown as { user: { tenantId: string; sub: string } }).user;
-    await oauth.saveConnection({
-      tenantId: user.tenantId,
-      userId: user.sub,
-      provider,
-      scope: tokens.scope ?? 'calendar,email',
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token,
-      expiresIn: tokens.expires_in,
-    });
-    return reply.send({ success: true, data: { connected: true } });
-  });
+  app.get(
+    '/api/v1/integrations/oauth/:provider/callback',
+    async (request, reply) => {
+      const { provider } = z.object({ provider: Provider }).parse(request.params);
+      const query = z.object({ code: z.string().min(1), state: z.string().min(1) }).parse(request.query);
+      const cookie = (request as any).unsignCookie((request as any).cookies.oauth_state ?? '');
+      if (!cookie.valid || cookie.value !== query.state) {
+        return reply.code(403).send({ success: false, error: { code: 'INVALID_STATE', message: 'OAuth state mismatch — possible CSRF attack.' } });
+      }
+      // Recover tenant + user from the HMAC-signed state (the callback is
+      // unauthenticated, so request.user is not available here).
+      const decoded = oauth.verifyState(query.state);
+      if (!decoded) {
+        return reply.code(403).send({ success: false, error: { code: 'INVALID_STATE', message: 'OAuth state invalid or expired.' } });
+      }
+      const tokens = await oauth.exchangeCode(provider, query.code);
+      let email: string | null = null;
+      if (provider === 'slack' && tokens.access_token) {
+        email = await oauth.getSlackUserInfo(tokens.access_token);
+      }
+      await oauth.saveConnection({
+        tenantId: decoded.tenantId,
+        userId: decoded.userId,
+        provider,
+        scope: tokens.scope ?? (provider === 'slack' ? 'chat:write,users:read' : 'calendar,email'),
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        expiresIn: tokens.expires_in,
+        email: email ?? undefined,
+      });
+      return reply.send({ success: true, data: { connected: true } });
+    }
+  );
 
   app.get(
     '/api/v1/integrations/oauth/connections',

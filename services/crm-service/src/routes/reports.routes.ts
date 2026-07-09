@@ -11,7 +11,8 @@ const QuerySpecSchema = z.object({
   groupBy: z.string().optional(),
   sortBy: z.string().optional(),
   sortDir: z.enum(['asc', 'desc']).optional(),
-  limit: z.number().int().positive().max(500).optional(),
+  limit: z.number().int().positive().max(2000).optional(),
+  offset: z.number().int().min(0).max(10000).optional(),
 });
 
 function matchesFilter(row: Record<string, unknown>, filter: { field: string; operator: string; value: string }): boolean {
@@ -50,24 +51,30 @@ export async function registerCrmReportsRoutes(app: FastifyInstance, prisma: Crm
       r.post('/reports/query', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
         const jwt = request.user as JwtPayload;
         const body = z.object({ querySpec: QuerySpecSchema, params: z.record(z.unknown()).optional() }).parse(request.body);
-        const take = body.querySpec.limit ?? 250;
+        const fetchCap = Math.min(5000, Math.max(500, (body.querySpec.limit ?? 250) + (body.querySpec.offset ?? 0) + 100));
         const where = { tenantId: jwt.tenantId };
         const source =
           body.querySpec.entity === 'deal'
-            ? await prisma.deal.findMany({ where, take })
+            ? await prisma.deal.findMany({ where, take: fetchCap })
             : body.querySpec.entity === 'lead'
-              ? await prisma.lead.findMany({ where, take })
+              ? await prisma.lead.findMany({ where, take: fetchCap })
               : body.querySpec.entity === 'activity'
-                ? await prisma.activity.findMany({ where, take })
+                ? await prisma.activity.findMany({ where, take: fetchCap })
                 : body.querySpec.entity === 'account'
-                  ? await prisma.account.findMany({ where, take })
-                  : await prisma.contact.findMany({ where, take });
+                  ? await prisma.account.findMany({ where, take: fetchCap })
+                  : await prisma.contact.findMany({ where, take: fetchCap });
         const filtered = (source as Array<Record<string, unknown>>).filter((row) =>
           (body.querySpec.filters ?? []).every((filter) => matchesFilter(row, filter))
         );
-        const rows = groupRows(filtered, body.querySpec.groupBy);
-        const columns = body.querySpec.columns ?? Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
-        return reply.send({ success: true, data: { columns, rows } });
+        const grouped = groupRows(filtered, body.querySpec.groupBy);
+        const total = grouped.length;
+        const limit = body.querySpec.limit ?? 250;
+        const offset = body.querySpec.offset ?? 0;
+        const rows = grouped.slice(offset, offset + limit);
+        const columns =
+          body.querySpec.columns ??
+          Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
+        return reply.send({ success: true, data: { columns, rows, total } });
       });
     },
     { prefix: '/api/v1' }

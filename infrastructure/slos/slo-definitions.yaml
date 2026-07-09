@@ -1,0 +1,59 @@
+# Nexus CRM — SLO Definitions
+
+slos:
+  - name: api-availability
+    description: API availability for all services
+    service: nexus-crm
+    target: 0.999
+    window: 30d
+    burnRateAlerts:
+      - name: fast-burn
+        burnRate: 14.4
+        lookback: 1h
+        severity: critical
+      - name: slow-burn
+        burnRate: 2
+        lookback: 6h
+        severity: warning
+
+  - name: api-latency
+    description: API request latency P95
+    service: nexus-crm
+    target: 0.99
+    window: 30d
+    metric: http_request_duration_seconds
+    quantile: 0.95
+    threshold: 0.5
+
+  - name: kafka-consumer-lag
+    description: Kafka consumer lag should stay low
+    service: nexus-crm
+    target: 0.99
+    window: 7d
+    metric: kafka_consumer_group_lag
+    threshold: 1000
+
+  - name: database-availability
+    description: PostgreSQL availability
+    service: postgres
+    target: 0.9999
+    window: 30d
+
+  - name: cache-hit-ratio
+    description: Redis cache hit ratio
+    service: redis
+    target: 0.95
+    window: 7d
+    metric: redis_keyspace_hit_rate
+
+errorBudgets:
+  - name: monthly-api-error-budget
+    slo: api-availability
+    budget: 0.001
+    consequences:
+      - at: 0.5
+        action: Page on-call engineer
+      - at: 0.75
+        action: Halt feature releases
+      - at: 1.0
+        action: Initiate incident response

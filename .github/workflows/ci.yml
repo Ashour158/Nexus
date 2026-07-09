@@ -1,4 +1,4 @@
-﻿name: CI
+name: CI
 
 on:
   push:
@@ -7,21 +7,26 @@ on:
     branches: [main]
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
 
 jobs:
   quality:
     name: Lint & Typecheck
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -33,7 +38,7 @@ jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
-    needs: quality
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:16-alpine
@@ -57,38 +62,71 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
+      kafka:
+        image: confluentinc/cp-kafka:7.6.0
+        env:
+          KAFKA_BROKER_ID: 1
+          KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+          KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+          KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+          KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+          KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+          KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+        ports:
+          - '9092:9092'
+      zookeeper:
+        image: confluentinc/cp-zookeeper:7.6.0
+        env:
+          ZOOKEEPER_CLIENT_PORT: 2181
+          ZOOKEEPER_TICK_TIME: 2000
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Run database migrations
+        run: pnpm db:migrate
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://nexus:nexus@localhost:5432/nexus_test
       - name: Run tests
         run: pnpm test
         env:
           NODE_ENV: test
           DATABASE_URL: postgresql://nexus:nexus@localhost:5432/nexus_test
           REDIS_URL: redis://localhost:6379
-          JWT_SECRET: test-jwt-secret-at-least-32-chars-long!!
-          KAFKA_BROKERS: ''
+          # Use a GitHub secret for test JWT; falls back to a non-secret placeholder only in CI env
+          JWT_SECRET: ${{ secrets.CI_JWT_SECRET || 'test-jwt-placeholder-replace-with-secret-min-32-chars' }}
+          KAFKA_BROKERS: localhost:9092
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: '**/coverage/**'
+          retention-days: 7
 
   build:
-    name: Build
+    name: Build Packages
     runs-on: ubuntu-latest
-    needs: test
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -97,31 +135,180 @@ jobs:
         env:
           NODE_ENV: production
           NEXT_TELEMETRY_DISABLED: 1
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: |
+            apps/web/.next/standalone
+            services/*/dist
+            packages/*/dist
+          retention-days: 3
 
   docker:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
-    needs: build
+    timeout-minutes: 30
+    needs: [quality, test, build]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - context: apps/web
+            image: web
+          - context: services/auth-service
+            image: auth-service
+          - context: services/crm-service
+            image: crm-service
+          - context: services/finance-service
+            image: finance-service
+          - context: services/notification-service
+            image: notification-service
+          - context: services/realtime-service
+            image: realtime-service
+          - context: services/search-service
+            image: search-service
+          - context: services/workflow-service
+            image: workflow-service
+          - context: services/integration-service
+            image: integration-service
+          - context: services/blueprint-service
+            image: blueprint-service
+          - context: services/approval-service
+            image: approval-service
+          - context: services/data-service
+            image: data-service
+          - context: services/document-service
+            image: document-service
+          - context: services/chatbot-service
+            image: chatbot-service
+          - context: services/cadence-service
+            image: cadence-service
+          - context: services/territory-service
+            image: territory-service
+          - context: services/planning-service
+            image: planning-service
+          - context: services/reporting-service
+            image: reporting-service
+          - context: services/portal-service
+            image: portal-service
+          - context: services/knowledge-service
+            image: knowledge-service
+          - context: services/incentive-service
+            image: incentive-service
+          - context: services/graphql-gateway
+            image: graphql-gateway
+          - context: services/comm-service
+            image: comm-service
+          - context: services/storage-service
+            image: storage-service
+          - context: services/email-sync-service
+            image: email-sync-service
+          - context: services/analytics-service
+            image: analytics-service
+          - context: services/metadata-service
+            image: metadata-service
+          - context: services/audit-consumer
+            image: audit-consumer
+          - context: services/outbox-relay
+            image: outbox-relay
+          - context: services/router-coprocessor
+            image: router-coprocessor
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push web
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./apps/web/Dockerfile
+          file: ./${{ matrix.context }}/Dockerfile
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/web:latest
-            ghcr.io/${{ github.repository }}/web:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            ghcr.io/${{ github.repository_owner }}/nexus-${{ matrix.image }}:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/nexus-${{ matrix.image }}:latest
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+      # TODO: Sign images with cosign for supply-chain security
+      # - uses: sigstore/cosign-installer@v3
+      # - run: cosign sign --yes ghcr.io/${{ github.repository_owner }}/nexus-${{ matrix.image }}:${{ github.sha }}
+      # TODO: Generate SBOM with syft or trivy
+      # - uses: anchore/sbom-action@v0
+      #   with:
+      #     image: ghcr.io/${{ github.repository_owner }}/nexus-${{ matrix.image }}:${{ github.sha }}
+
+  load-test:
+    name: Load Testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: docker
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run K6 load tests
+        uses: grafana/k6-action@v0.3.0
+        with:
+          filename: tests/load/api-load-test.js
+        env:
+          K6_PROMETHEUS_RW_SERVER_URL: ${{ secrets.PROMETHEUS_REMOTE_WRITE_URL }}
+          K6_PROMETHEUS_RW_USERNAME: ${{ secrets.PROMETHEUS_USERNAME }}
+          K6_PROMETHEUS_RW_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: build
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  smoke-test-staging:
+    name: Smoke Test Staging Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: docker
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Verify images in registry
+        run: |
+          # Quick smoke test: verify a critical image manifest exists in GHCR
+          TOKEN=$(curl -s -u "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
+            "https://ghcr.io/token?service=ghcr.io&scope=repository:${{ github.repository_owner }}/nexus-web:pull" | jq -r .token)
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $TOKEN" \
+            "https://ghcr.io/v2/${{ github.repository_owner }}/nexus-web/manifests/${{ github.sha }}")
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Image manifest check failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+          echo "✅ Staging images verified in registry"
+      # Note: full staging deployment smoke tests run automatically in
+      # deploy-staging.yml via workflow_run after this CI workflow completes.

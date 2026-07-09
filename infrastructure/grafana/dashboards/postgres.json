@@ -1,0 +1,66 @@
+{
+  "title": "PostgreSQL Metrics",
+  "tags": [
+    "postgres",
+    "database"
+  ],
+  "timezone": "UTC",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Active Connections",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "pg_stat_activity_count{state=\"active\"}",
+          "legendFormat": "active"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 2,
+      "title": "Transaction Rate",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "rate(pg_stat_database_xact_commit[5m])",
+          "legendFormat": "commits/s"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      }
+    },
+    {
+      "id": 3,
+      "title": "Replication Lag",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "pg_replication_lag_seconds",
+          "legendFormat": "lag"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      }
+    }
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "30s"
+}

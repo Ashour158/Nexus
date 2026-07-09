@@ -1,0 +1,208 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key", "@shareable", "@external"])
+
+scalar DateTime
+scalar JSON
+
+type Query {
+  cadenceTemplates(limit: Int, offset: Int): [CadenceTemplate!]!
+  cadenceTemplate(id: ID!): CadenceTemplate
+  cadenceSteps(limit: Int, offset: Int): [CadenceStep!]!
+  cadenceStep(id: ID!): CadenceStep
+  cadenceEnrollments(limit: Int, offset: Int): [CadenceEnrollment!]!
+  cadenceEnrollment(id: ID!): CadenceEnrollment
+  stepExecutions(limit: Int, offset: Int): [StepExecution!]!
+  stepExecution(id: ID!): StepExecution
+}
+
+type Mutation {
+  createCadenceTemplate(input: CreateCadenceTemplateInput!): CadenceTemplate!
+  updateCadenceTemplate(id: ID!, input: UpdateCadenceTemplateInput!): CadenceTemplate!
+  deleteCadenceTemplate(id: ID!): Boolean!
+  createCadenceStep(input: CreateCadenceStepInput!): CadenceStep!
+  updateCadenceStep(id: ID!, input: UpdateCadenceStepInput!): CadenceStep!
+  deleteCadenceStep(id: ID!): Boolean!
+  createCadenceEnrollment(input: CreateCadenceEnrollmentInput!): CadenceEnrollment!
+  updateCadenceEnrollment(id: ID!, input: UpdateCadenceEnrollmentInput!): CadenceEnrollment!
+  deleteCadenceEnrollment(id: ID!): Boolean!
+  createStepExecution(input: CreateStepExecutionInput!): StepExecution!
+  updateStepExecution(id: ID!, input: UpdateStepExecutionInput!): StepExecution!
+  deleteStepExecution(id: ID!): Boolean!
+}
+
+type CadenceTemplate @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  name: String!
+  description: String
+  objectType: ObjectType!
+  isActive: Boolean!
+  exitOnReply: Boolean!
+  exitOnMeeting: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  steps: [CadenceStep!]!
+  enrollments: [CadenceEnrollment!]!
+}
+
+type CadenceStep {
+  id: ID!
+  cadenceId: String!
+  cadence: CadenceTemplate!
+  position: Int!
+  type: StepType!
+  delayDays: Int!
+  subject: String
+  body: String
+  taskTitle: String
+  variantB: JSON
+  createdAt: DateTime!
+}
+
+type CadenceEnrollment @key(fields: "id") {
+  id: ID!
+  tenantId: String!
+  cadenceId: String!
+  cadence: CadenceTemplate!
+  objectType: ObjectType!
+  objectId: String!
+  ownerId: String!
+  status: EnrollmentStatus!
+  currentStep: Int!
+  enrolledAt: DateTime!
+  exitReason: String
+  exitedAt: DateTime
+  executions: [StepExecution!]!
+}
+
+type StepExecution {
+  id: ID!
+  enrollmentId: String!
+  enrollment: CadenceEnrollment!
+  stepPosition: Int!
+  stepType: StepType!
+  status: ExecutionStatus!
+  scheduledAt: DateTime!
+  executedAt: DateTime
+  result: String
+  variant: String!
+  createdAt: DateTime!
+}
+
+enum ObjectType {
+  CONTACT
+  LEAD
+}
+
+enum StepType {
+  EMAIL
+  CALL_TASK
+  LINKEDIN_TASK
+  SMS
+  WAIT
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  EXITED
+}
+
+enum ExecutionStatus {
+  PENDING
+  EXECUTED
+  SKIPPED
+  FAILED
+  RUNNING
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+input CreateCadenceTemplateInput {
+  tenantId: String!
+  name: String!
+  description: String
+  objectType: ObjectType
+  isActive: Boolean
+  exitOnReply: Boolean
+  exitOnMeeting: Boolean
+}
+
+input UpdateCadenceTemplateInput {
+  name: String
+  description: String
+  objectType: ObjectType
+  isActive: Boolean
+  exitOnReply: Boolean
+  exitOnMeeting: Boolean
+}
+
+input CreateCadenceStepInput {
+  cadenceId: ID!
+  position: Int!
+  type: StepType!
+  delayDays: Int
+  subject: String
+  body: String
+  taskTitle: String
+  variantB: JSON
+}
+
+input UpdateCadenceStepInput {
+  cadenceId: ID
+  position: Int
+  type: StepType
+  delayDays: Int
+  subject: String
+  body: String
+  taskTitle: String
+  variantB: JSON
+}
+
+input CreateCadenceEnrollmentInput {
+  tenantId: String!
+  cadenceId: ID!
+  objectType: ObjectType!
+  objectId: String!
+  ownerId: String!
+  status: EnrollmentStatus
+  currentStep: Int
+  enrolledAt: DateTime
+  exitReason: String
+  exitedAt: DateTime
+}
+
+input UpdateCadenceEnrollmentInput {
+  cadenceId: ID
+  objectType: ObjectType
+  objectId: String
+  ownerId: String
+  status: EnrollmentStatus
+  currentStep: Int
+  enrolledAt: DateTime
+  exitReason: String
+  exitedAt: DateTime
+}
+
+input CreateStepExecutionInput {
+  enrollmentId: ID!
+  stepPosition: Int!
+  stepType: StepType!
+  status: ExecutionStatus
+  scheduledAt: DateTime!
+  executedAt: DateTime
+  result: String
+  variant: String
+}
+
+input UpdateStepExecutionInput {
+  stepPosition: Int
+  stepType: StepType
+  status: ExecutionStatus
+  scheduledAt: DateTime
+  executedAt: DateTime
+  result: String
+  variant: String
+}

@@ -11,6 +11,9 @@ export async function handleEmailNode(
     body?: string;
   };
   const base = process.env.NOTIFICATION_SERVICE_URL ?? 'http://localhost:3003/api/v1';
+  if (!process.env.NOTIFICATION_SERVICE_URL) {
+    console.warn('[email.node] NOTIFICATION_SERVICE_URL is not set — falling back to localhost:3003');
+  }
   return handleActionNode(
     {
       ...node,

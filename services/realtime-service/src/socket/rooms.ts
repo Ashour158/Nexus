@@ -9,3 +9,11 @@ export function userRoom(userId: string): string {
 export function dealRoom(dealId: string): string {
   return `deal:${dealId}`;
 }
+
+export function contactRoom(contactId: string): string {
+  return `contact:${contactId}`;
+}
+
+export function accountRoom(accountId: string): string {
+  return `account:${accountId}`;
+}

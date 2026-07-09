@@ -1,0 +1,82 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: nexus-crm
+  description: Nexus CRM - Enterprise Customer Relationship Management Platform
+  tags:
+    - crm
+    - microservices
+    - typescript
+    - nextjs
+    - fastify
+  links:
+    - url: https://app.nexus-crm.io
+      title: Production
+      icon: dashboard
+    - url: https://grafana.nexus-crm.io
+      title: Grafana
+      icon: dashboard
+  annotations:
+    github.com/project-slug: nexus-crm/nexus-crm
+    backstage.io/techdocs-ref: dir:.
+    argocd/app-name: nexus-crm
+    grafana/dashboard-selector: "tags @> 'nexus'"
+spec:
+  type: website
+  lifecycle: production
+  owner: team-platform
+  system: nexus-crm
+  dependsOn:
+    - resource:postgres
+    - resource:redis
+    - resource:kafka
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: nexus-crm
+  description: Nexus CRM Platform
+tags:
+  - crm
+spec:
+  owner: team-platform
+  domain: sales
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: postgres
+  description: PostgreSQL database cluster
+tags:
+  - database
+  - postgres
+spec:
+  type: database
+  owner: team-platform
+  system: nexus-crm
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: redis
+  description: Redis cache cluster
+tags:
+  - cache
+  - redis
+spec:
+  type: cache
+  owner: team-platform
+  system: nexus-crm
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: kafka
+  description: Kafka message broker
+tags:
+  - messaging
+  - kafka
+spec:
+  type: message-broker
+  owner: team-platform
+  system: nexus-crm

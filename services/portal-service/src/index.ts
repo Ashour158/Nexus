@@ -4,6 +4,7 @@ import { createService, startService, globalErrorHandler, registerHealthRoutes, 
 import { NexusProducer } from '@nexus/kafka';
 import { getPrisma } from './prisma.js';
 import { createPortalService } from './services/portal.service.js';
+import { createPortalAccountService } from './services/portal-account.service.js';
 import { registerRoutes } from './routes/index.js';
 import { registerGraphQL } from './graphql/index.js';
 
@@ -52,9 +53,10 @@ app.setErrorHandler(globalErrorHandler);
 registerHealthRoutes(app, 'portal-service', [() => checkDatabase(prisma)]);
 
 const portalSvc = createPortalService(prisma, producer);
+const portalAccountSvc = createPortalAccountService(prisma);
 
 await registerGraphQL(app, prisma);
 
 await startService(app, port, async () => {
-  await registerRoutes(app, portalSvc);
+  await registerRoutes(app, portalSvc, portalAccountSvc);
 });

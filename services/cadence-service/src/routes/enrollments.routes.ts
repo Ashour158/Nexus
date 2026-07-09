@@ -18,6 +18,11 @@ const Create = z.object({
 });
 const ExitBody = z.object({ reason: z.string().min(1) });
 const Id = z.object({ id: z.string().cuid() });
+const EnrollByCadence = z.object({
+  objectType: z.enum(['CONTACT', 'LEAD']),
+  objectId: z.string().min(1),
+  ownerId: z.string().cuid(),
+});
 
 export async function registerEnrollmentsRoutes(
   app: FastifyInstance,
@@ -70,5 +75,22 @@ export async function registerEnrollmentsRoutes(
     const body = ExitBody.parse(request.body);
     const data = await enrollments.exitEnrollment(tenantId, id, body.reason);
     return reply.send({ success: true, data });
+  });
+
+  // Force the enrollment's next pending step to run on the next poller tick.
+  app.post('/api/v1/enrollments/:id/advance', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+    const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+    const { id } = Id.parse(request.params);
+    const data = await enrollments.advanceEnrollment(tenantId, id);
+    return reply.send({ success: true, data });
+  });
+
+  // Manual enroll shortcut: POST /cadences/:id/enroll (cadence id in the path).
+  app.post('/api/v1/cadences/:id/enroll', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+    const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+    const { id } = Id.parse(request.params);
+    const body = EnrollByCadence.parse(request.body);
+    const data = await enrollments.enroll(tenantId, id, body.objectType, body.objectId, body.ownerId);
+    return reply.code(201).send({ success: true, data });
   });
 }

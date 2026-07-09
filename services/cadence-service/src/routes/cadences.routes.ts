@@ -11,12 +11,14 @@ const CadenceSchema = z.object({
   isActive: z.boolean().optional(),
   exitOnReply: z.boolean().optional(),
   exitOnMeeting: z.boolean().optional(),
+  autoEnrollTrigger: z.string().nullable().optional(),
   steps: z
     .array(
       z.object({
         position: z.number().int().min(0),
         type: z.enum(['EMAIL', 'CALL_TASK', 'LINKEDIN_TASK', 'SMS', 'WAIT']),
         delayDays: z.number().int().min(0).optional(),
+        delayHours: z.number().int().min(0).optional(),
         subject: z.string().optional(),
         body: z.string().optional(),
         taskTitle: z.string().optional(),

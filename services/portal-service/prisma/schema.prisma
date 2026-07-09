@@ -24,6 +24,27 @@ model PortalToken {
   @@unique([id, tenantId])
 }
 
+// A logged-in customer/partner portal user (B9), scoped to exactly one Account.
+// Distinct from the magic-link PortalToken flow: a PortalUser authenticates
+// with email + password and then sees ONLY their own account's quotes, orders,
+// invoices and tickets. passwordHash is a scrypt digest (see lib/portal-auth).
+model PortalUser {
+  id           String    @id @default(cuid())
+  tenantId     String
+  accountId    String
+  email        String
+  name         String?
+  passwordHash String
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([tenantId, email])
+  @@index([tenantId, accountId])
+  @@unique([id, tenantId])
+}
+
 model PortalBranding {
   id           String   @id @default(cuid())
   tenantId     String   @unique

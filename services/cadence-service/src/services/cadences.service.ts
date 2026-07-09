@@ -32,10 +32,12 @@ export function createCadencesService(prisma: CadencePrisma) {
         isActive?: boolean;
         exitOnReply?: boolean;
         exitOnMeeting?: boolean;
+        autoEnrollTrigger?: string | null;
         steps: Array<{
           position: number;
           type: 'EMAIL' | 'CALL_TASK' | 'LINKEDIN_TASK' | 'SMS' | 'WAIT';
           delayDays?: number;
+          delayHours?: number;
           subject?: string;
           body?: string;
           taskTitle?: string;
@@ -53,6 +55,7 @@ export function createCadencesService(prisma: CadencePrisma) {
             isActive: input.isActive ?? true,
             exitOnReply: input.exitOnReply ?? true,
             exitOnMeeting: input.exitOnMeeting ?? true,
+            autoEnrollTrigger: input.autoEnrollTrigger ?? null,
           },
         });
         if (input.steps.length > 0) {
@@ -62,6 +65,7 @@ export function createCadencesService(prisma: CadencePrisma) {
               position: s.position,
               type: s.type,
               delayDays: s.delayDays ?? 0,
+              delayHours: s.delayHours ?? 0,
               subject: s.subject ?? null,
               body: s.body ?? null,
               taskTitle: s.taskTitle ?? null,
@@ -83,6 +87,7 @@ export function createCadencesService(prisma: CadencePrisma) {
         isActive: boolean;
         exitOnReply: boolean;
         exitOnMeeting: boolean;
+        autoEnrollTrigger: string | null;
       }>
     ) {
       const existing = await prisma.cadenceTemplate.findFirst({ where: { tenantId, id } });

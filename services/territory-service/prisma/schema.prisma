@@ -23,9 +23,36 @@ model Territory {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   rules       TerritoryRule[]
+  assignmentRules AssignmentRule[]
   routingLogs LeadRoutingLog[]
 
   @@index([tenantId])
+  @@unique([id, tenantId])
+}
+
+// Higher-level, criteria-JSON assignment rule (B6). Unlike TerritoryRule
+// (a single field/operator/value predicate ANDed within a territory), an
+// AssignmentRule carries a whole `criteria` object ({ country: ['US','CA'],
+// product: 'X' }) plus its own owner or round-robin queue, and is evaluated
+// across ALL of a tenant's rules by descending priority. The first matching
+// rule decides the territory + owner for an incoming lead/deal.
+model AssignmentRule {
+  id          String    @id @default(cuid())
+  tenantId    String
+  territoryId String
+  territory   Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  name        String
+  entityType  String    @default("lead") // 'lead' | 'deal' | 'any'
+  criteria    Json      @default("{}")
+  ownerId     String?
+  queue       String? // round-robin queue key; owners resolved from territory.ownerIds
+  priority    Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId, isActive, priority])
+  @@index([territoryId])
   @@unique([id, tenantId])
 }
 

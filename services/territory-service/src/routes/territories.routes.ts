@@ -20,6 +20,15 @@ const Paging = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
+const AssignmentRuleBody = z.object({
+  name: z.string().min(1),
+  entityType: z.enum(['lead', 'deal', 'any']).default('lead'),
+  criteria: z.record(z.unknown()).default({}),
+  ownerId: z.string().nullable().optional(),
+  queue: z.string().nullable().optional(),
+  priority: z.number().int().default(0),
+  isActive: z.boolean().default(true),
+});
 
 export async function registerTerritoriesRoutes(
   app: FastifyInstance,
@@ -89,5 +98,37 @@ export async function registerTerritoriesRoutes(
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const q = Paging.parse(request.query);
     return reply.send({ success: true, data: await territories.getRoutingLogs(tenantId, q.leadId, q.page, q.limit) });
+  });
+
+  // ─── B6: assignment rules (criteria-JSON) + members ─────────────────────────
+  app.get('/api/v1/territories/:id/rules', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
+    const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+    const { id } = Id.parse(request.params);
+    const data = await territories.listAssignmentRules(tenantId, id);
+    if (data === null) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Territory not found', requestId: request.id } });
+    return reply.send({ success: true, data });
+  });
+
+  app.post('/api/v1/territories/:id/rules', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+    const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+    const { id } = Id.parse(request.params);
+    const body = AssignmentRuleBody.parse(request.body);
+    const data = await territories.createAssignmentRule(tenantId, id, body);
+    if (data === null) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Territory not found', requestId: request.id } });
+    return reply.code(201).send({ success: true, data });
+  });
+
+  app.delete('/api/v1/territories/:id/rules/:ruleId', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+    const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+    const { ruleId } = z.object({ id: z.string().cuid(), ruleId: z.string().cuid() }).parse(request.params);
+    return reply.send({ success: true, data: await territories.deleteAssignmentRule(tenantId, ruleId) });
+  });
+
+  app.get('/api/v1/territories/:id/members', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
+    const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+    const { id } = Id.parse(request.params);
+    const data = await territories.getMembers(tenantId, id);
+    if (data === null) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Territory not found', requestId: request.id } });
+    return reply.send({ success: true, data });
   });
 }

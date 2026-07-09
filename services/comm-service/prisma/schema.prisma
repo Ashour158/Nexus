@@ -90,6 +90,9 @@ model CommOutbox {
   body         String    @db.Text
   status       String    @default("QUEUED")
   templateId   String?
+  /// Optional per-user MailAccount to send THROUGH (SMTP/OAuth of the user's own
+  /// mail provider). Null → send via the global/system SMTP transport.
+  mailAccountId String?
   entityType   String?
   entityId     String?
   sentAt       DateTime?
@@ -171,5 +174,53 @@ model WhatsAppMessage {
 
   @@index([tenantId, contactId])
   @@index([externalId])
+  @@unique([id, tenantId])
+}
+
+/// Per-user / per-tenant mail-provider account. Lets a user register their OWN
+/// mail account (SMTP/IMAP creds or an OAuth Gmail/Outlook token) so outbound
+/// email can be sent FROM their address instead of the global system SMTP.
+///
+/// Secrets are NEVER stored in cleartext: SMTP passwords and OAuth tokens are
+/// encrypted at rest with AES-256-GCM (same field-crypto mechanism as
+/// integration-service) using the platform ENCRYPTION_MASTER_KEY. API responses
+/// always mask them.
+model MailAccount {
+  id          String    @id @default(cuid())
+  tenantId    String
+  /// Owner (JWT sub). A user manages only their own accounts.
+  userId      String
+  /// SMTP | GMAIL | OUTLOOK
+  provider    String    @default("SMTP")
+  displayName String
+  fromEmail   String
+  fromName    String?
+  isDefault   Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  /// Set when a successful connection test (SMTP verify / OAuth token check) ran.
+  verifiedAt  DateTime?
+  /// Last verify/send error, surfaced to the UI. Cleared on success.
+  lastError   String?
+
+  // ── SMTP provider config (encrypted secret) ──────────────────────────────
+  smtpHost        String?
+  smtpPort        Int?
+  smtpSecure      Boolean?
+  smtpUsername    String?
+  /// AES-256-GCM encrypted SMTP password blob (base64url iv|tag|ciphertext).
+  smtpPasswordEnc String?   @db.Text
+
+  // ── OAuth provider config (encrypted tokens) — Gmail / Outlook ───────────
+  /// AES-256-GCM encrypted OAuth access token blob.
+  oauthAccessTokenEnc  String?   @db.Text
+  /// AES-256-GCM encrypted OAuth refresh token blob.
+  oauthRefreshTokenEnc String?   @db.Text
+  oauthExpiresAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, userId])
+  @@unique([tenantId, userId, fromEmail])
   @@unique([id, tenantId])
 }

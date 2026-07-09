@@ -24,11 +24,22 @@ function toPaginated<T>(
   };
 }
 
+/**
+ * Resolves an EmailChannel that sends THROUGH a specific user MailAccount.
+ * Supplied by the mail-accounts service; may throw if the account is
+ * missing/inactive/uncredentialed (the send loop catches it → row FAILED).
+ */
+export type ResolveAccountChannel = (
+  tenantId: string,
+  mailAccountId: string
+) => Promise<EmailChannel>;
+
 export function createOutboxService(
   prisma: CommPrisma,
   email: EmailChannel,
   sms: SmsChannel,
-  producer?: NexusProducer
+  producer?: NexusProducer,
+  resolveAccountChannel?: ResolveAccountChannel
 ) {
   return {
     async queueEmail(
@@ -41,6 +52,8 @@ export function createOutboxService(
         templateId?: string;
         entityType?: string;
         entityId?: string;
+        /** Optional user MailAccount to send from; null → system SMTP. */
+        mailAccountId?: string;
       }
     ): Promise<CommOutbox> {
       return (prisma as any).commOutbox.create({
@@ -51,6 +64,7 @@ export function createOutboxService(
           subject: args.subject,
           body: args.htmlBody,
           templateId: args.templateId ?? null,
+          mailAccountId: args.mailAccountId ?? null,
           entityType: args.entityType ?? null,
           entityId: args.entityId ?? null,
           status: 'QUEUED',
@@ -98,7 +112,15 @@ export function createOutboxService(
         const results = await Promise.allSettled(
           chunk.map(async (row: any) => {
             if (row.channel === 'EMAIL') {
-              await email.send({
+              // Send through the user's own MailAccount when one is attached;
+              // otherwise use the global/system SMTP transport. A bad user
+              // account throws here → caught by allSettled → row marked FAILED
+              // with a clear message; the worker never crashes.
+              const channel =
+                row.mailAccountId && resolveAccountChannel
+                  ? await resolveAccountChannel(tenantId, row.mailAccountId)
+                  : email;
+              await channel.send({
                 to: row.to,
                 subject: row.subject ?? '(no subject)',
                 html: row.body,

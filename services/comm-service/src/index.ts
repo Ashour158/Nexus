@@ -19,6 +19,9 @@ import { createSequencesService } from './services/sequences.service.js';
 import { registerTemplatesRoutes } from './routes/templates.routes.js';
 import { registerSequencesRoutes } from './routes/sequences.routes.js';
 import { registerOutboxRoutes } from './routes/outbox.routes.js';
+import { createMailAccountsService } from './services/mail-accounts.service.js';
+import { registerMailAccountsRoutes } from './routes/mail-accounts.routes.js';
+import { createFieldCryptoFromEnv } from './lib/field-crypto.js';
 import { registerWebhookRoutes } from './routes/webhook.routes.js';
 import { registerInternalOutboxRoutes } from './routes/internal-outbox.routes.js';
 import { createWhatsAppChannel } from './channels/whatsapp.channel.js';
@@ -93,7 +96,19 @@ try {
   telephonyProducer = null;
 }
 const templates = createTemplatesService(prisma);
-const outbox = createOutboxService(prisma, smtp, sms, telephonyProducer ?? undefined);
+// Per-user mail-provider accounts: AES-256-GCM field crypto (platform master
+// key) protects stored SMTP passwords / OAuth tokens.
+const fieldCrypto = createFieldCryptoFromEnv();
+const mailAccounts = createMailAccountsService(prisma, fieldCrypto);
+const outbox = createOutboxService(
+  prisma,
+  smtp,
+  sms,
+  telephonyProducer ?? undefined,
+  // Send path: resolve a per-user account transport when a message carries a
+  // mailAccountId; falls back to system SMTP otherwise.
+  (tenantId, mailAccountId) => mailAccounts.getSendChannel(tenantId, mailAccountId)
+);
 const sequences = createSequencesService(prisma, smtp, templates);
 
 let triggerConsumer: Awaited<ReturnType<typeof startTriggerConsumer>> | null = null;
@@ -156,6 +171,7 @@ await startService(app, port, async (a) => {
   await registerTemplatesRoutes(a, templates);
   await registerSequencesRoutes(a, sequences);
   await registerOutboxRoutes(a, outbox);
+  await registerMailAccountsRoutes(a, mailAccounts);
   await registerWebhookRoutes(a, outbox);
   await registerInternalOutboxRoutes(a, outbox);
   await registerWhatsAppOutboundRoutes(a, prisma, whatsapp, telephonyProducer);

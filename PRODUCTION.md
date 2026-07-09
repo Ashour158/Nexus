@@ -3,6 +3,21 @@
 Everything here is **staged and testable without a domain**. When you have a
 domain, the TLS step is a one-shot cutover.
 
+## Launch readiness
+
+Before cutover, work the pre-launch sign-off:
+
+- **[GO_LIVE_CHECKLIST.md](./GO_LIVE_CHECKLIST.md)** — the go/no-go checklist
+  (security, data, observability, DR, smoke tests, rollback, sign-off table),
+  marked DONE vs OPEN against the current audit reality.
+- **[SLA.md](./SLA.md)** — availability targets, P1–P4 support response times,
+  maintenance windows, and incident-response summary.
+
+**One hard external dependency:** the **TLS domain cutover is blocked until a
+domain is provisioned** — no domain exists yet. The Caddy prod profile is
+staged and ready (step 1 below); until then the app is HTTP-only at
+`http://64.225.27.128:3100`. Everything else can be completed without a domain.
+
 ## 1. TLS + custom domain (Caddy, auto Let's Encrypt)
 
 Prereq: a domain with an **A record** (and AAAA if using IPv6) pointing at the

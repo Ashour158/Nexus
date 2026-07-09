@@ -29,6 +29,10 @@ interface NormalizedDealEvent {
   /** Raw per-deal currency code, e.g. "EUR". Defaults to "USD" when absent. */
   currency: string;
   category: ForecastCategory;
+  /** Stage probability (0-100) when the event carries it, else 0. */
+  probability: number;
+  /** Calibrated AI win-probability (0.0-1.0) when the event carries it, else null. */
+  aiWinProbability: number | null;
 }
 
 /**
@@ -48,9 +52,15 @@ export function categoryForEvent(
 ): ForecastCategory {
   if (type === 'deal.won') return 'won';
   if (type === 'deal.lost') return 'lost';
+  // Prefer the deal's explicit forecast category when the event carries it —
+  // it is the human/CRM-native categorization and is more accurate than
+  // bucketing on probability alone.
   const explicit = String(payload.forecastCategory ?? '').toUpperCase();
   if (explicit === 'CLOSED') return 'won';
   if (explicit === 'OMITTED') return 'lost';
+  if (explicit === 'COMMIT') return 'commit';
+  if (explicit === 'BEST_CASE') return 'best_case';
+  if (explicit === 'PIPELINE') return 'pipeline';
   const probRaw = payload.probability;
   const prob = typeof probRaw === 'number' ? probRaw : Number(probRaw);
   if (Number.isFinite(prob)) {
@@ -94,6 +104,11 @@ export function normalizeDealEvent(
   const dealId = String(payload.dealId ?? payload.id ?? '');
   const ownerId = String(payload.ownerId ?? '');
   if (!tenantId || !dealId || !ownerId) return null;
+  const probRaw = Number(payload.probability);
+  const probability = Number.isFinite(probRaw) ? Math.max(0, Math.min(100, probRaw)) : 0;
+  const aiRaw = Number(payload.aiWinProbability);
+  const aiWinProbability =
+    Number.isFinite(aiRaw) && aiRaw >= 0 && aiRaw <= 1 ? aiRaw : null;
   return {
     tenantId,
     dealId,
@@ -102,6 +117,8 @@ export function normalizeDealEvent(
     amount: toDecimal(payload.amount),
     currency: String(payload.currency ?? 'USD'),
     category: categoryForEvent(type, payload),
+    probability,
+    aiWinProbability,
   };
 }
 
@@ -123,10 +140,13 @@ export function createForecastRollupService(prisma: PlanningPrisma) {
     let best = new Decimal(0);
     let pipeline = new Decimal(0);
     let won = new Decimal(0);
+    let weighted = new Decimal(0);
+    let aiWeighted = new Decimal(0);
     let openCount = 0;
     let wonCount = 0;
     for (const s of states) {
       const amt = new Decimal(s.amount.toString());
+      const isOpen = s.category === 'commit' || s.category === 'best_case' || s.category === 'pipeline';
       switch (s.category) {
         case 'commit':
           commit = commit.plus(amt);
@@ -148,6 +168,15 @@ export function createForecastRollupService(prisma: PlanningPrisma) {
         default:
           break;
       }
+      if (isOpen) {
+        // Probability-weighted open pipeline (stage probability, 0-100).
+        const prob = new Decimal(s.probability ?? 0).div(100);
+        weighted = weighted.plus(amt.mul(prob));
+        // AI-adjusted open pipeline: use the per-deal AI win-probability when
+        // present, else fall back to the stage probability (never invent).
+        const ai = s.aiWinProbability != null ? new Decimal(s.aiWinProbability) : prob;
+        aiWeighted = aiWeighted.plus(amt.mul(ai));
+      }
     }
     // Commit ⊆ best-case ⊆ pipeline: higher-confidence amounts roll up.
     const bestCaseTotal = commit.plus(best);
@@ -159,6 +188,8 @@ export function createForecastRollupService(prisma: PlanningPrisma) {
         commitAmount: commit.toFixed(2),
         bestCaseAmount: bestCaseTotal.toFixed(2),
         pipelineAmount: pipelineTotal.toFixed(2),
+        weightedAmount: weighted.toFixed(2),
+        aiWeightedAmount: aiWeighted.toFixed(2),
         closedWonAmount: won.toFixed(2),
         openDealCount: openCount,
         wonDealCount: wonCount,
@@ -170,6 +201,8 @@ export function createForecastRollupService(prisma: PlanningPrisma) {
         commitAmount: commit.toFixed(2),
         bestCaseAmount: bestCaseTotal.toFixed(2),
         pipelineAmount: pipelineTotal.toFixed(2),
+        weightedAmount: weighted.toFixed(2),
+        aiWeightedAmount: aiWeighted.toFixed(2),
         closedWonAmount: won.toFixed(2),
         openDealCount: openCount,
         wonDealCount: wonCount,
@@ -213,6 +246,8 @@ export function createForecastRollupService(prisma: PlanningPrisma) {
           period: evt.period,
           amount: baseAmountStr,
           category: evt.category,
+          probability: evt.probability,
+          aiWinProbability: evt.aiWinProbability,
         },
         create: {
           tenantId: evt.tenantId,
@@ -221,6 +256,8 @@ export function createForecastRollupService(prisma: PlanningPrisma) {
           period: evt.period,
           amount: baseAmountStr,
           category: evt.category,
+          probability: evt.probability,
+          aiWinProbability: evt.aiWinProbability,
         },
       });
 
@@ -241,6 +278,8 @@ export function createForecastRollupService(prisma: PlanningPrisma) {
         commit: new Decimal(r.commitAmount.toString()).toFixed(2),
         bestCase: new Decimal(r.bestCaseAmount.toString()).toFixed(2),
         pipeline: new Decimal(r.pipelineAmount.toString()).toFixed(2),
+        weighted: new Decimal(r.weightedAmount.toString()).toFixed(2),
+        aiWeighted: new Decimal(r.aiWeightedAmount.toString()).toFixed(2),
         closedWon: new Decimal(r.closedWonAmount.toString()).toFixed(2),
         openDealCount: r.openDealCount,
         wonDealCount: r.wonDealCount,
@@ -250,12 +289,16 @@ export function createForecastRollupService(prisma: PlanningPrisma) {
           commit: acc.commit.plus(o.commit),
           bestCase: acc.bestCase.plus(o.bestCase),
           pipeline: acc.pipeline.plus(o.pipeline),
+          weighted: acc.weighted.plus(o.weighted),
+          aiWeighted: acc.aiWeighted.plus(o.aiWeighted),
           closedWon: acc.closedWon.plus(o.closedWon),
         }),
         {
           commit: new Decimal(0),
           bestCase: new Decimal(0),
           pipeline: new Decimal(0),
+          weighted: new Decimal(0),
+          aiWeighted: new Decimal(0),
           closedWon: new Decimal(0),
         }
       );
@@ -266,6 +309,8 @@ export function createForecastRollupService(prisma: PlanningPrisma) {
           commit: totals.commit.toFixed(2),
           bestCase: totals.bestCase.toFixed(2),
           pipeline: totals.pipeline.toFixed(2),
+          weighted: totals.weighted.toFixed(2),
+          aiWeighted: totals.aiWeighted.toFixed(2),
           closedWon: totals.closedWon.toFixed(2),
         },
       };
@@ -306,8 +351,194 @@ export function createForecastRollupService(prisma: PlanningPrisma) {
         quota: quota.toFixed(2),
         closedWon: closedWon.toFixed(2),
         attainmentPct: attainmentPct.toFixed(2),
+        gapToQuota: Decimal.max(quota.minus(closedWon), 0).toFixed(2),
         currency: target?.currency ?? 'USD',
         wonDealCount: agg?.wonDealCount ?? 0,
+      };
+    },
+
+    /**
+     * Capture a point-in-time snapshot of every owner aggregate AND a team
+     * (per-period) aggregate, for a given `asOf` day. Cross-tenant safe: the
+     * poller runs with NO tenant ALS, so the tenant Prisma extension is a no-op
+     * and explicit tenantId scoping in each row governs isolation.
+     *
+     * Idempotent: re-running for the same `asOf` upserts the same rows (unique on
+     * tenant+scope+owner+period+asOf), so a retry never double-writes.
+     */
+    async snapshotAll(asOf: Date = new Date()): Promise<{ owners: number; teams: number }> {
+      // Normalize to UTC midnight so at most one snapshot per day per key.
+      const day = new Date(
+        Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), asOf.getUTCDate())
+      );
+      const aggregates = await prisma.forecastAggregate.findMany({});
+      // Accumulate team totals per (tenant, period).
+      const teamTotals = new Map<
+        string,
+        {
+          tenantId: string;
+          period: string;
+          commit: Decimal;
+          bestCase: Decimal;
+          pipeline: Decimal;
+          weighted: Decimal;
+          aiWeighted: Decimal;
+          closedWon: Decimal;
+          openDealCount: number;
+          wonDealCount: number;
+        }
+      >();
+      let ownerRows = 0;
+      for (const a of aggregates) {
+        const commit = new Decimal(a.commitAmount.toString());
+        const bestCase = new Decimal(a.bestCaseAmount.toString());
+        const pipeline = new Decimal(a.pipelineAmount.toString());
+        const weighted = new Decimal(a.weightedAmount.toString());
+        const aiWeighted = new Decimal(a.aiWeightedAmount.toString());
+        const closedWon = new Decimal(a.closedWonAmount.toString());
+        await prisma.forecastSnapshot.upsert({
+          where: {
+            tenantId_scope_ownerId_period_asOf: {
+              tenantId: a.tenantId,
+              scope: 'owner',
+              ownerId: a.ownerId,
+              period: a.period,
+              asOf: day,
+            },
+          },
+          update: {
+            commitAmount: commit.toFixed(2),
+            bestCaseAmount: bestCase.toFixed(2),
+            pipelineAmount: pipeline.toFixed(2),
+            weightedAmount: weighted.toFixed(2),
+            aiWeightedAmount: aiWeighted.toFixed(2),
+            closedWonAmount: closedWon.toFixed(2),
+            openDealCount: a.openDealCount,
+            wonDealCount: a.wonDealCount,
+          },
+          create: {
+            tenantId: a.tenantId,
+            scope: 'owner',
+            ownerId: a.ownerId,
+            period: a.period,
+            asOf: day,
+            commitAmount: commit.toFixed(2),
+            bestCaseAmount: bestCase.toFixed(2),
+            pipelineAmount: pipeline.toFixed(2),
+            weightedAmount: weighted.toFixed(2),
+            aiWeightedAmount: aiWeighted.toFixed(2),
+            closedWonAmount: closedWon.toFixed(2),
+            openDealCount: a.openDealCount,
+            wonDealCount: a.wonDealCount,
+          },
+        });
+        ownerRows += 1;
+
+        const key = `${a.tenantId}::${a.period}`;
+        const t =
+          teamTotals.get(key) ??
+          {
+            tenantId: a.tenantId,
+            period: a.period,
+            commit: new Decimal(0),
+            bestCase: new Decimal(0),
+            pipeline: new Decimal(0),
+            weighted: new Decimal(0),
+            aiWeighted: new Decimal(0),
+            closedWon: new Decimal(0),
+            openDealCount: 0,
+            wonDealCount: 0,
+          };
+        t.commit = t.commit.plus(commit);
+        t.bestCase = t.bestCase.plus(bestCase);
+        t.pipeline = t.pipeline.plus(pipeline);
+        t.weighted = t.weighted.plus(weighted);
+        t.aiWeighted = t.aiWeighted.plus(aiWeighted);
+        t.closedWon = t.closedWon.plus(closedWon);
+        t.openDealCount += a.openDealCount;
+        t.wonDealCount += a.wonDealCount;
+        teamTotals.set(key, t);
+      }
+
+      let teamRows = 0;
+      for (const t of teamTotals.values()) {
+        await prisma.forecastSnapshot.upsert({
+          where: {
+            tenantId_scope_ownerId_period_asOf: {
+              tenantId: t.tenantId,
+              scope: 'team',
+              ownerId: '',
+              period: t.period,
+              asOf: day,
+            },
+          },
+          update: {
+            commitAmount: t.commit.toFixed(2),
+            bestCaseAmount: t.bestCase.toFixed(2),
+            pipelineAmount: t.pipeline.toFixed(2),
+            weightedAmount: t.weighted.toFixed(2),
+            aiWeightedAmount: t.aiWeighted.toFixed(2),
+            closedWonAmount: t.closedWon.toFixed(2),
+            openDealCount: t.openDealCount,
+            wonDealCount: t.wonDealCount,
+          },
+          create: {
+            tenantId: t.tenantId,
+            scope: 'team',
+            ownerId: '',
+            period: t.period,
+            asOf: day,
+            commitAmount: t.commit.toFixed(2),
+            bestCaseAmount: t.bestCase.toFixed(2),
+            pipelineAmount: t.pipeline.toFixed(2),
+            weightedAmount: t.weighted.toFixed(2),
+            aiWeightedAmount: t.aiWeighted.toFixed(2),
+            closedWonAmount: t.closedWon.toFixed(2),
+            openDealCount: t.openDealCount,
+            wonDealCount: t.wonDealCount,
+          },
+        });
+        teamRows += 1;
+      }
+      return { owners: ownerRows, teams: teamRows };
+    },
+
+    /**
+     * Forecast TREND for a period: the ordered series of point-in-time snapshots
+     * so a caller can chart how commit / best-case / AI-weighted moved over the
+     * quarter. `scope="team"` returns the whole-team series; `scope="owner"`
+     * requires an ownerId.
+     */
+    async getTrend(
+      tenantId: string,
+      period: string,
+      scope: 'owner' | 'team' = 'team',
+      ownerId?: string
+    ) {
+      const rows = await prisma.forecastSnapshot.findMany({
+        where: {
+          tenantId,
+          period,
+          scope,
+          ...(scope === 'owner' ? { ownerId: ownerId ?? '' } : { ownerId: '' }),
+        },
+        orderBy: { asOf: 'asc' },
+      });
+      return {
+        period,
+        scope,
+        ownerId: scope === 'owner' ? ownerId ?? '' : null,
+        points: rows.map((r) => ({
+          asOf: r.asOf,
+          commit: new Decimal(r.commitAmount.toString()).toFixed(2),
+          bestCase: new Decimal(r.bestCaseAmount.toString()).toFixed(2),
+          pipeline: new Decimal(r.pipelineAmount.toString()).toFixed(2),
+          weighted: new Decimal(r.weightedAmount.toString()).toFixed(2),
+          aiWeighted: new Decimal(r.aiWeightedAmount.toString()).toFixed(2),
+          closedWon: new Decimal(r.closedWonAmount.toString()).toFixed(2),
+          openDealCount: r.openDealCount,
+          wonDealCount: r.wonDealCount,
+        })),
       };
     },
   };

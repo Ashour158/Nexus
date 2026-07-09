@@ -38,4 +38,25 @@ export async function registerForecastRollupRoutes(
       });
     }
   );
+
+  // Forecast TREND: point-in-time snapshot series for a period, so the UI can
+  // chart how commit / best-case / AI-weighted moved across the quarter.
+  app.get(
+    '/api/v1/forecasts/trend',
+    { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
+    async (request, reply) => {
+      const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+      const query = z
+        .object({
+          period: z.string().min(1),
+          scope: z.enum(['owner', 'team']).default('team'),
+          ownerId: z.string().optional(),
+        })
+        .parse(request.query);
+      return reply.send({
+        success: true,
+        data: await rollup.getTrend(tenantId, query.period, query.scope, query.ownerId),
+      });
+    }
+  );
 }

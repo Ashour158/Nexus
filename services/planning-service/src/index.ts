@@ -10,8 +10,13 @@ import { registerQuotasRoutes } from './routes/quotas.routes.js';
 import { registerForecastsRoutes } from './routes/forecasts.routes.js';
 import { registerForecastOverrideRoutes } from './routes/forecast-override.routes.js';
 import { registerForecastRollupRoutes } from './routes/forecast-rollup.routes.js';
+import { registerForecastHierarchyRoutes } from './routes/forecast-hierarchy.routes.js';
+import { registerForecastEntryRoutes } from './routes/forecast-entry.routes.js';
 import { createForecastRollupService } from './services/forecast-rollup.service.js';
+import { createForecastHierarchyService } from './services/forecast-hierarchy.service.js';
+import { createForecastEntryService } from './services/forecast-entry.service.js';
 import { startDealForecastConsumer } from './consumers/deal-forecast.consumer.js';
+import { startForecastSnapshotPoller } from './lib/forecast-snapshot.poller.js';
 import { registerGraphQL } from './graphql/index.js';
 
 startTracing({ serviceName: 'planning-service' });
@@ -72,9 +77,24 @@ app.addHook('onClose', async () => {
   try { if (dealForecastConsumer) await dealForecastConsumer.disconnect(); } catch { /* ignore */ }
 });
 
+// ─── Daily forecast-snapshot poller (best-effort) ──────────────────────────
+// Captures point-in-time ForecastSnapshot rows for trend charting. Fail-open;
+// never blocks boot.
+let snapshotPoller: { stop: () => void } | null = null;
+try {
+  snapshotPoller = startForecastSnapshotPoller(prisma, app.log as any);
+} catch (err) {
+  app.log.error({ err }, 'planning-service: failed to start forecast-snapshot poller (continuing without it)');
+}
+app.addHook('onClose', async () => {
+  try { if (snapshotPoller) snapshotPoller.stop(); } catch { /* ignore */ }
+});
+
 await startService(app, port, async () => {
   await registerQuotasRoutes(app, createQuotasService(prisma));
   await registerForecastsRoutes(app, createForecastsService(prisma, producer));
   await registerForecastOverrideRoutes(app, prisma);
   await registerForecastRollupRoutes(app, createForecastRollupService(prisma));
+  await registerForecastHierarchyRoutes(app, createForecastHierarchyService(prisma));
+  await registerForecastEntryRoutes(app, createForecastEntryService(prisma));
 });

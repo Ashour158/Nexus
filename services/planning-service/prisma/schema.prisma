@@ -123,6 +123,11 @@ model ForecastAggregate {
   commitAmount    Decimal  @default(0) @db.Decimal(18, 2)
   bestCaseAmount  Decimal  @default(0) @db.Decimal(18, 2)
   pipelineAmount  Decimal  @default(0) @db.Decimal(18, 2)
+  // Probability-weighted (stage) open pipeline.
+  weightedAmount  Decimal  @default(0) @db.Decimal(18, 2)
+  // AI-adjusted open pipeline: sum(amount * per-deal AI win-probability),
+  // falling back to stage probability when no AI score is carried by the event.
+  aiWeightedAmount Decimal @default(0) @db.Decimal(18, 2)
   // Realized attainment inputs.
   closedWonAmount Decimal  @default(0) @db.Decimal(18, 2)
   openDealCount   Int      @default(0)
@@ -143,10 +148,70 @@ model DealForecastState {
   amount    Decimal  @default(0) @db.Decimal(18, 2)
   // commit | best_case | pipeline | won | lost
   category  String   @default("pipeline")
+  // Stage probability (0-100) carried by the deal event when present.
+  probability Int    @default(0)
+  // Calibrated AI win-probability (0.0-1.0) carried by the deal event, if any.
+  aiWinProbability Float?
   updatedAt DateTime @updatedAt
 
   @@unique([tenantId, dealId])
   @@index([tenantId, ownerId, period])
+  @@unique([id, tenantId])
+}
+
+// ─── Point-in-time forecast snapshots ────────────────────────────────────────
+//
+// Captures the ForecastAggregate for an owner (scope="owner") or a whole team
+// (scope="team", ownerId="") at a given `asOf` date, so the forecast TREND over
+// a period (e.g. how commit moved across the quarter) can be reconstructed. A
+// daily poller writes one row per (owner|team, period) per day.
+model ForecastSnapshot {
+  id               String   @id @default(cuid())
+  tenantId         String
+  scope            String   @default("owner") // "owner" | "team"
+  ownerId          String   @default("")       // owner id for owner scope, "" for team
+  period           String
+  asOf             DateTime // snapshot day (UTC midnight)
+  commitAmount     Decimal  @default(0) @db.Decimal(18, 2)
+  bestCaseAmount   Decimal  @default(0) @db.Decimal(18, 2)
+  pipelineAmount   Decimal  @default(0) @db.Decimal(18, 2)
+  weightedAmount   Decimal  @default(0) @db.Decimal(18, 2)
+  aiWeightedAmount Decimal  @default(0) @db.Decimal(18, 2)
+  closedWonAmount  Decimal  @default(0) @db.Decimal(18, 2)
+  openDealCount    Int      @default(0)
+  wonDealCount     Int      @default(0)
+  createdAt        DateTime @default(now())
+
+  @@unique([tenantId, scope, ownerId, period, asOf])
+  @@index([tenantId, period, asOf])
+  @@index([tenantId, scope, period])
+  @@unique([id, tenantId])
+}
+
+// ─── Rep per-deal forecast categorization + manager override ─────────────────
+//
+// A rep SUBMITS a forecast category per deal for a period (repCategory); a
+// manager may OVERRIDE the category (managerCategory). The effective category is
+// managerCategory ?? repCategory. Persisted + audited (managerId + updatedAt);
+// the entry rollup sums by effective category with commit ⊆ best_case ⊆ pipeline.
+model ForecastDealEntry {
+  id              String   @id @default(cuid())
+  tenantId        String
+  period          String
+  ownerId         String
+  dealId          String
+  // Base-currency amount snapshot at submission time.
+  amount          Decimal  @default(0) @db.Decimal(18, 2)
+  // commit | best_case | pipeline | omitted | closed
+  repCategory     String   @default("pipeline")
+  managerCategory String?
+  managerId       String?
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, period, dealId])
+  @@index([tenantId, period, ownerId])
   @@unique([id, tenantId])
 }
 

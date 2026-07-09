@@ -63,10 +63,15 @@ export default function FeedPage() {
 function FeedItem({ item }: { item: FeedActivity }) {
   const when = item.at ?? item.createdAt;
   const title = item.title ?? item.type ?? 'Activity';
+  const ENTITY_ROUTES: Record<string, string> = {
+    account: 'accounts',
+    contact: 'contacts',
+    deal: 'deals',
+    lead: 'leads',
+  };
+  const entitySegment = item.entityType ? ENTITY_ROUTES[item.entityType] : undefined;
   const href =
-    item.entityType && item.entityId
-      ? `/${item.entityType === 'account' ? 'accounts' : 'contacts'}/${item.entityId}`
-      : undefined;
+    entitySegment && item.entityId ? `/${entitySegment}/${item.entityId}` : undefined;
 
   const body = (
     <div className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-200 hover:bg-blue-50/30">

@@ -305,10 +305,14 @@ export default function ContactsPage(): ReactElement {
       return;
     }
 
+    // Map blank optional IDs to undefined so we never send '' back over the
+    // wire (which would overwrite the schema-normalized values / fail cuid).
+    const accountId = draft.accountId.trim() || undefined;
+    const ownerId = draft.ownerId.trim() || undefined;
     const mutationPayload = {
       ...result.data,
-      accountId: draft.accountId.trim(),
-      ownerId: draft.ownerId.trim(),
+      accountId,
+      ownerId,
       tags: splitTags(draft.tags),
       customFields: {
         photoUrl: payload.photoUrl,
@@ -326,12 +330,23 @@ export default function ContactsPage(): ReactElement {
         { onSuccess: () => setDrawerMode(null) }
       );
     } else {
-      createContact.mutate(mutationPayload, {
-        onSuccess: () => {
-          setDrawerMode(null);
-          setDraft(EMPTY_DRAFT);
-        },
-      });
+      if (!accountId || !ownerId) {
+        const missing: Record<string, string> = {};
+        if (!accountId) missing.accountId = 'An account is required.';
+        if (!ownerId) missing.ownerId = 'An owner is required.';
+        setFieldErrors((current) => ({ ...current, ...missing }));
+        notify.error('Validation error', Object.values(missing)[0]);
+        return;
+      }
+      createContact.mutate(
+        { ...mutationPayload, accountId, ownerId },
+        {
+          onSuccess: () => {
+            setDrawerMode(null);
+            setDraft(EMPTY_DRAFT);
+          },
+        }
+      );
     }
   }
 

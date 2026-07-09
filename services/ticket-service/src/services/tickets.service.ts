@@ -276,21 +276,25 @@ export function createTicketsService(prisma: TicketPrisma, producer: NexusProduc
       tenantId: string,
       id: string,
       actorId: string | undefined,
-      target: { assigneeId?: string; teamId?: string }
+      target: { assigneeId?: string | null; teamId?: string | null }
     ) {
       const existing = await prisma.ticket.findFirst({ where: { tenantId, id, deletedAt: null } });
       if (!existing) return null;
+      // `undefined` = leave untouched; explicit null/'' = clear (unassign).
+      const nextAssignee =
+        target.assigneeId !== undefined ? target.assigneeId || null : existing.assigneeId;
+      const nextTeam = target.teamId !== undefined ? target.teamId || null : existing.teamId;
       const updated = await prisma.$transaction(async (tx) => {
         const t = await tx.ticket.update({
           where: { id },
           data: {
-            assigneeId: target.assigneeId ?? existing.assigneeId,
-            teamId: target.teamId ?? existing.teamId,
+            assigneeId: nextAssignee,
+            teamId: nextTeam,
           },
         });
         await record(tx as any, tenantId, id, 'assigned', actorId, {
-          assigneeId: target.assigneeId,
-          teamId: target.teamId,
+          assigneeId: nextAssignee,
+          teamId: nextTeam,
         });
         return t;
       });

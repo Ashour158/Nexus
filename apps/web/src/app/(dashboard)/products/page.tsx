@@ -109,6 +109,7 @@ export default function ProductsPage(): JSX.Element {
     queryKey: ['product-kits'],
     queryFn: async () => {
       const res = await fetch('/api/finance/product-kits', { headers: authHeaders() });
+      if (!res.ok) throw new Error(`Failed to load product kits (${res.status})`);
       const json = await res.json();
       return (json.data ?? []) as ProductKit[];
     },
@@ -118,6 +119,7 @@ export default function ProductsPage(): JSX.Element {
     queryKey: ['vendors'],
     queryFn: async () => {
       const res = await fetch('/api/finance/vendors', { headers: authHeaders() });
+      if (!res.ok) throw new Error(`Failed to load vendors (${res.status})`);
       const json = await res.json();
       return (json.data ?? []) as Vendor[];
     },
@@ -202,8 +204,8 @@ export default function ProductsPage(): JSX.Element {
     if (!form.name.trim()) return setFormError('Name is required.');
     if (!form.sku.trim()) return setFormError('SKU is required.');
     const price = Number(form.listPrice);
-    if (Number.isNaN(price) || price < 0) return setFormError('Price must be a non-negative number.');
-    if (form.currency.trim().length !== 3) return setFormError('Currency must be a 3-letter code.');
+    if (!Number.isFinite(price) || price < 0) return setFormError('Price must be a non-negative number.');
+    if (!/^[A-Z]{3}$/.test(form.currency.trim().toUpperCase())) return setFormError('Currency must be a 3-letter code.');
 
     const body: Record<string, unknown> = {
       name: form.name.trim(),

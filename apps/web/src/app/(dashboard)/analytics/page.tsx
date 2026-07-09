@@ -282,7 +282,7 @@ export default function AnalyticsPage(): ReactElement {
             <span className="text-xs font-bold text-blue-600">View Map</span>
           </div>
           <div className="space-y-5">
-            {data.territory.map((territory) => {
+            {(data.territory ?? []).map((territory) => {
               const width = Math.max(8, Math.round((territory.value / maxTerritory) * 100));
               return (
                 <div key={territory.name} className="space-y-2">
@@ -308,7 +308,7 @@ export default function AnalyticsPage(): ReactElement {
           <HelpCircle className="absolute right-4 top-4 h-16 w-16 text-white opacity-10" />
           <h2 className="mb-6 text-lg font-bold text-white">Recent Events</h2>
           <div className="relative z-10 space-y-4">
-            {data.events.slice(0, 4).map((event, index) => (
+            {(data.events ?? []).slice(0, 4).map((event, index) => (
               <div key={event.id} className={cn('flex gap-3 border-l-2 pl-4 py-1', index === 0 ? 'border-blue-500' : 'border-slate-700')}>
                 <div className={cn('w-14 text-[10px] font-bold uppercase', index === 0 ? 'text-blue-400' : 'text-slate-500')}>
                   {index === 0 ? '2m ago' : event.timestamp}

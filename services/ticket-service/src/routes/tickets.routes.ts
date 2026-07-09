@@ -50,8 +50,15 @@ const PatchBody = z.object({
 });
 
 const AssignBody = z
-  .object({ assigneeId: z.string().optional(), teamId: z.string().optional() })
-  .refine((b) => b.assigneeId || b.teamId, { message: 'assigneeId or teamId is required' });
+  .object({
+    assigneeId: z.string().nullable().optional(),
+    teamId: z.string().nullable().optional(),
+  })
+  // Presence (not truthiness) of a key is the signal: `{assigneeId: null}` or
+  // `{assigneeId: ''}` explicitly unassigns; both keys absent is invalid.
+  .refine((b) => 'assigneeId' in b || 'teamId' in b, {
+    message: 'assigneeId or teamId is required',
+  });
 
 const TransitionBody = z.object({ status: z.enum(STATUSES) });
 

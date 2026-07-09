@@ -15,6 +15,7 @@ import {
   Users,
 } from 'lucide-react';
 import { notify } from '@/lib/toast';
+import { sanitizeHtml } from '@/lib/sanitize-html';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import {
@@ -234,8 +235,8 @@ function OverviewTab({
           <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
             <div
               className="prose prose-sm max-w-none text-slate-800"
-              // Content is authored by campaign owners inside the tenant.
-              dangerouslySetInnerHTML={{ __html: campaign.contentHtml }}
+              // Tenant-authored content is sanitized to strip scripts/handlers.
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(campaign.contentHtml) }}
             />
           </div>
         ) : (

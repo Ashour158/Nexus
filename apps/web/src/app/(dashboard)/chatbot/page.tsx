@@ -46,7 +46,9 @@ export default function ChatbotPage(): JSX.Element {
       const d = new Date(c.lastMessageAt).toISOString().slice(0, 10);
       byDayMap.set(d, (byDayMap.get(d) ?? 0) + 1);
     }
-    const byDay = Array.from(byDayMap.entries()).map(([day, count]) => ({ day, count }));
+    const byDay = Array.from(byDayMap.entries())
+      .map(([day, count]) => ({ day, count }))
+      .sort((a, b) => a.day.localeCompare(b.day));
     const quotesCreated = convRows.filter((c) => c.state === 'QUOTE_SENT').length;
     const conversionRate = total > 0 ? (quotesCreated / total) * 100 : 0;
     return { total, quotesCreated, conversionRate, avgMsgsPerQuote: quotesCreated > 0 ? 4 : 0, byDay };

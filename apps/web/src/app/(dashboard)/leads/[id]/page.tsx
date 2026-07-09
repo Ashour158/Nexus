@@ -43,7 +43,7 @@ export default function LeadDetailPage() {
   const queryClient = useQueryClient();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const isDevPreview = process.env.NODE_ENV === 'development';
-  const canRead = isDevPreview || hasPermission('leads:read');
+  const canRead = isDevPreview || hasPermission('leads:read') || hasPermission('leads:*');
   const canUpdate = isDevPreview || hasPermission('leads:update') || hasPermission('leads:*');
   const leadQuery = useLead(leadId);
   const notesQuery = useLeadNotes(leadId);

@@ -61,6 +61,7 @@ export default function InboxPage() {
   const [replyBody, setReplyBody] = useState('');
   const [composeBody, setComposeBody] = useState('');
   const [composeSubject, setComposeSubject] = useState('');
+  const [composeTo, setComposeTo] = useState('');
   const qc = useQueryClient();
 
   const { data: connection } = useQuery({
@@ -209,7 +210,7 @@ export default function InboxPage() {
               <button onClick={() => setShowCompose(false)} className="rounded p-1 hover:bg-gray-700" aria-label="Close compose"><X className="h-4 w-4 text-gray-400" /></button>
             </div>
             <div className="space-y-3 p-4">
-              <input placeholder="To" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+              <input value={composeTo} onChange={(e) => setComposeTo(e.target.value)} placeholder="To" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
               <div className="flex gap-2">
                 <input value={composeSubject} onChange={(e) => setComposeSubject(e.target.value)} placeholder="Subject" className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm" />
                 {templates.length > 0 ? (
@@ -237,8 +238,26 @@ export default function InboxPage() {
                 minHeight="200px"
               />
               <div className="flex justify-end gap-2">
-                <button onClick={() => { setShowCompose(false); setComposeBody(''); setComposeSubject(''); }} className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Discard</button>
-                <button className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"><Send className="h-3.5 w-3.5" />Send</button>
+                <button onClick={() => { setShowCompose(false); setComposeBody(''); setComposeSubject(''); setComposeTo(''); }} className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Discard</button>
+                <button
+                  onClick={() => {
+                    if (!composeTo.trim() || !composeBody.trim()) return;
+                    // New emails have no thread yet; the send API opens a thread when threadId is empty.
+                    sendMutation.mutate(
+                      { threadId: '', to: composeTo.trim(), subject: composeSubject, body: composeBody },
+                      {
+                        onSuccess: () => {
+                          setShowCompose(false);
+                          setComposeBody('');
+                          setComposeSubject('');
+                          setComposeTo('');
+                        },
+                      }
+                    );
+                  }}
+                  disabled={!composeTo.trim() || !composeBody.trim() || sendMutation.isPending}
+                  className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                ><Send className="h-3.5 w-3.5" />{sendMutation.isPending ? 'Sending...' : 'Send'}</button>
               </div>
             </div>
           </div>

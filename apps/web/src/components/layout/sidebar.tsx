@@ -198,13 +198,29 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps): ReactEleme
   const userId = useAuthStore((s) => s.userId);
   const tenantId = useAuthStore((s) => s.tenantId);
 
+  const isActive = (href: string) =>
+    pathname === href || (href !== '/' && pathname.startsWith(`${href}/`));
+
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     NAV_GROUPS.forEach((g) => {
-      initial[g.label] = g.items.some((item) => pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href)));
+      initial[g.label] = g.items.some((item) => isActive(item.href));
     });
     return initial;
   });
+
+  useEffect(() => {
+    setExpandedGroups((prev) => {
+      const next = { ...prev };
+      NAV_GROUPS.forEach((g) => {
+        if (g.items.some((item) => isActive(item.href))) {
+          next[g.label] = true;
+        }
+      });
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -217,8 +233,6 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps): ReactEleme
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [onMobileClose, toggle]);
-
-  const isActive = (href: string) => pathname === href || (href !== '/' && pathname.startsWith(href));
 
   const toggleGroup = (label: string) => {
     setExpandedGroups((prev) => ({ ...prev, [label]: !prev[label] }));

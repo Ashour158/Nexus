@@ -234,7 +234,7 @@ export default function AdminRolesPage() {
                                 <input
                                   type="checkbox"
                                   checked={has(perm)}
-                                  disabled={selected.isSystem || perms.has('*')}
+                                  disabled={selected.isSystem || perms.has('*') || perms.has(`${res}:*`)}
                                   onChange={(e) => toggle(perm, e.target.checked)}
                                 />
                               </td>

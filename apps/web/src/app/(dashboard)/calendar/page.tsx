@@ -178,7 +178,7 @@ export default function CalendarPage() {
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" onClick={() => setShowCreate(false)} className="rounded border border-slate-300 px-4 py-2 text-sm text-slate-700">Cancel</button>
-          <button type="button" onClick={() => create.mutate()} disabled={!form.title} className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50">Save event</button>
+          <button type="button" onClick={() => create.mutate()} disabled={!form.title || !form.date || !form.time || create.isPending} className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50">Save event</button>
         </div>
       </Modal>
     </main>

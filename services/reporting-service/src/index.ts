@@ -67,6 +67,10 @@ await startService(app, port, async (a) => {
     a.log.warn({ err }, 'Snapshot scheduler failed to start');
   }
   try {
+    // Single consolidated schedule runner: renders + delivers BOTH the
+    // self-serve ReportSchedule and the legacy DefinitionReportSchedule models
+    // through the comm outbox email path (RR-H20 — previously the definition
+    // schedules never executed).
     startScheduleRunner(prisma);
   } catch (err) {
     a.log.warn({ err }, 'Schedule runner failed to start');

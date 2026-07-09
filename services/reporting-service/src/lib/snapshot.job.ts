@@ -76,6 +76,42 @@ export async function takeSnapshotNow(
   }
 }
 
+/**
+ * Enumerate the tenants that should receive a nightly pipeline snapshot.
+ *
+ * Previously this only read `PIPELINE_SNAPSHOT_TENANT_IDS` (empty by default),
+ * which meant no snapshots were ever taken and the outage fallback returned $0
+ * for every tenant. We now discover tenants dynamically from the reporting
+ * DB — any tenant that has ANY reporting artifact (saved/definition report,
+ * schedule, dashboard, BI report, or a prior snapshot) is a live tenant whose
+ * pipeline we should snapshot. The env var, when set, is merged in as an
+ * additional allow-list rather than the sole source.
+ */
+export async function enumerateSnapshotTenantIds(prisma: ReportingPrisma): Promise<string[]> {
+  const ids = new Set<string>();
+
+  for (const id of process.env.PIPELINE_SNAPSHOT_TENANT_IDS?.split(',').map((s) => s.trim()) ?? []) {
+    if (id) ids.add(id);
+  }
+
+  const distinct = async (
+    rows: Promise<Array<{ tenantId: string | null }>>
+  ): Promise<void> => {
+    for (const r of await rows) if (r.tenantId) ids.add(r.tenantId);
+  };
+
+  await Promise.all([
+    distinct(prisma.savedReport.findMany({ distinct: ['tenantId'], select: { tenantId: true } })),
+    distinct(prisma.reportDefinition.findMany({ distinct: ['tenantId'], select: { tenantId: true } })),
+    distinct(prisma.reportSchedule.findMany({ distinct: ['tenantId'], select: { tenantId: true } })),
+    distinct(prisma.dashboard.findMany({ distinct: ['tenantId'], select: { tenantId: true } })),
+    distinct(prisma.biSavedReport.findMany({ distinct: ['tenantId'], select: { tenantId: true } })),
+    distinct(prisma.pipelineSnapshot.findMany({ distinct: ['tenantId'], select: { tenantId: true } })),
+  ]);
+
+  return Array.from(ids);
+}
+
 export function startSnapshotScheduler(prisma: ReportingPrisma): NodeJS.Timeout {
   const INTERVAL_MS = 60 * 1000;
   return setInterval(async () => {
@@ -84,10 +120,7 @@ export function startSnapshotScheduler(prisma: ReportingPrisma): NodeJS.Timeout 
     if (hour !== 23 || minute < 45) return;
 
     try {
-      const tenants =
-        process.env.PIPELINE_SNAPSHOT_TENANT_IDS?.split(',')
-          .map((s) => s.trim())
-          .filter(Boolean) ?? [];
+      const tenants = await enumerateSnapshotTenantIds(prisma);
       for (const tenantId of tenants) {
         await takeSnapshotNow(prisma, tenantId).catch(() => undefined);
       }

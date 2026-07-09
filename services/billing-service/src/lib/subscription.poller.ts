@@ -2,6 +2,7 @@ import { Decimal } from 'decimal.js';
 import { NexusProducer, TOPICS } from '@nexus/kafka';
 import type { BillingPrisma } from '../prisma.js';
 import { aggregateUnbilledUsage, computeInvoiceBalance, money, toDecimal } from './billing-math.js';
+import { attemptDunningCharge, getStripe } from './stripe.js';
 
 /**
  * Subscription lifecycle poller (COM-05): renewals + dunning.
@@ -18,8 +19,10 @@ import { aggregateUnbilledUsage, computeInvoiceBalance, money, toDecimal } from 
  *   3. cancelAtPeriodEnd — due periods flagged to cancel → CANCELLED.
  *   4. dunning       — PAST_DUE subs → day 1/3/5/7 retries, then EXPIRE.
  *
- * No external payment API is called (Stripe is cred-gated); this models the
- * state machine + events + retry scheduling only.
+ * Dunning performs a REAL payment retry (`stripe.invoices.pay()`) against the
+ * customer's stored payment method when STRIPE_SECRET_KEY is set; a successful
+ * collection recovers the subscription to ACTIVE. When Stripe is unconfigured
+ * (stub mode) the retry is event-only, exactly as before — no external call.
  */
 
 interface LoggerLike {
@@ -324,6 +327,9 @@ async function runDunning(
     take: MAX_PER_TICK,
   });
 
+  // Real charge retries when configured; null → event-only (stub) behaviour.
+  const stripe = getStripe(log);
+
   let retries = 0;
   let expired = 0;
 
@@ -369,6 +375,51 @@ async function runDunning(
       if (claim.count === 0) continue;
       retries += 1;
 
+      // Real collection attempt against the stored Stripe payment method. In
+      // stub mode (no key) this is skipped and the retry is event-only.
+      const charge = stripe
+        ? await attemptDunningCharge(stripe, prisma, log, {
+            tenantId: sub.tenantId,
+            subscriptionId: sub.id,
+            attempt: attempts + 1,
+            now,
+          })
+        : { attempted: false, recovered: false, stripePaymentIntentId: null, amountPaid: null, currency: null };
+
+      if (charge.recovered) {
+        // Collection succeeded → recover the subscription to ACTIVE and clear
+        // dunning bookkeeping. Guarded so a concurrent tick can't double-apply.
+        const recover = await prisma.subscription.updateMany({
+          where: { id: sub.id, status: 'PAST_DUE' },
+          data: { status: 'ACTIVE', pastDueSince: null, dunningAttempts: 0, lastDunningAt: now },
+        });
+        if (recover.count > 0) {
+          await producer.publish(TOPICS.PAYMENTS, {
+            type: 'payment.received',
+            tenantId: sub.tenantId,
+            payload: {
+              subscriptionId: sub.id,
+              amount: charge.amountPaid,
+              currency: charge.currency,
+              stripePaymentIntentId: charge.stripePaymentIntentId,
+              source: 'dunning.retry',
+            },
+          });
+          await producer.publish(TOPICS.PAYMENTS, {
+            type: 'subscription.dunning',
+            tenantId: sub.tenantId,
+            payload: {
+              subscriptionId: sub.id,
+              phase: 'retry',
+              attempt: attempts + 1,
+              maxAttempts: DUNNING_RETRY_DAYS.length,
+              outcome: 'recovered',
+            },
+          });
+        }
+        continue; // recovered — no failure events
+      }
+
       await producer.publish(TOPICS.PAYMENTS, {
         type: 'subscription.payment_retry',
         tenantId: sub.tenantId,
@@ -377,6 +428,7 @@ async function runDunning(
           attempt: attempts + 1,
           maxAttempts: DUNNING_RETRY_DAYS.length,
           scheduledDay: dueDay,
+          charged: charge.attempted,
         },
       });
       await producer.publish(TOPICS.PAYMENTS, {
@@ -387,6 +439,7 @@ async function runDunning(
           phase: 'retry',
           attempt: attempts + 1,
           maxAttempts: DUNNING_RETRY_DAYS.length,
+          outcome: charge.attempted ? 'failed' : 'scheduled',
         },
       });
     } catch (err) {

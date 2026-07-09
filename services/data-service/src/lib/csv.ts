@@ -109,16 +109,34 @@ export function parseCsvRows(input: string): string[][] {
 }
 
 /**
- * Escape a single CSV cell value. Wraps in double quotes and doubles any
- * embedded quotes when the value contains a comma, quote, or line break.
+ * Neutralize CSV formula/injection payloads. Spreadsheet applications (Excel,
+ * LibreOffice, Google Sheets) treat a cell whose first character is one of
+ * `= + - @`, tab (\t), or CR (\r) as a formula. A malicious value like
+ * `=CMD|'/c calc'!A1` would then execute on open. Prefixing such values with a
+ * single quote forces the cell to be interpreted as literal text (OWASP CSV
+ * Injection). Applied before RFC-4180 quoting so the guard survives quoting.
+ */
+function neutralizeCsvFormula(str: string): string {
+  if (str.length > 0 && /^[=+\-@\t\r]/.test(str)) {
+    return `'${str}`;
+  }
+  return str;
+}
+
+/**
+ * Escape a single CSV cell value. Neutralizes formula-injection payloads, then
+ * wraps in double quotes and doubles any embedded quotes when the value
+ * contains a comma, quote, or line break.
  */
 export function escapeCsvValue(value: unknown): string {
-  const str =
+  const raw =
     value === null || value === undefined
       ? ''
       : typeof value === 'object'
         ? JSON.stringify(value)
         : String(value);
+
+  const str = neutralizeCsvFormula(raw);
 
   if (/[",\r\n]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;

@@ -249,6 +249,54 @@ enum CommandEnrollmentStatus {
   FAILED
 }
 
+// ─── Automation Rules — cross-module declarative automation ─────────────────
+//
+// A simpler, admin-configurable layer than WorkflowTemplate. One row = one rule:
+// "when <triggerEvent> happens on <module> (with optional AND conditions), run
+// <actions>". Evaluated by the Kafka automation consumer against every relevant
+// domain event; matched rules execute their actions via the existing engine node
+// handlers. Each firing records an AutomationRuleRun for audit/idempotency.
+
+model AutomationRule {
+  id           String              @id @default(cuid())
+  tenantId     String
+  name         String
+  description  String?
+  module       String              // lead | contact | account | deal | quote | ticket | campaign | invoice | ...
+  triggerEvent String              // e.g. 'deal.created', 'deal.stage_changed', 'ticket.sla.breached'
+  // [{ field, operator, value }] — AND-combined, evaluated against the event payload
+  conditions   Json                @default("[]")
+  // [{ type, config }] — type ∈ engine action types (SEND_NOTIFICATION/CREATE_TASK/…)
+  actions      Json                @default("[]")
+  isActive     Boolean             @default(true)
+  runCount     Int                 @default(0)
+  lastRunAt    DateTime?
+  createdBy    String
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  runs         AutomationRuleRun[]
+
+  @@index([tenantId, module, triggerEvent])
+  @@index([tenantId, isActive])
+  @@unique([id, tenantId])
+}
+
+model AutomationRuleRun {
+  id        String         @id @default(cuid())
+  tenantId  String
+  ruleId    String
+  rule      AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  eventId   String         // source domain-event id — dedupe key
+  status    String         @default("RUNNING") // RUNNING | SUCCESS | PARTIAL | FAILED | SKIPPED
+  error     String?
+  ranAt     DateTime       @default(now())
+
+  // One run per (rule, event) — the idempotency guard for the consumer.
+  @@unique([ruleId, eventId])
+  @@index([tenantId, ruleId])
+  @@index([ruleId, ranAt])
+}
+
 model OutboxMessage {
   id             String   @id @default(cuid())
   topic          String

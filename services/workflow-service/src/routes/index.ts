@@ -6,6 +6,7 @@ import { registerExecutionsRoutes } from './executions.routes.js';
 import { registerJourneysRoutes } from './journeys.routes.js';
 import { registerCommandJourneysRoutes } from './command-journeys.routes.js';
 import { registerSlaRoutes } from './sla.routes.js';
+import { registerAutomationRulesRoutes } from './automation-rules.routes.js';
 
 export async function registerRoutes(
   app: FastifyInstance,
@@ -17,4 +18,5 @@ export async function registerRoutes(
   await registerJourneysRoutes(app, prisma);
   await registerCommandJourneysRoutes(app, prisma, producer);
   await registerSlaRoutes(app, prisma);
+  await registerAutomationRulesRoutes(app, prisma);
 }

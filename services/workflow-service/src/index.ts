@@ -16,6 +16,7 @@ import { buildDatabaseUrl } from '@nexus/service-utils/db';
 import { createWorkflowPrisma } from './prisma.js';
 import { registerRoutes } from './routes/index.js';
 import { startTriggerConsumer } from './consumers/trigger.consumer.js';
+import { startAutomationConsumer } from './consumers/automation.consumer.js';
 import { startBranchConsumer } from './consumers/branch.consumer.js';
 import { startApprovalConsumer } from './consumers/approval.consumer.js';
 import { startGdprConsumer } from './consumers/gdpr.consumer.js';
@@ -90,9 +91,16 @@ let branchConsumer: Awaited<ReturnType<typeof startBranchConsumer>> | null = nul
 let approvalConsumer: Awaited<ReturnType<typeof startApprovalConsumer>> | null = null;
 let gdprConsumer: Awaited<ReturnType<typeof startGdprConsumer>> | null = null;
 let journeyEnrollmentConsumer: Awaited<ReturnType<typeof startJourneyEnrollmentConsumer>> | null = null;
+let automationConsumer: Awaited<ReturnType<typeof startAutomationConsumer>> | null = null;
 try {
   await producer.connect();
   await startTriggerConsumer(prisma, producer);
+  // Cross-module automation-rules consumer — fail-open, isolated from the others.
+  try {
+    automationConsumer = await startAutomationConsumer(prisma);
+  } catch (err) {
+    app.log.warn({ err }, 'Automation-rules consumer failed to start');
+  }
   branchConsumer = await startBranchConsumer(prisma, producer);
   approvalConsumer = await startApprovalConsumer(prisma, producer, app.log);
   gdprConsumer = await startGdprConsumer(prisma);
@@ -112,6 +120,7 @@ app.addHook('onClose', async () => {
   try { await approvalConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Approval consumer disconnect failed'); }
   try { await gdprConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'GDPR consumer disconnect failed'); }
   try { await journeyEnrollmentConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Journey enrollment consumer disconnect failed'); }
+  try { await automationConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Automation-rules consumer disconnect failed'); }
   try { await producer.disconnect(); } catch (err) { app.log.warn({ err }, 'Producer disconnect failed'); }
 });
 

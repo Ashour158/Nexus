@@ -179,6 +179,7 @@ services:
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3000'
       APP_URL: http://localhost:3000
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_auth
@@ -206,6 +207,7 @@ services:
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_crm
       METADATA_SERVICE_URL: http://metadata-service:3004
       KAFKA_BROKERS: kafka:29092
@@ -236,6 +238,7 @@ services:
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       CHROMIUM_PATH: /usr/bin/chromium
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_finance
       KAFKA_BROKERS: kafka:29092
@@ -495,6 +498,7 @@ services:
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       # Must equal crm-service's BLUEPRINT_SERVICE_TOKEN so the internal
       # validate-transition call authenticates (timingSafeEqual).
       BLUEPRINT_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
@@ -522,6 +526,7 @@ services:
       CRM_SERVICE_URL: http://crm-service:3001
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
     depends_on:
       kafka:
         condition: service_started
@@ -558,6 +563,7 @@ services:
       # every reporting/analytics/forecast/etc call 500'd. Internal DNS names.
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       AUTH_SERVICE_URL: http://auth-service:3000
       CRM_SERVICE_URL: http://crm-service:3001
       FINANCE_SERVICE_URL: http://finance-service:3002
@@ -661,6 +667,7 @@ services:
       CRM_SERVICE_URL: http://crm-service:3001
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
     depends_on:
       postgres:
         condition: service_healthy
@@ -702,6 +709,7 @@ services:
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3014'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_approval
       KAFKA_BROKERS: kafka:29092
@@ -742,6 +750,7 @@ services:
       KNOWLEDGE_SERVICE_URL: http://knowledge-service:3023
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
     depends_on:
       postgres:
         condition: service_healthy
@@ -767,6 +776,7 @@ services:
       DOCUMENT_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_document
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
     depends_on:
       - finance-service
 
@@ -852,6 +862,7 @@ services:
       CRM_SERVICE_URL: http://crm-service:3001
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
@@ -878,6 +889,7 @@ services:
       ANALYTICS_SERVICE_URL: http://analytics-service:3008/api/v1/analytics
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
@@ -898,6 +910,7 @@ services:
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3022'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_portal
       KAFKA_BROKERS: kafka:29092
@@ -983,6 +996,7 @@ services:
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
@@ -1135,6 +1149,7 @@ services:
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3029'
       TICKET_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_ticket
       KAFKA_BROKERS: kafka:29092
@@ -1159,6 +1174,7 @@ services:
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3025'
       CAMPAIGN_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_campaign
       KAFKA_BROKERS: kafka:29092

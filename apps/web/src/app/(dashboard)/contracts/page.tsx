@@ -11,6 +11,7 @@ import { useUiStore } from '@/stores/ui.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { formatCurrency, formatDate } from '@/lib/format';
 import SendForSignature from '@/components/esign/SendForSignature';
+import { ExportButton } from '@/components/export/ExportButton';
 
 interface Contract {
   id: string;
@@ -116,9 +117,12 @@ export default function ContractsPage(): JSX.Element {
 
   return (
     <main className="space-y-4 p-4">
-      <header>
-        <h1 className="text-xl font-semibold">Contracts</h1>
-        <p className="text-sm text-slate-500">Track lifecycle and signatures for customer contracts.</p>
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">Contracts</h1>
+          <p className="text-sm text-slate-500">Track lifecycle and signatures for customer contracts.</p>
+        </div>
+        <ExportButton module="contracts" />
       </header>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4">

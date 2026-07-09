@@ -7,6 +7,7 @@ import { usePrompt } from '@/hooks/use-confirm';
 import { Input } from '@/components/ui/input';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
+import { ExportButton } from '@/components/export/ExportButton';
 import {
   useApproveQuote,
   useArchivedQuotes,
@@ -127,6 +128,7 @@ export default function QuotesPage(): JSX.Element {
             Archived
           </button>
         </div>
+        <ExportButton module="quotes" filters={{ status, ownerId }} />
         <SavedViewsControl
           entityType="quote"
           currentFilters={{ status, ownerId, dateFrom, dateTo }}

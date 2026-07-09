@@ -7,6 +7,7 @@ import { TableSkeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { useOrders, ORDER_STATUSES, type SalesOrderStatus } from '@/hooks/use-orders';
+import { ExportButton } from '@/components/export/ExportButton';
 
 const PAGE_SIZE = 25;
 
@@ -41,6 +42,7 @@ export default function OrdersPage(): JSX.Element {
           <h1 className="text-xl font-semibold text-slate-900">Orders</h1>
           <p className="text-sm text-slate-500">{total} total sales orders</p>
         </div>
+        <ExportButton module="orders" filters={{ status: statusFilter }} />
       </header>
 
       {/* Filters */}

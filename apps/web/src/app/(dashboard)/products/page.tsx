@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ExportButton } from '@/components/export/ExportButton';
 
 type Product = {
   id: string;
@@ -221,11 +222,14 @@ export default function ProductsPage(): JSX.Element {
     <main className="space-y-4 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900">Catalog</h1>
-        {tab === 'products' && canCreate ? (
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" /> New Product
-          </Button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {tab === 'products' ? <ExportButton module="products" /> : null}
+          {tab === 'products' && canCreate ? (
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4" /> New Product
+            </Button>
+          ) : null}
+        </div>
       </div>
       <div className="flex gap-2">
         {(['products', 'kits', 'vendors'] as const).map((key) => (

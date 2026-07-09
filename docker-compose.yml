@@ -723,9 +723,15 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
-      # CSV export streams source rows from crm-service; without this the client
-      # fell back to localhost:3001 (nothing in-container) → export 500'd.
+      # CSV export streams source rows from each module's owning service; without
+      # these the client fell back to localhost (nothing in-container) → export
+      # 500'd / 404'd. crm→crm modules, finance→quotes/rfqs/invoices/orders/
+      # products/contracts, ticket→tickets, campaign→campaigns, knowledge→articles.
       CRM_SERVICE_URL: http://crm-service:3001
+      FINANCE_SERVICE_URL: http://finance-service:3002
+      TICKET_SERVICE_URL: http://ticket-service:3029
+      CAMPAIGN_SERVICE_URL: http://campaign-service:3025
+      KNOWLEDGE_SERVICE_URL: http://knowledge-service:3023
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
     depends_on:
       postgres:

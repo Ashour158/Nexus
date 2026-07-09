@@ -25,6 +25,7 @@ import {
   statusTone,
   typeTone,
 } from '@/components/campaigns/campaign-ui';
+import { ExportButton } from '@/components/export/ExportButton';
 import {
   CRMCard,
   CRMEmptyState,
@@ -94,6 +95,7 @@ export default function CampaignsPage() {
         }
         actions={
           <>
+            <ExportButton module="campaigns" />
             <button
               type="button"
               onClick={() => void refetch()}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ExportButton } from '@/components/export/ExportButton';
 
 interface Article {
   id: string;
@@ -39,7 +40,10 @@ export default function KnowledgePage() {
 
   return (
     <div className="max-w-3xl p-6">
-      <h1 className="mb-2 text-2xl font-bold text-gray-900">Knowledge Base</h1>
+      <div className="mb-2 flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Knowledge Base</h1>
+        <ExportButton module="knowledge" />
+      </div>
       <p className="mb-6 text-sm text-gray-500">Sales playbooks, battle cards, and product docs</p>
       <form onSubmit={handleSearch} className="mb-6 flex gap-2">
         <input className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="Search articles..." value={query} onChange={(e) => setQuery(e.target.value)} />

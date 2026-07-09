@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth.store';
 import { notify } from '@/lib/toast';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ExportButton } from '@/components/export/ExportButton';
 
 type RFQ = {
   id: string;
@@ -55,6 +56,7 @@ export default function RFQsPage(): JSX.Element {
     <main className="space-y-4 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">RFQs</h1>
+        <ExportButton module="rfqs" />
       </div>
 
       <section className="rounded-lg border bg-white p-4">

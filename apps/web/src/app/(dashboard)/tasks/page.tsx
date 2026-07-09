@@ -20,6 +20,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { useUiStore } from '@/stores/ui.store';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/button';
+import { ExportButton } from '@/components/export/ExportButton';
 import {
   Dialog,
   DialogContent,
@@ -263,14 +264,17 @@ export default function TasksPage(): ReactElement {
                 <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">Tasks</h1>
                 <p className="mt-1 text-sm text-slate-500">Manage follow-ups, ownership, priorities, and due dates efficiently.</p>
               </div>
-              <button
-                type="button"
-                onClick={openCreate}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#4A90E2] px-4 text-sm font-bold text-white shadow-sm"
-              >
-                <Plus className="h-4 w-4" />
-                Add Task
-              </button>
+              <div className="flex items-center gap-2">
+                <ExportButton module="tasks" />
+                <button
+                  type="button"
+                  onClick={openCreate}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#4A90E2] px-4 text-sm font-bold text-white shadow-sm"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Task
+                </button>
+              </div>
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

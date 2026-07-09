@@ -9,6 +9,7 @@ import { FilterBar } from '@/components/ui/filter-bar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { EditableSelectCell } from '@/components/ui/editable-cell';
 import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
+import { ExportButton } from '@/components/export/ExportButton';
 import { Avatar } from '@/components/ui/avatar';
 import { CreateTicketModal } from '@/components/tickets/create-ticket-modal';
 import { TicketStatusPill, TicketPriorityPill, SlaBreachBadge } from '@/components/tickets/ticket-pills';
@@ -76,6 +77,7 @@ export default function TicketsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <ExportButton module="tickets" filters={{ status, priority, assigneeId, search }} />
           <SavedViewsControl
             entityType="ticket"
             currentFilters={{ status, priority, assigneeId, search }}

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
+import { ExportButton } from '@/components/export/ExportButton';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { notify } from '@/lib/toast';
 
@@ -86,11 +87,14 @@ export default function InvoicesPage(): JSX.Element {
           <h1 className="text-xl font-semibold text-slate-900">Invoices</h1>
           <p className="text-sm text-slate-500">{total} total invoices</p>
         </div>
-        <SavedViewsControl
-          entityType="invoice"
-          currentFilters={{ status: statusFilter }}
-          onApply={(f) => setStatusFilter(typeof f.status === 'string' ? f.status : 'ALL')}
-        />
+        <div className="flex items-center gap-2">
+          <ExportButton module="invoices" filters={{ status: statusFilter }} />
+          <SavedViewsControl
+            entityType="invoice"
+            currentFilters={{ status: statusFilter }}
+            onApply={(f) => setStatusFilter(typeof f.status === 'string' ? f.status : 'ALL')}
+          />
+        </div>
       </header>
 
       {/* Summary metrics */}

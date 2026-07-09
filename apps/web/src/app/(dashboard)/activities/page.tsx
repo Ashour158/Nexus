@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Calendar, CheckCircle2, FileText, Mail, MessageSquare, Phone, Clock, AlertCircle, Plus } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
+import { ExportButton } from '@/components/export/ExportButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -175,6 +176,7 @@ export default function ActivitiesPage() {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Activity Feed</h1>
         <div className="flex items-center gap-3">
+          <ExportButton module="activities" />
           <SavedViewsControl
             entityType="activity"
             currentFilters={{ tab }}

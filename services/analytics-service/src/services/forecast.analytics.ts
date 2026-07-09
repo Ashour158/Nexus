@@ -9,6 +9,23 @@ interface DealEventRow {
   owner_id: string;
   occurred_at: string;
   close_month?: string;
+  forecast_category?: string | null;
+}
+
+/**
+ * Open-pipeline forecast categories (spec B7). CLOSED is intentionally excluded
+ * from the open-pipeline breakdown; deals whose latest category is CLOSED are
+ * dropped. Empty/unknown categories (old events that predate the column) are
+ * treated as PIPELINE so nothing silently disappears from the roll-up.
+ */
+export type ForecastCategory = 'COMMIT' | 'BEST_CASE' | 'PIPELINE';
+const FORECAST_CATEGORIES: ForecastCategory[] = ['COMMIT', 'BEST_CASE', 'PIPELINE'];
+
+export interface ForecastCategoryBreakdown {
+  category: ForecastCategory;
+  weighted: string;
+  total: string;
+  dealCount: number;
 }
 
 export interface ForecastData {
@@ -20,6 +37,7 @@ export interface ForecastData {
     weighted: string;
     total: string;
   }>;
+  forecastByCategory: ForecastCategoryBreakdown[];
 }
 
 export function createForecastAnalyticsService(client: ClickHouseClient) {
@@ -78,6 +96,7 @@ export function createForecastAnalyticsService(client: ClickHouseClient) {
             argMaxIf(if(base_amount != 0, base_amount, amount), occurred_at, amount != 0) AS amount,
             argMaxIf(probability, occurred_at, probability != 0) AS probability,
             argMax(owner_id, occurred_at) AS owner_id,
+            argMaxIf(forecast_category, occurred_at, forecast_category != '') AS forecast_category,
             toStartOfMonth(max(occurred_at)) AS close_month
           FROM deal_events
           WHERE tenant_id = {tenantId:String}
@@ -92,6 +111,16 @@ export function createForecastAnalyticsService(client: ClickHouseClient) {
       let weightedPipeline = new Decimal(0);
       let totalPipeline = new Decimal(0);
       const byMonth: Record<string, { weighted: Decimal; total: Decimal }> = {};
+      // Weighted-pipeline broken down by forecast category (spec B7). Seeded with
+      // all open categories so the response shape is stable even for empty buckets.
+      const byCategory: Record<
+        ForecastCategory,
+        { weighted: Decimal; total: Decimal; dealCount: number }
+      > = {
+        COMMIT: { weighted: new Decimal(0), total: new Decimal(0), dealCount: 0 },
+        BEST_CASE: { weighted: new Decimal(0), total: new Decimal(0), dealCount: 0 },
+        PIPELINE: { weighted: new Decimal(0), total: new Decimal(0), dealCount: 0 },
+      };
 
       for (const deal of deals) {
         const amount = new Decimal(deal.amount ?? 0);
@@ -113,6 +142,23 @@ export function createForecastAnalyticsService(client: ClickHouseClient) {
         };
         byMonth[month].weighted = byMonth[month].weighted.plus(weighted);
         byMonth[month].total = byMonth[month].total.plus(amount);
+
+        // ── Forecast-category breakdown ──────────────────────────────────────
+        // Resolve the deal's LATEST forecast_category (argMaxIf already skipped
+        // empty rows in SQL). Normalize: empty / unknown / legacy-PIPELINE → the
+        // PIPELINE bucket so no open deal is silently dropped. An explicit CLOSED
+        // on a still-open deal is a data inconsistency — excluded from the open
+        // breakdown per spec (won/lost are already filtered out by status above).
+        const rawCategory = String(deal.forecast_category ?? '').trim().toUpperCase();
+        if (rawCategory !== 'CLOSED') {
+          const category: ForecastCategory =
+            rawCategory === 'COMMIT' || rawCategory === 'BEST_CASE'
+              ? rawCategory
+              : 'PIPELINE';
+          byCategory[category].weighted = byCategory[category].weighted.plus(weighted);
+          byCategory[category].total = byCategory[category].total.plus(amount);
+          byCategory[category].dealCount += 1;
+        }
       }
 
       return {
@@ -126,6 +172,12 @@ export function createForecastAnalyticsService(client: ClickHouseClient) {
             total: values.total.toFixed(2),
           }))
           .sort((a, b) => a.month.localeCompare(b.month)),
+        forecastByCategory: FORECAST_CATEGORIES.map((category) => ({
+          category,
+          weighted: byCategory[category].weighted.toFixed(2),
+          total: byCategory[category].total.toFixed(2),
+          dealCount: byCategory[category].dealCount,
+        })),
       };
     },
   };

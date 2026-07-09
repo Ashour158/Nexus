@@ -59,6 +59,13 @@ export async function ensureCurrencyColumns(client: ClickHouseClient): Promise<v
   statements.push(
     `ALTER TABLE deal_events ADD COLUMN IF NOT EXISTS probability Float64 DEFAULT 0`
   );
+  // deal_events gains a `forecast_category` column (PIPELINE|BEST_CASE|COMMIT|
+  // CLOSED) carried on the deal.* event payloads by crm-service. Additive +
+  // idempotent; existing rows default to '' and the forecast group-by-category
+  // query treats empty/unknown as PIPELINE.
+  statements.push(
+    `ALTER TABLE deal_events ADD COLUMN IF NOT EXISTS forecast_category String DEFAULT ''`
+  );
 
   statements.push(...SUMMARY_ALTERS);
 

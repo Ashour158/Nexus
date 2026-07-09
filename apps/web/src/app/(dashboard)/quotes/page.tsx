@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { usePrompt } from '@/hooks/use-confirm';
 import { Input } from '@/components/ui/input';
 import { TableSkeleton } from '@/components/ui/skeleton';
+import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
 import {
   useApproveQuote,
   useArchivedQuotes,
@@ -126,6 +127,17 @@ export default function QuotesPage(): JSX.Element {
             Archived
           </button>
         </div>
+        <SavedViewsControl
+          entityType="quote"
+          currentFilters={{ status, ownerId, dateFrom, dateTo }}
+          onApply={(f) => {
+            setStatus(typeof f.status === 'string' ? (f.status as Quote['status'] | '') : '');
+            setOwnerId(typeof f.ownerId === 'string' ? f.ownerId : '');
+            setDateFrom(typeof f.dateFrom === 'string' ? f.dateFrom : '');
+            setDateTo(typeof f.dateTo === 'string' ? f.dateTo : '');
+            setPage(1);
+          }}
+        />
         {canUseStandaloneQuoteBuilder ? (
           <Link href="/quotes/new">
             <Button type="button">Admin quote builder</Button>

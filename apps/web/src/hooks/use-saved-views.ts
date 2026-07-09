@@ -12,7 +12,15 @@ import { api } from '@/lib/api-client';
  * before the backend deploys.
  */
 
-export type SavedViewEntityType = 'account' | 'contact';
+export type SavedViewEntityType =
+  | 'account'
+  | 'contact'
+  | 'lead'
+  | 'deal'
+  | 'quote'
+  | 'ticket'
+  | 'invoice'
+  | 'activity';
 
 export interface SavedView {
   id: string;

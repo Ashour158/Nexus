@@ -6,6 +6,7 @@ import { apiClients } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useUiStore } from '@/stores/ui.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { formatCurrency, formatDate } from '@/lib/format';
@@ -152,7 +153,15 @@ export default function ContractsPage(): JSX.Element {
         {query.isLoading ? (
           <div className="space-y-2 p-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10" />)}</div>
         ) : contracts.length === 0 ? (
-          <p className="p-8 text-center text-sm text-slate-500">No contracts found.</p>
+          <EmptyState
+            icon="📄"
+            title="No contracts found"
+            description={
+              status === 'ALL'
+                ? 'Create a contract above to track its lifecycle and signatures.'
+                : `No contracts with status ${status}. Try a different filter.`
+            }
+          />
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-start text-xs uppercase text-slate-500">

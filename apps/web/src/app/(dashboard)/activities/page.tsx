@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Calendar, CheckCircle2, FileText, Mail, MessageSquare, Phone, Clock, AlertCircle, Plus } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -173,10 +174,17 @@ export default function ActivitiesPage() {
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Activity Feed</h1>
-        <Button onClick={openCreate}>
-          <Plus className="mr-1.5 h-4 w-4" />
-          New activity
-        </Button>
+        <div className="flex items-center gap-3">
+          <SavedViewsControl
+            entityType="activity"
+            currentFilters={{ tab }}
+            onApply={(f) => setTab((f.tab as ActivityTab) ?? 'all')}
+          />
+          <Button onClick={openCreate}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            New activity
+          </Button>
+        </div>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">

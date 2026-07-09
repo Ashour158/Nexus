@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { EditableSelectCell } from '@/components/ui/editable-cell';
+import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
 import { Avatar } from '@/components/ui/avatar';
 import { CreateTicketModal } from '@/components/tickets/create-ticket-modal';
 import { TicketStatusPill, TicketPriorityPill, SlaBreachBadge } from '@/components/tickets/ticket-pills';
@@ -15,9 +17,14 @@ import { useAuthStore } from '@/stores/auth.store';
 import { formatDateTime } from '@/lib/format';
 import {
   useTickets,
+  useUpdateTicket,
+  useTransitionTicket,
+  allowedNextStatuses,
   TICKET_STATUSES,
   TICKET_PRIORITIES,
   type Ticket,
+  type TicketStatus,
+  type TicketPriority,
 } from '@/hooks/use-tickets';
 
 const PAGE_SIZE = 25;
@@ -51,6 +58,9 @@ export default function TicketsPage() {
     limit: PAGE_SIZE,
   });
 
+  const updateTicket = useUpdateTicket();
+  const transitionTicket = useTransitionTicket();
+
   const rows = ticketsQuery.data ?? [];
   const hasMore = rows.length === PAGE_SIZE;
 
@@ -66,6 +76,17 @@ export default function TicketsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <SavedViewsControl
+            entityType="ticket"
+            currentFilters={{ status, priority, assigneeId, search }}
+            onApply={(f) => {
+              setStatus(typeof f.status === 'string' ? f.status : '');
+              setPriority(typeof f.priority === 'string' ? f.priority : '');
+              setAssigneeId(typeof f.assigneeId === 'string' ? f.assigneeId : '');
+              setSearch(typeof f.search === 'string' ? f.search : '');
+              setPage(1);
+            }}
+          />
           {canManageSla ? (
             <Link href="/tickets/sla-policies">
               <Button type="button" variant="outline">
@@ -175,13 +196,38 @@ export default function TicketsPage() {
               key: 'status',
               header: 'Status',
               align: 'center',
-              cell: (row) => <TicketStatusPill status={row.status} />,
+              cell: (row) => {
+                const options = Array.from(new Set([row.status, ...allowedNextStatuses(row.status)])).map(
+                  (s) => ({ label: s.replace('_', ' '), value: s })
+                );
+                return (
+                  <EditableSelectCell<TicketStatus>
+                    value={row.status}
+                    options={options}
+                    onSave={(v) => {
+                      if (v !== row.status) transitionTicket.mutate({ id: row.id, status: v });
+                    }}
+                  >
+                    <TicketStatusPill status={row.status} />
+                  </EditableSelectCell>
+                );
+              },
             },
             {
               key: 'priority',
               header: 'Priority',
               align: 'center',
-              cell: (row) => <TicketPriorityPill priority={row.priority} />,
+              cell: (row) => (
+                <EditableSelectCell<TicketPriority>
+                  value={row.priority}
+                  options={TICKET_PRIORITIES.map((p) => ({ label: p, value: p }))}
+                  onSave={(v) => {
+                    if (v !== row.priority) updateTicket.mutate({ id: row.id, data: { priority: v } });
+                  }}
+                >
+                  <TicketPriorityPill priority={row.priority} />
+                </EditableSelectCell>
+              ),
             },
             {
               key: 'assignee',

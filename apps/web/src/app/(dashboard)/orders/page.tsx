@@ -4,6 +4,7 @@ import { useState, type JSX } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { TableSkeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { useOrders, ORDER_STATUSES, type SalesOrderStatus } from '@/hooks/use-orders';
 
@@ -68,7 +69,15 @@ export default function OrdersPage(): JSX.Element {
         ) : ordersQuery.isError ? (
           <div className="p-8 text-center text-sm text-red-600">Could not load orders.</div>
         ) : orders.length === 0 ? (
-          <div className="p-8 text-center text-sm text-slate-500">No orders found.</div>
+          <EmptyState
+            icon="📦"
+            title="No orders found"
+            description={
+              statusFilter === 'ALL'
+                ? 'Sales orders confirmed from quotes will appear here.'
+                : `No orders with status ${statusFilter.replace('_', ' ')}. Try a different filter.`
+            }
+          />
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-start text-xs uppercase tracking-wide text-slate-500">

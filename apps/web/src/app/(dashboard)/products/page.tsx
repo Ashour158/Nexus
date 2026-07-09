@@ -6,6 +6,7 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type Product = {
   id: string;
@@ -312,13 +313,13 @@ export default function ProductsPage(): JSX.Element {
                 ))}
                 {products.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">
-                      No products yet.{' '}
-                      {canCreate ? (
-                        <button className="text-blue-600 underline" onClick={openCreate}>
-                          Add your first product
-                        </button>
-                      ) : null}
+                    <td colSpan={5} className="px-4 py-8">
+                      <EmptyState
+                        icon="📦"
+                        title="No products yet"
+                        description="Build your catalog so quotes and orders can reference priced items."
+                        cta={canCreate ? { label: 'Add your first product', onClick: openCreate } : undefined}
+                      />
                     </td>
                   </tr>
                 ) : null}

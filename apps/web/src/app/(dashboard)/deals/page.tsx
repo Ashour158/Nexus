@@ -11,6 +11,7 @@ import { PipelineBoard } from '@/components/deals/pipeline-board';
 import { ExportButton } from '@/components/export/ExportButton';
 import { ImportButton } from '@/components/export/ImportButton';
 import { EmptyState as SharedEmptyState } from '@/components/ui/EmptyState';
+import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
 import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Avatar } from '@/components/ui/avatar';
@@ -131,6 +132,16 @@ export default function DealsPage() {
         <div className="flex items-center gap-3">
           <ImportButton module="deals" onImported={() => void dealsQuery.refetch()} />
           <ExportButton module="deals" />
+          <SavedViewsControl
+            entityType="deal"
+            currentFilters={{ search, stageId: stageFilter, ownerId: ownerFilter }}
+            onApply={(f) => {
+              setSearch(typeof f.search === 'string' ? f.search : '');
+              setStageFilter(typeof f.stageId === 'string' ? f.stageId : '');
+              setOwnerFilter(typeof f.ownerId === 'string' ? f.ownerId : '');
+              setPage(1);
+            }}
+          />
           <div className="inline-flex rounded-lg border p-0.5" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface)' }}>
             <button
               type="button"

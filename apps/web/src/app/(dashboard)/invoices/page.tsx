@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClients } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { TableSkeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { notify } from '@/lib/toast';
 
@@ -84,6 +86,11 @@ export default function InvoicesPage(): JSX.Element {
           <h1 className="text-xl font-semibold text-slate-900">Invoices</h1>
           <p className="text-sm text-slate-500">{total} total invoices</p>
         </div>
+        <SavedViewsControl
+          entityType="invoice"
+          currentFilters={{ status: statusFilter }}
+          onApply={(f) => setStatusFilter(typeof f.status === 'string' ? f.status : 'ALL')}
+        />
       </header>
 
       {/* Summary metrics */}
@@ -123,7 +130,15 @@ export default function InvoicesPage(): JSX.Element {
         {invoicesQuery.isLoading ? (
           <TableSkeleton rows={8} cols={7} />
         ) : invoices.length === 0 ? (
-          <div className="p-8 text-center text-sm text-slate-500">No invoices found.</div>
+          <EmptyState
+            icon="🧾"
+            title="No invoices found"
+            description={
+              statusFilter === 'ALL'
+                ? 'Invoices generated from accepted quotes and orders will appear here.'
+                : `No invoices with status ${statusFilter}. Try a different filter.`
+            }
+          />
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-start text-xs uppercase tracking-wide text-slate-500">

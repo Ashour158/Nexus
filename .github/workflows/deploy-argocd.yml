@@ -42,11 +42,14 @@ jobs:
           sudo mv argocd /usr/local/bin/
 
       - name: Update image tags in GitOps repo
+        env:
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          IMAGE_TAG="${{ github.event.inputs.image_tag }}"
-          ENV="${{ github.event.inputs.environment }}"
+          case "$IMAGE_TAG" in *[!A-Za-z0-9._-]*) echo "invalid image tag"; exit 1;; esac
+          ENV="$ENVIRONMENT"
           # Update Helm values or Kustomize overlays with new image tag
           find "infrastructure/k8s/overlays/${ENV}" -name "*.yaml" -exec \
             sed -i -E "s|(image: ghcr.io/.*/nexus-[^:]+):[^[:space:]]+|\1:${IMAGE_TAG}|g" {} +
@@ -55,26 +58,32 @@ jobs:
           git push
 
       - name: Sync ArgoCD application
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
         run: |
-          argocd app sync "nexus-crm-${{ github.event.inputs.environment }}" \
+          argocd app sync "nexus-crm-${ENVIRONMENT}" \
             --server "${ARGOCD_SERVER}" \
             --auth-token "${ARGOCD_AUTH_TOKEN}" \
             --prune \
             --timeout 600
 
       - name: Wait for healthy rollout
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
         run: |
-          argocd app wait "nexus-crm-${{ github.event.inputs.environment }}" \
+          argocd app wait "nexus-crm-${ENVIRONMENT}" \
             --server "${ARGOCD_SERVER}" \
             --auth-token "${ARGOCD_AUTH_TOKEN}" \
             --health \
             --timeout 600
 
       - name: Run smoke tests
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
         run: |
           bash scripts/health-check.sh || {
             echo "❌ Smoke tests failed — rolling back via ArgoCD..."
-            argocd app rollback "nexus-crm-${{ github.event.inputs.environment }}" 0 \
+            argocd app rollback "nexus-crm-${ENVIRONMENT}" 0 \
               --server "${ARGOCD_SERVER}" \
               --auth-token "${ARGOCD_AUTH_TOKEN}"
             exit 1

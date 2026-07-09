@@ -127,7 +127,7 @@ to the repo — `.env` stays on the host only.
 
 ## 8. Disaster recovery runbook
 
-**Backups:** `scripts/backup.sh` runs nightly (02:00, cron) → `pg_dump` of every
+**Backups:** `scripts/backup.sh` runs nightly (03:15 UTC, cron) → `pg_dump` of every
 database to `/opt/nexus/backups/` (system of record = Postgres). Copy these
 off-box (e.g. `rclone`/`aws s3 cp` to object storage) — a droplet-local backup
 does not survive droplet loss. Verify a backup monthly by restoring into a scratch DB.

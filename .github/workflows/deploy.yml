@@ -50,21 +50,25 @@ jobs:
       - name: Deploy via SSH
         id: ssh_deploy
         uses: appleboy/ssh-action@v1
+        env:
+          DEPLOY_IMAGE_TAG: ${{ github.event.inputs.image_tag || github.sha }}
+          DEPLOY_SKIP_MIGRATIONS: ${{ github.event.inputs.skip_migrations }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT || 22 }}
+          envs: DEPLOY_IMAGE_TAG,DEPLOY_SKIP_MIGRATIONS
           script_stop: true
           script: |
             set -euo pipefail
             cd /opt/nexus
-            IMAGE_TAG="${{ github.event.inputs.image_tag || github.sha }}"
-            export IMAGE_TAG
+            export IMAGE_TAG="$DEPLOY_IMAGE_TAG"
+            case "$IMAGE_TAG" in *[!A-Za-z0-9._-]*) echo "invalid image tag"; exit 1;; esac
             echo "Pulling images with tag: ${IMAGE_TAG}"
             docker compose pull || true
 
-            if [ "${{ github.event.inputs.skip_migrations }}" = "false" ]; then
+            if [ "$DEPLOY_SKIP_MIGRATIONS" = "false" ]; then
               echo "Running migrations..."
               bash scripts/migrate-all.sh
             else

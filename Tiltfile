@@ -26,7 +26,7 @@ def services():
 # Watch and rebuild services
 for svc in services():
   local_resource(
-    svc,
+    'web-build' if svc == 'web' else svc,
     cmd='cd services/{} && pnpm build'.format(svc) if svc != 'web' else 'cd apps/web && pnpm build',
     deps=['services/{}/src'.format(svc)] if svc != 'web' else ['apps/web/src'],
     labels=['services'],
@@ -44,11 +44,11 @@ docker_build_with_restart(
 )
 
 # Port forwards
-k8s_resource('postgres', port_forwards='5432:5432')
-k8s_resource('redis', port_forwards='6379:6379')
-k8s_resource('kafka', port_forwards='9092:9092')
-k8s_resource('grafana', port_forwards='3001:3000')
-k8s_resource('prometheus', port_forwards='9090:9090')
+dc_resource('postgres', port_forwards='5432:5432')
+dc_resource('redis', port_forwards='6379:6379')
+dc_resource('kafka', port_forwards='9092:9092')
+dc_resource('grafana', port_forwards='3001:3000')
+dc_resource('prometheus', port_forwards='9090:9090')
 
 # Tilt UI settings
 update_settings(max_parallel_updates=6)

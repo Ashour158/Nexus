@@ -7,7 +7,6 @@ infrastructure/ @nexus/sre-team
 scripts/deploy.sh @nexus/sre-team
 scripts/rollback.sh @nexus/sre-team
 scripts/health-check.* @nexus/sre-team
-scripts/migrate-all.sh @nexus/sre-team
 
 # Helm charts and K8s manifests
 infrastructure/helm/ @nexus/sre-team
@@ -15,6 +14,7 @@ infrastructure/k8s/ @nexus/sre-team
 infrastructure/terraform/ @nexus/sre-team
 
 # Security-sensitive files
+infrastructure/k8s/*secret*.yaml @nexus/security-team
 infrastructure/k8s/secrets.yaml @nexus/security-team
 infrastructure/k8s/external-secrets.yaml @nexus/security-team
 scripts/seal-secrets.sh @nexus/security-team
@@ -23,7 +23,7 @@ scripts/rotate-db-credentials.sh @nexus/security-team
 
 # Database migrations require DBA / backend lead sign-off
 **/prisma/migrations/ @nexus/backend-leads
-scripts/migrate-all.sh @nexus/backend-leads
+scripts/migrate-all.sh @nexus/sre-team @nexus/backend-leads
 scripts/db-migrate-all.sh @nexus/backend-leads
 
 # API contracts and OpenAPI

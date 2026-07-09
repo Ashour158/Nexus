@@ -97,7 +97,7 @@ try {
   await startTriggerConsumer(prisma, producer);
   // Cross-module automation-rules consumer — fail-open, isolated from the others.
   try {
-    automationConsumer = await startAutomationConsumer(prisma);
+    automationConsumer = await startAutomationConsumer(prisma, producer);
   } catch (err) {
     app.log.warn({ err }, 'Automation-rules consumer failed to start');
   }

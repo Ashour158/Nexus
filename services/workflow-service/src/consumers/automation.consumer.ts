@@ -1,4 +1,5 @@
 import { NexusConsumer, TOPICS } from '@nexus/kafka';
+import type { NexusProducer } from '@nexus/kafka';
 import type { WorkflowPrisma } from '../prisma.js';
 import {
   AUTOMATION_MODULES,
@@ -23,10 +24,13 @@ function moduleForEvent(type: string): string {
  * the service layer.
  */
 export async function startAutomationConsumer(
-  prisma: WorkflowPrisma
+  prisma: WorkflowPrisma,
+  producer?: NexusProducer
 ): Promise<NexusConsumer> {
   const consumer = new NexusConsumer('workflow-service.automation-rules');
-  const rules = createAutomationRulesService(prisma);
+  // Producer lets NOTIFY/EMAIL actions publish `notification.requested` so the
+  // notification actually reaches delivery via notification-service.
+  const rules = createAutomationRulesService(prisma, producer);
 
   const onEvent = async (event: {
     type: string;

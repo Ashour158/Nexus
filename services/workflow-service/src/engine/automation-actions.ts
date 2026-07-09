@@ -1,4 +1,10 @@
-import type { ExecutionContext, NodeResult, WorkflowNode, WorkflowNodeType } from './types.js';
+import type {
+  ExecutionContext,
+  NodeResult,
+  NotificationProducer,
+  WorkflowNode,
+  WorkflowNodeType,
+} from './types.js';
 import { handleAssignNode } from './nodes/assign.node.js';
 import { handleCreateActivityNode } from './nodes/create-activity.node.js';
 import { handleCreateTaskNode } from './nodes/create-task.node.js';
@@ -96,7 +102,8 @@ export function buildRuleExecutionContext(
   tenantId: string,
   ruleId: string,
   eventId: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  producer?: NotificationProducer
 ): ExecutionContext {
   return {
     tenantId,
@@ -104,5 +111,6 @@ export function buildRuleExecutionContext(
     workflowId: ruleId,
     triggerPayload: payload,
     currentNodeId: null,
+    producer,
   };
 }

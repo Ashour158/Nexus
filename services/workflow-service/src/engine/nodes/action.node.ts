@@ -1,6 +1,24 @@
 import { withResilience } from '@nexus/service-utils';
 import type { ExecutionContext, NodeResult, WorkflowNode } from '../types.js';
 
+/**
+ * Non-2xx HTTP responses from an action target are surfaced as a thrown
+ * `ActionHttpError` carrying the status code, so:
+ *   - `withResilience` can decide retryability by status (5xx/429 → retry,
+ *     4xx → fail fast — retrying a client error never succeeds), and
+ *   - the run-status logic (executeRule / the graph executor) marks the run
+ *     FAILED/PARTIAL instead of silently logging a 4xx/5xx as SUCCESS (RR-C2).
+ */
+export class ActionHttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string
+  ) {
+    super(message);
+    this.name = 'ActionHttpError';
+  }
+}
+
 export async function handleActionNode(
   node: WorkflowNode,
   context: ExecutionContext
@@ -49,9 +67,12 @@ export async function handleActionNode(
   const method = cfg.method ?? 'POST';
   const body = cfg.body ?? context.triggerPayload;
 
-  const res = await withResilience(
-    () =>
-      fetch(cfg.url!, {
+  // The fetch + response-status check live INSIDE the resilience callback so a
+  // non-2xx response counts as a failed attempt: 5xx/429 is retried, and the
+  // final failure propagates as a throw (never resolves as success — RR-C2).
+  const result = await withResilience(
+    async () => {
+      const res = await fetch(cfg.url!, {
         method,
         headers: {
           'content-type': 'application/json',
@@ -59,14 +80,30 @@ export async function handleActionNode(
           ...(cfg.headers ?? {}),
         },
         body: method === 'GET' ? undefined : JSON.stringify(body),
-      }),
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        throw new ActionHttpError(
+          res.status,
+          `Action ${method} ${parsedUrl.host}${parsedUrl.pathname} failed: ${res.status} ${text.slice(0, 500)}`
+        );
+      }
+      return { status: res.status, body: text.slice(0, 5000) };
+    },
     {
       timeoutMs: 10000,
       maxRetries: 3,
+      // Retry transient failures (5xx/429/network/timeout); fail fast on 4xx —
+      // a rejected/invalid request never succeeds on retry.
+      retryable: (err: unknown) => {
+        if (err instanceof ActionHttpError) return err.status >= 500 || err.status === 429;
+        if (err instanceof Error) return /fetch|network|timeout|ECONNRESET|ETIMEDOUT|abort/i.test(err.message);
+        return false;
+      },
       circuitBreaker: { failureThreshold: 5, resetTimeoutMs: 30000 },
+      circuitBreakerName: `workflow-action:${parsedUrl.host}`,
     }
   );
 
-  const text = await res.text();
-  return { output: { status: res.status, body: text.slice(0, 5000) } };
+  return { output: result };
 }

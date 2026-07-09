@@ -12,22 +12,25 @@ export async function handleCreateActivityNode(
     dealIdField?: string;
     dueInHours?: number;
   };
-  const base = process.env.CRM_SERVICE_URL ?? 'http://localhost:3001/api/v1';
+  // CRM_SERVICE_URL in compose is the bare origin (http://crm-service:3001) — the
+  // internal automation write route lives under /api/v1/internal/automation.
+  const base = process.env.CRM_SERVICE_URL ?? 'http://localhost:3001';
   const ownerId = String(context.triggerPayload[cfg.ownerIdField ?? 'ownerId'] ?? '');
   const dealId = String(context.triggerPayload[cfg.dealIdField ?? 'dealId'] ?? '');
   return handleActionNode(
     {
       ...node,
       config: {
-        url: `${base}/activities`,
+        url: `${base}/api/v1/internal/automation/activities`,
         method: 'POST',
+        headers: { 'x-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '' },
         body: {
+          tenantId: context.tenantId,
           type: cfg.type ?? 'TASK',
           subject: cfg.subject ?? 'Workflow follow-up',
           ownerId,
           dealId: dealId || undefined,
           dueDate: new Date(Date.now() + (cfg.dueInHours ?? 24) * 60 * 60 * 1000).toISOString(),
-          customFields: { source: 'workflow' },
         },
       },
     },

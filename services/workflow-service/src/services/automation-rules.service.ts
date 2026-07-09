@@ -1,5 +1,6 @@
 import { NotFoundError } from '@nexus/service-utils';
 import type { WorkflowPrisma } from '../prisma.js';
+import type { NotificationProducer } from '../engine/types.js';
 import {
   SUPPORTED_ACTION_TYPES,
   buildRuleExecutionContext,
@@ -235,7 +236,10 @@ export interface AutomationRuleInput {
   isActive?: boolean;
 }
 
-export function createAutomationRulesService(prisma: WorkflowPrisma) {
+export function createAutomationRulesService(
+  prisma: WorkflowPrisma,
+  producer?: NotificationProducer
+) {
   return {
     async list(
       tenantId: string,
@@ -372,7 +376,7 @@ export function createAutomationRulesService(prisma: WorkflowPrisma) {
       payload: Record<string, unknown>
     ): Promise<void> {
       const actions = Array.isArray(actionsJson) ? (actionsJson as AutomationAction[]) : [];
-      const ctx = buildRuleExecutionContext(tenantId, ruleId, eventId, payload);
+      const ctx = buildRuleExecutionContext(tenantId, ruleId, eventId, payload, producer);
       const errors: string[] = [];
       let executed = 0;
 

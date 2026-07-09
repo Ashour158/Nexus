@@ -35,6 +35,20 @@ export interface ExecutionContext {
   workflowId: string;
   triggerPayload: Record<string, unknown>;
   currentNodeId?: string | null;
+  /**
+   * Kafka producer used by side-effect nodes that deliver via an event rather
+   * than an HTTP call (NOTIFY / EMAIL publish `notification.requested`). Optional
+   * so contexts that never reach those nodes need not supply one.
+   */
+  producer?: NotificationProducer;
+}
+
+/** Minimal producer surface the notify/email nodes need (a NexusProducer). */
+export interface NotificationProducer {
+  publish(
+    topic: string,
+    event: { type: string; tenantId: string; payload?: unknown; [key: string]: unknown }
+  ): Promise<void>;
 }
 
 export interface NodeResult {

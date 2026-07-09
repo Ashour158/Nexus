@@ -50,6 +50,7 @@ export class WorkflowExecutor {
       workflowId: execution.workflowId,
       triggerPayload: (execution.triggerPayload ?? {}) as Record<string, unknown>,
       currentNodeId,
+      producer: this.producer,
     };
 
     const visitedCount = new Map<string, number>();

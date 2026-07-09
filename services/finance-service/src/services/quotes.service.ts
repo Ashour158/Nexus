@@ -180,6 +180,63 @@ function toPrismaDecimal(value: number): Prisma.Decimal {
   return new Prisma.Decimal(value);
 }
 
+function toDecimal(value: unknown): Prisma.Decimal {
+  if (value === null || value === undefined) return new Prisma.Decimal(0);
+  if (value instanceof Prisma.Decimal) return value;
+  const n = typeof value === 'number' || typeof value === 'string' ? value : String(value);
+  try {
+    return new Prisma.Decimal(n);
+  } catch {
+    return new Prisma.Decimal(0);
+  }
+}
+
+/**
+ * RR-H7 — single source of truth for quote money. Derives all four monetary
+ * fields from the (denormalized) line items using decimal.js so the invariant
+ *
+ *     total = grossSubtotal − discount + tax
+ *
+ * holds exactly once. `subtotal` is the GROSS sum of `listPrice × qty` BEFORE
+ * discount (matching the invoice service's `computeTotals` convention); the
+ * discount is then subtracted a single time. Both the CPQ-engine create path
+ * and the manual update path call this helper, so the two can never disagree.
+ *
+ * When `discountOverride` is supplied (a manual `discountAmount` edit), it
+ * replaces the line-derived discount; the gross subtotal and per-line tax are
+ * still recomputed from the line items, so the total never double-counts.
+ */
+export function computeQuoteTotals(
+  rawItems: unknown,
+  discountOverride?: number
+): { subtotal: number; discountAmount: number; taxAmount: number; total: number } {
+  const items = Array.isArray(rawItems)
+    ? (rawItems as Array<Record<string, unknown>>)
+    : [];
+  let gross = new Prisma.Decimal(0);
+  let lineDiscount = new Prisma.Decimal(0);
+  let tax = new Prisma.Decimal(0);
+  for (const item of items) {
+    const qty = toDecimal(item.quantity);
+    const listPrice = toDecimal(item.listPrice);
+    const unitPrice = toDecimal(item.unitPrice);
+    gross = gross.plus(listPrice.times(qty));
+    lineDiscount = lineDiscount.plus(listPrice.minus(unitPrice).times(qty));
+    tax = tax.plus(toDecimal(item.taxAmount));
+  }
+  const discount =
+    discountOverride !== undefined
+      ? new Prisma.Decimal(discountOverride)
+      : lineDiscount;
+  const total = gross.minus(discount).plus(tax);
+  return {
+    subtotal: Number(gross.toFixed(2)),
+    discountAmount: Number(discount.toFixed(2)),
+    taxAmount: Number(tax.toFixed(2)),
+    total: Number(total.toFixed(2)),
+  };
+}
+
 function assertFutureDate(date: Date | null | undefined, label: string) {
   if (!date) {
     throw new BusinessRuleError(`${label} is required`);
@@ -364,15 +421,21 @@ export function createQuotesService(
         : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       assertFutureDate(expiry, 'Quote expiry date');
 
+      // RR-H7: derive the persisted money from the line items via the single
+      // canonical helper so `subtotal` is GROSS and `total = subtotal − discount
+      // + tax` holds exactly once (the CPQ engine's own `subtotal` is net-of-
+      // discount and must not be stored as-is).
+      const totals = computeQuoteTotals(pricingResult.items);
+
       // Multi-level approval: does this quote's total / effective discount cross
       // any active approval tier? Combined with the CPQ engine's own signal.
-      const subtotalNum = Number(pricingResult.subtotal) || 0;
+      // Effective discount % is measured against the GROSS subtotal (% off list).
       const effectiveDiscountPct =
-        subtotalNum > 0 ? (Number(pricingResult.discountTotal) / subtotalNum) * 100 : 0;
+        totals.subtotal > 0 ? (totals.discountAmount / totals.subtotal) * 100 : 0;
       const requiredLevel = await computeRequiredApprovalLevel(
         prisma,
         tenantId,
-        Number(pricingResult.total) || 0,
+        totals.total,
         effectiveDiscountPct
       );
       const needsApproval = pricingResult.approvalRequired || requiredLevel > 0;
@@ -399,10 +462,10 @@ export function createQuotesService(
               requiredApprovalLevel: requiredLevel,
               approvalLevel: 0,
               currency: data.currency,
-              subtotal: toPrismaDecimal(pricingResult.subtotal),
-              discountAmount: toPrismaDecimal(pricingResult.discountTotal),
-              taxAmount: toPrismaDecimal(pricingResult.taxTotal),
-              total: toPrismaDecimal(pricingResult.total),
+              subtotal: toPrismaDecimal(totals.subtotal),
+              discountAmount: toPrismaDecimal(totals.discountAmount),
+              taxAmount: toPrismaDecimal(totals.taxAmount),
+              total: toPrismaDecimal(totals.total),
               validUntil: expiry,
               expiresAt: expiry,
               approvalRequired: needsApproval,
@@ -505,10 +568,17 @@ export function createQuotesService(
         updateData.customFields = data.customFields as Prisma.InputJsonValue;
 
       if (data.discountAmount !== undefined) {
-        updateData.discountAmount = toPrismaDecimal(data.discountAmount);
-        const subtotalNum = Number(existing.subtotal);
-        const taxNum = Number(existing.taxAmount);
-        updateData.total = toPrismaDecimal(subtotalNum - data.discountAmount + taxNum);
+        // RR-H7: recompute ALL money from the (unchanged) line items through the
+        // same canonical helper, applying the manual discount as an override.
+        // The previous code did `existing.subtotal − discount + tax` while
+        // `existing.subtotal` was already net-of-discount, subtracting the
+        // discount a SECOND time. Deriving from gross line items fixes this and
+        // keeps subtotal/discount/tax/total mutually consistent.
+        const totals = computeQuoteTotals(existing.lineItems, data.discountAmount);
+        updateData.subtotal = toPrismaDecimal(totals.subtotal);
+        updateData.discountAmount = toPrismaDecimal(totals.discountAmount);
+        updateData.taxAmount = toPrismaDecimal(totals.taxAmount);
+        updateData.total = toPrismaDecimal(totals.total);
       }
 
       const updated = await prisma.quote.update({ where: { id }, data: updateData });

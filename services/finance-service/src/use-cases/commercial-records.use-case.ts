@@ -97,6 +97,40 @@ type CreateOrderInput = {
   customFields: Record<string, unknown>;
 };
 
+type SalesOrderStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'CONFIRMED' | 'FULFILLING' | 'FULFILLED' | 'CANCELLED' | 'CLOSED';
+
+type UpdateOrderInput = {
+  name?: string;
+  status?: SalesOrderStatus;
+  expectedFulfillmentAt?: string | null;
+  lineItems?: Array<Record<string, unknown>>;
+  subtotal?: number;
+  taxAmount?: number;
+  discountAmount?: number;
+  total?: number;
+  customFields?: Record<string, unknown>;
+};
+
+// Allowed forward status transitions for an order edited via PATCH. Moving an
+// order to CANCELLED is NOT permitted here — that goes through cancelOrder so a
+// reason is captured and the terminal-guard is enforced consistently.
+const ORDER_FORWARD_TRANSITIONS: Record<SalesOrderStatus, SalesOrderStatus[]> = {
+  DRAFT: ['PENDING_APPROVAL', 'CONFIRMED'],
+  PENDING_APPROVAL: ['CONFIRMED'],
+  CONFIRMED: ['FULFILLING'],
+  FULFILLING: ['FULFILLED'],
+  FULFILLED: ['CLOSED'],
+  CANCELLED: [],
+  CLOSED: [],
+};
+
+// Once an order is CONFIRMED its lines/amounts are "posted" and immutable — only
+// metadata (name / expected date / custom fields) may change; money edits require
+// a fresh order. These are the states where line/amount edits are still allowed.
+const ORDER_AMOUNT_EDITABLE = new Set<SalesOrderStatus>(['DRAFT', 'PENDING_APPROVAL']);
+// Terminal states accept no content edits at all.
+const ORDER_TERMINAL = new Set<SalesOrderStatus>(['CANCELLED', 'CLOSED']);
+
 type QuoteTemplateInput = {
   name: string;
   description?: string;
@@ -431,6 +465,62 @@ async function generateOrderNumber(client: SqlRunner, tenantId: string): Promise
 async function generateRfqNumber(client: SqlRunner, tenantId: string): Promise<string> {
   const seq = await allocateDocumentNumber(client, tenantId, 'rfq', 'ALL');
   return `RFQ-${String(seq).padStart(6, '0')}`;
+}
+
+/**
+ * RR-H9 — commit promo-code redemptions at ORDER COMMIT (quote → order), the
+ * only point a promo is actually consumed. The pricing engine no longer bumps
+ * `uses` on preview/calculate, so a promo can be previewed any number of times
+ * without eroding its cap.
+ *
+ * The increment is a single atomic `UPDATE … WHERE uses < maxUses RETURNING`,
+ * so Postgres evaluates the cap under a row lock and two concurrent conversions
+ * can never push a capped promo past `maxUses`. Run it INSIDE the conversion
+ * transaction so a rejected redemption (cap reached) rolls back the whole order.
+ *
+ * A zero-row result is disambiguated: a genuinely capped promo rejects the
+ * commit; a promo that has since been deleted/deactivated is skipped (its
+ * discount is already baked into the quote's stored line items).
+ */
+async function commitPromoRedemptions(
+  client: SqlRunner,
+  tenantId: string,
+  appliedPromos: unknown
+): Promise<void> {
+  const codes = Array.from(
+    new Set(
+      (Array.isArray(appliedPromos) ? appliedPromos : []).filter(
+        (c): c is string => typeof c === 'string' && c.trim().length > 0
+      )
+    )
+  );
+  for (const code of codes) {
+    const updated = await client.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      UPDATE "PromoCode"
+      SET "uses" = "uses" + 1, "updatedAt" = now()
+      WHERE "tenantId" = ${tenantId}
+        AND "code" = ${code}
+        AND "isActive" = true
+        AND ("maxUses" IS NULL OR "uses" < "maxUses")
+      RETURNING "id"
+    `);
+    if (updated.length === 0) {
+      const capped = await client.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT "id" FROM "PromoCode"
+        WHERE "tenantId" = ${tenantId}
+          AND "code" = ${code}
+          AND "isActive" = true
+          AND "maxUses" IS NOT NULL
+          AND "uses" >= "maxUses"
+        LIMIT 1
+      `);
+      if (capped.length > 0) {
+        throw new BusinessRuleError(
+          `Promo code "${code}" has reached its redemption cap and cannot be committed to an order`
+        );
+      }
+    }
+  }
 }
 
 function quoteApprovalMessage(check: Awaited<ReturnType<DiscountApprovalCheck>>) {
@@ -2655,6 +2745,133 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
       return order;
     },
 
+    /**
+     * RR-H15 — edit a non-terminal order. Metadata (name / expected fulfillment
+     * date / custom fields) is editable through FULFILLING; line items and money
+     * are editable only while the order is still DRAFT/PENDING_APPROVAL (before
+     * its lines are "posted" at CONFIRMED). Status may move one step forward
+     * along the fulfillment lifecycle — cancellation goes through `cancelOrder`.
+     */
+    async updateOrder(ctx: EngineContext, id: string, data: UpdateOrderInput) {
+      const tenantId = actor(ctx).tenantId;
+      const order = await prisma.salesOrder.findFirst({ where: { id, tenantId } });
+      if (!order) throw new NotFoundError('SalesOrder', id);
+      const current = order.status as SalesOrderStatus;
+
+      const wantsAmountEdit =
+        data.lineItems !== undefined ||
+        data.subtotal !== undefined ||
+        data.taxAmount !== undefined ||
+        data.discountAmount !== undefined ||
+        data.total !== undefined;
+      const wantsMetadataEdit =
+        data.name !== undefined ||
+        data.expectedFulfillmentAt !== undefined ||
+        data.customFields !== undefined;
+
+      if (ORDER_TERMINAL.has(current) && (wantsAmountEdit || wantsMetadataEdit)) {
+        throw new BusinessRuleError(`Cannot edit a ${current} order; use a new order instead`);
+      }
+      if (wantsAmountEdit && !ORDER_AMOUNT_EDITABLE.has(current)) {
+        throw new BusinessRuleError(
+          `Order lines/amounts are posted and immutable in status ${current}; cancel and re-create to change them`
+        );
+      }
+
+      const update: Prisma.SalesOrderUpdateInput = {};
+      if (data.name !== undefined) update.name = data.name;
+      if (data.expectedFulfillmentAt !== undefined) {
+        update.expectedFulfillmentAt = data.expectedFulfillmentAt
+          ? new Date(data.expectedFulfillmentAt)
+          : null;
+      }
+      if (data.customFields !== undefined) {
+        update.customFields = {
+          ...customFieldsOf(order.customFields),
+          ...data.customFields,
+        } as Prisma.InputJsonValue;
+      }
+      if (wantsAmountEdit) {
+        if (data.lineItems !== undefined) update.lineItems = data.lineItems as Prisma.InputJsonValue;
+        if (data.subtotal !== undefined) update.subtotal = new Prisma.Decimal(data.subtotal);
+        if (data.taxAmount !== undefined) update.taxAmount = new Prisma.Decimal(data.taxAmount);
+        if (data.discountAmount !== undefined) update.discountAmount = new Prisma.Decimal(data.discountAmount);
+        if (data.total !== undefined) update.total = new Prisma.Decimal(data.total);
+      }
+      if (data.status !== undefined && data.status !== current) {
+        if (data.status === 'CANCELLED') {
+          throw new BusinessRuleError('Use the cancel action to cancel an order');
+        }
+        if (!ORDER_FORWARD_TRANSITIONS[current].includes(data.status)) {
+          throw new BusinessRuleError(`Order cannot transition from ${current} to ${data.status}`);
+        }
+        update.status = data.status;
+        if (data.status === 'FULFILLED') update.fulfilledAt = ctx.now;
+      }
+
+      const updated = await prisma.salesOrder.update({ where: { id: order.id }, data: update });
+      await emitCommercialEvent(ctx, {
+        type: 'order.updated',
+        aggregateType: 'order',
+        aggregateId: updated.id,
+        payload: {
+          orderId: updated.id,
+          orderNumber: updated.orderNumber,
+          accountId: updated.accountId,
+          previousStatus: current,
+          status: updated.status,
+          total: Number(updated.total.toFixed(2)),
+          currency: updated.currency,
+        },
+      });
+      return updated;
+    },
+
+    /**
+     * RR-H15 — cancel/void an order. Permitted while the order is not yet
+     * fulfilled/closed; a fulfilled order is a posted commercial record and can
+     * no longer be cancelled. Captures the reason and stamps `cancelledAt`.
+     */
+    async cancelOrder(ctx: EngineContext, id: string, reason: string) {
+      const tenantId = actor(ctx).tenantId;
+      const order = await prisma.salesOrder.findFirst({ where: { id, tenantId } });
+      if (!order) throw new NotFoundError('SalesOrder', id);
+      const current = order.status as SalesOrderStatus;
+      if (current === 'CANCELLED') return order;
+      if (current === 'FULFILLED' || current === 'CLOSED') {
+        throw new BusinessRuleError(`A ${current} order cannot be cancelled`);
+      }
+      if (!hasText(reason)) {
+        throw new BusinessRuleError('Order cancellation requires a reason');
+      }
+      const updated = await prisma.salesOrder.update({
+        where: { id: order.id },
+        data: {
+          status: 'CANCELLED',
+          cancelledAt: ctx.now,
+          customFields: {
+            ...customFieldsOf(order.customFields),
+            cancelReason: reason,
+            cancelledById: actor(ctx).userId,
+          } as Prisma.InputJsonValue,
+        },
+      });
+      await emitCommercialEvent(ctx, {
+        type: 'order.cancelled',
+        aggregateType: 'order',
+        aggregateId: updated.id,
+        payload: {
+          orderId: updated.id,
+          orderNumber: updated.orderNumber,
+          accountId: updated.accountId,
+          previousStatus: current,
+          status: 'CANCELLED',
+          reason,
+        },
+      });
+      return updated;
+    },
+
     async convertQuoteToOrder(ctx: EngineContext, quoteId: string, meta: CpqTransitionMeta = {}) {
       const tenantId = actor(ctx).tenantId;
       return persistCpqTransition(ctx, {
@@ -2714,6 +2931,9 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
           where: { id: quote.id },
           data: { status: 'CONVERTED', version: { increment: 1 } },
         });
+        // RR-H9: consume promo redemptions atomically as part of the commit. A
+        // capped promo throws here and rolls the whole conversion back.
+        await commitPromoRedemptions(tx as unknown as SqlRunner, tenantId, quote.appliedPromos);
         return created;
       });
 

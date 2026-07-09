@@ -22,6 +22,24 @@ const OrderListQuerySchema = z.object({
   sortDir: z.enum(['asc', 'desc']).default('desc'),
 });
 
+const UpdateOrderSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    status: z.enum(['DRAFT', 'PENDING_APPROVAL', 'CONFIRMED', 'FULFILLING', 'FULFILLED', 'CANCELLED', 'CLOSED']).optional(),
+    expectedFulfillmentAt: z.string().datetime().nullable().optional(),
+    lineItems: z.array(z.record(z.unknown())).optional(),
+    subtotal: z.number().nonnegative().optional(),
+    taxAmount: z.number().nonnegative().optional(),
+    discountAmount: z.number().nonnegative().optional(),
+    total: z.number().nonnegative().optional(),
+    customFields: z.record(z.unknown()).optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: 'At least one field is required' });
+
+const CancelOrderSchema = z.object({
+  reason: z.string().min(1),
+});
+
 const CreateOrderSchema = z.object({
   accountId: z.string().min(1),
   contactId: z.string().optional(),
@@ -107,6 +125,32 @@ export async function registerOrdersRoutes(
           const jwt = request.user as JwtPayload;
           const order = await commercial.createOrder(engineContextFromJwt(request.id, jwt), parsed.data);
           return reply.code(201).send({ success: true, data: order });
+        }
+      );
+
+      r.patch(
+        '/orders/:id',
+        { preHandler: requirePermission(PERMISSIONS.QUOTES.UPDATE) },
+        async (request, reply) => {
+          const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+          const parsed = UpdateOrderSchema.safeParse(request.body);
+          if (!parsed.success) throw new ValidationError('Invalid body', parsed.error.flatten());
+          const jwt = request.user as JwtPayload;
+          const order = await commercial.updateOrder(engineContextFromJwt(request.id, jwt), id, parsed.data);
+          return reply.send({ success: true, data: order });
+        }
+      );
+
+      r.post(
+        '/orders/:id/cancel',
+        { preHandler: requirePermission(PERMISSIONS.QUOTES.UPDATE) },
+        async (request, reply) => {
+          const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+          const parsed = CancelOrderSchema.safeParse(request.body);
+          if (!parsed.success) throw new ValidationError('Invalid body', parsed.error.flatten());
+          const jwt = request.user as JwtPayload;
+          const order = await commercial.cancelOrder(engineContextFromJwt(request.id, jwt), id, parsed.data.reason);
+          return reply.send({ success: true, data: order });
         }
       );
 

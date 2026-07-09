@@ -195,6 +195,30 @@ export function createContractsService(prisma: FinancePrisma) {
       return signed;
     },
 
+    /**
+     * RR-H15 — void/delete a contract. Only a DRAFT contract may be hard-deleted;
+     * a signed (ACTIVE) or already-closed (EXPIRED/TERMINATED) contract is an
+     * immutable commercial record and must be terminated via `terminateContract`
+     * instead. Returns the deleted contract id.
+     */
+    async deleteContract(tenantId: string, id: string): Promise<{ id: string; deleted: true }> {
+      const existing = await loadOrThrow(tenantId, id);
+      if (existing.status !== 'DRAFT') {
+        throw new BusinessRuleError(
+          `Only draft contracts can be deleted (status ${existing.status}); terminate signed contracts instead`
+        );
+      }
+      await prisma.contract.delete({ where: { id } });
+      producer.publish(TOPICS.CONTRACTS, {
+        type: 'contract.deleted',
+        tenantId,
+        contractId: existing.id,
+        contractNumber: existing.contractNumber,
+        accountId: existing.accountId,
+      }).catch((err: unknown) => console.error('[contracts.service] Kafka publish failed', err));
+      return { id, deleted: true };
+    },
+
     async terminateContract(tenantId: string, id: string): Promise<Contract> {
       const existing = await loadOrThrow(tenantId, id);
       if (existing.status === 'TERMINATED') return existing;

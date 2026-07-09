@@ -105,6 +105,17 @@ export async function registerContractsRoutes(
         }
       );
 
+      r.delete(
+        '/contracts/:id',
+        { preHandler: requirePermission(PERMISSIONS.CONTRACTS.DELETE) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const result = await contracts.deleteContract(jwt.tenantId, id);
+          return reply.send({ success: true, data: result });
+        }
+      );
+
       r.post(
         '/contracts/:id/terminate',
         { preHandler: requirePermission(PERMISSIONS.CONTRACTS.DELETE) },

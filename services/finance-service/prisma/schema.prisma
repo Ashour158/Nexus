@@ -115,9 +115,16 @@ model Account {
   tenantId      String
   tier          String   @default("SMB")
   annualRevenue Decimal? @db.Decimal(18, 2)
+  /// Jurisdiction hints for CPQ tax resolution (denormalized from CRM). When
+  /// set, the pricing engine resolves the TaxRate by the account's tax zone
+  /// (taxZoneId) or billing country (joined to TaxZone.country) instead of the
+  /// single tenant-default rate.
+  taxZoneId     String?
+  country       String?
   updatedAt     DateTime @updatedAt
 
   @@index([tenantId])
+  @@index([tenantId, country])
   @@unique([id, tenantId])
 }
 

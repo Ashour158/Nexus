@@ -14,10 +14,10 @@ import { hashPassword, signPortalSession, verifyPassword, type PortalSession } f
  * downstream outage degrades gracefully rather than 500-ing the portal.
  */
 function financeBase(): string {
-  return process.env.FINANCE_SERVICE_URL ?? 'http://localhost:3003';
+  return process.env.FINANCE_SERVICE_URL ?? 'http://localhost:3002';
 }
 function ticketBase(): string {
-  return process.env.TICKET_SERVICE_URL ?? 'http://localhost:3020';
+  return process.env.TICKET_SERVICE_URL ?? 'http://localhost:3029';
 }
 function serviceHeaders(tenantId: string): Record<string, string> {
   return {

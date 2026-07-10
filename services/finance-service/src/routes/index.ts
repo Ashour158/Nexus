@@ -23,6 +23,7 @@ import { registerQuoteDocumentRoutes } from './quote-documents.routes.js';
 import { registerCpqTransitionRoutes } from './cpq-transitions.routes.js';
 import { registerInternalOperationsRoutes } from './internal-operations.routes.js';
 import { registerMoneyTimelineRoutes } from './money-timeline.routes.js';
+import { registerInternalPortalRoutes } from './internal-portal.routes.js';
 
 /**
  * Registers every finance HTTP route under `/api/v1`.
@@ -54,4 +55,5 @@ export async function registerAllRoutes(
   await registerDealRoomsRoutes(app, prisma);
   await registerZatcaRoutes(app, prisma);
   await registerMoneyTimelineRoutes(app, prisma);
+  await registerInternalPortalRoutes(app, prisma, producer);
 }

@@ -13,6 +13,7 @@ import { getPrisma, tenantAls } from './prisma.js';
 import { createTicketsService } from './services/tickets.service.js';
 import { registerTicketRoutes } from './routes/tickets.routes.js';
 import { registerSlaRoutes } from './routes/sla.routes.js';
+import { registerInternalPortalRoutes } from './routes/internal-portal.routes.js';
 
 startTracing({ serviceName: 'ticket-service' });
 const port = parseInt(process.env.PORT ?? '3029', 10);
@@ -54,6 +55,7 @@ app.setErrorHandler(globalErrorHandler);
 
 await registerTicketRoutes(app, tickets);
 await registerSlaRoutes(app, tickets);
+await registerInternalPortalRoutes(app, prisma);
 
 // Kafka producer is best-effort: if the broker is down we keep serving requests.
 try {

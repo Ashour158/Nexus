@@ -23,6 +23,7 @@ import { updateDealDataQuality } from '../lib/data-quality.js';
 import { computeDealHealth, deriveMeddicGaps } from '../lib/deal-health.engine.js';
 import { scoreDeal } from '../lib/ai/scoring.service.js';
 import { assertValidStageTransition } from '../lib/blueprint-client.js';
+import { assignTerritory, isTerritoryRoutingEnabled } from '../lib/territory-client.js';
 import {
   enforceValidationRules,
   applyFieldPermissions,
@@ -468,6 +469,58 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           forecastCategory: created.forecastCategory,
         },
       });
+
+      // ─── External territory-service routing (additive, enrichment-only) ─────
+      // STRICTLY FAIL-OPEN: runs AFTER the row is committed (no open
+      // transaction) and the client swallows every error (returning null +
+      // warn), so a territory-service outage/timeout/non-2xx can NEVER fail or
+      // roll back the deal create. Skipped entirely when TERRITORY_SERVICE_URL is
+      // unset. territoryId is a plain string column (no FK), so persisting an
+      // external territory id always succeeds. Owner is only overridden when the
+      // caller did not explicitly choose one.
+      if (isTerritoryRoutingEnabled()) {
+        const routing = await assignTerritory(tenantId, 'deal', {
+          amount: created.amount != null ? Number(created.amount) : undefined,
+          currency: created.currency,
+          country: account.country ?? undefined,
+          industry: account.industry ?? undefined,
+          source: created.source ?? undefined,
+        });
+        if (routing?.territoryId) {
+          const ownerExplicitlySet = Boolean(data.ownerId);
+          const prevOwnerId = created.ownerId;
+          const nextOwnerId =
+            !ownerExplicitlySet && routing.ownerId ? routing.ownerId : prevOwnerId;
+          try {
+            await prisma.deal.update({
+              where: { id: created.id },
+              data: { territoryId: routing.territoryId, ownerId: nextOwnerId },
+            });
+            created.territoryId = routing.territoryId;
+            created.ownerId = nextOwnerId;
+            if (nextOwnerId !== prevOwnerId) {
+              await producer
+                .publish(TOPICS.DEALS, {
+                  type: 'deal.assigned',
+                  tenantId,
+                  payload: {
+                    dealId: created.id,
+                    tenantId,
+                    newOwnerId: nextOwnerId,
+                    previousOwnerId: prevOwnerId,
+                    dealName: created.name,
+                  },
+                })
+                .catch(() => undefined);
+            }
+          } catch (err) {
+            console.warn(
+              '[territory-client] deal territory persist failed; continuing',
+              err
+            );
+          }
+        }
+      }
 
       updateDealDataQuality(prisma, created.id).catch(() => undefined);
 

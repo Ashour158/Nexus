@@ -18,6 +18,8 @@ import type {
 import type { CrmPrisma } from '../prisma.js';
 import { toPaginatedResult } from '@nexus/shared-types';
 import { assignLeadToTerritory } from '../lib/territory-router.js';
+import { assignTerritory, isTerritoryRoutingEnabled } from '../lib/territory-client.js';
+import { autoEnrollCadence, isCadenceEnrollEnabled } from '../lib/cadence-client.js';
 import {
   updateLeadDataQuality,
   updateAccountDataQuality,
@@ -282,6 +284,76 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
             },
           })
           .catch(() => undefined);
+      }
+
+      // ─── External territory-service routing + cadence auto-enroll ───────────
+      // Additive, enrichment-only, and STRICTLY FAIL-OPEN. Both calls run AFTER
+      // the row is committed (no open transaction) and the clients swallow every
+      // error (returning null + warn), so a territory/cadence outage, timeout, or
+      // non-2xx can NEVER fail or roll back the lead create. When the env URLs
+      // are unset the clients are disabled and these calls are skipped entirely.
+      //
+      // The in-CRM native router (assignLeadToTerritory, above) remains
+      // authoritative for owner assignment when a CRM-native Territory matches.
+      // We only consult the standalone territory-service as a fallback when the
+      // native router did not assign, and only override the owner when the caller
+      // did not explicitly choose one (territoryId enrichment always applies).
+      if (!assignment && isTerritoryRoutingEnabled()) {
+        const routing = await assignTerritory(tenantId, 'lead', {
+          country: created.country ?? undefined,
+          city: created.city ?? undefined,
+          industry: created.industry ?? undefined,
+          source: created.source ?? undefined,
+          companySize: created.employeeCount ?? undefined,
+          employeeCount: created.employeeCount ?? undefined,
+          annualRevenue:
+            created.annualRevenue != null ? Number(created.annualRevenue) : undefined,
+        });
+        if (routing?.territoryId) {
+          const ownerExplicitlySet = Boolean(data.ownerId);
+          const prevOwnerId = created.ownerId;
+          const nextOwnerId =
+            !ownerExplicitlySet && routing.ownerId ? routing.ownerId : prevOwnerId;
+          try {
+            await prisma.lead.update({
+              where: { id: created.id },
+              data: { territoryId: routing.territoryId, ownerId: nextOwnerId },
+            });
+            // Reflect the persisted routing on the returned object.
+            created.territoryId = routing.territoryId;
+            created.ownerId = nextOwnerId;
+            if (nextOwnerId !== prevOwnerId) {
+              await producer
+                .publish(TOPICS.LEADS, {
+                  type: 'lead.assigned',
+                  tenantId,
+                  payload: {
+                    leadId: created.id,
+                    tenantId,
+                    ownerId: nextOwnerId,
+                    territoryId: routing.territoryId,
+                  },
+                })
+                .catch(() => undefined);
+            }
+          } catch (err) {
+            // e.g. the external territoryId is not a CRM-native Territory row and
+            // the FK rejects it. Fail-open: the lead is already created.
+            console.warn(
+              '[territory-client] lead territory persist failed; continuing',
+              err
+            );
+          }
+        }
+      }
+
+      // Cadence auto-enroll on lead.created — independent of territory routing.
+      if (isCadenceEnrollEnabled()) {
+        await autoEnrollCadence(tenantId, 'lead.created', {
+          objectType: 'LEAD',
+          objectId: created.id,
+          ownerId: created.ownerId,
+        });
       }
 
       // Data quality scoring (fire-and-forget)

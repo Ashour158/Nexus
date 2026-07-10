@@ -429,6 +429,14 @@ model Deal {
   mrr                Decimal?  @db.Decimal(18, 2)
   arr                Decimal?  @db.Decimal(18, 2)
 
+  // ─── Territory routing (additive, nullable, no data loss) ─────────────────
+  // Territory this deal was routed to by the standalone territory-service on
+  // create. Stored as a plain indexed string (NOT a Prisma relation) because the
+  // authoritative territory catalog lives in territory-service and its ids need
+  // not exist in this service's CRM-native `Territory` table — a FK would risk
+  // failing the write. Enrichment-only + fail-open.
+  territoryId        String?
+
   @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, pipelineId, stageId])
@@ -439,6 +447,7 @@ model Deal {
   @@index([tenantId, isRenewal])
   @@index([tenantId, contractEndDate])
   @@index([tenantId, renewedFromDealId])
+  @@index([tenantId, territoryId])
 }
 
 enum DealStatus {

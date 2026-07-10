@@ -15,6 +15,7 @@
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { NexusProducer } from '@nexus/kafka';
+import { parseCausation, runWithCausation } from '@nexus/kafka';
 import type {
   CreateActivityInput,
   UpdateAccountInput,
@@ -67,6 +68,25 @@ function notFound(reply: FastifyReply, requestId: string, entity: string) {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+/**
+ * AU-5 — close the cause chain across the service hop.
+ *
+ * workflow-service bounds automation cascades with a depth counter, but a rule's
+ * write lands here and CRM then emits `deal.updated` / `activity.created`, which
+ * can re-trigger the same rule. Unless the emitted event carries the running
+ * depth, every hop through CRM looks like a fresh depth-0 trigger and the guard
+ * never trips. Establishing the ambient context here makes `NexusProducer.publish`
+ * stamp `causationDepth` + `rootEventId` on whatever the entity services emit,
+ * without threading an argument through all of them.
+ *
+ * Absent a cause chain (an ordinary request) `parseCausation` returns undefined
+ * and the handler runs unwrapped, so nothing changes for normal traffic.
+ */
+function withCausation<T>(req: FastifyRequest, fn: () => Promise<T>): Promise<T> {
+  const causation = parseCausation(req.headers as Record<string, unknown>, req.body);
+  return causation ? runWithCausation(causation, fn) : fn();
 }
 
 /**
@@ -151,7 +171,7 @@ export async function registerInternalAutomationRoutes(
           customFields: { source: 'workflow', ...asRecord(body.customFields) },
         } as unknown as CreateActivityInput;
 
-        const created = await activities.createActivity(tenantId, input);
+        const created = await withCausation(req, () => activities.createActivity(tenantId, input));
         return reply.send({ success: true, data: created });
       });
 
@@ -181,7 +201,7 @@ export async function registerInternalAutomationRoutes(
 
         if (!(await recordExists(prisma, entity, id, tenantId))) return notFound(reply, req.id, entity);
 
-        const updated = await applyEntityUpdate(entity, id, tenantId, fields);
+        const updated = await withCausation(req, () => applyEntityUpdate(entity, id, tenantId, fields));
         return reply.send({ success: true, data: updated });
       });
 
@@ -203,7 +223,7 @@ export async function registerInternalAutomationRoutes(
 
         if (!(await recordExists(prisma, entity, id, tenantId))) return notFound(reply, req.id, entity);
 
-        const updated = await applyEntityUpdate(entity, id, tenantId, { ownerId });
+        const updated = await withCausation(req, () => applyEntityUpdate(entity, id, tenantId, { ownerId }));
         return reply.send({ success: true, data: updated });
       });
     },

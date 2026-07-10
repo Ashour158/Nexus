@@ -64,6 +64,44 @@ export function scoreAccountPair(
   return nameSim * 0.6 + domainSim * 0.25 + phoneSim * 0.15;
 }
 
+/**
+ * Deal duplicate matcher (RR-H14). Deals are only ever compared WITHIN the same
+ * account (the caller buckets by accountId first), so this scores the remaining
+ * signals. A pair is a duplicate when EITHER:
+ *   - the names are highly similar (token Jaccard ≥ 0.8), OR
+ *   - the amounts are within 5% AND the expected close dates are within a
+ *     30-day window.
+ * `score` is a representative confidence for surfacing/ordering.
+ */
+export function scoreDealPair(
+  a: { name: string; amount?: unknown; expectedCloseDate?: Date | string | null },
+  b: { name: string; amount?: unknown; expectedCloseDate?: Date | string | null }
+): { match: boolean; score: number } {
+  const nameSim = tokenSimilarity(a.name ?? '', b.name ?? '');
+
+  const numA = a.amount == null ? NaN : Number(a.amount);
+  const numB = b.amount == null ? NaN : Number(b.amount);
+  let amountClose = false;
+  if (Number.isFinite(numA) && Number.isFinite(numB)) {
+    const larger = Math.max(Math.abs(numA), Math.abs(numB));
+    amountClose = larger === 0 ? true : Math.abs(numA - numB) / larger <= 0.05;
+  }
+
+  let datesClose = false;
+  if (a.expectedCloseDate && b.expectedCloseDate) {
+    const ta = new Date(a.expectedCloseDate).getTime();
+    const tb = new Date(b.expectedCloseDate).getTime();
+    if (Number.isFinite(ta) && Number.isFinite(tb)) {
+      datesClose = Math.abs(ta - tb) <= 30 * 24 * 60 * 60 * 1000;
+    }
+  }
+
+  const amountDateMatch = amountClose && datesClose;
+  const match = nameSim >= 0.8 || amountDateMatch;
+  const score = Math.max(nameSim, amountDateMatch ? 0.9 : 0);
+  return { match, score };
+}
+
 export function createDedupService(prisma: CrmPrisma, producer?: NexusProducer) {
   const THRESHOLD = 0.75;
   const p = prisma as any;
@@ -179,9 +217,59 @@ export function createDedupService(prisma: CrmPrisma, producer?: NexusProducer) 
     return groups;
   }
 
+  /**
+   * RR-H14: deal duplicate scan. Deals are compared ONLY within the same
+   * account (accountId bucket), then matched on name similarity and/or
+   * amount+close-date proximity (see {@link scoreDealPair}). Open deals are the
+   * common dedup target, but all non-deleted deals are considered so historical
+   * dupes surface too. Bounded per bucket to keep the scan O(n) in practice.
+   */
+  async function scanDeals(tenantId: string, limit = 1000) {
+    const deals = await p.deal.findMany({
+      where: { tenantId },
+      select: { id: true, accountId: true, name: true, amount: true, expectedCloseDate: true },
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Bucket by account — cross-account deals are never considered duplicates.
+    const byAccount = new Map<string, typeof deals>();
+    for (const d of deals) {
+      if (!d.accountId) continue;
+      const bucket = byAccount.get(d.accountId) ?? [];
+      bucket.push(d);
+      byAccount.set(d.accountId, bucket);
+    }
+
+    const groups: Array<{ records: Array<{ id: string; score: number }>; topScore: number }> = [];
+    for (const bucket of byAccount.values()) {
+      if (bucket.length < 2) continue;
+      const processed = new Set<string>();
+      for (let i = 0; i < bucket.length; i += 1) {
+        if (processed.has(bucket[i].id)) continue;
+        const group: Array<{ id: string; score: number }> = [{ id: bucket[i].id, score: 1 }];
+        // Bound the inner window to keep CPU predictable on huge accounts.
+        for (let j = i + 1; j < Math.min(bucket.length, i + 201); j += 1) {
+          if (processed.has(bucket[j].id)) continue;
+          const { match, score } = scoreDealPair(bucket[i], bucket[j]);
+          if (match) {
+            group.push({ id: bucket[j].id, score });
+            processed.add(bucket[j].id);
+          }
+        }
+        if (group.length > 1) {
+          processed.add(bucket[i].id);
+          groups.push({ records: group, topScore: Math.max(...group.map((r) => r.score)) });
+        }
+      }
+    }
+
+    return groups;
+  }
+
   async function persistGroups(
     tenantId: string,
-    entityType: 'contact' | 'account',
+    entityType: 'contact' | 'account' | 'deal',
     groups: Array<{ records: Array<{ id: string; score: number }>; topScore: number }>
   ) {
     const existing = await p.duplicateGroup.findMany({ where: { tenantId, entityType, status: 'pending' }, select: { id: true } });
@@ -203,12 +291,28 @@ export function createDedupService(prisma: CrmPrisma, producer?: NexusProducer) 
   }
 
   async function runFullScan(tenantId: string) {
-    const [contactGroups, accountGroups] = await Promise.all([scanContacts(tenantId), scanAccounts(tenantId)]);
-    const [contactCount, accountCount] = await Promise.all([
+    const [contactGroups, accountGroups, dealGroups] = await Promise.all([
+      scanContacts(tenantId),
+      scanAccounts(tenantId),
+      scanDeals(tenantId),
+    ]);
+    const [contactCount, accountCount, dealCount] = await Promise.all([
       persistGroups(tenantId, 'contact', contactGroups),
       persistGroups(tenantId, 'account', accountGroups),
+      persistGroups(tenantId, 'deal', dealGroups),
     ]);
-    return { contacts: { groups: contactCount }, accounts: { groups: accountCount } };
+    return {
+      contacts: { groups: contactCount },
+      accounts: { groups: accountCount },
+      deals: { groups: dealCount },
+    };
+  }
+
+  /** Deal-only scan entrypoint for `POST /deals/dedup/scan`. */
+  async function runDealScan(tenantId: string) {
+    const dealGroups = await scanDeals(tenantId);
+    const dealCount = await persistGroups(tenantId, 'deal', dealGroups);
+    return { deals: { groups: dealCount } };
   }
 
   async function mergeContacts(
@@ -373,5 +477,262 @@ export function createDedupService(prisma: CrmPrisma, producer?: NexusProducer) 
     return { merged: duplicateIds.length, masterId };
   }
 
-  return { runFullScan, scanContacts, scanAccounts, mergeContacts, mergeAccounts };
+  /**
+   * RR-H14: deal merge. Re-parents every child of the merged deals onto the
+   * survivor, then soft-deletes the merged deals, recomputes the survivor's
+   * amount roll-up (when it has line-items), and writes merge-audit rows.
+   *
+   * Collision-safe reparenting is applied to every child that carries a
+   * per-deal uniqueness constraint (DealContact, DealStakeholder, DealTeam,
+   * DealCompetitor, DealRoom); constraint-free children move with a bulk
+   * updateMany. Runs entirely inside one interactive transaction so a mid-way
+   * failure leaves the graph untouched.
+   *
+   * @param survivorId the deal that survives (a.k.a. master).
+   * @param mergedIds  the deals to collapse into the survivor.
+   */
+  async function mergeDeals(
+    tenantId: string,
+    survivorId: string,
+    mergedIds: string[],
+    fieldResolutions: Record<string, { sourceId?: string; value?: unknown }> | undefined,
+    userId: string
+  ) {
+    const dupIds = [...new Set(mergedIds)].filter((id) => id && id !== survivorId);
+    if (dupIds.length === 0) throw new Error('No deals to merge');
+
+    // Validate survivor + all merged deals belong to the tenant.
+    const involved = await p.deal.findMany({
+      where: { tenantId, id: { in: [survivorId, ...dupIds] } },
+      select: { id: true },
+    });
+    const involvedIds = new Set(involved.map((d: { id: string }) => d.id));
+    if (!involvedIds.has(survivorId)) throw new Error('Survivor deal not found');
+    const validDupIds = dupIds.filter((id) => involvedIds.has(id));
+    if (validDupIds.length === 0) throw new Error('No valid deals to merge');
+
+    const mergedData: Record<string, unknown> = {};
+    for (const [field, selection] of Object.entries(fieldResolutions ?? {})) {
+      mergedData[field] = selection.value;
+    }
+
+    await p.$transaction(async (tx: CrmPrisma) => {
+      // Survivor field overrides from the resolution map (if any).
+      if (Object.keys(mergedData).length > 0) {
+        await tx.deal.update({ where: { id: survivorId }, data: mergedData });
+      }
+
+      // ── Constraint-free children: bulk reparent (collision-safe) ───────────
+      // Deal line-items roll up into Deal.amount; move them all to the survivor.
+      await tx.dealProduct.updateMany({ where: { tenantId, dealId: { in: validDupIds } }, data: { dealId: survivorId } });
+      // Activities + notes — typed dealId FK …
+      await tx.activity.updateMany({ where: { tenantId, dealId: { in: validDupIds } }, data: { dealId: survivorId } });
+      await tx.note.updateMany({ where: { tenantId, dealId: { in: validDupIds } }, data: { dealId: survivorId } });
+      // … and the polymorphic entityType/entityId rows (A1) that point at a deal.
+      await tx.activity.updateMany({ where: { tenantId, entityType: { in: ['deal', 'DEAL'] }, entityId: { in: validDupIds } }, data: { entityId: survivorId } });
+      await tx.note.updateMany({ where: { tenantId, entityType: { in: ['deal', 'DEAL'] }, entityId: { in: validDupIds } }, data: { entityId: survivorId } });
+      // Attachments are keyed by (module, recordId).
+      await tx.attachment.updateMany({ where: { tenantId, module: 'deal', recordId: { in: validDupIds } }, data: { recordId: survivorId } });
+      // Quotes + quote-projection read-model.
+      await tx.quote.updateMany({ where: { tenantId, dealId: { in: validDupIds } }, data: { dealId: survivorId } });
+      await tx.quoteProjection.updateMany({ where: { tenantId, dealId: { in: validDupIds } }, data: { dealId: survivorId } });
+
+      // ── Per-deal-unique children: collision-safe reparent ──────────────────
+      // DealContact @@unique([dealId, contactId]) / DealStakeholder @@unique
+      // ([dealId, contactId]) / DealCompetitor @@unique([dealId, competitorId]).
+      for (const [relation, peerField] of [
+        ['dealContact', 'contactId'],
+        ['dealStakeholder', 'contactId'],
+        ['dealCompetitor', 'competitorId'],
+      ] as const) {
+        const model = tx[relation] as unknown as {
+          findMany: (a: unknown) => Promise<Array<Record<string, unknown>>>;
+          delete: (a: unknown) => Promise<unknown>;
+          update: (a: unknown) => Promise<unknown>;
+        };
+        const survivorLinks = await model.findMany({ where: { dealId: survivorId } });
+        const taken = new Set(survivorLinks.map((l) => l[peerField] as string));
+        const dupLinks = await model.findMany({ where: { dealId: { in: validDupIds } } });
+        for (const link of dupLinks) {
+          const peer = link[peerField] as string;
+          if (taken.has(peer)) {
+            await model.delete({ where: { id: link.id as string } });
+          } else {
+            await model.update({ where: { id: link.id as string }, data: { dealId: survivorId } });
+            taken.add(peer);
+          }
+        }
+      }
+
+      // DealTeam @@unique([tenantId, dealId, userId, splitType]).
+      const teamModel = tx.dealTeam as unknown as {
+        findMany: (a: unknown) => Promise<Array<{ id: string; userId: string; splitType: string }>>;
+        delete: (a: unknown) => Promise<unknown>;
+        update: (a: unknown) => Promise<unknown>;
+      };
+      const survivorTeam = await teamModel.findMany({ where: { tenantId, dealId: survivorId } });
+      const takenTeam = new Set(survivorTeam.map((t) => `${t.userId}:${t.splitType}`));
+      const dupTeam = await teamModel.findMany({ where: { tenantId, dealId: { in: validDupIds } } });
+      for (const t of dupTeam) {
+        const k = `${t.userId}:${t.splitType}`;
+        if (takenTeam.has(k)) {
+          await teamModel.delete({ where: { id: t.id } });
+        } else {
+          await teamModel.update({ where: { id: t.id }, data: { dealId: survivorId } });
+          takenTeam.add(k);
+        }
+      }
+
+      // DealRoom @unique(dealId): a deal has at most one. If the survivor already
+      // has a room, fold each merged room's items+documents into it and soft-
+      // delete the merged room; otherwise reparent the room to the survivor.
+      const roomModel = tx.dealRoom as unknown as {
+        findFirst: (a: unknown) => Promise<{ id: string } | null>;
+        findMany: (a: unknown) => Promise<Array<{ id: string }>>;
+        update: (a: unknown) => Promise<unknown>;
+      };
+      const survivorRoom = await roomModel.findFirst({ where: { tenantId, dealId: survivorId } });
+      const dupRooms = await roomModel.findMany({ where: { tenantId, dealId: { in: validDupIds } } });
+      for (const room of dupRooms) {
+        if (survivorRoom) {
+          await tx.mutualActionItem.updateMany({ where: { tenantId, dealRoomId: room.id }, data: { dealRoomId: survivorRoom.id } });
+          await tx.dealRoomDocument.updateMany({ where: { tenantId, dealRoomId: room.id }, data: { dealRoomId: survivorRoom.id } });
+          await roomModel.update({ where: { id: room.id }, data: { deletedAt: new Date() } });
+        } else {
+          await roomModel.update({ where: { id: room.id }, data: { dealId: survivorId } });
+        }
+      }
+
+      // Recompute the survivor's amount roll-up from its (now merged) line-items.
+      // Only overwrite when line-items exist so a manually-set amount on a deal
+      // without products is never clobbered.
+      const agg = await (tx.dealProduct as unknown as {
+        aggregate: (a: unknown) => Promise<{ _sum: { lineTotal: unknown }; _count: number }>;
+      }).aggregate({ where: { tenantId, dealId: survivorId }, _sum: { lineTotal: true }, _count: true });
+      if (agg._count > 0 && agg._sum.lineTotal != null) {
+        await tx.deal.update({ where: { id: survivorId }, data: { amount: agg._sum.lineTotal as never } });
+      }
+
+      // Soft-delete the merged deals so they drop out of every list.
+      await tx.deal.updateMany({
+        where: { tenantId, id: { in: validDupIds } },
+        data: { deletedAt: new Date(), version: { increment: 1 } },
+      });
+
+      // Merge-audit rows (survivor + merged ids + actor) via the field-change log.
+      await tx.fieldChangeLog.create({
+        data: {
+          tenantId,
+          objectType: 'deal',
+          objectId: survivorId,
+          fieldName: 'mergedFrom',
+          oldValue: null,
+          newValue: JSON.stringify(validDupIds),
+          changedBy: userId,
+        },
+      });
+      for (const dupId of validDupIds) {
+        await tx.fieldChangeLog.create({
+          data: {
+            tenantId,
+            objectType: 'deal',
+            objectId: dupId,
+            fieldName: 'mergedInto',
+            oldValue: null,
+            newValue: survivorId,
+            changedBy: userId,
+          },
+        });
+      }
+    });
+
+    // Resolve any pending deal duplicate groups that referenced these records.
+    try {
+      const pendingGroups = await p.duplicateGroup.findMany({
+        where: { tenantId, entityType: 'deal', status: 'pending' },
+        include: { records: true },
+      });
+      const collapsed = new Set([survivorId, ...validDupIds]);
+      for (const g of pendingGroups) {
+        const ids = g.records.map((r: { recordId: string }) => r.recordId);
+        if (ids.some((id: string) => collapsed.has(id))) {
+          await p.duplicateGroup.update({
+            where: { id: g.id },
+            data: { status: 'merged', masterRecordId: survivorId, resolvedAt: new Date(), resolvedBy: userId },
+          });
+        }
+      }
+    } catch {
+      /* group resolution is best-effort — the merge itself already committed */
+    }
+
+    // Nervous system: survivor updated, each merged deal archived + a merge note.
+    if (producer) {
+      const survivor = await p.deal.findFirst({ where: { id: survivorId, tenantId } });
+      await producer
+        .publish(TOPICS.DEALS, {
+          type: 'deal.updated',
+          tenantId,
+          payload: survivor
+            ? {
+                id: survivor.id,
+                dealId: survivor.id,
+                ownerId: survivor.ownerId,
+                accountId: survivor.accountId,
+                pipelineId: survivor.pipelineId,
+                stageId: survivor.stageId,
+                status: survivor.status,
+                amount: Number(survivor.amount),
+                currency: survivor.currency,
+                changedFields: ['merge'],
+              }
+            : { id: survivorId, dealId: survivorId },
+        })
+        .catch(() => undefined);
+      for (const dupId of validDupIds) {
+        await producer
+          .publish(TOPICS.DEALS, {
+            type: 'deal.archived',
+            tenantId,
+            payload: { dealId: dupId, mergedIntoId: survivorId, reason: 'merged' },
+          })
+          .catch(() => undefined);
+      }
+    }
+
+    return { merged: validDupIds.length, survivorId };
+  }
+
+  /**
+   * Group-based deal merge for the generic `/dedup/groups/:id/merge` route:
+   * derives the merged ids from the group's records (all but the master) and
+   * delegates to {@link mergeDeals}.
+   */
+  async function mergeDealsByGroup(
+    tenantId: string,
+    groupId: string,
+    masterId: string,
+    fieldSelections: Record<string, { sourceId?: string; value?: unknown }>,
+    userId: string
+  ) {
+    const group = await p.duplicateGroup.findUnique({ where: { id: groupId }, include: { records: true } });
+    if (!group || group.tenantId !== tenantId) throw new Error('Group not found');
+    const mergedIds = group.records
+      .map((r: { recordId: string }) => r.recordId)
+      .filter((id: string) => id !== masterId);
+    const result = await mergeDeals(tenantId, masterId, mergedIds, fieldSelections, userId);
+    return { merged: result.merged, masterId };
+  }
+
+  return {
+    runFullScan,
+    runDealScan,
+    scanContacts,
+    scanAccounts,
+    scanDeals,
+    mergeContacts,
+    mergeAccounts,
+    mergeDeals,
+    mergeDealsByGroup,
+  };
 }

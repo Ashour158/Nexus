@@ -17,6 +17,7 @@ import { registerEmailThreadsRoutes } from './email-threads.routes.js';
 import { registerCrmReportsRoutes } from './reports.routes.js';
 import { registerBulkRoutes } from './bulk.routes.js';
 import { registerDedupRoutes } from './dedup.routes.js';
+import { registerDealDedupRoutes } from './deal-dedup.routes.js';
 import { createDedupService } from '../services/dedup.service.js';
 import { registerScoringRoutes } from './scoring.routes.js';
 import { registerForecastRoutes } from './forecast.routes.js';
@@ -64,6 +65,7 @@ export async function registerAllRoutes(
   await registerCrmReportsRoutes(app, prisma);
   await registerBulkRoutes(app, prisma, producer);
   await registerDedupRoutes(app, prisma, dedupService);
+  await registerDealDedupRoutes(app, prisma, dedupService);
   await registerScoringRoutes(app, prisma);
   await registerForecastRoutes(app, prisma);
   await registerEnrichmentRoutes(app, prisma, producer);

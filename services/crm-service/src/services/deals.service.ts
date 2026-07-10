@@ -23,6 +23,7 @@ import { updateDealDataQuality } from '../lib/data-quality.js';
 import { computeDealHealth, deriveMeddicGaps } from '../lib/deal-health.engine.js';
 import { scoreDeal } from '../lib/ai/scoring.service.js';
 import { assertValidStageTransition } from '../lib/blueprint-client.js';
+import { cachedListRead } from '../lib/read-cache.js';
 import { assignTerritory, isTerritoryRoutingEnabled } from '../lib/territory-client.js';
 import {
   enforceValidationRules,
@@ -319,25 +320,34 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         [sortField]: sortDir,
       };
 
-      const [total, rows] = await Promise.all([
-        prisma.deal.count({ where }),
-        prisma.deal.findMany({
-          where,
-          skip: (page - 1) * limit,
-          take: limit,
-          orderBy,
-        }),
-      ]);
-
-      const masked = (await maskFieldPermissions(
-        prisma,
-        tenantId,
+      // RR-H13: cache-aside. Key folds tenant + filters + pagination + ownership
+      // scope + roles so RBAC-scoped / field-masked results never leak.
+      return cachedListRead(
         'deal',
-        rows as unknown as Record<string, unknown>[],
-        access?.roles
-      )) as unknown as Deal[];
+        tenantId,
+        { filters, pagination, ownership: access?.ownershipWhere ?? null, roles: access?.roles ?? null },
+        async () => {
+          const [total, rows] = await Promise.all([
+            prisma.deal.count({ where }),
+            prisma.deal.findMany({
+              where,
+              skip: (page - 1) * limit,
+              take: limit,
+              orderBy,
+            }),
+          ]);
 
-      return toPaginatedResult(masked, total, page, limit);
+          const masked = (await maskFieldPermissions(
+            prisma,
+            tenantId,
+            'deal',
+            rows as unknown as Record<string, unknown>[],
+            access?.roles
+          )) as unknown as Deal[];
+
+          return toPaginatedResult(masked, total, page, limit);
+        }
+      );
     },
 
     /**
@@ -681,9 +691,10 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
 
       // Blueprint validation when stage actually changes
       if (data.stageId && data.stageId !== existing.stageId) {
-        const [contacts, activities] = await Promise.all([
+        const [contacts, activities, targetStage] = await Promise.all([
           prisma.dealContact.findMany({ where: { dealId: id }, include: { contact: true } }),
           prisma.activity.findMany({ where: { dealId: id, tenantId } }),
+          prisma.stage.findFirst({ where: { id: data.stageId, tenantId }, select: { isWon: true, isLost: true } }),
         ]);
         const safeContacts = contacts ?? [];
         const safeActivities = activities ?? [];
@@ -696,7 +707,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           linkedContacts: safeContacts.map(c => ({ id: c.contactId })),
           completedActivityTypes: safeActivities.filter(a => a.status === 'COMPLETED').map(a => a.type),
           activities: safeActivities.map(a => ({ type: a.type, completed: a.status === 'COMPLETED' })),
-        });
+        }, { toStageIsTerminal: Boolean(targetStage?.isWon || targetStage?.isLost) });
       }
 
       // Terminal-state guard (BL-13): a generic update must not silently change
@@ -1023,7 +1034,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         linkedContacts: safeContacts.map(c => ({ id: c.contactId })),
         completedActivityTypes: safeActivities.filter(a => a.status === 'COMPLETED').map(a => a.type),
         activities: safeActivities.map(a => ({ type: a.type, completed: a.status === 'COMPLETED' })),
-      });
+      }, { toStageIsTerminal: Boolean(stage.isWon || stage.isLost) });
 
       // BL-05: stage↔status reconciliation. The destination stage's won/lost
       // flags drive the deal status so a card dragged into a Won/Lost column is

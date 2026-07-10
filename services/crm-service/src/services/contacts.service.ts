@@ -11,6 +11,7 @@ import { Prisma } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { Contact, Deal } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { CrmPrisma } from '../prisma.js';
 import { toPaginatedResult } from '@nexus/shared-types';
+import { cachedListRead } from '../lib/read-cache.js';
 import {
   recordFieldChanges,
   recordCreateSnapshot,
@@ -91,23 +92,32 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
       const orderBy: Prisma.ContactOrderByWithRelationInput = {
         [sortField]: pagination.sortDir,
       };
-      const [total, rows] = await Promise.all([
-        prisma.contact.count({ where }),
-        prisma.contact.findMany({
-          where,
-          skip: (pagination.page - 1) * pagination.limit,
-          take: pagination.limit,
-          orderBy,
-        }),
-      ]);
-      const masked = (await maskFieldPermissions(
-        prisma,
-        tenantId,
+      // RR-H13: cache-aside; key folds tenant + filters + pagination + ownership
+      // scope + roles so RBAC-scoped / field-masked results never leak.
+      return cachedListRead(
         'contact',
-        rows as unknown as Record<string, unknown>[],
-        access?.roles
-      )) as unknown as Contact[];
-      return toPaginatedResult(masked, total, pagination.page, pagination.limit);
+        tenantId,
+        { filters, pagination, ownership: access?.ownershipWhere ?? null, roles: access?.roles ?? null },
+        async () => {
+          const [total, rows] = await Promise.all([
+            prisma.contact.count({ where }),
+            prisma.contact.findMany({
+              where,
+              skip: (pagination.page - 1) * pagination.limit,
+              take: pagination.limit,
+              orderBy,
+            }),
+          ]);
+          const masked = (await maskFieldPermissions(
+            prisma,
+            tenantId,
+            'contact',
+            rows as unknown as Record<string, unknown>[],
+            access?.roles
+          )) as unknown as Contact[];
+          return toPaginatedResult(masked, total, pagination.page, pagination.limit);
+        }
+      );
     },
 
     async getContactById(tenantId: string, id: string, access?: ReadAccessContext): Promise<Contact & { emails: unknown[]; addresses: unknown[] }> {

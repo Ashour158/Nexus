@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { JwtPayload } from '@nexus/shared-types';
 import { PERMISSIONS, requirePermission, ValidationError } from '@nexus/service-utils';
 import type { CrmPrisma } from '../prisma.js';
+import { cachedListRead } from '../lib/read-cache.js';
 
 const SummaryQuerySchema = z.object({
   entityType: z.enum(['account', 'contact']),
@@ -34,6 +35,10 @@ export async function registerDataQualityRoutes(
       const { entityType } = parsed.data;
       const tenantId = jwt.tenantId;
 
+      // RR-H13: cache-aside the tenant-wide dashboard aggregate. Not user-scoped
+      // (whole-tenant rollup gated by accounts:read), so the key is just the
+      // tenant + entityType; invalidated on any account/contact mutation.
+      const data = await cachedListRead('data-quality', tenantId, { entityType }, async () => {
       if (entityType === 'account') {
         const [totalRecords, agg, lowQualityCount, openDuplicateGroups] = await Promise.all([
           prisma.account.count({ where: { tenantId } }),
@@ -55,17 +60,14 @@ export async function registerDataQualityRoutes(
         ACCOUNT_KEY_FIELDS.forEach((field, i) => {
           fieldCompleteness[field] = totalRecords > 0 ? Math.round((counts[i] / totalRecords) * 100) : 0;
         });
-        return reply.send({
-          success: true,
-          data: {
-            entityType,
-            avgQualityScore: agg._avg.dataQualityScore != null ? Math.round(agg._avg.dataQualityScore) : 0,
-            lowQualityCount,
-            totalRecords,
-            fieldCompleteness,
-            openDuplicateGroups,
-          },
-        });
+        return {
+          entityType,
+          avgQualityScore: agg._avg.dataQualityScore != null ? Math.round(agg._avg.dataQualityScore) : 0,
+          lowQualityCount,
+          totalRecords,
+          fieldCompleteness,
+          openDuplicateGroups,
+        };
       }
 
       // contact
@@ -86,17 +88,17 @@ export async function registerDataQualityRoutes(
       CONTACT_KEY_FIELDS.forEach((field, i) => {
         fieldCompleteness[field] = totalRecords > 0 ? Math.round((counts[i] / totalRecords) * 100) : 0;
       });
-      return reply.send({
-        success: true,
-        data: {
-          entityType,
-          avgQualityScore: agg._avg.dataQualityScore != null ? Math.round(agg._avg.dataQualityScore) : 0,
-          lowQualityCount,
-          totalRecords,
-          fieldCompleteness,
-          openDuplicateGroups,
-        },
+      return {
+        entityType,
+        avgQualityScore: agg._avg.dataQualityScore != null ? Math.round(agg._avg.dataQualityScore) : 0,
+        lowQualityCount,
+        totalRecords,
+        fieldCompleteness,
+        openDuplicateGroups,
+      };
       });
+
+      return reply.send({ success: true, data });
     }
   );
 }

@@ -18,6 +18,7 @@ import type {
 } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { CrmPrisma } from '../prisma.js';
 import { toPaginatedResult } from '@nexus/shared-types';
+import { cachedListRead } from '../lib/read-cache.js';
 import { updateAccountDataQuality } from '../lib/data-quality.js';
 import { enrichAccount } from '../lib/enrichment.engine.js';
 import {
@@ -220,23 +221,32 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
       const orderBy: Prisma.AccountOrderByWithRelationInput = {
         [sortField]: pagination.sortDir,
       };
-      const [total, rows] = await Promise.all([
-        prisma.account.count({ where }),
-        prisma.account.findMany({
-          where,
-          skip: (pagination.page - 1) * pagination.limit,
-          take: pagination.limit,
-          orderBy,
-        }),
-      ]);
-      const masked = (await maskFieldPermissions(
-        prisma,
-        tenantId,
+      // RR-H13: cache-aside; key folds tenant + filters + pagination + ownership
+      // scope + roles so RBAC-scoped / field-masked results never leak.
+      return cachedListRead(
         'account',
-        rows as unknown as Record<string, unknown>[],
-        access?.roles
-      )) as unknown as Account[];
-      return toPaginatedResult(masked, total, pagination.page, pagination.limit);
+        tenantId,
+        { filters, pagination, ownership: access?.ownershipWhere ?? null, roles: access?.roles ?? null },
+        async () => {
+          const [total, rows] = await Promise.all([
+            prisma.account.count({ where }),
+            prisma.account.findMany({
+              where,
+              skip: (pagination.page - 1) * pagination.limit,
+              take: pagination.limit,
+              orderBy,
+            }),
+          ]);
+          const masked = (await maskFieldPermissions(
+            prisma,
+            tenantId,
+            'account',
+            rows as unknown as Record<string, unknown>[],
+            access?.roles
+          )) as unknown as Account[];
+          return toPaginatedResult(masked, total, pagination.page, pagination.limit);
+        }
+      );
     },
 
     async getAccountById(tenantId: string, id: string, access?: ReadAccessContext): Promise<Account> {

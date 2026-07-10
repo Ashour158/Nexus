@@ -17,6 +17,7 @@ import type {
 } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { CrmPrisma } from '../prisma.js';
 import { toPaginatedResult } from '@nexus/shared-types';
+import { cachedListRead } from '../lib/read-cache.js';
 import { assignLeadToTerritory } from '../lib/territory-router.js';
 import { assignTerritory, isTerritoryRoutingEnabled } from '../lib/territory-client.js';
 import { autoEnrollCadence, isCadenceEnrollEnabled } from '../lib/cadence-client.js';
@@ -127,23 +128,32 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
       const orderBy: Prisma.LeadOrderByWithRelationInput = {
         [sortField]: pagination.sortDir,
       };
-      const [total, rows] = await Promise.all([
-        prisma.lead.count({ where }),
-        prisma.lead.findMany({
-          where,
-          skip: (pagination.page - 1) * pagination.limit,
-          take: pagination.limit,
-          orderBy,
-        }),
-      ]);
-      const masked = (await maskFieldPermissions(
-        prisma,
-        tenantId,
+      // RR-H13: cache-aside; key folds tenant + filters + pagination + ownership
+      // scope + roles so RBAC-scoped / field-masked results never leak.
+      return cachedListRead(
         'lead',
-        rows as unknown as Record<string, unknown>[],
-        access?.roles
-      )) as unknown as Lead[];
-      return toPaginatedResult(masked, total, pagination.page, pagination.limit);
+        tenantId,
+        { filters, pagination, ownership: access?.ownershipWhere ?? null, roles: access?.roles ?? null },
+        async () => {
+          const [total, rows] = await Promise.all([
+            prisma.lead.count({ where }),
+            prisma.lead.findMany({
+              where,
+              skip: (pagination.page - 1) * pagination.limit,
+              take: pagination.limit,
+              orderBy,
+            }),
+          ]);
+          const masked = (await maskFieldPermissions(
+            prisma,
+            tenantId,
+            'lead',
+            rows as unknown as Record<string, unknown>[],
+            access?.roles
+          )) as unknown as Lead[];
+          return toPaginatedResult(masked, total, pagination.page, pagination.limit);
+        }
+      );
     },
 
     async getLeadById(tenantId: string, id: string, access?: ReadAccessContext): Promise<Lead> {

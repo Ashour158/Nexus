@@ -6,6 +6,7 @@ import { createMeilisearchClient } from './meilisearch.js';
 import { setupIndexes } from './indexes/setup.js';
 import { startIndexerConsumer } from './consumers/indexer.consumer.js';
 import { registerSearchRoutes } from './routes/search.routes.js';
+import { registerReindexRoutes } from './routes/reindex.routes.js';
 import { registerSavedSearchRoutes } from './routes/saved-search.routes.js';
 import { createSearchPrisma } from './prisma.js';
 import { registerGraphQL } from './graphql/index.js';
@@ -83,5 +84,6 @@ await registerGraphQL(app);
 
 await startService(app, port, async (a) => {
   await registerSearchRoutes(a, meili, prisma);
+  await registerReindexRoutes(a, meili);
   await registerSavedSearchRoutes(a, prisma);
 });

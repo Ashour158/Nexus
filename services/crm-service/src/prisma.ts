@@ -5,6 +5,7 @@ import { withFieldEncryption } from '@nexus/security';
 import { alsStore } from './request-context.js';
 import { OutboxPublisher } from '@nexus/outbox';
 import { TOPICS } from '@nexus/kafka';
+import { invalidateListCache, cachedEntityForModel } from './lib/read-cache.js';
 
 const skipTenantModels = new Set<string>();
 
@@ -169,6 +170,20 @@ export function createCrmPrisma() {
           const result = await query(args);
           if (['create', 'update', 'delete', 'upsert'].includes(operation)) {
             await publishMutationEvent(base, outbox, model, operation, result);
+            // RR-H13: event-driven cache invalidation — drop this entity's cached
+            // list/aggregate reads for the tenant on any single-row mutation.
+            // Fire-and-forget; the short read TTL bounds staleness if this misses.
+            const entity = cachedEntityForModel(model);
+            if (entity) {
+              const tid = (result as Record<string, unknown> | null)?.tenantId as string | undefined;
+              if (tid) {
+                void invalidateListCache(entity, tid);
+                // Account/Contact writes also move the data-quality dashboard rollup.
+                if (entity === 'account' || entity === 'contact') {
+                  void invalidateListCache('data-quality', tid);
+                }
+              }
+            }
           }
           return result;
         },

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { MeiliSearch } from 'meilisearch';
+import type { MeiliSearch, SearchParams } from 'meilisearch';
 import type { JwtPayload } from '@nexus/shared-types';
 import { PERMISSIONS, ValidationError, requirePermission, checkPermission } from '@nexus/service-utils';
 import { ACCOUNTS_INDEX } from '../indexes/accounts.index.js';
@@ -12,6 +12,13 @@ import { QUOTES_INDEX } from '../indexes/quotes.index.js';
 import { KB_ARTICLES_INDEX } from '../indexes/kb-articles.index.js';
 import type { SearchPrisma } from '../prisma.js';
 import { recordRecentSearch } from './saved-search.routes.js';
+import {
+  FilterQuerySchema,
+  type FilterQuery,
+  buildIndexFilter,
+  buildIndexSort,
+  assertSortable,
+} from '../lib/search-filters.js';
 
 // All searchable entity types → their Meilisearch index uid. The four primary
 // entities are always part of the default global search; the additional types
@@ -60,6 +67,18 @@ const TypeFilterSchema = z
   .transform((raw) => (raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : undefined))
   .pipe(z.array(z.enum(Object.keys(INDEX_BY_TYPE) as [SearchType, ...SearchType[]])).optional());
 
+/**
+ * Assemble Meilisearch search options for one index. `filter` (tenant-scoped)
+ * and pagination are always present; `sort` is only included when a valid,
+ * index-supported sort was requested, so the default path is byte-identical to
+ * the pre-filter behavior.
+ */
+function searchOpts(filter: string, limit: number, offset: number, sort?: string[]): SearchParams {
+  const opts: SearchParams = { filter, limit, offset };
+  if (sort) opts.sort = sort;
+  return opts;
+}
+
 export async function registerSearchRoutes(
   app: FastifyInstance,
   client: MeiliSearch,
@@ -75,6 +94,9 @@ export async function registerSearchRoutes(
       if (!parsed.success) throw new ValidationError('Invalid query', parsed.error.flatten());
       const typeParsed = TypeFilterSchema.safeParse((request.query as { type?: string }).type);
       if (!typeParsed.success) throw new ValidationError('Invalid type filter', typeParsed.error.flatten());
+      const filterParsed = FilterQuerySchema.safeParse(request.query);
+      if (!filterParsed.success) throw new ValidationError('Invalid filter', filterParsed.error.flatten());
+      const filters: FilterQuery = filterParsed.data;
 
       const jwt = request.user as JwtPayload;
       const perms = jwt.permissions ?? [];
@@ -83,8 +105,6 @@ export async function registerSearchRoutes(
 
       const { q, limit, page } = parsed.data;
       const offset = (page - 1) * limit;
-      // Tenant scoping is mandatory on every index query.
-      const filter = `tenantId = '${jwt.tenantId}'`;
 
       const requestedTypes = typeParsed.data;
 
@@ -101,19 +121,36 @@ export async function registerSearchRoutes(
         );
       }
 
+      // Determine the set of indexes that will actually be queried (permitted +
+      // requested) so sortBy is validated against a whitelist that reflects what
+      // this specific request can sort on — an unknown/unsupported field is a
+      // 400 rather than a silent no-op.
+      const effectiveTypes = (requestedTypes && requestedTypes.length ? requestedTypes : DEFAULT_TYPES).filter(canRead);
+      assertSortable(filters.sortBy, effectiveTypes.map((t) => INDEX_BY_TYPE[t]));
+
       // Default request (no `type`): preserve the original four-entity response
       // shape, but only for the entity types the caller may read (RR-H1). Keys
       // for un-permitted entities are returned empty so the shape stays stable
-      // for existing clients while never leaking un-authorised rows/PII. An
-      // admin (`*` / resource wildcards) still gets all four populated; a
-      // `deals:read`-only caller gets deals only, the rest empty.
+      // for existing clients while never leaking un-authorised rows/PII.
       if (!requestedTypes) {
         const empty = { hits: [] as unknown[], estimatedTotalHits: 0 };
+        const runFor = (type: SearchType) => {
+          const uid = INDEX_BY_TYPE[type];
+          return client.index(uid).search(
+            q,
+            searchOpts(
+              buildIndexFilter(uid, jwt.tenantId, filters),
+              limit,
+              offset,
+              buildIndexSort(uid, filters.sortBy, filters.sortOrder)
+            )
+          );
+        };
         const [deals, contacts, accounts, leads] = await Promise.all([
-          canRead('deals') ? client.index(DEALS_INDEX).search(q, { filter, limit, offset }) : empty,
-          canRead('contacts') ? client.index(CONTACTS_INDEX).search(q, { filter, limit, offset }) : empty,
-          canRead('accounts') ? client.index(ACCOUNTS_INDEX).search(q, { filter, limit, offset }) : empty,
-          canRead('leads') ? client.index(LEADS_INDEX).search(q, { filter, limit, offset }) : empty,
+          canRead('deals') ? runFor('deals') : empty,
+          canRead('contacts') ? runFor('contacts') : empty,
+          canRead('accounts') ? runFor('accounts') : empty,
+          canRead('leads') ? runFor('leads') : empty,
         ]);
         return reply.send({
           success: true,
@@ -138,7 +175,18 @@ export async function registerSearchRoutes(
       const requested = requestedTypes.length ? requestedTypes : DEFAULT_TYPES;
       const types = requested.filter(canRead);
       const results = await Promise.all(
-        types.map((type) => client.index(INDEX_BY_TYPE[type]).search(q, { filter, limit, offset }))
+        types.map((type) => {
+          const uid = INDEX_BY_TYPE[type];
+          return client.index(uid).search(
+            q,
+            searchOpts(
+              buildIndexFilter(uid, jwt.tenantId, filters),
+              limit,
+              offset,
+              buildIndexSort(uid, filters.sortBy, filters.sortOrder)
+            )
+          );
+        })
       );
 
       const data: Record<string, unknown> = {};
@@ -151,78 +199,39 @@ export async function registerSearchRoutes(
       return reply.send({ success: true, data });
     });
 
-    r.get('/search/deals', { preHandler: requirePermission(PERMISSIONS.DEALS.READ) }, async (request, reply) => {
-      const parsed = SearchQuerySchema.safeParse(request.query);
-      if (!parsed.success) throw new ValidationError('Invalid query', parsed.error.flatten());
-      const jwt = request.user as JwtPayload;
-      const result = await client.index(DEALS_INDEX).search(parsed.data.q, {
-        filter: `tenantId = '${jwt.tenantId}'`,
-        limit: parsed.data.limit,
-        offset: (parsed.data.page - 1) * parsed.data.limit,
+    // ── Per-entity search endpoints ────────────────────────────────────────────
+    // Each is gated on its own read permission (unchanged) and now honours the
+    // documented filter/sort params, still always tenant-scoped.
+    const registerEntity = (path: string, uid: SearchType, permission: string) => {
+      r.get(`/search/${path}`, { preHandler: requirePermission(permission) }, async (request, reply) => {
+        const parsed = SearchQuerySchema.safeParse(request.query);
+        if (!parsed.success) throw new ValidationError('Invalid query', parsed.error.flatten());
+        const filterParsed = FilterQuerySchema.safeParse(request.query);
+        if (!filterParsed.success) throw new ValidationError('Invalid filter', filterParsed.error.flatten());
+        const filters = filterParsed.data;
+        const meiliUid = INDEX_BY_TYPE[uid];
+        assertSortable(filters.sortBy, [meiliUid]);
+        const jwt = request.user as JwtPayload;
+        const result = await client.index(meiliUid).search(
+          parsed.data.q,
+          searchOpts(
+            buildIndexFilter(meiliUid, jwt.tenantId, filters),
+            parsed.data.limit,
+            (parsed.data.page - 1) * parsed.data.limit,
+            buildIndexSort(meiliUid, filters.sortBy, filters.sortOrder)
+          )
+        );
+        return reply.send({ success: true, data: result.hits });
       });
-      return reply.send({ success: true, data: result.hits });
-    });
+    };
 
-    r.get('/search/contacts', { preHandler: requirePermission(PERMISSIONS.CONTACTS.READ) }, async (request, reply) => {
-      const parsed = SearchQuerySchema.safeParse(request.query);
-      if (!parsed.success) throw new ValidationError('Invalid query', parsed.error.flatten());
-      const jwt = request.user as JwtPayload;
-      const result = await client.index(CONTACTS_INDEX).search(parsed.data.q, {
-        filter: `tenantId = '${jwt.tenantId}'`,
-        limit: parsed.data.limit,
-        offset: (parsed.data.page - 1) * parsed.data.limit,
-      });
-      return reply.send({ success: true, data: result.hits });
-    });
-
-    r.get('/search/accounts', { preHandler: requirePermission(PERMISSIONS.ACCOUNTS.READ) }, async (request, reply) => {
-      const parsed = SearchQuerySchema.safeParse(request.query);
-      if (!parsed.success) throw new ValidationError('Invalid query', parsed.error.flatten());
-      const jwt = request.user as JwtPayload;
-      const result = await client.index(ACCOUNTS_INDEX).search(parsed.data.q, {
-        filter: `tenantId = '${jwt.tenantId}'`,
-        limit: parsed.data.limit,
-        offset: (parsed.data.page - 1) * parsed.data.limit,
-      });
-      return reply.send({ success: true, data: result.hits });
-    });
-
-    r.get('/search/activities', { preHandler: requirePermission(PERMISSIONS.ACTIVITIES.READ) }, async (request, reply) => {
-      const parsed = SearchQuerySchema.safeParse(request.query);
-      if (!parsed.success) throw new ValidationError('Invalid query', parsed.error.flatten());
-      const jwt = request.user as JwtPayload;
-      const result = await client.index(ACTIVITIES_INDEX).search(parsed.data.q, {
-        filter: `tenantId = '${jwt.tenantId}'`,
-        limit: parsed.data.limit,
-        offset: (parsed.data.page - 1) * parsed.data.limit,
-      });
-      return reply.send({ success: true, data: result.hits });
-    });
-
-    r.get('/search/quotes', { preHandler: requirePermission(PERMISSIONS.QUOTES.READ) }, async (request, reply) => {
-      const parsed = SearchQuerySchema.safeParse(request.query);
-      if (!parsed.success) throw new ValidationError('Invalid query', parsed.error.flatten());
-      const jwt = request.user as JwtPayload;
-      const result = await client.index(QUOTES_INDEX).search(parsed.data.q, {
-        filter: `tenantId = '${jwt.tenantId}'`,
-        limit: parsed.data.limit,
-        offset: (parsed.data.page - 1) * parsed.data.limit,
-      });
-      return reply.send({ success: true, data: result.hits });
-    });
-
+    registerEntity('deals', 'deals', PERMISSIONS.DEALS.READ);
+    registerEntity('contacts', 'contacts', PERMISSIONS.CONTACTS.READ);
+    registerEntity('accounts', 'accounts', PERMISSIONS.ACCOUNTS.READ);
+    registerEntity('activities', 'activities', PERMISSIONS.ACTIVITIES.READ);
+    registerEntity('quotes', 'quotes', PERMISSIONS.QUOTES.READ);
     // Knowledge-base search. Uses SETTINGS.READ to mirror knowledge-service's
     // own permission model for KB content.
-    r.get('/search/kb', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
-      const parsed = SearchQuerySchema.safeParse(request.query);
-      if (!parsed.success) throw new ValidationError('Invalid query', parsed.error.flatten());
-      const jwt = request.user as JwtPayload;
-      const result = await client.index(KB_ARTICLES_INDEX).search(parsed.data.q, {
-        filter: `tenantId = '${jwt.tenantId}'`,
-        limit: parsed.data.limit,
-        offset: (parsed.data.page - 1) * parsed.data.limit,
-      });
-      return reply.send({ success: true, data: result.hits });
-    });
+    registerEntity('kb', 'kb_articles', PERMISSIONS.SETTINGS.READ);
   }, { prefix: '/api/v1' });
 }

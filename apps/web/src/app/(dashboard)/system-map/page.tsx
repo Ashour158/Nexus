@@ -80,7 +80,7 @@ export default function SystemMapPage() {
                             <ModuleIcon className="h-4 w-4" />
                           </span>
                           <div className="min-w-0">
-                            <Link href={module.href} className="font-semibold text-slate-950 hover:text-blue-700">
+                            <Link href={module.href} className="font-semibold text-slate-950 hover:text-indigo-700">
                               {module.label}
                             </Link>
                             <p className="mt-1 text-sm text-slate-600">{module.description}</p>

@@ -92,7 +92,7 @@ const TYPE_HREFS: Record<string, (id: string) => string> = {
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  deal: 'bg-blue-100 text-blue-700',
+  deal: 'bg-indigo-100 text-indigo-700',
   contact: 'bg-emerald-100 text-emerald-700',
   account: 'bg-purple-100 text-purple-700',
   lead: 'bg-orange-100 text-orange-700',

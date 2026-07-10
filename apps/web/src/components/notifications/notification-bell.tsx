@@ -79,7 +79,7 @@ export function NotificationBell() {
               <button
                 onClick={() => markAllRead.mutate()}
                 disabled={markAllRead.isPending}
-                className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
+                className="text-xs font-medium text-indigo-600 hover:underline disabled:opacity-50"
               >
                 {markAllRead.isPending ? 'Marking…' : 'Mark all read'}
               </button>
@@ -100,7 +100,7 @@ export function NotificationBell() {
                     onClick={() => {
                       if (!n.isRead) markRead.mutate(n.id);
                     }}
-                    className={`flex cursor-pointer gap-3 px-4 py-3 transition-colors hover:bg-gray-50 ${!n.isRead ? 'bg-blue-50/40' : ''}`}
+                    className={`flex cursor-pointer gap-3 px-4 py-3 transition-colors hover:bg-gray-50 ${!n.isRead ? 'bg-indigo-50/40' : ''}`}
                   >
                     <span className="mt-0.5 flex-shrink-0 rounded-md bg-gray-100 p-1">
                       <Icon className="h-4 w-4 text-gray-600" />
@@ -110,7 +110,7 @@ export function NotificationBell() {
                         <p className={`truncate text-sm ${!n.isRead ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
                           {n.title}
                         </p>
-                        {!n.isRead ? <span className="h-2 w-2 flex-shrink-0 rounded-full bg-blue-500" /> : null}
+                        {!n.isRead ? <span className="h-2 w-2 flex-shrink-0 rounded-full bg-indigo-500" /> : null}
                       </div>
                       <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">{n.body}</p>
                       <p className="mt-1 text-[11px] text-gray-400">{timeAgo(n.createdAt)}</p>
@@ -124,7 +124,7 @@ export function NotificationBell() {
           <div className="border-t border-gray-100 bg-gray-50 px-4 py-2">
             <a
               href="/notifications"
-              className="block w-full py-1 text-center text-xs font-medium text-blue-600 hover:underline"
+              className="block w-full py-1 text-center text-xs font-medium text-indigo-600 hover:underline"
             >
               View all notifications
             </a>

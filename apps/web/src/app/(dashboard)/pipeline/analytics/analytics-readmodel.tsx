@@ -31,7 +31,7 @@ export function AnalyticsReadModelSection() {
             Live from the analytics service (event-sourced ClickHouse projections).
           </p>
         </div>
-        <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-blue-700">
+        <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-700">
           <BarChart3 className="h-3 w-3" />
           analytics-service
         </span>
@@ -53,7 +53,7 @@ export function AnalyticsReadModelSection() {
             label="Open deals"
             value={summary.data?.totalDeals ?? 0}
             icon={<Layers className="h-5 w-5" />}
-            iconBg="bg-blue-100 text-blue-700"
+            iconBg="bg-indigo-100 text-indigo-700"
           />
           <StatCard
             label="Open pipeline value"

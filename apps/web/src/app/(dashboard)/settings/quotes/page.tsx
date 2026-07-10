@@ -102,7 +102,7 @@ export default function QuoteSettingsPage() {
       {/* Numbering */}
       <section className="rounded-xl border border-slate-200 bg-white p-5">
         <h2 className="text-sm font-bold text-slate-900">Auto-numbering</h2>
-        <p className="mt-1 text-xs text-slate-500">Next quote will be numbered <span className="font-mono font-semibold text-blue-700">{preview}</span>.</p>
+        <p className="mt-1 text-xs text-slate-500">Next quote will be numbered <span className="font-mono font-semibold text-indigo-700">{preview}</span>.</p>
         {cfg ? (
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">

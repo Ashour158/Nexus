@@ -77,7 +77,7 @@ export function PipelineClient() {
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
         <SummaryCard
-          icon={<Layers3 className="h-5 w-5 text-blue-600" />}
+          icon={<Layers3 className="h-5 w-5 text-indigo-600" />}
           label="Pipelines"
           value={pipelines.length}
           detail="Active sales paths under governance"

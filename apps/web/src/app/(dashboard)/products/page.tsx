@@ -239,7 +239,7 @@ export default function ProductsPage(): JSX.Element {
             key={key}
             onClick={() => setTab(key)}
             className={`rounded-lg px-3 py-1.5 text-sm ${
-              tab === key ? 'bg-blue-600 text-white' : 'bg-gray-100'
+              tab === key ? 'bg-indigo-600 text-white' : 'bg-gray-100'
             }`}
           >
             {key === 'products' ? 'Products' : key === 'kits' ? 'Kits' : 'Vendors'}
@@ -394,14 +394,14 @@ export default function ProductsPage(): JSX.Element {
         <div className="space-y-3">
           <FormRow label="Name" required>
             <input
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             />
           </FormRow>
           <FormRow label="Name (Arabic)">
             <input
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
               dir="rtl"
               lang="ar"
               value={form.nameAr}
@@ -411,14 +411,14 @@ export default function ProductsPage(): JSX.Element {
           <div className="grid grid-cols-2 gap-3">
             <FormRow label="SKU" required>
               <input
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                 value={form.sku}
                 onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
               />
             </FormRow>
             <FormRow label="Category">
               <input
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
               />
@@ -430,7 +430,7 @@ export default function ProductsPage(): JSX.Element {
                 type="number"
                 min={0}
                 step="0.01"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                 value={form.listPrice}
                 onChange={(e) => setForm((f) => ({ ...f, listPrice: e.target.value }))}
               />
@@ -438,7 +438,7 @@ export default function ProductsPage(): JSX.Element {
             <FormRow label="Currency" required>
               <input
                 maxLength={3}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase outline-none focus:border-blue-500"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase outline-none focus:border-indigo-500"
                 value={form.currency}
                 onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value.toUpperCase() }))}
               />
@@ -447,7 +447,7 @@ export default function ProductsPage(): JSX.Element {
           <FormRow label="Description">
             <textarea
               rows={3}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
             />

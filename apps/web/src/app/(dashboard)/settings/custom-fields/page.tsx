@@ -79,21 +79,21 @@ export default function CustomFieldsSettingsPage() {
     <div className="mx-auto max-w-4xl space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900"><Settings2 className="h-6 w-6 text-blue-600" /> Custom Fields</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900"><Settings2 className="h-6 w-6 text-indigo-600" /> Custom Fields</h1>
           <p className="mt-1 text-sm text-gray-500">Add fields specific to your business.</p>
         </div>
-        <button onClick={() => setShowAddForm(true)} className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"><Plus className="h-4 w-4" /> Add Field</button>
+        <button onClick={() => setShowAddForm(true)} className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"><Plus className="h-4 w-4" /> Add Field</button>
       </div>
 
       <div className="flex w-fit overflow-hidden rounded-lg border border-gray-200">
         {ENTITY_TABS.map((tab) => (
-          <button key={tab.key} onClick={() => setEntityType(tab.key)} className={`px-4 py-2 text-sm font-medium transition-colors ${entityType === tab.key ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>{tab.label}</button>
+          <button key={tab.key} onClick={() => setEntityType(tab.key)} className={`px-4 py-2 text-sm font-medium transition-colors ${entityType === tab.key ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>{tab.label}</button>
         ))}
       </div>
 
       {showAddForm ? (
-        <div className="space-y-4 rounded-xl border border-blue-200 bg-blue-50 p-5">
-          <h3 className="font-semibold text-blue-900">New field on {ENTITY_TABS.find((t) => t.key === entityType)?.label}</h3>
+        <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50 p-5">
+          <h3 className="font-semibold text-indigo-900">New field on {ENTITY_TABS.find((t) => t.key === entityType)?.label}</h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Field Label</label>
@@ -112,13 +112,13 @@ export default function CustomFieldsSettingsPage() {
               </div>
             ) : null}
             <div className="flex items-center gap-2">
-              <input type="checkbox" id="required" checked={newField.required} onChange={(e) => setNewField((f) => ({ ...f, required: e.target.checked }))} className="accent-blue-600" />
+              <input type="checkbox" id="required" checked={newField.required} onChange={(e) => setNewField((f) => ({ ...f, required: e.target.checked }))} className="accent-indigo-600" />
               <label htmlFor="required" className="text-sm text-gray-700">Required field</label>
             </div>
           </div>
           <div className="flex justify-end gap-2">
             <button onClick={() => setShowAddForm(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Cancel</button>
-            <button disabled={!newField.name.trim() || createMutation.isPending} onClick={() => createMutation.mutate({ entityType, name: newField.name.trim(), fieldType: newField.fieldType, required: newField.required, options: newField.options ? newField.options.split(',').map((o) => o.trim()).filter(Boolean) : [] })} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">{createMutation.isPending ? 'Creating...' : 'Create Field'}</button>
+            <button disabled={!newField.name.trim() || createMutation.isPending} onClick={() => createMutation.mutate({ entityType, name: newField.name.trim(), fieldType: newField.fieldType, required: newField.required, options: newField.options ? newField.options.split(',').map((o) => o.trim()).filter(Boolean) : [] })} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">{createMutation.isPending ? 'Creating...' : 'Create Field'}</button>
           </div>
         </div>
       ) : null}
@@ -129,7 +129,7 @@ export default function CustomFieldsSettingsPage() {
         {!isLoading && fields.length > 0 ? (
           <table className="w-full text-sm"><thead><tr className="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-500"><th className="w-8 px-5 py-3 text-start font-medium"></th><th className="px-5 py-3 text-start font-medium">Field Name</th><th className="px-5 py-3 text-start font-medium">API Key</th><th className="px-5 py-3 text-start font-medium">Type</th><th className="px-5 py-3 text-start font-medium">Required</th><th className="w-20 px-5 py-3 text-start font-medium">Actions</th></tr></thead><tbody>
             {fields.map((field, i) => (
-              <tr key={field.id} className={`border-b border-gray-50 ${i % 2 === 0 ? '' : 'bg-gray-50/50'} hover:bg-blue-50/30`}>
+              <tr key={field.id} className={`border-b border-gray-50 ${i % 2 === 0 ? '' : 'bg-gray-50/50'} hover:bg-indigo-50/30`}>
                 <td className="cursor-grab px-3 py-3 text-gray-300"><GripVertical className="h-4 w-4" /></td>
                 <td className="px-5 py-3 font-medium text-gray-900">{field.name}</td>
                 <td className="bg-gray-50/80 px-5 py-3 font-mono text-xs text-gray-500">{field.apiKey}</td>

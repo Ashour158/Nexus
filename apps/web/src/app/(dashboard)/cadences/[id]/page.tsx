@@ -305,7 +305,7 @@ export default function CadenceBuilderPage() {
       <section className="space-y-2 lg:col-span-3 rounded-xl border border-slate-200 bg-white p-3">
         <h2 className="text-sm font-semibold text-slate-900">Step timeline</h2>
         {steps.map((step, idx) => (
-          <div key={step.id} className={`rounded-lg border p-2 ${selected?.id === step.id ? 'border-blue-500 bg-blue-50' : 'border-slate-200'}`}>
+          <div key={step.id} className={`rounded-lg border p-2 ${selected?.id === step.id ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'}`}>
             <button onClick={() => setSelectedId(step.id)} className="w-full text-start">
               <p className="text-xs text-slate-500">Step {idx + 1} � Day {step.day}</p>
               <p className="text-sm font-medium capitalize flex items-center gap-1">{step.type === 'email' ? <Mail className="h-3.5 w-3.5" /> : step.type === 'task' ? '??' : <PauseCircle className="h-3.5 w-3.5" />}{step.type}</p>
@@ -381,7 +381,7 @@ export default function CadenceBuilderPage() {
         <button
           onClick={handleSave}
           disabled={createMutation.isPending || updateMutation.isPending}
-          className="w-full rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="w-full rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           {isNew ? 'Create cadence' : 'Save changes'}
         </button>

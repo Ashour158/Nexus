@@ -40,7 +40,7 @@ const STATUS_META: Record<string, { label: string; tone: string; icon: JSX.Eleme
   },
   PROCESSING: {
     label: 'Processing',
-    tone: 'bg-blue-50 text-blue-700',
+    tone: 'bg-indigo-50 text-indigo-700',
     icon: <RefreshCw className="h-4 w-4 animate-spin" />,
     hint: 'Contacting the data provider and applying matched fields.',
   },

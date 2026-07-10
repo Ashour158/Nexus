@@ -68,7 +68,7 @@ export default function AdminHubPage() {
           return (
             <section key={group.id}>
               <div className="mb-3 flex items-center gap-2.5">
-                <GroupIcon className="h-4 w-4 text-blue-400" />
+                <GroupIcon className="h-4 w-4 text-indigo-400" />
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-300">
                   {group.label}
                 </h3>
@@ -81,9 +81,9 @@ export default function AdminHubPage() {
                     <Link
                       key={feature.id}
                       href={feature.href}
-                      className="group flex items-start gap-3 rounded-xl border border-gray-800 bg-gray-900 p-4 transition-colors hover:border-blue-600 hover:bg-gray-850"
+                      className="group flex items-start gap-3 rounded-xl border border-gray-800 bg-gray-900 p-4 transition-colors hover:border-indigo-600 hover:bg-gray-850"
                     >
-                      <span className="mt-0.5 rounded-lg bg-gray-800 p-2 text-blue-400 group-hover:bg-blue-600 group-hover:text-white">
+                      <span className="mt-0.5 rounded-lg bg-gray-800 p-2 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white">
                         <Icon className="h-4 w-4" />
                       </span>
                       <span className="min-w-0">

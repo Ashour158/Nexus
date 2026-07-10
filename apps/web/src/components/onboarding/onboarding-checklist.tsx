@@ -41,13 +41,13 @@ export function OnboardingChecklist() {
   if (isLoading || dismissed || state?.completed) return null;
 
   return (
-    <div className="mb-6 overflow-hidden rounded-xl border border-blue-200 bg-white shadow-sm">
+    <div className="mb-6 overflow-hidden rounded-xl border border-indigo-200 bg-white shadow-sm">
       <div
-        className="flex cursor-pointer items-center justify-between px-5 py-4 transition-colors hover:bg-blue-50/30"
+        className="flex cursor-pointer items-center justify-between px-5 py-4 transition-colors hover:bg-indigo-50/30"
         onClick={() => setCollapsed((c) => !c)}
       >
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white">
             {progress}%
           </div>
           <div>
@@ -61,7 +61,7 @@ export function OnboardingChecklist() {
           <Link
             href="/onboarding"
             onClick={(e) => e.stopPropagation()}
-            className="hidden rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 sm:inline-block"
+            className="hidden rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 sm:inline-block"
           >
             {completedCount > 0 ? 'Resume setup' : 'Start setup'}
           </Link>
@@ -84,7 +84,7 @@ export function OnboardingChecklist() {
       </div>
 
       <div className="h-1 bg-gray-100">
-        <div className="h-full bg-blue-600 transition-all duration-500" style={{ width: `${progress}%` }} />
+        <div className="h-full bg-indigo-600 transition-all duration-500" style={{ width: `${progress}%` }} />
       </div>
 
       {!collapsed ? (
@@ -99,7 +99,7 @@ export function OnboardingChecklist() {
               >
                 <span className="mt-0.5 flex-shrink-0">
                   {done ? (
-                    <CheckCircle2 className="h-5 w-5 text-blue-600" />
+                    <CheckCircle2 className="h-5 w-5 text-indigo-600" />
                   ) : (
                     <Circle className="h-5 w-5 text-gray-300" />
                   )}

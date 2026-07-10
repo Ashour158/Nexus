@@ -69,7 +69,7 @@ export default function CadenceEnrollPage() {
         <button
           onClick={handleEnroll}
           disabled={submitting || !cadenceId}
-          className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           {submitting ? 'Enrolling…' : 'Confirm enrollment'}
         </button>

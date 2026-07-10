@@ -212,7 +212,7 @@ export default function KnowledgeArticlePage() {
                 .then(() => notify.success('Copied to clipboard'))
                 .catch(() => notify.error('Could not copy'));
             }}
-            className="flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm text-blue-600 hover:text-blue-700 hover:bg-slate-50"
+            className="flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm text-indigo-600 hover:text-indigo-700 hover:bg-slate-50"
           >
             <Copy className="h-4 w-4" /> Use in email
           </button>

@@ -26,7 +26,7 @@ interface TimelineMeta {
 
 const CHANNEL_META: Record<string, TimelineMeta> = {
   CALL: { icon: <Phone className="h-4 w-4 text-emerald-600" />, label: 'Call' },
-  EMAIL: { icon: <Mail className="h-4 w-4 text-blue-600" />, label: 'Email' },
+  EMAIL: { icon: <Mail className="h-4 w-4 text-indigo-600" />, label: 'Email' },
   CHAT: { icon: <MessageSquare className="h-4 w-4 text-indigo-600" />, label: 'Chat' },
   WHATSAPP: { icon: <MessageCircle className="h-4 w-4 text-green-600" />, label: 'WhatsApp' },
   WHATS_APP: { icon: <MessageCircle className="h-4 w-4 text-green-600" />, label: 'WhatsApp' },

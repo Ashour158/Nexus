@@ -67,7 +67,7 @@ export default function RFQsPage(): JSX.Element {
             className="flex-1 rounded border px-3 py-2 text-sm"
             placeholder="RFQ title"
           />
-          <button onClick={() => create.mutate()} className="rounded bg-blue-600 px-3 py-2 text-sm text-white">
+          <button onClick={() => create.mutate()} className="rounded bg-indigo-600 px-3 py-2 text-sm text-white">
             Create RFQ
           </button>
         </div>

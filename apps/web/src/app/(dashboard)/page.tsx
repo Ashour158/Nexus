@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, type ComponentType, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart,
@@ -16,13 +16,22 @@ import {
   Cell,
   Legend,
 } from 'recharts';
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  Briefcase,
+  DollarSign,
+  Gauge,
+  Plus,
+  Sparkles,
+  Trophy,
+} from 'lucide-react';
 
-import { KpiCard } from '@/components/ui/kpi-card';
-import { ChartCard } from '@/components/ui/chart-card';
 import { EventFeed } from '@/components/ui/event-feed';
 import { DataTable } from '@/components/ui/data-table';
 import { Skeleton, StatCardSkeleton, TableSkeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/auth.store';
+import { cn } from '@/lib/cn';
 import { formatCurrency } from '@/lib/format';
 import type { FeedEvent } from '@/components/ui/event-feed';
 import { useDeals } from '@/hooks/use-deals';
@@ -56,7 +65,25 @@ interface StrategicWin {
   impactScore: number;
 }
 
-const PIPELINE_COLORS = ['#4F6CF7', '#3D56C5', '#7B8FFA', '#A5B4FD'];
+type InsightTone = 'danger' | 'success' | 'primary';
+
+interface Insight {
+  id: string;
+  dealId: string;
+  tone: InsightTone;
+  title: string;
+  body: string;
+}
+
+const PIPELINE_COLORS = ['#4f46e5', '#4338ca', '#818cf8', '#a5b4fc'];
+
+const INSIGHT_DOT: Record<InsightTone, string> = {
+  danger: 'bg-error',
+  success: 'bg-success',
+  primary: 'bg-primary',
+};
+
+const DAY_MS = 86_400_000;
 
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -71,6 +98,82 @@ function timeAgo(iso: string) {
 function computeDelta(current: number, previous: number): number {
   if (previous === 0) return 0;
   return Number((((current - previous) / previous) * 100).toFixed(1));
+}
+
+/** Stat tile matching the Stitch bento dashboard: value, tonal icon chip, delta pill. */
+function StatTile({
+  label,
+  value,
+  delta,
+  icon: Icon,
+  chipClass,
+}: {
+  label: string;
+  value: string;
+  delta: number;
+  icon: ComponentType<{ className?: string }>;
+  chipClass: string;
+}) {
+  const positive = delta >= 0;
+  const DeltaIcon = positive ? ArrowUpRight : ArrowDownRight;
+
+  return (
+    <div className="glass-card p-6 transition-shadow hover:shadow-elevated">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+            {label}
+          </p>
+          <h3 className="mt-1 truncate text-2xl font-bold text-on-surface">{value}</h3>
+        </div>
+        <div className={cn('shrink-0 rounded-lg p-2', chipClass)}>
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className={cn(
+            'pill',
+            positive
+              ? 'bg-success-container text-on-success-container'
+              : 'bg-error-container text-on-error-container'
+          )}
+        >
+          <DeltaIcon className="h-3 w-3" />
+          {Math.abs(delta).toFixed(1)}%
+        </span>
+        <span className="text-xs text-on-surface-variant">vs last month</span>
+      </div>
+    </div>
+  );
+}
+
+/** Section card used by the chart / rail / table panels. */
+function Panel({
+  title,
+  subtitle,
+  action,
+  className,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className={cn('glass-card flex flex-col p-6', className)}>
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold text-on-surface">{title}</h3>
+          {subtitle ? <p className="mt-0.5 text-xs text-on-surface-variant">{subtitle}</p> : null}
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </div>
+      {children}
+    </section>
+  );
 }
 
 export default function DashboardPage() {
@@ -119,7 +222,7 @@ export default function DashboardPage() {
   const stages = useMemo(() => pipelines?.flatMap((p) => p.stages ?? []) ?? [], [pipelines]);
   const stageMap = useMemo(() => new Map(stages.map((s) => [s.id, s.name])), [stages]);
 
-  // Monthly metrics for sparklines and deltas
+  // Monthly metrics for deltas
   const monthlyMetrics = useMemo(() => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const now = new Date();
@@ -168,23 +271,13 @@ export default function DashboardPage() {
     monthlyMetrics[4]?.won ? monthlyMetrics[4].revenue / monthlyMetrics[4].won : 0
   );
 
-  // Sparklines derived from current deal data
-  const revenueSparkline = monthlyMetrics.map((m) => m.revenue);
-  const winRateSparkline = monthlyMetrics.map((m) => (m.total > 0 ? (m.won / m.total) * 100 : 0));
-  const activeDealsSparkline = monthlyMetrics.map((m) => m.open);
-  const avgDealSizeSparkline = monthlyMetrics.map((m) => (m.won > 0 ? m.revenue / m.won : 0));
-
   // Revenue chart data grouped by month from won deals
   const revenueData = useMemo(() => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const now = new Date();
     const result = Array.from({ length: 6 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
-      return {
-        month: months[d.getMonth()],
-        revenue: 0,
-        target: 0,
-      };
+      return { month: months[d.getMonth()], revenue: 0, target: 0 };
     });
 
     wonDeals.forEach((deal) => {
@@ -228,6 +321,57 @@ export default function DashboardPage() {
         ];
   }, [stats, openDeals, stageMap]);
 
+  /**
+   * Copilot insights are DERIVED from live deal data (never fabricated): the
+   * stalest open deal, the strongest MEDDICC score and the largest open
+   * opportunity. Deduped by deal so one dominant deal can't fill every slot.
+   */
+  const insights = useMemo<Insight[]>(() => {
+    if (openDeals.length === 0) return [];
+    const candidates: Insight[] = [];
+
+    const stalest = [...openDeals].sort(
+      (a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
+    )[0];
+    const staleDays = Math.floor((Date.now() - new Date(stalest.updatedAt).getTime()) / DAY_MS);
+    if (staleDays >= 7) {
+      candidates.push({
+        id: `stale-${stalest.id}`,
+        dealId: stalest.id,
+        tone: 'danger',
+        title: `${stalest.name} may be at risk`,
+        body: `No activity in ${staleDays} days. Consider sending a check-in.`,
+      });
+    }
+
+    const strongest = [...openDeals].sort(
+      (a, b) => (b.meddicicScore ?? 0) - (a.meddicicScore ?? 0)
+    )[0];
+    if ((strongest.meddicicScore ?? 0) > 0) {
+      candidates.push({
+        id: `score-${strongest.id}`,
+        dealId: strongest.id,
+        tone: 'success',
+        title: 'High closing probability',
+        body: `${strongest.name} scores ${strongest.meddicicScore}/100 on MEDDICC.`,
+      });
+    }
+
+    const biggest = [...openDeals].sort(
+      (a, b) => (parseFloat(b.amount) || 0) - (parseFloat(a.amount) || 0)
+    )[0];
+    candidates.push({
+      id: `size-${biggest.id}`,
+      dealId: biggest.id,
+      tone: 'primary',
+      title: 'Largest open opportunity',
+      body: `${biggest.name} — ${formatCurrency(parseFloat(biggest.amount) || 0)}`,
+    });
+
+    const seen = new Set<string>();
+    return candidates.filter((i) => !seen.has(i.dealId) && seen.add(i.dealId)).slice(0, 3);
+  }, [openDeals]);
+
   // Strategic wins from real won deals
   const strategicWins = useMemo<StrategicWin[]>(() => {
     return wonDeals
@@ -267,90 +411,92 @@ export default function DashboardPage() {
   }, [activitiesResult, userMap]);
 
   const hasError = statsError || dealsError || activitiesError;
+  const kpisLoading = dealsLoading || statsLoading || usersLoading;
 
   return (
-    <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <main className="mx-auto max-w-[1280px] space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <OnboardingChecklist />
 
       {hasError ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
-          Failed to load some dashboard data.{" "}
-          <button onClick={() => void refetchStats()} className="font-medium underline">
+        <div className="rounded-xl border border-error/30 bg-error-container p-4 text-sm text-on-error-container">
+          Failed to load some dashboard data.{' '}
+          <button onClick={() => void refetchStats()} className="font-semibold underline">
             Retry
           </button>
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* Page header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-            Welcome, {userId.split(/[._-]/)[0]}
+          <h1 className="text-3xl font-bold tracking-tight text-on-surface sm:text-4xl">
+            Sales Overview
           </h1>
-          <p className="mt-0.5 text-sm" style={{ color: 'var(--text-muted)' }}>
-            Live CRM dashboard
+          <p className="mt-2 text-base text-on-surface-variant">
+            Welcome back, {userId.split(/[._-]/)[0]} — live pipeline &amp; revenue insights
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/deals/new"
-            className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-dark transition"
-          >
-            + New Deal
-          </Link>
-        </div>
+        <Link
+          href="/deals/new"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary shadow-sm shadow-primary/20 transition-opacity hover:opacity-90"
+        >
+          <Plus className="h-4 w-4" />
+          New Deal
+        </Link>
       </div>
 
-      {/* KPI Strip */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {dealsLoading || statsLoading || usersLoading ? (
-          Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
-        ) : (
-          <>
-            <KpiCard
-              label="Total Revenue"
-              value={totalRevenue}
-              format="currency"
-              delta={revenueDelta}
-              sparklineData={revenueSparkline}
-            />
-            <KpiCard
-              label="Win Rate"
-              value={winRate}
-              format="percent"
-              delta={winRateDelta}
-              sparklineData={winRateSparkline}
-            />
-            <KpiCard
-              label="Active Deals"
-              value={activeDeals}
-              format="number"
-              delta={activeDealsDelta}
-              sparklineData={activeDealsSparkline}
-            />
-            <KpiCard
-              label="Avg Deal Size"
-              value={avgDealSize}
-              format="currency"
-              delta={avgDealSizeDelta}
-              sparklineData={avgDealSizeSparkline}
-            />
-          </>
-        )}
-      </section>
+      {/* Bento grid */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
+        {/* Stat tiles */}
+        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4 md:col-span-12">
+          {kpisLoading ? (
+            Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
+          ) : (
+            <>
+              <StatTile
+                label="Total Revenue"
+                value={formatCurrency(totalRevenue)}
+                delta={revenueDelta}
+                icon={DollarSign}
+                chipClass="bg-success-container text-on-success-container"
+              />
+              <StatTile
+                label="Win Rate"
+                value={`${winRate.toFixed(1)}%`}
+                delta={winRateDelta}
+                icon={Trophy}
+                chipClass="bg-primary-container text-on-primary-container"
+              />
+              <StatTile
+                label="Active Deals"
+                value={activeDeals.toLocaleString()}
+                delta={activeDealsDelta}
+                icon={Briefcase}
+                chipClass="bg-tertiary-container text-on-tertiary-container"
+              />
+              <StatTile
+                label="Avg Deal Size"
+                value={formatCurrency(avgDealSize)}
+                delta={avgDealSizeDelta}
+                icon={Gauge}
+                chipClass="bg-secondary-container text-on-secondary-container"
+              />
+            </>
+          )}
+        </div>
 
-      {/* Charts Row */}
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <ChartCard
+        {/* Main chart */}
+        <Panel
           title="Revenue Performance"
           subtitle="Monthly revenue vs target (last 6 months)"
-          className="lg:col-span-2"
+          className="min-h-[420px] md:col-span-8"
         >
           {dealsLoading ? (
-            <div className="h-72 flex items-center justify-center">
+            <div className="flex h-72 items-center justify-center">
               <Skeleton className="h-64 w-full" />
             </div>
           ) : (
-            <div className="h-72">
+            <div className="h-72 flex-1">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={revenueData} barGap={4}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
@@ -374,17 +520,155 @@ export default function DashboardPage() {
                     }}
                   />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="revenue" name="Actual" fill="#4F6CF7" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="target" name="Target" fill="#E2E8F0" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="revenue" name="Actual" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="target" name="Target" fill="#c7d2fe" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           )}
-        </ChartCard>
+        </Panel>
 
-        <ChartCard title="Pipeline Velocity" subtitle={`${activeDeals} active deals`}>
+        {/* Side rail */}
+        <div className="flex flex-col gap-6 md:col-span-4">
+          <section className="glass-card border-2 border-primary/30 p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold text-on-surface">Copilot Insights</h3>
+            </div>
+            {dealsLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : insights.length === 0 ? (
+              <p className="text-sm text-on-surface-variant">
+                No open deals yet — insights appear once your pipeline has activity.
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {insights.map((insight) => (
+                  <li key={insight.id}>
+                    <Link
+                      href={`/deals/${insight.dealId}`}
+                      className="flex items-start gap-3 rounded-lg p-2 transition-colors hover:bg-surface-container-high"
+                    >
+                      <span
+                        className={cn('mt-1.5 h-2 w-2 shrink-0 rounded-full', INSIGHT_DOT[insight.tone])}
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-on-surface">
+                          {insight.title}
+                        </span>
+                        <span className="mt-1 block text-xs text-on-surface-variant">
+                          {insight.body}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <Panel
+            title="Recent Activity"
+            className="flex-1"
+            action={
+              <Link href="/activities" className="text-xs font-semibold text-primary hover:underline">
+                View all
+              </Link>
+            }
+          >
+            {activitiesLoading || usersLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <Skeleton className="h-7 w-7 rounded-full" />
+                    <div className="flex-1 space-y-1">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/4" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EventFeed events={recentEvents} />
+            )}
+          </Panel>
+        </div>
+
+        {/* Strategic wins */}
+        <Panel
+          title="Top Strategic Wins"
+          subtitle="Top 5 closed-won deals this quarter"
+          className="md:col-span-8"
+        >
+          {dealsLoading || usersLoading ? (
+            <TableSkeleton rows={5} cols={6} />
+          ) : (
+            <DataTable
+              data={strategicWins}
+              keyExtractor={(row) => row.id}
+              columns={[
+                {
+                  key: 'client',
+                  header: 'Enterprise Client',
+                  cell: (row) => <span className="font-medium text-on-surface">{row.client}</span>,
+                },
+                {
+                  key: 'executiveLead',
+                  header: 'Executive Lead',
+                  cell: (row) => <span className="text-on-surface-variant">{row.executiveLead}</span>,
+                },
+                {
+                  key: 'amount',
+                  header: 'Amount',
+                  align: 'right',
+                  cell: (row) => (
+                    <span className="font-semibold text-on-surface">{formatCurrency(row.amount)}</span>
+                  ),
+                },
+                {
+                  key: 'region',
+                  header: 'Region',
+                  cell: (row) => <span className="text-on-surface-variant">{row.region}</span>,
+                },
+                {
+                  key: 'vertical',
+                  header: 'Vertical',
+                  cell: (row) => <span className="text-on-surface-variant">{row.vertical}</span>,
+                },
+                {
+                  key: 'impactScore',
+                  header: 'Impact',
+                  align: 'center',
+                  cell: (row) => (
+                    <div className="flex justify-center gap-0.5">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <span
+                          key={i}
+                          className={i < row.impactScore ? 'text-warning' : 'text-outline-variant'}
+                        >
+                          ★
+                        </span>
+                      ))}
+                    </div>
+                  ),
+                },
+              ]}
+            />
+          )}
+        </Panel>
+
+        {/* Pipeline velocity */}
+        <Panel
+          title="Pipeline Velocity"
+          subtitle={`${activeDeals} active deals`}
+          className="md:col-span-4"
+        >
           {statsLoading || dealsLoading ? (
-            <div className="h-72 flex items-center justify-center">
+            <div className="flex h-72 items-center justify-center">
               <Skeleton className="h-64 w-full" />
             </div>
           ) : (
@@ -418,99 +702,8 @@ export default function DashboardPage() {
               </ResponsiveContainer>
             </div>
           )}
-        </ChartCard>
-      </section>
-
-      {/* Table + Activity Row */}
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <ChartCard title="Top Strategic Wins" subtitle="Top 5 closed-won deals this quarter">
-            {dealsLoading || usersLoading ? (
-              <TableSkeleton rows={5} cols={6} />
-            ) : (
-              <DataTable
-                data={strategicWins}
-                keyExtractor={(row) => row.id}
-                columns={[
-                  {
-                    key: 'client',
-                    header: 'Enterprise Client',
-                    cell: (row) => (
-                      <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                        {row.client}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: 'executiveLead',
-                    header: 'Executive Lead',
-                    cell: (row) => <span style={{ color: 'var(--text-secondary)' }}>{row.executiveLead}</span>,
-                  },
-                  {
-                    key: 'amount',
-                    header: 'Amount',
-                    align: 'right',
-                    cell: (row) => (
-                      <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        {formatCurrency(row.amount)}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: 'region',
-                    header: 'Region',
-                    cell: (row) => <span style={{ color: 'var(--text-secondary)' }}>{row.region}</span>,
-                  },
-                  {
-                    key: 'vertical',
-                    header: 'Vertical',
-                    cell: (row) => <span style={{ color: 'var(--text-secondary)' }}>{row.vertical}</span>,
-                  },
-                  {
-                    key: 'impactScore',
-                    header: 'Impact',
-                    align: 'center',
-                    cell: (row) => (
-                      <div className="flex justify-center gap-0.5">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <span key={i} className={i < row.impactScore ? 'text-amber-400' : 'text-gray-200'}>
-                            ★
-                          </span>
-                        ))}
-                      </div>
-                    ),
-                  },
-                ]}
-              />
-            )}
-          </ChartCard>
-        </div>
-
-        <ChartCard
-          title="Recent Activity"
-          action={
-            <Link href="/activities" className="text-xs font-medium text-primary hover:underline">
-              View all
-            </Link>
-          }
-        >
-          {activitiesLoading || usersLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <Skeleton className="h-7 w-7 rounded-full" />
-                  <div className="flex-1 space-y-1">
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-3 w-1/4" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EventFeed events={recentEvents} />
-          )}
-        </ChartCard>
-      </section>
+        </Panel>
+      </div>
     </main>
   );
 }

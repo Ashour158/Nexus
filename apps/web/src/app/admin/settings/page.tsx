@@ -162,7 +162,7 @@ export default function AdminSettingsPage() {
           <button
             type="submit"
             disabled={saving}
-            className="rounded bg-blue-600 px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save settings'}
           </button>

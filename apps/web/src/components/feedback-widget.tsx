@@ -52,7 +52,7 @@ export function FeedbackWidget() {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-lg transition-colors hover:bg-blue-700"
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg transition-colors hover:bg-indigo-700"
         aria-label="Send feedback"
       >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -97,7 +97,7 @@ export function FeedbackWidget() {
                       onClick={() => setType(t)}
                       className={`flex-1 rounded-md border py-1.5 text-xs font-medium transition-colors ${
                         type === t
-                          ? 'border-blue-600 bg-blue-600 text-white'
+                          ? 'border-indigo-600 bg-indigo-600 text-white'
                           : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
                       }`}
                     >
@@ -112,13 +112,13 @@ export function FeedbackWidget() {
                   placeholder="Tell us what you think or describe a bug..."
                   rows={4}
                   required
-                  className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
 
                 <button
                   type="submit"
                   disabled={isSubmitting || !message.trim()}
-                  className="mt-3 w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-3 w-full rounded-lg bg-indigo-600 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isSubmitting ? 'Sending...' : 'Submit Feedback'}
                 </button>

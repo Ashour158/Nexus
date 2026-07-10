@@ -121,8 +121,8 @@ export default function InboxPage() {
   if (!connection?.connected) {
     return (
       <div className="flex h-[60vh] flex-col items-center justify-center gap-6 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-50">
-          <Mail className="h-8 w-8 text-blue-600" />
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-50">
+          <Mail className="h-8 w-8 text-indigo-600" />
         </div>
         <div>
           <h2 className="mb-2 text-xl font-semibold text-gray-900">Connect Your Email</h2>
@@ -142,16 +142,16 @@ export default function InboxPage() {
         <div className="flex items-center gap-2 border-b border-gray-200 p-3">
           <div className="relative flex-1">
             <Search className="absolute start-2.5 top-2.5 h-4 w-4 text-gray-400" />
-            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search emails..." className="w-full rounded-lg border border-gray-200 py-2 ps-8 pe-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search emails..." className="w-full rounded-lg border border-gray-200 py-2 ps-8 pe-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
           <button onClick={() => void refetch()} className="rounded-lg p-2 hover:bg-gray-100" title="Refresh" aria-label="Refresh inbox"><RefreshCw className="h-4 w-4 text-gray-500" /></button>
-          <button onClick={() => setShowCompose(true)} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Compose</button>
+          <button onClick={() => setShowCompose(true)} className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">Compose</button>
         </div>
         <div className="flex-1 overflow-y-auto">
           {isLoading ? <div className="p-4 text-sm text-gray-500">Loading emails...</div> : null}
           {!isLoading && threads.length === 0 ? <div className="p-8 text-center text-sm text-gray-400">No emails found</div> : null}
           {threads.map((thread) => (
-            <button key={thread.id} onClick={() => setSelectedThread(thread)} className={`w-full border-b border-gray-100 p-3 text-start transition-colors hover:bg-blue-50/40 ${selectedThread?.id === thread.id ? 'bg-blue-50' : ''}`}>
+            <button key={thread.id} onClick={() => setSelectedThread(thread)} className={`w-full border-b border-gray-100 p-3 text-start transition-colors hover:bg-indigo-50/40 ${selectedThread?.id === thread.id ? 'bg-indigo-50' : ''}`}>
               <div className="mb-0.5 flex items-start justify-between gap-2">
                 <span className={`truncate text-sm ${!thread.isRead ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>{thread.from.split('<')[0].trim()}</span>
                 <span className="shrink-0 text-xs text-gray-400">{new Date(thread.sentAt).toLocaleDateString()}</span>
@@ -175,8 +175,8 @@ export default function InboxPage() {
           <div className="flex-1 space-y-4 overflow-y-auto p-4">
             {messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.isInbound ? 'justify-start' : 'justify-end'}`}>
-                <div className={`max-w-[80%] rounded-xl p-4 ${msg.isInbound ? 'bg-gray-100 text-gray-900' : 'bg-blue-600 text-white'}`}>
-                  <div className={`mb-2 text-xs ${msg.isInbound ? 'text-gray-500' : 'text-blue-100'}`}>{msg.isInbound ? msg.from : 'You'} · {new Date(msg.sentAt).toLocaleString()}</div>
+                <div className={`max-w-[80%] rounded-xl p-4 ${msg.isInbound ? 'bg-gray-100 text-gray-900' : 'bg-indigo-600 text-white'}`}>
+                  <div className={`mb-2 text-xs ${msg.isInbound ? 'text-gray-500' : 'text-indigo-100'}`}>{msg.isInbound ? msg.from : 'You'} · {new Date(msg.sentAt).toLocaleString()}</div>
                   <div className="whitespace-pre-wrap text-sm" dangerouslySetInnerHTML={{ __html: sanitizeEmailBody(msg.body) }} />
                 </div>
               </div>
@@ -194,7 +194,7 @@ export default function InboxPage() {
               <button onClick={() => {
                 if (!selectedThread || !replyBody.trim()) return;
                 sendMutation.mutate({ threadId: selectedThread.id, to: selectedThread.from, subject: `Re: ${selectedThread.subject}`, body: replyBody });
-              }} disabled={!replyBody.trim() || sendMutation.isPending} className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-3.5 w-3.5" />{sendMutation.isPending ? 'Sending...' : 'Send'}</button>
+              }} disabled={!replyBody.trim() || sendMutation.isPending} className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"><Send className="h-3.5 w-3.5" />{sendMutation.isPending ? 'Sending...' : 'Send'}</button>
             </div>
           </div>
         </div>
@@ -256,7 +256,7 @@ export default function InboxPage() {
                     );
                   }}
                   disabled={!composeTo.trim() || !composeBody.trim() || sendMutation.isPending}
-                  className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                 ><Send className="h-3.5 w-3.5" />{sendMutation.isPending ? 'Sending...' : 'Send'}</button>
               </div>
             </div>

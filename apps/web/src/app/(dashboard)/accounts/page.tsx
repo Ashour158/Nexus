@@ -47,7 +47,7 @@ function tierColor(tier: Account['tier']): string {
     case 'STRATEGIC':
       return 'bg-violet-100 text-violet-700';
     case 'ENTERPRISE':
-      return 'bg-blue-100 text-blue-700';
+      return 'bg-indigo-100 text-indigo-700';
     case 'MID_MARKET':
       return 'bg-emerald-100 text-emerald-700';
     default:
@@ -147,15 +147,15 @@ export default function AccountsPage(): ReactElement {
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-lg border border-[#dbe7f3] bg-white shadow-sm">
-        <div className="h-1.5 bg-gradient-to-r from-blue-600 via-emerald-500 to-amber-400" />
+        <div className="h-1.5 bg-gradient-to-r from-indigo-600 via-emerald-500 to-amber-400" />
         <div className="p-4 sm:p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-200">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm shadow-indigo-200">
                 <Building2 className="h-5 w-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase text-blue-700">Customer foundation</p>
+                <p className="text-xs font-semibold uppercase text-indigo-700">Customer foundation</p>
                 <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">Accounts command center</h1>
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
                   Govern companies, billing and shipping profiles, account health, ownership, contacts, territories, and customer hierarchy from one operating view.
@@ -194,7 +194,7 @@ export default function AccountsPage(): ReactElement {
             className={cn(
               'inline-flex h-9 items-center gap-2 rounded-md px-3 text-xs font-bold transition',
               viewMode === 'list'
-                ? 'bg-blue-600 text-white shadow-sm'
+                ? 'bg-indigo-600 text-white shadow-sm'
                 : 'text-slate-600 hover:bg-white'
             )}
           >
@@ -207,7 +207,7 @@ export default function AccountsPage(): ReactElement {
             className={cn(
               'inline-flex h-9 items-center gap-2 rounded-md px-3 text-xs font-bold transition',
               viewMode === 'map'
-                ? 'bg-blue-600 text-white shadow-sm'
+                ? 'bg-indigo-600 text-white shadow-sm'
                 : 'text-slate-600 hover:bg-white'
             )}
           >
@@ -239,7 +239,7 @@ export default function AccountsPage(): ReactElement {
             setSearch(e.target.value);
           }}
           placeholder="Search account name…"
-          className="h-11 w-full rounded-lg border border-slate-200 bg-slate-100 pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
+          className="h-11 w-full rounded-lg border border-slate-200 bg-slate-100 pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
         />
         </label>
         <select
@@ -248,7 +248,7 @@ export default function AccountsPage(): ReactElement {
             setPage(1);
             setIndustry(e.target.value);
           }}
-          className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+          className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
         >
           <option value="">All industries</option>
           {industries.map((i) => (
@@ -263,7 +263,7 @@ export default function AccountsPage(): ReactElement {
             setPage(1);
             setTier(e.target.value as AccountListFilters['tier'] | '');
           }}
-          className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+          className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
         >
           <option value="">All tiers</option>
           {TIERS.map((t) => (
@@ -278,7 +278,7 @@ export default function AccountsPage(): ReactElement {
             setPage(1);
             setOwnerId(e.target.value);
           }}
-          className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+          className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
         >
           <option value="">All owners</option>
           {(users.data?.data ?? []).map((u) => (
@@ -631,8 +631,8 @@ function StatCard({
 }): ReactElement {
   const tones = {
     blue: {
-      bar: 'from-blue-500 to-cyan-400',
-      badge: 'border-blue-100 bg-blue-50 text-blue-700',
+      bar: 'from-indigo-500 to-cyan-400',
+      badge: 'border-indigo-100 bg-indigo-50 text-indigo-700',
     },
     emerald: {
       bar: 'from-emerald-500 to-teal-400',

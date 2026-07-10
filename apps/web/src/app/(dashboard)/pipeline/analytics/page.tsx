@@ -114,7 +114,7 @@ export default function PipelineAnalyticsPage() {
           }
           delta={2.4}
           icon={<Gauge className="h-5 w-5" />}
-          iconBg="bg-blue-100 text-blue-700"
+          iconBg="bg-indigo-100 text-indigo-700"
         />
         <StatCard
           label="Deals stalled >14 days"

@@ -75,7 +75,7 @@ export function DetailQuickActions({ contactId, accountId, invalidateKeys = [] }
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Quick note…"
-            className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-blue-500"
+            className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-indigo-500"
           />
           <div className="mt-2 flex justify-end gap-2">
             <button
@@ -92,7 +92,7 @@ export function DetailQuickActions({ contactId, accountId, invalidateKeys = [] }
               type="button"
               onClick={saveNote}
               disabled={saving || !note.trim()}
-              className="rounded-lg bg-[#137fec] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+              className="rounded-lg bg-[#4f46e5] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Save Note'}
             </button>

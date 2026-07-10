@@ -37,27 +37,16 @@ export function KpiCard({
   return (
     <div
       className={cn(
-        'rounded-xl border p-5 transition-shadow hover:shadow-sm',
-        'bg-surface border-border-color',
+        'rounded-xl border border-outline-variant bg-surface p-5 shadow-card transition-shadow hover:shadow-elevated',
         className
       )}
-      style={{
-        backgroundColor: 'var(--surface)',
-        borderColor: 'var(--border-color)',
-      }}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p
-            className="text-xs font-medium uppercase tracking-wide"
-            style={{ color: 'var(--text-muted)' }}
-          >
+          <p className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
             {label}
           </p>
-          <p
-            className="mt-2 text-2xl font-bold truncate"
-            style={{ color: 'var(--text-primary)' }}
-          >
+          <p className="mt-2 truncate text-2xl font-bold text-on-surface">
             {formatValue(value, format)}
           </p>
         </div>
@@ -65,7 +54,7 @@ export function KpiCard({
           <div className="shrink-0">
             <Sparkline
               data={sparklineData}
-              color={positive || neutral ? '#4F6CF7' : '#EF4444'}
+              color={positive || neutral ? '#4f46e5' : '#dc2626'}
               width={100}
               height={32}
             />
@@ -75,16 +64,16 @@ export function KpiCard({
       {typeof delta === 'number' ? (
         <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold">
           {positive ? (
-            <TrendingUp className="h-3 w-3 text-emerald-600" />
+            <TrendingUp className="h-3 w-3 text-success" />
           ) : !positive && !neutral ? (
-            <TrendingDown className="h-3 w-3 text-rose-600" />
+            <TrendingDown className="h-3 w-3 text-error" />
           ) : (
-            <Minus className="h-3 w-3 text-gray-400" />
+            <Minus className="h-3 w-3 text-outline" />
           )}
-          <span className={neutral ? 'text-gray-500' : positive ? 'text-emerald-600' : 'text-rose-600'}>
+          <span className={neutral ? 'text-on-surface-variant' : positive ? 'text-success' : 'text-error'}>
             {Math.abs(delta).toFixed(1)}%
           </span>
-          <span style={{ color: 'var(--text-muted)' }} className="font-normal">
+          <span className="font-normal text-on-surface-variant">
             {deltaLabel}
           </span>
         </div>

@@ -28,10 +28,10 @@ export default function NotificationsPage() {
     <div className="mx-auto max-w-3xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Bell className="h-6 w-6 text-blue-600" />
+          <Bell className="h-6 w-6 text-indigo-600" />
           <h1 className="text-2xl font-semibold text-slate-900">Notifications</h1>
           {unreadCount > 0 && (
-            <span className="rounded-full bg-blue-600 px-2.5 py-0.5 text-xs font-medium text-white">
+            <span className="rounded-full bg-indigo-600 px-2.5 py-0.5 text-xs font-medium text-white">
               {unreadCount}
             </span>
           )}
@@ -66,7 +66,7 @@ export default function NotificationsPage() {
             className={cn(
               'px-4 py-2 text-sm font-medium capitalize transition',
               filter === tab
-                ? 'border-b-2 border-blue-600 text-blue-600'
+                ? 'border-b-2 border-indigo-600 text-indigo-600'
                 : 'text-slate-500 hover:text-slate-700'
             )}
           >
@@ -105,9 +105,9 @@ function NotificationRow({
   onMarkRead: () => void;
 }) {
   return (
-    <li className={cn('flex items-start gap-3 p-4 transition hover:bg-slate-50', !n.isRead && 'bg-blue-50/40')}>
+    <li className={cn('flex items-start gap-3 p-4 transition hover:bg-slate-50', !n.isRead && 'bg-indigo-50/40')}>
       {!n.isRead && (
-        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-600" aria-hidden="true" />
+        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-indigo-600" aria-hidden="true" />
       )}
       {n.isRead && <span className="mt-1.5 h-2 w-2 shrink-0" />}
       <div className="min-w-0 flex-1">
@@ -121,7 +121,7 @@ function NotificationRow({
         {n.actionUrl && (
           <Link
             href={n.actionUrl}
-            className="rounded p-1 text-slate-400 transition hover:text-blue-600"
+            className="rounded p-1 text-slate-400 transition hover:text-indigo-600"
             title="View"
           >
             <ExternalLink className="h-4 w-4" />

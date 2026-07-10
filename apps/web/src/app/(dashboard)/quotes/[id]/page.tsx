@@ -240,7 +240,7 @@ export default function QuoteDetailPage(): JSX.Element {
           <p className="mt-1 text-sm">
             <Link
               href={`/deals/${quote.dealId}`}
-              className="text-blue-700 hover:underline"
+              className="text-indigo-700 hover:underline"
             >
               Open deal
             </Link>
@@ -318,8 +318,8 @@ export default function QuoteDetailPage(): JSX.Element {
       ) : null}
 
       {portalLink ? (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm">
-          <p className="font-medium text-blue-900">Portal link copied</p>
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm">
+          <p className="font-medium text-indigo-900">Portal link copied</p>
           <Input className="mt-2" readOnly value={portalLink} onFocus={(e) => e.currentTarget.select()} />
         </div>
       ) : null}
@@ -638,7 +638,7 @@ export default function QuoteDetailPage(): JSX.Element {
                   <p className="mt-1 truncate font-mono text-[11px] text-slate-500">SHA-256 {document.checksum}</p>
                 ) : null}
                 <a
-                  className="mt-2 inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                  className="mt-2 inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
                   href={`/api/quote-documents/${document.id}/download`}
                 >
                   Download package

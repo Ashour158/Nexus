@@ -238,9 +238,9 @@ export function DataTable<T>({
                     <tr
                       key={id}
                       className={cn(
-                        'transition-colors hover:bg-gray-50 dark:hover:bg-slate-800/50',
+                        'transition-colors hover:bg-surface-container-high',
                         rowClassName?.(row),
-                        selectedIds?.has(id) && 'bg-primary-light/30'
+                        selectedIds?.has(id) && 'bg-primary-container/40'
                       )}
                     >
                       {onSelect ? (

@@ -41,7 +41,7 @@ const NODE_COLORS: Record<NodeType, string> = {
   TRIGGER: 'bg-emerald-100 text-emerald-700 border-emerald-300',
   CONDITION: 'bg-amber-100 text-amber-700 border-amber-300',
   WAIT: 'bg-slate-100 text-slate-700 border-slate-300',
-  ACTION: 'bg-blue-100 text-blue-700 border-blue-300',
+  ACTION: 'bg-indigo-100 text-indigo-700 border-indigo-300',
   EMAIL: 'bg-purple-100 text-purple-700 border-purple-300',
   WEBHOOK: 'bg-cyan-100 text-cyan-700 border-cyan-300',
   SET_FIELD: 'bg-pink-100 text-pink-700 border-pink-300',
@@ -294,7 +294,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
                 onClick={() => setSelectedNodeId(node.id)}
                 className={`absolute w-40 cursor-pointer rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm transition hover:shadow-md ${
                   NODE_COLORS[node.type]
-                } ${selectedNodeId === node.id ? 'ring-2 ring-offset-2 ring-blue-500' : ''}`}
+                } ${selectedNodeId === node.id ? 'ring-2 ring-offset-2 ring-indigo-500' : ''}`}
                 style={{ left: pos.x, top: pos.y }}
               >
                 <div className="flex items-center justify-between">

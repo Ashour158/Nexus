@@ -38,13 +38,13 @@ export default async function RepDetailPage({ params }: { params: { id: string }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
-      <Link href="/reports/manager" className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700">
+      <Link href="/reports/manager" className="flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700">
         <ChevronLeft className="h-4 w-4" /> Back to Manager Dashboard
       </Link>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { label: 'Pipeline', value: `$${(pipeline / 1000).toFixed(1)}K`, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Pipeline', value: `$${(pipeline / 1000).toFixed(1)}K`, icon: TrendingUp, color: 'text-indigo-600', bg: 'bg-indigo-50' },
           { label: 'Revenue Won', value: `$${(revenue / 1000).toFixed(1)}K`, icon: Award, color: 'text-green-600', bg: 'bg-green-50' },
           { label: 'Quota Attainment', value: `${attainment}%`, icon: Target, color: attainment >= 100 ? 'text-green-600' : attainment >= 70 ? 'text-amber-600' : 'text-red-600', bg: attainment >= 100 ? 'bg-green-50' : attainment >= 70 ? 'bg-amber-50' : 'bg-red-50' },
           { label: 'Activities', value: String(activities.length), icon: Activity, color: 'text-purple-600', bg: 'bg-purple-50' },
@@ -62,7 +62,7 @@ export default async function RepDetailPage({ params }: { params: { id: string }
           <thead><tr className="border-b border-gray-100 text-xs uppercase text-gray-500"><th className="px-5 py-3 text-start font-medium">Deal</th><th className="px-5 py-3 text-start font-medium">Stage</th><th className="px-5 py-3 text-start font-medium">Amount</th><th className="px-5 py-3 text-start font-medium">Close Date</th></tr></thead>
           <tbody>
             {openDeals.slice(0, 10).map((deal: any, i: number) => (
-              <tr key={deal.id} className={`border-b border-gray-50 ${i % 2 === 0 ? '' : 'bg-gray-50/50'} hover:bg-blue-50/30`}>
+              <tr key={deal.id} className={`border-b border-gray-50 ${i % 2 === 0 ? '' : 'bg-gray-50/50'} hover:bg-indigo-50/30`}>
                 <td className="px-5 py-3 font-medium text-gray-900">{deal.name}</td>
                 <td className="px-5 py-3 text-gray-500">{deal.stage?.name ?? '-'}</td>
                 <td className="px-5 py-3 font-medium">${Number(deal.amount ?? 0).toLocaleString()}</td>

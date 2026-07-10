@@ -32,7 +32,7 @@ const SENTIMENTS = ['Positive', 'Neutral', 'Negative', 'Unknown'];
 const ROLE_COLORS: Record<string, string> = {
   Champion: 'bg-emerald-50 text-emerald-700',
   EconomicBuyer: 'bg-indigo-50 text-indigo-700',
-  DecisionMaker: 'bg-blue-50 text-blue-700',
+  DecisionMaker: 'bg-indigo-50 text-indigo-700',
   Influencer: 'bg-purple-50 text-purple-700',
   TechnicalBuyer: 'bg-cyan-50 text-cyan-700',
   User: 'bg-slate-100 text-slate-600',
@@ -78,7 +78,7 @@ export function BuyingCommittee({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="flex items-center gap-2 text-sm font-bold text-slate-950">
-            <Users className="h-4 w-4 text-blue-600" />
+            <Users className="h-4 w-4 text-indigo-600" />
             Buying committee ({relations.length})
           </h3>
           <p className="mt-1 text-xs text-slate-500">
@@ -92,7 +92,7 @@ export function BuyingCommittee({
               onClick={() => setView('table')}
               className={cn(
                 'rounded-md px-3 py-1.5 text-xs font-semibold transition',
-                view === 'table' ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:text-slate-800'
+                view === 'table' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:text-slate-800'
               )}
             >
               Table
@@ -102,7 +102,7 @@ export function BuyingCommittee({
               onClick={() => setView('org')}
               className={cn(
                 'inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition',
-                view === 'org' ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:text-slate-800'
+                view === 'org' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:text-slate-800'
               )}
             >
               <Network className="h-3.5 w-3.5" />
@@ -192,7 +192,7 @@ function RelationsTable({
               <td className="px-4 py-3">
                 <Link
                   href={`/contacts/${r.contactId}`}
-                  className="font-semibold text-slate-900 hover:text-blue-700 hover:underline"
+                  className="font-semibold text-slate-900 hover:text-indigo-700 hover:underline"
                 >
                   {fullName(r)}
                 </Link>
@@ -204,7 +204,7 @@ function RelationsTable({
                     </span>
                   ) : null}
                   {r.isPrimary ? (
-                    <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-700">
+                    <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
                       Primary
                     </span>
                   ) : null}
@@ -239,7 +239,7 @@ function RelationsTable({
                       onTouchEnd={(e) =>
                         onUpdate(r.id, { influence: Number((e.target as HTMLInputElement).value) })
                       }
-                      className="w-24 accent-blue-600"
+                      className="w-24 accent-indigo-600"
                     />
                     <span className="w-9 text-xs font-semibold text-slate-700">{r.influence ?? 0}%</span>
                   </div>
@@ -321,14 +321,14 @@ function RelationsOrgChart({ relations }: { relations: RelatedContact[] }) {
     >
       <div className="rounded-xl border border-slate-200 bg-white p-3">
         <div className="flex items-start gap-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
             {(r.contact.firstName[0] ?? '') + (r.contact.lastName[0] ?? '')}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <Link
                 href={`/contacts/${r.contactId}`}
-                className="text-sm font-semibold text-slate-900 hover:text-blue-700 hover:underline"
+                className="text-sm font-semibold text-slate-900 hover:text-indigo-700 hover:underline"
               >
                 {fullName(r)}
               </Link>
@@ -424,7 +424,7 @@ function AddRelatedContactModal({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search contacts by name or email…"
-              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
             />
             <div className="mt-2 max-h-44 space-y-1 overflow-y-auto rounded-lg border border-slate-100 p-1">
               {contactsQuery.isLoading ? (
@@ -439,7 +439,7 @@ function AddRelatedContactModal({
                     onClick={() => setContactId(c.id)}
                     className={cn(
                       'flex w-full flex-col rounded-md px-2 py-1.5 text-left text-sm',
-                      contactId === c.id ? 'bg-blue-50 text-blue-800' : 'hover:bg-slate-50'
+                      contactId === c.id ? 'bg-indigo-50 text-indigo-800' : 'hover:bg-slate-50'
                     )}
                   >
                     <span className="font-semibold">
@@ -457,7 +457,7 @@ function AddRelatedContactModal({
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-500"
+                className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500"
               >
                 {ROLES.map((rl) => (
                   <option key={rl} value={rl}>
@@ -470,7 +470,7 @@ function AddRelatedContactModal({
               <select
                 value={sentiment}
                 onChange={(e) => setSentiment(e.target.value)}
-                className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-500"
+                className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500"
               >
                 {SENTIMENTS.map((s) => (
                   <option key={s} value={s}>
@@ -488,7 +488,7 @@ function AddRelatedContactModal({
               max={100}
               value={influence}
               onChange={(e) => setInfluence(Number(e.target.value))}
-              className="mt-2 w-full accent-blue-600"
+              className="mt-2 w-full accent-indigo-600"
             />
           </Field>
 
@@ -496,7 +496,7 @@ function AddRelatedContactModal({
             <select
               value={reportsToContactId}
               onChange={(e) => setReportsToContactId(e.target.value)}
-              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-500"
+              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500"
             >
               <option value="">None (top level)</option>
               {existing.map((r) => (
@@ -512,7 +512,7 @@ function AddRelatedContactModal({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
             />
           </Field>
 
@@ -522,7 +522,7 @@ function AddRelatedContactModal({
                 type="checkbox"
                 checked={isPrimary}
                 onChange={(e) => setIsPrimary(e.target.checked)}
-                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
               />
               Primary contact
             </label>
@@ -531,7 +531,7 @@ function AddRelatedContactModal({
                 type="checkbox"
                 checked={isChampion}
                 onChange={(e) => setIsChampion(e.target.checked)}
-                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
               />
               Champion
             </label>

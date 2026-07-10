@@ -131,7 +131,7 @@ export function PolicyAdmin() {
               setDraft(EMPTY_DRAFT);
               setError(null);
             }}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[#137fec] px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-700"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#4f46e5] px-3 py-2 text-xs font-bold text-white transition hover:bg-indigo-700"
           >
             <Plus className="h-4 w-4" /> New policy
           </button>
@@ -192,7 +192,7 @@ export function PolicyAdmin() {
               <input
                 value={draft.name}
                 onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-                className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium normal-case text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium normal-case text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                 placeholder="High-value discount"
               />
             </label>
@@ -201,7 +201,7 @@ export function PolicyAdmin() {
               <input
                 value={draft.module}
                 onChange={(e) => setDraft((d) => ({ ...d, module: e.target.value }))}
-                className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium normal-case text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium normal-case text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                 placeholder="Quote"
               />
             </label>
@@ -308,7 +308,7 @@ export function PolicyAdmin() {
                     onClick={() =>
                       editLevel(li, { approvers: [...level.approvers, { ...EMPTY_APPROVER }] })
                     }
-                    className="text-xs font-bold text-[#005baf] hover:underline"
+                    className="text-xs font-bold text-[#4f46e5] hover:underline"
                   >
                     + Add approver
                   </button>
@@ -331,7 +331,7 @@ export function PolicyAdmin() {
               onClick={submit}
               disabled={saving}
               className={cn(
-                'inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#137fec] px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-60'
+                'inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#4f46e5] px-4 py-2 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:opacity-60'
               )}
             >
               <Save className="h-4 w-4" />

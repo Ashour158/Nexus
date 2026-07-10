@@ -333,7 +333,7 @@ function ApprovalCell({ quote }: { quote: Quote }) {
 function StatusPill({ status }: { status: Quote['status'] }) {
   const cls: Record<Quote['status'], string> = {
     DRAFT: 'bg-slate-100 text-slate-700',
-    SENT: 'bg-blue-100 text-blue-800',
+    SENT: 'bg-indigo-100 text-indigo-800',
     ACCEPTED: 'bg-emerald-100 text-emerald-800',
     REJECTED: 'bg-red-100 text-red-800',
     EXPIRED: 'bg-amber-100 text-amber-800',

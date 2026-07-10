@@ -265,7 +265,7 @@ export default function NewLeadPage() {
             <button
               type="submit"
               disabled={createLead.isPending}
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#137fec] px-4 text-sm font-bold text-white transition hover:bg-[#005baf] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#4f46e5] px-4 text-sm font-bold text-white transition hover:bg-[#4f46e5] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <UserPlus className="h-4 w-4" />
               {createLead.isPending ? 'Creating...' : 'Create Lead'}
@@ -303,7 +303,7 @@ function TextField({
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+        className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
       />
       {hint && !error ? <p className="mt-1 text-xs text-slate-500">{hint}</p> : null}
       {error ? <p className="mt-1 text-xs font-semibold text-rose-600">{error}</p> : null}
@@ -327,7 +327,7 @@ function TextareaField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         rows={4}
-        className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+        className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
       />
     </label>
   );
@@ -356,7 +356,7 @@ function SelectField({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+        className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -384,7 +384,7 @@ function CheckboxField({
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="h-4 w-4 rounded border-slate-300 text-[#137fec] focus:ring-blue-200"
+        className="h-4 w-4 rounded border-slate-300 text-[#4f46e5] focus:ring-indigo-200"
       />
       {label}
     </label>

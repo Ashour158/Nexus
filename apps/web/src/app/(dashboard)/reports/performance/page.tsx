@@ -134,7 +134,7 @@ export default function PerformanceDashboardPage() {
             </div>
             <div className="mt-3 h-2 rounded-full bg-slate-100">
               <div
-                className="h-full rounded-full bg-blue-600"
+                className="h-full rounded-full bg-indigo-600"
                 style={{ width: `${Math.min(100, (row.revenue / row.quota) * 100)}%` }}
               />
             </div>

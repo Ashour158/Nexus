@@ -26,7 +26,7 @@ export function StatCard({
   delta,
   deltaLabel = 'vs previous period',
   icon,
-  iconBg = 'bg-blue-100 text-blue-700',
+  iconBg = 'bg-indigo-100 text-indigo-700',
   format = 'number',
 }: StatCardProps) {
   const positive = (delta ?? 0) > 0;

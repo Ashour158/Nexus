@@ -196,7 +196,7 @@ export default function AdminValidationRulesPage() {
       <section className="rounded-2xl border border-gray-800 bg-gray-900 p-6 shadow-xl">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-blue-300">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-indigo-300">
               <LockKeyhole className="h-4 w-4" />
               Admin controlled policy
             </p>
@@ -216,7 +216,7 @@ export default function AdminValidationRulesPage() {
           <button
             type="button"
             onClick={startCreate}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-500"
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-500"
           >
             <Plus className="h-4 w-4" />
             New Policy
@@ -230,7 +230,7 @@ export default function AdminValidationRulesPage() {
       <section className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)_320px]">
         <aside className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
           <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-200">
-            <Database className="h-4 w-4 text-blue-300" />
+            <Database className="h-4 w-4 text-indigo-300" />
             CRM modules
           </div>
           <div className="space-y-2">
@@ -245,7 +245,7 @@ export default function AdminValidationRulesPage() {
                   onClick={() => setSelectedModule(module.id)}
                   className={`w-full rounded-xl border px-4 py-3 text-left transition ${
                     active
-                      ? 'border-blue-500 bg-blue-600 text-white'
+                      ? 'border-indigo-500 bg-indigo-600 text-white'
                       : 'border-gray-800 bg-gray-950 text-gray-300 hover:border-gray-700 hover:bg-gray-900'
                   }`}
                 >
@@ -255,7 +255,7 @@ export default function AdminValidationRulesPage() {
                       {moduleRequired}/{moduleRules.length}
                     </span>
                   </div>
-                  <p className={`mt-1 text-xs leading-5 ${active ? 'text-blue-100' : 'text-gray-500'}`}>
+                  <p className={`mt-1 text-xs leading-5 ${active ? 'text-indigo-100' : 'text-gray-500'}`}>
                     {module.description}
                   </p>
                 </button>
@@ -268,7 +268,7 @@ export default function AdminValidationRulesPage() {
           <div className="border-b border-gray-800 px-6 py-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-300">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-300">
                   {selectedDefinition.label}
                 </p>
                 <h2 className="mt-1 text-xl font-bold text-white">Required Field Policy</h2>
@@ -277,7 +277,7 @@ export default function AdminValidationRulesPage() {
                   Reading {activeFields.length} fields across {fieldGroups.length} field groups for this module.
                 </p>
               </div>
-              <div className="rounded-lg border border-blue-900/70 bg-blue-950/40 px-4 py-2 text-sm font-bold text-blue-200">
+              <div className="rounded-lg border border-indigo-900/70 bg-blue-950/40 px-4 py-2 text-sm font-bold text-indigo-200">
                 {requiredCount} active required fields
               </div>
             </div>
@@ -301,17 +301,17 @@ export default function AdminValidationRulesPage() {
                   <input
                     value={rule.message}
                     onChange={(event) => updateRule(rule, { message: event.target.value })}
-                    className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-sm text-gray-100 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-sm text-gray-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                   />
                   <div className="flex items-center justify-between gap-3">
-                    <span className={`text-sm font-semibold ${rule.enabled ? 'text-blue-200' : 'text-gray-400'}`}>
+                    <span className={`text-sm font-semibold ${rule.enabled ? 'text-indigo-200' : 'text-gray-400'}`}>
                       {rule.enabled ? 'Required' : 'Optional'}
                     </span>
                     <button
                       type="button"
                       onClick={() => updateRule(rule, { enabled: !rule.enabled })}
                       className={`relative h-7 w-12 rounded-full transition ${
-                        rule.enabled ? 'bg-blue-600' : 'bg-gray-700'
+                        rule.enabled ? 'bg-indigo-600' : 'bg-gray-700'
                       }`}
                       aria-label={`Toggle ${rule.label}`}
                     >
@@ -321,7 +321,7 @@ export default function AdminValidationRulesPage() {
                         }`}
                       />
                     </button>
-                    {savingId === rule.id ? <Loader2 className="h-4 w-4 animate-spin text-blue-300" /> : null}
+                    {savingId === rule.id ? <Loader2 className="h-4 w-4 animate-spin text-indigo-300" /> : null}
                   </div>
                 </div>
               ))}
@@ -343,7 +343,7 @@ export default function AdminValidationRulesPage() {
             <div className="mt-4 max-h-72 space-y-4 overflow-y-auto pr-1">
               {fieldGroups.map(([group, groupFields]) => (
                 <div key={group}>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-300">{group}</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-300">{group}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {groupFields.map((field) => {
                       const exists = activeRules.some((rule) => rule.field === field.field);
@@ -351,7 +351,7 @@ export default function AdminValidationRulesPage() {
                         <span
                           key={field.field}
                           className={`rounded px-2 py-1 text-xs ${
-                            exists ? 'bg-blue-950 text-blue-200' : 'bg-gray-800 text-gray-300'
+                            exists ? 'bg-blue-950 text-indigo-200' : 'bg-gray-800 text-gray-300'
                           }`}
                         >
                           {field.label}
@@ -365,7 +365,7 @@ export default function AdminValidationRulesPage() {
           </div>
 
           <div className="rounded-2xl border border-gray-800 bg-gray-900 p-5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600 text-white">
               <GitBranch className="h-5 w-5" />
             </div>
             <h2 className="mt-4 text-lg font-bold text-white">How the policy runs</h2>
@@ -375,7 +375,7 @@ export default function AdminValidationRulesPage() {
               <PolicyLine text="Contacts enforce this policy in the API before duplicate checks." />
               <PolicyLine text="Accounts, leads, deals, and quotes enforce the same policy in preview and service routes as they are created or updated." />
             </div>
-            <button className="mt-6 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 text-sm font-bold text-white">
+            <button className="mt-6 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 text-sm font-bold text-white">
               <Save className="h-4 w-4" />
               Auto-saved Policy
             </button>
@@ -394,7 +394,7 @@ export default function AdminValidationRulesPage() {
 
           <div className="rounded-2xl border border-gray-800 bg-gray-900 p-5">
             <div className="flex items-center gap-2 text-sm font-bold text-gray-200">
-              <SlidersHorizontal className="h-4 w-4 text-blue-300" />
+              <SlidersHorizontal className="h-4 w-4 text-indigo-300" />
               Next hardening path
             </div>
             <div className="mt-4 space-y-3 text-sm text-gray-400">
@@ -438,7 +438,7 @@ export default function AdminValidationRulesPage() {
                       useCustomField: !firstField,
                     });
                   }}
-                  className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-blue-500"
+                  className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-indigo-500"
                 >
                   {MODULES.map((module) => (
                     <option key={module.id} value={module.id}>{module.label}</option>
@@ -452,7 +452,7 @@ export default function AdminValidationRulesPage() {
                   type="checkbox"
                   checked={draft.useCustomField}
                   onChange={(event) => setDraft((current) => ({ ...current, useCustomField: event.target.checked }))}
-                  className="rounded border-gray-600 bg-gray-900 text-blue-600 focus:ring-blue-500"
+                  className="rounded border-gray-600 bg-gray-900 text-indigo-600 focus:ring-indigo-500"
                 />
               </label>
 
@@ -463,7 +463,7 @@ export default function AdminValidationRulesPage() {
                     value={draft.customField}
                     onChange={(event) => setDraft((current) => ({ ...current, customField: event.target.value, label: current.label || event.target.value }))}
                     placeholder="customFields.customerSegment"
-                    className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-blue-500"
+                    className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-indigo-500"
                   />
                 </label>
               ) : (
@@ -472,7 +472,7 @@ export default function AdminValidationRulesPage() {
                   <select
                     value={draft.field}
                     onChange={(event) => updateDraftField(event.target.value)}
-                    className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-blue-500"
+                    className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-indigo-500"
                   >
                     {fields
                       .filter((field) => field.objectType === draft.objectType)
@@ -491,7 +491,7 @@ export default function AdminValidationRulesPage() {
                   <input
                     value={draft.label}
                     onChange={(event) => setDraft((current) => ({ ...current, label: event.target.value }))}
-                    className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-blue-500"
+                    className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-indigo-500"
                   />
                 </label>
                 <label className="grid gap-1 text-sm">
@@ -499,7 +499,7 @@ export default function AdminValidationRulesPage() {
                   <select
                     value={draft.enabled ? 'required' : 'optional'}
                     onChange={(event) => setDraft((current) => ({ ...current, enabled: event.target.value === 'required' }))}
-                    className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-blue-500"
+                    className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-indigo-500"
                   >
                     <option value="required">Required</option>
                     <option value="optional">Optional</option>
@@ -512,7 +512,7 @@ export default function AdminValidationRulesPage() {
                 <input
                   value={draft.message}
                   onChange={(event) => setDraft((current) => ({ ...current, message: event.target.value }))}
-                  className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-blue-500"
+                  className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-indigo-500"
                 />
               </label>
             </div>
@@ -520,7 +520,7 @@ export default function AdminValidationRulesPage() {
               <button type="button" onClick={() => setCreating(false)} className="rounded-lg border border-gray-700 px-4 py-2 text-sm font-bold text-gray-200 hover:bg-gray-800">
                 Cancel
               </button>
-              <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-500">
+              <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500">
                 Create Policy
               </button>
             </div>

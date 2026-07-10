@@ -113,7 +113,7 @@ type ValidationRule = {
   message: string;
 };
 
-const ownerColors = ['bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700', 'bg-orange-100 text-orange-700'];
+const ownerColors = ['bg-indigo-100 text-indigo-700', 'bg-purple-100 text-purple-700', 'bg-orange-100 text-orange-700'];
 
 export default function ContactsPage(): ReactElement {
   const hasPermission = useAuthStore((s) => s.hasPermission);
@@ -357,7 +357,7 @@ export default function ContactsPage(): ReactElement {
           label="Total Contacts"
           value={stats.total.toLocaleString()}
           note={`${stats.newThisWeek} added this week`}
-          icon={<Users className="h-5 w-5 text-blue-500" />}
+          icon={<Users className="h-5 w-5 text-indigo-500" />}
         />
         <KpiCard
           label="Active Contacts"
@@ -412,7 +412,7 @@ export default function ContactsPage(): ReactElement {
                 <button
                   type="button"
                   onClick={openCreate}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#137fec] px-4 py-2 text-sm font-bold text-white transition active:scale-95"
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#4f46e5] px-4 py-2 text-sm font-bold text-white transition active:scale-95"
                 >
                   <Plus className="h-4 w-4" />
                   Create New Contact
@@ -429,12 +429,12 @@ export default function ContactsPage(): ReactElement {
             </div>
             <div className="relative z-10 flex h-64 items-end justify-between gap-4 px-4">
               {[
-                { label: 'Jan', value: 44, tone: 'bg-blue-100' },
-                { label: 'Feb', value: 58, tone: 'bg-blue-200' },
-                { label: 'Mar', value: 72, tone: 'bg-blue-300' },
-                { label: 'Apr', value: 88, tone: 'bg-[#137fec]' },
-                { label: 'May', value: 69, tone: 'bg-blue-300' },
-                { label: 'Jun', value: 80, tone: 'bg-blue-400' },
+                { label: 'Jan', value: 44, tone: 'bg-indigo-100' },
+                { label: 'Feb', value: 58, tone: 'bg-indigo-200' },
+                { label: 'Mar', value: 72, tone: 'bg-indigo-300' },
+                { label: 'Apr', value: 88, tone: 'bg-[#4f46e5]' },
+                { label: 'May', value: 69, tone: 'bg-indigo-300' },
+                { label: 'Jun', value: 80, tone: 'bg-indigo-400' },
               ].map((bar) => (
                 <div key={bar.label} className="group flex flex-1 flex-col items-center gap-2">
                   <div
@@ -459,7 +459,7 @@ export default function ContactsPage(): ReactElement {
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
                   <div
-                    className={cn('h-full', ['bg-blue-600', 'bg-blue-400', 'bg-blue-300', 'bg-blue-100'][index % 4])}
+                    className={cn('h-full', ['bg-indigo-600', 'bg-indigo-400', 'bg-indigo-300', 'bg-indigo-100'][index % 4])}
                     style={{ width: `${row.pct}%` }}
                   />
                 </div>
@@ -467,7 +467,7 @@ export default function ContactsPage(): ReactElement {
             ))}
           </div>
           <div className="mt-8 border-t border-slate-100 pt-6">
-            <Link href="/accounts/map" className="block text-center text-sm font-bold text-[#005baf] hover:underline">
+            <Link href="/accounts/map" className="block text-center text-sm font-bold text-[#4f46e5] hover:underline">
               View Detailed Map
             </Link>
           </div>
@@ -489,7 +489,7 @@ export default function ContactsPage(): ReactElement {
                     setPage(1);
                     setSearch(event.target.value);
                   }}
-                  className="h-10 w-64 rounded-lg border-0 bg-slate-100 pl-10 pr-4 text-sm focus:ring-2 focus:ring-blue-500"
+                  className="h-10 w-64 rounded-lg border-0 bg-slate-100 pl-10 pr-4 text-sm focus:ring-2 focus:ring-indigo-500"
                   placeholder="Search contacts..."
                 />
               </div>
@@ -499,7 +499,7 @@ export default function ContactsPage(): ReactElement {
                   setPage(1);
                   setOwnerId(event.target.value);
                 }}
-                className="h-10 rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500"
+                className="h-10 rounded-lg border-slate-200 text-sm focus:border-indigo-500 focus:ring-indigo-500"
               >
                 <option value="">All owners</option>
                 {users.map((user) => (
@@ -509,7 +509,7 @@ export default function ContactsPage(): ReactElement {
               <select
                 value={sortBy}
                 onChange={(event) => setSortBy(event.target.value as ContactListFilters['sortBy'])}
-                className="h-10 rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500"
+                className="h-10 rounded-lg border-slate-200 text-sm focus:border-indigo-500 focus:ring-indigo-500"
               >
                 <option value="createdAt">Newest</option>
                 <option value="firstName">First name</option>
@@ -577,7 +577,7 @@ export default function ContactsPage(): ReactElement {
                           {initials(contact)}
                         </div>
                         <div>
-                          <Link href={`/contacts/${contact.id}`} className="text-sm font-semibold text-slate-900 hover:text-[#005baf]">
+                          <Link href={`/contacts/${contact.id}`} className="text-sm font-semibold text-slate-900 hover:text-[#4f46e5]">
                             {contact.firstName} {contact.lastName}
                           </Link>
                           <p className="text-xs text-slate-500">{contact.accountId ? accountMap.get(contact.accountId) ?? contact.accountId : 'Unassigned account'}</p>
@@ -585,7 +585,7 @@ export default function ContactsPage(): ReactElement {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="rounded bg-blue-100 px-2 py-1 text-[10px] font-bold uppercase text-blue-700">
+                      <span className="rounded bg-indigo-100 px-2 py-1 text-[10px] font-bold uppercase text-indigo-700">
                         {contact.jobTitle ?? 'Stakeholder'}
                       </span>
                     </td>
@@ -608,7 +608,7 @@ export default function ContactsPage(): ReactElement {
                       <button
                         type="button"
                         onClick={() => setActive(contact)}
-                        className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-[#005baf]"
+                        className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-[#4f46e5]"
                       >
                         <MoreVertical className="h-5 w-5" />
                       </button>
@@ -747,7 +747,7 @@ function ContactPanel({
         <div className="flex-1 space-y-4 overflow-y-auto p-6 text-sm">
           <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
             <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl bg-white text-lg font-bold text-blue-700 ring-1 ring-slate-200">
+              <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl bg-white text-lg font-bold text-indigo-700 ring-1 ring-slate-200">
                 {customString(contact, 'photoUrl') ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={customString(contact, 'photoUrl')} alt="" className="h-full w-full object-cover" />
@@ -756,7 +756,7 @@ function ContactPanel({
                 )}
               </div>
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-blue-600">{customString(contact, 'lifecycleStage') || 'Relationship'}</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-indigo-600">{customString(contact, 'lifecycleStage') || 'Relationship'}</p>
                 <h3 className="text-base font-bold text-slate-950">{account}</h3>
                 <p className="text-xs text-slate-500">{[contact.department, contact.city, contact.country].filter(Boolean).join(' - ') || 'Profile enrichment pending'}</p>
               </div>
@@ -808,7 +808,7 @@ function ContactPanel({
         </div>
         <div className="flex gap-2 border-t border-slate-100 p-4">
           {canUpdate ? (
-            <button type="button" onClick={onEdit} className="flex-1 rounded-lg bg-[#137fec] px-4 py-2 text-sm font-bold text-white">
+            <button type="button" onClick={onEdit} className="flex-1 rounded-lg bg-[#4f46e5] px-4 py-2 text-sm font-bold text-white">
               Edit
             </button>
           ) : null}
@@ -842,7 +842,7 @@ function TagList({ title, values }: { title: string; values: string[] }) {
       <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</p>
       <div className="mt-2 flex flex-wrap gap-2">
         {values.map((value) => (
-          <span key={value} className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">
+          <span key={value} className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700">
             <Tag className="h-3 w-3" />
             {value}
           </span>
@@ -919,7 +919,7 @@ function ContactFormPanel({
           </button>
         </div>
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
-          <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-700">
+          <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs leading-5 text-indigo-700">
             Account linking is enforced through the low-code validation policy. Admins can change required fields under
             Settings / Validation Rules.
           </div>
@@ -941,7 +941,7 @@ function ContactFormPanel({
               required={requiredFields.has('ownerId')}
               value={draft.ownerId}
               onChange={(event) => onDraftChange({ ...draft, ownerId: event.target.value })}
-              className="mt-1 h-10 w-full rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500"
+              className="mt-1 h-10 w-full rounded-lg border-slate-200 text-sm focus:border-indigo-500 focus:ring-indigo-500"
             >
               <option value="">Select owner</option>
               {users.map((user) => (
@@ -993,7 +993,7 @@ function ContactFormPanel({
           <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
             Cancel
           </button>
-          <button type="submit" disabled={isSaving} className="rounded-lg bg-[#137fec] px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
+          <button type="submit" disabled={isSaving} className="rounded-lg bg-[#4f46e5] px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
             {isSaving ? 'Saving...' : mode === 'edit' ? 'Save' : 'Create'}
           </button>
         </div>
@@ -1024,7 +1024,7 @@ function Field({
       <span className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
         {icon}
         {label}
-        {required ? <span className="text-blue-600">*</span> : null}
+        {required ? <span className="text-indigo-600">*</span> : null}
       </span>
       <input
         type={type}
@@ -1032,7 +1032,7 @@ function Field({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
-          'mt-1 h-10 w-full rounded-lg border text-sm focus:border-blue-500 focus:ring-blue-500',
+          'mt-1 h-10 w-full rounded-lg border text-sm focus:border-indigo-500 focus:ring-indigo-500',
           error ? 'border-red-400' : 'border-slate-200'
         )}
       />
@@ -1060,14 +1060,14 @@ function SelectField({
     <label className="block">
       <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
         {label}
-        {required ? <span className="ml-1 text-blue-600">*</span> : null}
+        {required ? <span className="ml-1 text-indigo-600">*</span> : null}
       </span>
       <select
         required={required}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
-          'mt-1 h-10 w-full rounded-lg border text-sm focus:border-blue-500 focus:ring-blue-500',
+          'mt-1 h-10 w-full rounded-lg border text-sm focus:border-indigo-500 focus:ring-indigo-500',
           error ? 'border-red-400' : 'border-slate-200'
         )}
       >
@@ -1123,7 +1123,7 @@ function PhotoUpload({
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Profile photo</p>
           <p className="mt-0.5 text-xs text-slate-400">Upload JPG, PNG, or WebP. Stored with the contact preview.</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <label className="inline-flex h-9 cursor-pointer items-center rounded-lg bg-[#137fec] px-3 text-xs font-bold text-white hover:bg-blue-700">
+            <label className="inline-flex h-9 cursor-pointer items-center rounded-lg bg-[#4f46e5] px-3 text-xs font-bold text-white hover:bg-indigo-700">
               Upload image
               <input
                 type="file"
@@ -1165,7 +1165,7 @@ function CheckboxField({
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
       />
     </label>
   );

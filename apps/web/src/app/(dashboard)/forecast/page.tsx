@@ -154,7 +154,7 @@ export default function ForecastPage() {
             {[
               { label: 'Pipeline', value: fmt(data.pipeline), color: 'bg-gray-50 border-gray-200' },
               { label: 'Weighted', value: fmt(data.weighted), color: 'bg-indigo-50 border-indigo-200' },
-              { label: 'Committed', value: fmt(data.committed), color: 'bg-blue-50 border-blue-200' },
+              { label: 'Committed', value: fmt(data.committed), color: 'bg-indigo-50 border-indigo-200' },
               { label: 'Closed Won', value: fmt(data.closed), color: 'bg-green-50 border-green-200' },
             ].map((card) => (
               <div key={card.label} className={`rounded-xl border p-4 ${card.color}`}>

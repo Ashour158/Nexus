@@ -43,7 +43,7 @@ export default function DashboardsListPage(): ReactElement {
           </Link>
           <button
             onClick={() => setShowCreate(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
           >
             <Plus className="h-4 w-4" />
             New dashboard
@@ -66,10 +66,10 @@ export default function DashboardsListPage(): ReactElement {
           {dashboards.map((dashboard) => (
             <div
               key={dashboard.id}
-              className="group relative flex flex-col rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition hover:border-blue-200 hover:shadow"
+              className="group relative flex flex-col rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition hover:border-indigo-200 hover:shadow"
             >
               <Link href={`/analytics/dashboards/${dashboard.id}`} className="flex-1">
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
                   <LayoutGrid className="h-5 w-5" />
                 </div>
                 <h3 className="text-base font-bold text-slate-900">{dashboard.name}</h3>
@@ -116,7 +116,7 @@ export default function DashboardsListPage(): ReactElement {
                   onChange={(e) => setName(e.target.value)}
                   autoFocus
                   placeholder="e.g. Q3 Sales Review"
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                 />
               </label>
               <label className="flex flex-col gap-1">
@@ -125,7 +125,7 @@ export default function DashboardsListPage(): ReactElement {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                 />
               </label>
               <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -144,7 +144,7 @@ export default function DashboardsListPage(): ReactElement {
                 onClick={handleCreate}
                 disabled={!name.trim() || createDashboard.isPending}
                 className={cn(
-                  'rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700',
+                  'rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700',
                   (!name.trim() || createDashboard.isPending) && 'opacity-50'
                 )}
               >
@@ -161,7 +161,7 @@ export default function DashboardsListPage(): ReactElement {
 function EmptyState({ onCreate }: { onCreate: () => void }): ReactElement {
   return (
     <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white p-12 text-center">
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
         <LayoutGrid className="h-7 w-7" />
       </div>
       <h3 className="text-lg font-bold text-slate-900">No dashboards yet</h3>
@@ -171,7 +171,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }): ReactElement {
       </p>
       <button
         onClick={onCreate}
-        className="mt-5 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+        className="mt-5 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
       >
         <Plus className="h-4 w-4" />
         New dashboard

@@ -41,6 +41,17 @@ const nextConfig = {
       { source: '/roles', destination: '/admin/roles', permanent: false },
       // Validation Rules existed at both /settings/validation-rules and /admin/validation-rules.
       { source: '/settings/validation-rules', destination: '/admin/validation-rules', permanent: false },
+      // Commissions existed twice: the finance-backed /commissions and the wired
+      // incentive-backed /commission (plans + per-rep statements). Canonicalize on
+      // /commission and retire the /commissions twin.
+      { source: '/commissions', destination: '/commission', permanent: false },
+      // Journeys existed at both /journeys and /command-center (same
+      // workflow-service journey engine). Canonicalize on /command-center — the
+      // builder that owns create + step editing. Order matters: the /new rule
+      // must precede the :id rule so "new" is not treated as a journey id.
+      { source: '/journeys/new', destination: '/command-center', permanent: false },
+      { source: '/journeys/:id', destination: '/command-center/:id', permanent: false },
+      { source: '/journeys', destination: '/command-center', permanent: false },
     ];
   },
   // Same-origin BFF proxy: the browser calls /bff/<domain>/* on the web origin and

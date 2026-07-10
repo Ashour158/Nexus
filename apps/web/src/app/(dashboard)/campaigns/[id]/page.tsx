@@ -55,7 +55,7 @@ import {
 type Tab = 'overview' | 'members' | 'metrics';
 
 const inputClass =
-  'h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100';
+  'h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100';
 
 export default function CampaignDetailPage() {
   const params = useParams<{ id: string }>();
@@ -154,7 +154,7 @@ export default function CampaignDetailPage() {
                 type="button"
                 disabled={send.isPending}
                 onClick={() => send.mutate(id)}
-                className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#137fec] px-4 text-sm font-bold text-white hover:bg-[#005baf] disabled:opacity-50"
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#4f46e5] px-4 text-sm font-bold text-white hover:bg-[#4f46e5] disabled:opacity-50"
               >
                 <Send className="h-4 w-4" />
                 {send.isPending ? 'Sending…' : 'Send'}
@@ -425,7 +425,7 @@ function MembersTab({ campaignId }: { campaignId: string }) {
               type="button"
               disabled={add.isPending || !entityId.trim() || !email.trim()}
               onClick={handleAddOne}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#137fec] px-4 text-sm font-bold text-white hover:bg-[#005baf] disabled:opacity-50"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#4f46e5] px-4 text-sm font-bold text-white hover:bg-[#4f46e5] disabled:opacity-50"
             >
               <Plus className="h-4 w-4" />
               Add member
@@ -448,7 +448,7 @@ function MembersTab({ campaignId }: { campaignId: string }) {
               onChange={(e) => setBulkText(e.target.value)}
               rows={5}
               placeholder="a@x.com, b@y.com&#10;c@z.com"
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
             />
             <button
               type="button"
@@ -566,7 +566,7 @@ function MetricsTab({ campaignId }: { campaignId: string }) {
                 </div>
                 <div className="h-6 flex-1 overflow-hidden rounded-lg bg-slate-100">
                   <div
-                    className="h-full rounded-lg bg-[#137fec]"
+                    className="h-full rounded-lg bg-[#4f46e5]"
                     style={{ width: `${(f.count / max) * 100}%` }}
                   />
                 </div>

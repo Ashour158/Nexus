@@ -301,7 +301,7 @@ export default function ContactDetailPage() {
         <div className="grid gap-6 p-6 lg:grid-cols-[280px_minmax(0,1fr)]">
           <div className="space-y-4">
             <div className="flex flex-col items-center rounded-xl border border-slate-100 bg-white p-5 text-center">
-              <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-2xl bg-blue-50 text-3xl font-bold text-blue-700 ring-1 ring-blue-100">
+              <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-2xl bg-indigo-50 text-3xl font-bold text-indigo-700 ring-1 ring-indigo-100">
                 {photo ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={photo} alt={`${contact.firstName} ${contact.lastName}`} className="h-full w-full object-cover" />
@@ -313,7 +313,7 @@ export default function ContactDetailPage() {
                 {contact.firstName} {contact.lastName}
               </h1>
               <p className="mt-1 text-sm text-slate-500">{contact.jobTitle ?? 'Stakeholder'}</p>
-              <span className="mt-3 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-blue-700">
+              <span className="mt-3 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-indigo-700">
                 {lifecycle}
               </span>
               <span className={cn('mt-2 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider', slaTone(slaStatus))}>
@@ -345,7 +345,7 @@ export default function ContactDetailPage() {
                   label="Account"
                   value={
                     contact.accountId ? (
-                      <Link href={`/accounts/${contact.accountId}`} className="font-semibold text-blue-700 hover:underline">
+                      <Link href={`/accounts/${contact.accountId}`} className="font-semibold text-indigo-700 hover:underline">
                         {contact.accountId}
                       </Link>
                     ) : (
@@ -413,7 +413,7 @@ export default function ContactDetailPage() {
               className={cn(
                 'rounded-lg border px-3 py-2 text-sm font-semibold transition',
                 tab === t.id
-                  ? 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm'
+                  ? 'border-indigo-200 bg-indigo-50 text-indigo-700 shadow-sm'
                   : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'
               )}
             >
@@ -559,7 +559,7 @@ function ContactOverviewTab({
           label="LinkedIn"
           value={
             contact.linkedInUrl ? (
-              <a href={contact.linkedInUrl} target="_blank" rel="noreferrer" className="font-semibold text-blue-700 hover:underline">
+              <a href={contact.linkedInUrl} target="_blank" rel="noreferrer" className="font-semibold text-indigo-700 hover:underline">
                 {contact.linkedInUrl}
               </a>
             ) : (
@@ -570,7 +570,7 @@ function ContactOverviewTab({
         <DetailItem label="Twitter / X" value={contact.twitterHandle ?? 'Not set'} />
         <DetailItem label="Address" value={[contact.address, contact.city, contact.country].filter(Boolean).join(', ') || 'Not set'} />
         <DetailItem label="Timezone" value={contact.timezone ?? 'Not set'} />
-        <DetailItem label="Account" value={contact.accountId ? <Link href={`/accounts/${contact.accountId}`} className="font-semibold text-blue-700 hover:underline">{contact.accountId}</Link> : 'Unassigned'} />
+        <DetailItem label="Account" value={contact.accountId ? <Link href={`/accounts/${contact.accountId}`} className="font-semibold text-indigo-700 hover:underline">{contact.accountId}</Link> : 'Unassigned'} />
       </InfoCard>
 
       <InfoCard title="Consent & controls" icon={<ShieldCheck className="h-4 w-4" />}>
@@ -706,7 +706,7 @@ function EditContactModal({
                 <select
                   value={form.lifecycleStage}
                   onChange={(event) => setForm({ ...form, lifecycleStage: event.target.value })}
-                  className="mt-1 h-10 w-full rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 h-10 w-full rounded-lg border-slate-200 text-sm focus:border-indigo-500 focus:ring-indigo-500"
                 >
                   {['New relationship', 'Business champion', 'Technical evaluator', 'Executive sponsor', 'Dormant', 'Archived'].map((stage) => (
                     <option key={stage} value={stage}>{stage}</option>
@@ -789,8 +789,8 @@ function DocumentUploadModal({
           </button>
         </div>
         <div className="space-y-4 p-6">
-          <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center hover:border-blue-300 hover:bg-blue-50">
-            <Upload className="h-8 w-8 text-blue-600" />
+          <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center hover:border-indigo-300 hover:bg-indigo-50">
+            <Upload className="h-8 w-8 text-indigo-600" />
             <span className="mt-3 text-sm font-bold text-slate-900">{file ? file.name : 'Choose document'}</span>
             <span className="mt-1 text-xs text-slate-500">{file ? `${Math.round(file.size / 1024)} KB` : 'PDF, DOCX, XLSX, image, or archive'}</span>
             <input type="file" className="sr-only" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
@@ -842,7 +842,7 @@ function Input({
         required={required}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-1 h-10 w-full rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500"
+        className="mt-1 h-10 w-full rounded-lg border-slate-200 text-sm focus:border-indigo-500 focus:ring-indigo-500"
       />
     </label>
   );
@@ -856,7 +856,7 @@ function Checkbox({ label, checked, onChange }: { label: string; checked: boolea
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
       />
     </label>
   );
@@ -882,7 +882,7 @@ function InfoCard({ title, icon, children }: { title: string; icon: React.ReactN
   return (
     <div className="rounded-xl border border-slate-100 bg-white p-4">
       <div className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-900">
-        <span className="text-blue-600">{icon}</span>
+        <span className="text-indigo-600">{icon}</span>
         {title}
       </div>
       <dl className="space-y-3">{children}</dl>
@@ -899,7 +899,7 @@ function TagCloud({ label, values }: { label: string; values: string[] }) {
       ) : (
         <div className="flex flex-wrap gap-2">
           {values.map((value) => (
-            <span key={value} className="rounded bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">
+            <span key={value} className="rounded bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700">
               {value}
             </span>
           ))}
@@ -923,7 +923,7 @@ function MiniFeed({
   return (
     <div className="rounded-xl border border-slate-100 bg-white p-4">
       <div className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-900">
-        <span className="text-blue-600">{icon}</span>
+        <span className="text-indigo-600">{icon}</span>
         {title}
       </div>
       {rows.length === 0 ? (
@@ -1064,7 +1064,7 @@ function RelatedAccountsTab({
         <Link
           key={r.id}
           href={`/accounts/${r.accountId}`}
-          className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 hover:border-blue-200 hover:bg-blue-50/30"
+          className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 hover:border-indigo-200 hover:bg-indigo-50/30"
         >
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-slate-900">{r.account.name}</p>
@@ -1072,7 +1072,7 @@ function RelatedAccountsTab({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {r.isPrimary ? (
-              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-blue-700">
+              <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-indigo-700">
                 Primary
               </span>
             ) : null}

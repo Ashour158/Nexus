@@ -27,7 +27,7 @@ interface Contract {
 
 const statusStyles: Record<Contract['status'], string> = {
   DRAFT: 'bg-slate-100 text-slate-700',
-  PENDING_SIGNATURE: 'bg-blue-100 text-blue-700',
+  PENDING_SIGNATURE: 'bg-indigo-100 text-indigo-700',
   ACTIVE: 'bg-emerald-100 text-emerald-700',
   EXPIRED: 'bg-slate-100 text-slate-500',
   TERMINATED: 'bg-red-100 text-red-700',

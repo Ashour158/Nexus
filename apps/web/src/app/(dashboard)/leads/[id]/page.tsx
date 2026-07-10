@@ -322,7 +322,7 @@ function StatusBadge({ status }: { status: string }) {
       : status === 'UNQUALIFIED'
         ? 'bg-red-100 text-red-700'
         : status === 'QUALIFIED'
-          ? 'bg-blue-100 text-blue-700'
+          ? 'bg-indigo-100 text-indigo-700'
           : 'bg-slate-100 text-slate-700';
   return <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', color)}>{status}</span>;
 }
@@ -560,7 +560,7 @@ function ConversionTab({
             Conversion writes an account, a contact and an optional deal in one governed transaction.
           </p>
         </div>
-        <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', isReady ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700')}>
+        <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', isReady ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700')}>
           {isReady ? 'Ready' : 'Needs data'}
         </span>
       </div>

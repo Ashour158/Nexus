@@ -145,7 +145,7 @@ export default function AdminUsersPage() {
               <tr key={u.id}>
                 <td className="px-3 py-2"><Link href={`/admin/users/${u.id}`} className="hover:underline">{u.name}</Link></td>
                 <td className="px-3 py-2">{u.email}</td>
-                <td className="px-3 py-2"><span className="rounded bg-blue-900 px-2 py-0.5 text-xs">{u.role}</span></td>
+                <td className="px-3 py-2"><span className="rounded bg-indigo-900 px-2 py-0.5 text-xs">{u.role}</span></td>
                 <td className="px-3 py-2">{u.tenant}</td>
                 <td className="px-3 py-2"><span className={`rounded px-2 py-0.5 text-xs ${u.status === 'Active' ? 'bg-green-900' : u.status === 'Suspended' ? 'bg-red-900' : 'bg-yellow-900'}`}>{u.status}</span></td>
                 <td className="px-3 py-2">{new Date(u.lastActive).toLocaleString()}</td>

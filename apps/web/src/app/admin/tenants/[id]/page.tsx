@@ -117,7 +117,7 @@ export default function AdminTenantDetailPage({ params }: { params: { id: string
       <div className="flex justify-end">
         <button
           onClick={() => void patchTenant({ limits: { maxUsers, maxContacts, maxStorageGb: maxStorage, maxApiCallsPerDay: maxApi } }, 'Tenant limits saved')}
-          className="rounded bg-blue-600 px-3 py-2 text-sm"
+          className="rounded bg-indigo-600 px-3 py-2 text-sm"
         >
           Save limits
         </button>

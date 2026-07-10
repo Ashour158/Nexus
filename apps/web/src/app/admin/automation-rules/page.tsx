@@ -33,12 +33,12 @@ const RUN_STATUS_STYLES: Record<string, string> = {
   SUCCESS: 'bg-emerald-500/15 text-emerald-300',
   PARTIAL: 'bg-amber-500/15 text-amber-300',
   FAILED: 'bg-red-500/15 text-red-300',
-  RUNNING: 'bg-blue-500/15 text-blue-300',
+  RUNNING: 'bg-indigo-500/15 text-indigo-300',
   SKIPPED: 'bg-gray-500/15 text-gray-300',
 };
 
 const inputClass =
-  'w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none';
+  'w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-indigo-500 focus:outline-none';
 
 interface DraftState {
   id?: string;
@@ -106,7 +106,7 @@ export default function AutomationRulesAdminPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-blue-300">
+          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-indigo-300">
             <Zap className="h-4 w-4" /> Automation
           </p>
           <h1 className="mt-1 text-2xl font-bold text-white">Automation Rules</h1>
@@ -117,7 +117,7 @@ export default function AutomationRulesAdminPage() {
         <button
           type="button"
           onClick={() => setDraft(emptyDraft(meta?.modules[0]?.module ?? ''))}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
+          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
         >
           <Plus className="h-4 w-4" /> New rule
         </button>
@@ -181,7 +181,7 @@ export default function AutomationRulesAdminPage() {
             <button
               type="button"
               onClick={() => setDraft(emptyDraft(meta?.modules[0]?.module ?? ''))}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
             >
               <Plus className="h-4 w-4" /> Create your first rule
             </button>
@@ -420,7 +420,7 @@ function RuleFormDrawer({
                 onClick={() =>
                   set('conditions', [...draft.conditions, { field: '', operator: 'eq', value: '' }])
                 }
-                className="inline-flex items-center gap-1 text-xs font-medium text-blue-300 hover:text-blue-200"
+                className="inline-flex items-center gap-1 text-xs font-medium text-indigo-300 hover:text-indigo-200"
               >
                 <Plus className="h-3.5 w-3.5" /> Add condition
               </button>
@@ -490,7 +490,7 @@ function RuleFormDrawer({
               <button
                 type="button"
                 onClick={() => set('actions', [...draft.actions, { type: '', config: {} }])}
-                className="inline-flex items-center gap-1 text-xs font-medium text-blue-300 hover:text-blue-200"
+                className="inline-flex items-center gap-1 text-xs font-medium text-indigo-300 hover:text-indigo-200"
               >
                 <Plus className="h-3.5 w-3.5" /> Add action
               </button>
@@ -559,7 +559,7 @@ function RuleFormDrawer({
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"
           >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             {isEdit ? 'Save changes' : 'Create rule'}
@@ -585,7 +585,7 @@ function RunsDrawer({ rule, onClose }: { rule: AutomationRule; onClose: () => vo
         <div className="flex items-center justify-between border-b border-gray-800 px-6 py-4">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
-              <History className="h-4 w-4 text-blue-300" /> Run history
+              <History className="h-4 w-4 text-indigo-300" /> Run history
             </h2>
             <p className="text-xs text-gray-500">{rule.name}</p>
           </div>

@@ -26,7 +26,7 @@ interface Execution {
 }
 
 function statusClass(status: Execution['status']): string {
-  if (status === 'RUNNING') return 'bg-blue-100 text-blue-700';
+  if (status === 'RUNNING') return 'bg-indigo-100 text-indigo-700';
   if (status === 'COMPLETED') return 'bg-emerald-100 text-emerald-700';
   if (status === 'FAILED') return 'bg-red-100 text-red-700';
   if (status === 'PAUSED') return 'bg-amber-100 text-amber-700';

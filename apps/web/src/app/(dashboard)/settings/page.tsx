@@ -1,7 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { User, Users, Plug, Bell, Shield, Globe, Key, Loader2 } from 'lucide-react';
+import { User, Users, Plug, Bell, Shield, Globe, Key, Loader2, ArrowUpRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
 import { useUsers, useRoles } from '@/hooks/use-users';
@@ -56,7 +57,7 @@ function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputEleme
     <input
       {...props}
       className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400
-        focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition ${className ?? ''}`}
+        focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition ${className ?? ''}`}
     />
   );
 }
@@ -66,7 +67,7 @@ function SaveButton({ label = 'Save changes', onClick, disabled }: { label?: str
     <button
       onClick={onClick}
       disabled={disabled}
-      className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
+      className="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {label}
     </button>
@@ -80,7 +81,7 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
       aria-checked={enabled}
       onClick={() => onChange(!enabled)}
       className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200
-        ${enabled ? 'bg-blue-600' : 'bg-gray-200'}`}
+        ${enabled ? 'bg-indigo-600' : 'bg-gray-200'}`}
     >
       <span
         className={`inline-block h-4 w-4 mt-0.5 rounded-full bg-white shadow ring-0 transition-transform duration-200
@@ -150,13 +151,13 @@ function ProfileTab() {
 
       <SectionCard title="Profile photo" description="Upload a photo or choose an avatar.">
         <div className="flex items-center gap-4">
-          <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold">
+          <div className="h-16 w-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold">
             {name?.[0]?.toUpperCase() ?? 'U'}
           </div>
           <div className="space-y-1">
             <button
               onClick={() => notify.success('Avatar upload is not available yet.')}
-              className="text-sm font-medium text-blue-600 hover:text-blue-700"
+              className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
             >
               Upload photo
             </button>
@@ -180,7 +181,7 @@ function ProfileTab() {
         </div>
         <button
           onClick={() => notify.success('Password change is managed via your identity provider.')}
-          className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 transition"
+          className="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 transition"
         >
           Update password
         </button>
@@ -218,7 +219,7 @@ function TeamTab() {
                   <tr key={u.id} className="border-b border-gray-50 last:border-0">
                     <td className="py-3 pe-4">
                       <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500
+                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-500
                           flex items-center justify-center text-white text-xs font-semibold shrink-0">
                           {(u.firstName?.[0] ?? u.email[0]).toUpperCase()}
                         </div>
@@ -250,7 +251,7 @@ function TeamTab() {
         </div>
         <div className="pt-2 flex items-center gap-3">
           <Input placeholder="colleague@company.com" className="max-w-xs" />
-          <button className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 transition whitespace-nowrap">
+          <button className="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 transition whitespace-nowrap">
             Invite member
           </button>
         </div>
@@ -443,22 +444,10 @@ function SecurityTab() {
           <button
             onClick={mfaEnabled ? handleDisable : () => void handleEnable()}
             disabled={mfaLoading || setupMfa.isPending || enableMfa.isPending || disableMfa.isPending}
-            className="rounded-lg border border-gray-300 hover:border-blue-500 text-sm font-medium px-4 py-2 text-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="rounded-lg border border-gray-300 hover:border-indigo-500 text-sm font-medium px-4 py-2 text-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {mfaLoading ? 'Loading…' : mfaEnabled ? 'Disable' : 'Enable'}
           </button>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Active sessions" description="Manage devices currently signed in.">
-        <div className="text-center py-6">
-          <p className="text-sm text-gray-400">Session management is coming soon.</p>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Login history" description="Recent sign-in activity on your account.">
-        <div className="text-center py-6">
-          <p className="text-sm text-gray-400">Login history is coming soon.</p>
         </div>
       </SectionCard>
 
@@ -633,7 +622,7 @@ function IntegrationsTab() {
                 className={`text-xs font-medium px-3 py-1.5 rounded-lg transition ${
                   int.connected
                     ? 'border border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-500'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                 }`}
               >
                 {int.connected ? 'Disconnect' : 'Connect'}
@@ -652,7 +641,7 @@ function LocalizationTab() {
       <SectionCard title="Language & region" description="Set your preferred language, timezone, and date format.">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
           <Field label="Language">
-            <select className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
+            <select className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none">
               <option value="en">English</option>
               <option value="ar">العربية (Arabic)</option>
               <option value="fr">Français</option>
@@ -662,7 +651,7 @@ function LocalizationTab() {
             </select>
           </Field>
           <Field label="Timezone">
-            <select className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
+            <select className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none">
               <option>UTC+03:00 — Riyadh</option>
               <option>UTC+04:00 — Dubai</option>
               <option>UTC+00:00 — London</option>
@@ -671,14 +660,14 @@ function LocalizationTab() {
             </select>
           </Field>
           <Field label="Date format">
-            <select className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
+            <select className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none">
               <option>DD/MM/YYYY</option>
               <option>MM/DD/YYYY</option>
               <option>YYYY-MM-DD</option>
             </select>
           </Field>
           <Field label="Currency">
-            <select className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
+            <select className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none">
               <option>SAR — Saudi Riyal</option>
               <option>AED — UAE Dirham</option>
               <option>USD — US Dollar</option>
@@ -741,7 +730,7 @@ function ApiKeysTab() {
           <button
             onClick={handleCreate}
             disabled={create.isPending}
-            className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            className="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
           >
             {create.isPending ? 'Creating…' : 'Generate key'}
           </button>
@@ -796,8 +785,18 @@ function ApiKeysTab() {
       </SectionCard>
 
       <SectionCard title="Webhooks" description="Receive real-time event notifications to your endpoints.">
-        <div className="text-center py-6">
-          <p className="text-sm text-gray-400">Webhook management is coming soon.</p>
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <p className="text-sm text-gray-600">
+            Create subscriptions, manage signing secrets, and inspect delivery logs
+            in the webhook console.
+          </p>
+          <Link
+            href="/settings/integrations/webhooks"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+          >
+            Manage webhooks
+            <ArrowUpRight className="h-4 w-4" />
+          </Link>
         </div>
       </SectionCard>
 

@@ -131,18 +131,18 @@ export default function ReportsPage(): ReactElement {
     <div className="grid min-h-[calc(100vh-8rem)] gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
       <aside className="rounded-xl border border-[#e7edf3] bg-white p-5 shadow-sm xl:sticky xl:top-24 xl:self-start">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-50 text-[#137fec]">
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-indigo-50 text-[#4f46e5]">
             <FileBarChart className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-xs font-bold uppercase text-[#137fec]">Report builder</p>
+            <p className="text-xs font-bold uppercase text-[#4f46e5]">Report builder</p>
             <h2 className="text-xl font-bold tracking-tight text-slate-950">Create Report</h2>
           </div>
         </div>
 
         <div className="mt-6 space-y-5">
           <Field label="Report Template">
-            <select value={template} onChange={(event) => setTemplate(event.target.value)} className="h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#137fec] focus:ring-2 focus:ring-blue-100">
+            <select value={template} onChange={(event) => setTemplate(event.target.value)} className="h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-indigo-100">
               <option value="sales-region">Sales by Region</option>
               <option value="lead-conversion">Lead Conversion Rate</option>
               <option value="team-performance">Team Performance</option>
@@ -150,23 +150,23 @@ export default function ReportsPage(): ReactElement {
           </Field>
 
           <Field label="Date Range">
-            <input type="date" value={dateRange} onChange={(event) => setDateRange(event.target.value)} className="h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#137fec] focus:ring-2 focus:ring-blue-100" />
+            <input type="date" value={dateRange} onChange={(event) => setDateRange(event.target.value)} className="h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-indigo-100" />
           </Field>
 
           <div>
             <p className="pb-2 text-sm font-semibold text-slate-800">Filter Options</p>
             <div className="space-y-2">
-              <select value={user} onChange={(event) => setUser(event.target.value)} className="h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#137fec] focus:ring-2 focus:ring-blue-100">
+              <select value={user} onChange={(event) => setUser(event.target.value)} className="h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-indigo-100">
                 <option value="all">All Users</option>
                 <option value="dev-admin">Dev Admin</option>
                 <option value="sara-manager">Sara Manager</option>
               </select>
-              <select value={team} onChange={(event) => setTeam(event.target.value)} className="h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#137fec] focus:ring-2 focus:ring-blue-100">
+              <select value={team} onChange={(event) => setTeam(event.target.value)} className="h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-indigo-100">
                 <option value="all">All Teams</option>
                 <option value="enterprise">Enterprise Team</option>
                 <option value="smb">SMB Team</option>
               </select>
-              <select value={stage} onChange={(event) => setStage(event.target.value)} className="h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#137fec] focus:ring-2 focus:ring-blue-100">
+              <select value={stage} onChange={(event) => setStage(event.target.value)} className="h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-indigo-100">
                 <option value="all">All Deal Stages</option>
                 <option value="CLOSED WON">Closed Won</option>
                 <option value="IN PROGRESS">In Progress</option>
@@ -185,7 +185,7 @@ export default function ReportsPage(): ReactElement {
           </div>
         </div>
 
-        <button className="mt-8 h-12 w-full rounded-lg bg-[#137fec] px-4 text-base font-bold text-white shadow-sm hover:bg-blue-700">
+        <button className="mt-8 h-12 w-full rounded-lg bg-[#4f46e5] px-4 text-base font-bold text-white shadow-sm hover:bg-indigo-700">
           Generate Report
         </button>
       </aside>
@@ -193,7 +193,7 @@ export default function ReportsPage(): ReactElement {
       <main className="min-w-0 space-y-6">
         <div className="flex flex-col gap-4 rounded-xl border border-[#e7edf3] bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase text-[#137fec]">Sales performance</p>
+            <p className="text-xs font-bold uppercase text-[#4f46e5]">Sales performance</p>
             <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">
               Q3 Sales Performance for the West Coast Team
             </h1>
@@ -206,7 +206,7 @@ export default function ReportsPage(): ReactElement {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search deals..."
-                className="h-10 w-full rounded-lg border border-slate-200 bg-slate-100 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100 sm:w-64"
+                className="h-10 w-full rounded-lg border border-slate-200 bg-slate-100 pl-9 pr-3 text-sm outline-none focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100 sm:w-64"
               />
             </label>
             <button className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 hover:bg-slate-50">
@@ -228,7 +228,7 @@ export default function ReportsPage(): ReactElement {
               <h3 className="text-lg font-bold text-slate-950">Sales Over Time</h3>
               <p className="text-sm text-slate-500">Generated from current report filters.</p>
             </div>
-            <span className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase text-[#137fec]">{chartType} chart</span>
+            <span className="rounded-lg bg-indigo-50 px-3 py-1 text-xs font-bold uppercase text-[#4f46e5]">{chartType} chart</span>
           </div>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
@@ -238,13 +238,13 @@ export default function ReportsPage(): ReactElement {
                   <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} />
                   <YAxis tickFormatter={(value: number) => `$${(value / 1000).toFixed(0)}k`} tick={{ fontSize: 12, fill: '#64748b' }} />
                   <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                  <Line type="monotone" dataKey="value" stroke="#137fec" strokeWidth={3} dot={{ r: 4 }} />
+                  <Line type="monotone" dataKey="value" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4 }} />
                 </LineChart>
               ) : chartType === 'pie' ? (
                 <PieChart>
                   <Pie data={territoryData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={110} paddingAngle={4}>
                     {territoryData.map((_, index) => (
-                      <Cell key={index} fill={['#137fec', '#7ED321', '#F5A623', '#9013FE'][index % 4]} />
+                      <Cell key={index} fill={['#4f46e5', '#7ED321', '#F5A623', '#9013FE'][index % 4]} />
                     ))}
                   </Pie>
                   <Tooltip formatter={(value: number) => formatCurrency(value)} />
@@ -257,7 +257,7 @@ export default function ReportsPage(): ReactElement {
                   <Tooltip formatter={(value: number) => formatCurrency(value)} />
                   <Bar dataKey="value" radius={[8, 8, 0, 0]}>
                     {salesOverTime.map((_, index) => (
-                      <Cell key={index} fill={['#137fec', '#4A90E2', '#7ED321', '#F5A623', '#9013FE'][index % 5]} />
+                      <Cell key={index} fill={['#4f46e5', '#4A90E2', '#7ED321', '#F5A623', '#9013FE'][index % 5]} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -315,7 +315,7 @@ function ChartButton({ active, icon, label, onClick }: { active: boolean; icon: 
       type="button"
       onClick={onClick}
       className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold ${
-        active ? 'bg-blue-50 text-[#137fec]' : 'text-slate-500 hover:bg-slate-100'
+        active ? 'bg-indigo-50 text-[#4f46e5]' : 'text-slate-500 hover:bg-slate-100'
       }`}
     >
       {icon}
@@ -346,7 +346,7 @@ function StatusPill({ status }: { status: DealStatus }): ReactElement {
         ? 'bg-red-100 text-red-800'
         : status === 'IN PROGRESS'
           ? 'bg-orange-100 text-orange-800'
-          : 'bg-blue-100 text-blue-800';
+          : 'bg-indigo-100 text-indigo-800';
 
   return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${className}`}>{status}</span>;
 }

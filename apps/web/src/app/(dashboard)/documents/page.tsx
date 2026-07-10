@@ -22,7 +22,7 @@ interface FileRecord {
 function fileIcon(mime: string) {
   if (mime === 'application/pdf') return <FileText className="h-8 w-8 text-red-500" />;
   if (mime.includes('spreadsheet') || mime.includes('excel')) return <Sheet className="h-8 w-8 text-green-600" />;
-  return <File className="h-8 w-8 text-blue-500" />;
+  return <File className="h-8 w-8 text-indigo-500" />;
 }
 
 function formatBytes(bytes: number) {

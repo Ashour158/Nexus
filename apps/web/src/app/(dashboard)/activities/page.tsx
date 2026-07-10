@@ -61,7 +61,7 @@ interface ActivityItem {
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
   CALL: <Phone className="h-4 w-4 text-green-600" />,
-  EMAIL: <Mail className="h-4 w-4 text-blue-600" />,
+  EMAIL: <Mail className="h-4 w-4 text-indigo-600" />,
   MEETING: <Calendar className="h-4 w-4 text-purple-600" />,
   NOTE: <FileText className="h-4 w-4 text-gray-600" />,
   TASK: <MessageSquare className="h-4 w-4 text-orange-600" />,
@@ -77,7 +77,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 const PRIORITY_COLORS: Record<string, string> = {
   HIGH: 'bg-red-100 text-red-700',
-  NORMAL: 'bg-blue-100 text-blue-700',
+  NORMAL: 'bg-indigo-100 text-indigo-700',
   LOW: 'bg-slate-100 text-slate-700',
 };
 
@@ -195,7 +195,7 @@ export default function ActivitiesPage() {
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-              tab === t.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              tab === t.id ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
             {t.icon}
@@ -242,13 +242,13 @@ export default function ActivitiesPage() {
                   <p className="mt-1 text-xs text-gray-500">
                     {typeLabel}
                     {act.dealId && (
-                      <> · <Link href={`/deals/${act.dealId}`} className="text-blue-600 hover:underline">Deal</Link></>
+                      <> · <Link href={`/deals/${act.dealId}`} className="text-indigo-600 hover:underline">Deal</Link></>
                     )}
                     {act.contactId && (
-                      <> · <Link href={`/contacts/${act.contactId}`} className="text-blue-600 hover:underline">Contact</Link></>
+                      <> · <Link href={`/contacts/${act.contactId}`} className="text-indigo-600 hover:underline">Contact</Link></>
                     )}
                     {act.leadId && (
-                      <> · <Link href={`/leads/${act.leadId}`} className="text-blue-600 hover:underline">Lead</Link></>
+                      <> · <Link href={`/leads/${act.leadId}`} className="text-indigo-600 hover:underline">Lead</Link></>
                     )}
                   </p>
                   {act.dueDate && (

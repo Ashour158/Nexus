@@ -22,7 +22,7 @@ import {
 } from '@/hooks/use-api-keys';
 
 const inputClass =
-  'w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none';
+  'w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-indigo-500 focus:outline-none';
 
 const SCOPE_OPTIONS = ['read', 'write', 'admin'];
 
@@ -95,7 +95,7 @@ export default function ApiKeysAdminPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-blue-300">
+          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-indigo-300">
             <KeyRound className="h-4 w-4" /> Programmatic access
           </p>
           <h1 className="mt-1 text-2xl font-bold text-white">API Keys</h1>
@@ -106,7 +106,7 @@ export default function ApiKeysAdminPage() {
         <button
           type="button"
           onClick={() => setShowForm(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
+          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
         >
           <Plus className="h-4 w-4" /> New key
         </button>
@@ -165,7 +165,7 @@ export default function ApiKeysAdminPage() {
             <button
               type="button"
               onClick={() => setShowForm(true)}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
             >
               <Plus className="h-4 w-4" /> Create your first key
             </button>
@@ -255,7 +255,7 @@ export default function ApiKeysAdminPage() {
                       onClick={() => toggleScope(scope)}
                       className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                         scopes.includes(scope)
-                          ? 'bg-blue-600 text-white'
+                          ? 'bg-indigo-600 text-white'
                           : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                       }`}
                     >
@@ -280,7 +280,7 @@ export default function ApiKeysAdminPage() {
               <button
                 type="submit"
                 disabled={create.isPending}
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"
               >
                 {create.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 Create key

@@ -400,7 +400,7 @@ export default function AuditLogPage() {
           type="button"
           onClick={exportCsv}
           disabled={!filteredRecords.length}
-          className="self-end rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="self-end rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           Export CSV
         </button>
@@ -481,7 +481,7 @@ export default function AuditLogPage() {
                       </span>
                     </td>
                     <td className="px-3 py-3">
-                      <span className="rounded bg-blue-950 px-2 py-1 text-xs text-blue-100">
+                      <span className="rounded bg-blue-950 px-2 py-1 text-xs text-indigo-100">
                         {record.status ?? '-'}
                       </span>
                     </td>

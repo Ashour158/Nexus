@@ -85,7 +85,7 @@ export default function DashboardDetailPage(): ReactElement {
                 setEditing(null);
                 setBuilderOpen(true);
               }}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
             >
               <Plus className="h-4 w-4" />
               Add widget
@@ -103,7 +103,7 @@ export default function DashboardDetailPage(): ReactElement {
                   setEditing(null);
                   setBuilderOpen(true);
                 }}
-                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
               >
                 <Plus className="h-4 w-4" />
                 Add widget

@@ -38,7 +38,7 @@ export function AdminSidebar() {
     <aside className="flex h-screen w-72 flex-col border-r border-gray-800 bg-gray-900 text-white">
       <div className="border-b border-gray-800 px-5 py-4">
         <p className="text-xs uppercase tracking-[0.2em] text-gray-400">Control Center</p>
-        <Link href="/admin" className="mt-1 block text-lg font-semibold hover:text-blue-300">
+        <Link href="/admin" className="mt-1 block text-lg font-semibold hover:text-indigo-300">
           NEXUS Admin
         </Link>
       </div>
@@ -73,7 +73,7 @@ export function AdminSidebar() {
                       key={feature.id}
                       href={feature.href}
                       className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
-                        active ? 'bg-blue-600 text-white' : 'text-gray-200 hover:bg-gray-800'
+                        active ? 'bg-indigo-600 text-white' : 'text-gray-200 hover:bg-gray-800'
                       }`}
                     >
                       <Icon className="h-4 w-4 shrink-0" />

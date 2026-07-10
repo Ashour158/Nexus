@@ -36,7 +36,7 @@ export function ImportProgress({ jobId, onComplete }: { jobId: string; onComplet
   const isFailed = progress.status === 'FAILED';
 
   return (
-    <div className={`rounded-xl border p-4 ${isComplete ? 'border-green-200 bg-green-50' : isFailed ? 'border-red-200 bg-red-50' : 'border-blue-200 bg-blue-50'}`}>
+    <div className={`rounded-xl border p-4 ${isComplete ? 'border-green-200 bg-green-50' : isFailed ? 'border-red-200 bg-red-50' : 'border-indigo-200 bg-indigo-50'}`}>
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium text-gray-800">
           {isComplete ? '✅ Import complete' : isFailed ? '❌ Import failed' : `⏳ Importing… ${progress.progressPct}%`}
@@ -47,7 +47,7 @@ export function ImportProgress({ jobId, onComplete }: { jobId: string; onComplet
       </div>
       {!isComplete && !isFailed ? (
         <div className="mb-2 h-2 overflow-hidden rounded-full bg-white">
-          <div className="h-full rounded-full bg-blue-500 transition-all duration-300" style={{ width: `${progress.progressPct}%` }} />
+          <div className="h-full rounded-full bg-indigo-500 transition-all duration-300" style={{ width: `${progress.progressPct}%` }} />
         </div>
       ) : null}
       <div className="flex gap-4 text-xs text-gray-600">

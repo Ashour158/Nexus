@@ -145,12 +145,12 @@ export function CsvImportDialog({ onClose }: { onClose: () => void }) {
             <div
               onDrop={onDrop}
               onDragOver={(e) => e.preventDefault()}
-              className="rounded-xl border-2 border-dashed border-gray-200 p-12 text-center transition-colors hover:border-blue-400"
+              className="rounded-xl border-2 border-dashed border-gray-200 p-12 text-center transition-colors hover:border-indigo-400"
             >
               <FileSpreadsheet className="mx-auto mb-4 h-12 w-12 text-gray-300" />
               <p className="mb-1 font-medium text-gray-700">Drop your CSV file here</p>
               <p className="mb-4 text-sm text-gray-400">or</p>
-              <label className="cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700">
+              <label className="cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700">
                 Choose File
                 <input
                   type="file"
@@ -183,7 +183,7 @@ export function CsvImportDialog({ onClose }: { onClose: () => void }) {
                     <select
                       value={mapping.nexusField}
                       onChange={(e) => updateMapping(i, e.target.value)}
-                      className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                       {NEXUS_CONTACT_FIELDS.map((field) => (
                         <option key={field.value} value={field.value}>
@@ -197,7 +197,7 @@ export function CsvImportDialog({ onClose }: { onClose: () => void }) {
               <div className="mt-4 flex justify-end gap-2">
                 {error ? <p className="me-auto text-sm text-red-600">{error}</p> : null}
                 <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-100">Cancel</button>
-                <button onClick={runImport} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700">
+                <button onClick={runImport} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700">
                   Import {csvRows.length} Contacts
                 </button>
               </div>
@@ -206,7 +206,7 @@ export function CsvImportDialog({ onClose }: { onClose: () => void }) {
 
           {step === 'importing' ? (
             <div className="py-12 text-center">
-              <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+              <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
               <p className="font-medium text-gray-700">Importing contacts...</p>
               <p className="mt-1 text-sm text-gray-400">Checking for duplicates and validating emails</p>
               {importJobId ? (
@@ -260,7 +260,7 @@ export function CsvImportDialog({ onClose }: { onClose: () => void }) {
                   <p className="mt-1 text-sm text-gray-500">Errors</p>
                 </div>
               </div>
-              <button onClick={onClose} className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700">
+              <button onClick={onClose} className="rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700">
                 View Contacts
               </button>
             </div>

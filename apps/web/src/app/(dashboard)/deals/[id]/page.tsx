@@ -549,7 +549,7 @@ function StatusBadge({ status }: { status: string }) {
         ? 'bg-red-100 text-red-700'
         : status === 'DORMANT'
           ? 'bg-slate-100 text-slate-700'
-          : 'bg-blue-100 text-blue-700';
+          : 'bg-indigo-100 text-indigo-700';
   return <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', color)}>{status}</span>;
 }
 
@@ -635,7 +635,7 @@ function HealthTab({ data, isLoading, isError }: { data: DealScoringInsights | u
           <ul className="mt-3 space-y-2">
             {data.recommendations.map((rec, i) => (
               <li key={i} className="flex gap-2 text-sm text-slate-700">
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" />
                 <span>{rec}</span>
               </li>
             ))}

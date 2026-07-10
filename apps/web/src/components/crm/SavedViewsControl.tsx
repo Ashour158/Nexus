@@ -122,7 +122,7 @@ export function SavedViewsControl({
                     if (e.key === 'Escape') setSaving(false);
                   }}
                   placeholder="View name…"
-                  className="h-9 w-full rounded-md border border-slate-200 px-2.5 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                  className="h-9 w-full rounded-md border border-slate-200 px-2.5 text-sm outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
                 />
                 <label className="flex items-center gap-2 px-0.5 text-xs text-slate-600">
                   <input
@@ -139,7 +139,7 @@ export function SavedViewsControl({
                     type="button"
                     onClick={handleSave}
                     disabled={!name.trim() || createView.isPending}
-                    className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md bg-blue-600 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-60"
+                    className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md bg-indigo-600 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
                   >
                     <Check className="h-3.5 w-3.5" />
                     {createView.isPending ? 'Saving…' : 'Save'}

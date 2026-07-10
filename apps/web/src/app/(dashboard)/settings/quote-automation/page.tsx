@@ -204,7 +204,7 @@ export default function QuoteAutomationPage(): JSX.Element {
       <section className="grid gap-6 xl:grid-cols-2">
         <form onSubmit={submitRule} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-3">
-            <Zap className="h-5 w-5 text-blue-600" />
+            <Zap className="h-5 w-5 text-indigo-600" />
             <h2 className="text-lg font-bold text-slate-900">Create automation rule</h2>
           </div>
           <div className="mt-4 grid gap-3">
@@ -247,7 +247,7 @@ export default function QuoteAutomationPage(): JSX.Element {
 
         <form onSubmit={submitTemplate} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-3">
-            <UploadCloud className="h-5 w-5 text-blue-600" />
+            <UploadCloud className="h-5 w-5 text-indigo-600" />
             <h2 className="text-lg font-bold text-slate-900">Upload quote template</h2>
           </div>
           <div className="mt-4 grid gap-3">
@@ -260,7 +260,7 @@ export default function QuoteAutomationPage(): JSX.Element {
               <label className="flex items-end gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={templateForm.isDefault} onChange={(e) => setTemplateForm((s) => ({ ...s, isDefault: e.target.checked }))} /> Default</label>
             </div>
             <input type="file" accept=".html,.htm,.docx" onChange={onTemplateFile} className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm" />
-            {templateForm.fileName ? <p className="text-xs font-semibold text-blue-700">Validated file: {templateForm.fileName}</p> : null}
+            {templateForm.fileName ? <p className="text-xs font-semibold text-indigo-700">Validated file: {templateForm.fileName}</p> : null}
             <Field label="HTML body">
               <textarea disabled={templateForm.contentType.includes('wordprocessingml')} rows={5} value={templateForm.body} onChange={(e) => setTemplateForm((s) => ({ ...s, body: e.target.value }))} className="input min-h-28" />
             </Field>
@@ -291,7 +291,7 @@ export default function QuoteAutomationPage(): JSX.Element {
                   <p className="font-bold text-slate-900">{template.name} v{template.version}</p>
                   <p className="text-xs text-slate-500">{template.contentType} · {template.status}</p>
                 </div>
-                {template.isDefault ? <span className="rounded bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">Default</span> : null}
+                {template.isDefault ? <span className="rounded bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700">Default</span> : null}
               </div>
             </div>
           ))}
@@ -326,7 +326,7 @@ function ListPanel({ icon: Icon, title, children }: { icon: ComponentType<{ clas
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center gap-3">
-        <Icon className="h-5 w-5 text-blue-600" />
+        <Icon className="h-5 w-5 text-indigo-600" />
         <h2 className="text-lg font-bold text-slate-900">{title}</h2>
       </div>
       <div className="space-y-3">{children}</div>

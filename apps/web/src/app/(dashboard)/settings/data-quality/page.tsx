@@ -43,7 +43,7 @@ export default function DataQualityPage() {
               className={cn(
                 'inline-flex h-9 items-center rounded-md px-4 text-xs font-bold capitalize transition',
                 entityType === type
-                  ? 'bg-blue-600 text-white shadow-sm'
+                  ? 'bg-indigo-600 text-white shadow-sm'
                   : 'text-slate-600 hover:bg-white'
               )}
             >
@@ -133,7 +133,7 @@ function SummaryCard({
   note: string;
 }) {
   const tones = {
-    blue: { bar: 'from-blue-500 to-cyan-400', badge: 'border-blue-100 bg-blue-50 text-blue-700' },
+    blue: { bar: 'from-indigo-500 to-cyan-400', badge: 'border-indigo-100 bg-indigo-50 text-indigo-700' },
     amber: { bar: 'from-amber-500 to-orange-400', badge: 'border-amber-100 bg-amber-50 text-amber-700' },
     rose: { bar: 'from-rose-500 to-pink-400', badge: 'border-rose-100 bg-rose-50 text-rose-700' },
   }[tone];

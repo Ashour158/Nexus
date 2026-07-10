@@ -159,7 +159,7 @@ export default function ZatcaStatusPage(): JSX.Element {
                           type="button"
                           onClick={() => resubmit.mutate(s.invoiceId)}
                           disabled={resubmit.isPending}
-                          className="text-xs font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                          className="text-xs font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
                         >
                           Resubmit
                         </button>

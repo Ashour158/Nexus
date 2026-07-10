@@ -138,7 +138,7 @@ export default function AdminUserDetailPage({ params }: { params: { id: string }
       <div className="flex justify-end">
         <button
           onClick={() => void updateCurrent({ role, tenant, permissions }, 'User permissions saved')}
-          className="rounded bg-blue-600 px-3 py-2 text-sm"
+          className="rounded bg-indigo-600 px-3 py-2 text-sm"
         >
           Save changes
         </button>

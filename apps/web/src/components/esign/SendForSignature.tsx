@@ -16,7 +16,7 @@ type SignatureStatus = 'not_sent' | 'sent' | 'delivered' | 'completed' | 'declin
 
 const STATUS_CONFIG: Record<SignatureStatus, { label: string; color: string; icon: ReactNode }> = {
   not_sent: { label: 'Not Sent', color: 'text-gray-500', icon: <FileSignature className="h-4 w-4" /> },
-  sent: { label: 'Sent', color: 'text-blue-600', icon: <Clock className="h-4 w-4" /> },
+  sent: { label: 'Sent', color: 'text-indigo-600', icon: <Clock className="h-4 w-4" /> },
   delivered: { label: 'Delivered', color: 'text-amber-600', icon: <Clock className="h-4 w-4" /> },
   completed: { label: 'Signed', color: 'text-green-600', icon: <CheckCircle className="h-4 w-4" /> },
   declined: { label: 'Declined', color: 'text-red-600', icon: <AlertCircle className="h-4 w-4" /> },
@@ -62,8 +62,8 @@ export default function SendForSignature({ documentId, contractId, dealId, docum
           <span className="text-sm text-gray-500">- {documentName}</span>
         </div>
         <div className="flex items-center gap-2">
-          {envelopeId ? <a href={`https://app.docusign.com/documents/details/${envelopeId}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-600 hover:underline"><ExternalLink className="h-3 w-3" />View in DocuSign</a> : null}
-          {status === 'not_sent' ? <button onClick={() => setShowForm(true)} className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"><FileSignature className="h-3.5 w-3.5" />Send for Signature</button> : null}
+          {envelopeId ? <a href={`https://app.docusign.com/documents/details/${envelopeId}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-indigo-600 hover:underline"><ExternalLink className="h-3 w-3" />View in DocuSign</a> : null}
+          {status === 'not_sent' ? <button onClick={() => setShowForm(true)} className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"><FileSignature className="h-3.5 w-3.5" />Send for Signature</button> : null}
         </div>
       </div>
 
@@ -77,7 +77,7 @@ export default function SendForSignature({ documentId, contractId, dealId, docum
           <input value={signerRole} onChange={(e) => setSignerRole(e.target.value)} placeholder="Role" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
           <div className="flex items-center justify-end gap-2">
             <button onClick={() => setShowForm(false)} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900">Cancel</button>
-            <button onClick={() => sendMutation.mutate()} disabled={!signerEmail || !signerName || sendMutation.isPending} className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"><FileSignature className="h-3.5 w-3.5" />{sendMutation.isPending ? 'Sending...' : 'Send Now'}</button>
+            <button onClick={() => sendMutation.mutate()} disabled={!signerEmail || !signerName || sendMutation.isPending} className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"><FileSignature className="h-3.5 w-3.5" />{sendMutation.isPending ? 'Sending...' : 'Send Now'}</button>
           </div>
         </div>
       ) : null}

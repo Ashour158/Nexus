@@ -14,15 +14,15 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const VARIANT_STYLES: Record<ButtonVariant, string> = {
-  primary: 'bg-primary text-white hover:bg-primary-dark',
+  primary: 'bg-primary text-on-primary shadow-sm shadow-primary/20 hover:opacity-90',
   secondary:
-    'border border-border bg-background text-foreground hover:bg-muted',
+    'border border-outline-variant bg-surface text-on-surface hover:bg-surface-container-high',
   outline:
-    'border border-border bg-background text-foreground hover:bg-muted',
-  ghost: 'bg-transparent text-foreground hover:bg-muted',
-  danger: 'bg-red-600 text-white hover:bg-red-700',
+    'border border-outline-variant bg-transparent text-on-surface hover:bg-surface-container-high',
+  ghost: 'bg-transparent text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface',
+  danger: 'bg-error text-on-error hover:opacity-90',
   destructive:
-    'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+    'bg-destructive text-destructive-foreground hover:opacity-90',
 };
 
 const SIZE_STYLES: Record<ButtonSize, string> = {
@@ -55,8 +55,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={isDisabled}
         aria-busy={isLoading || undefined}
         className={cn(
-          'inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+          'inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-all',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:ring-offset-surface',
           'disabled:cursor-not-allowed disabled:opacity-60',
           VARIANT_STYLES[variant],
           SIZE_STYLES[size],

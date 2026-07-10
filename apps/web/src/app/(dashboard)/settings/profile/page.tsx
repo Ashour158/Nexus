@@ -7,7 +7,6 @@ import { useAuthStore } from '@/stores/auth.store';
 import { notify } from '@/lib/toast';
 import {
   Briefcase,
-  Heart,
   Link,
   Mail,
   Globe,
@@ -19,13 +18,12 @@ import {
   X,
 } from 'lucide-react';
 
-type Tab = 'personal' | 'professional' | 'security' | 'hr';
+type Tab = 'personal' | 'professional' | 'security';
 
 const TABS = [
   { id: 'personal' as Tab, label: 'Personal Info', icon: User },
   { id: 'professional' as Tab, label: 'Professional', icon: Briefcase },
   { id: 'security' as Tab, label: 'Account & Security', icon: Shield },
-  { id: 'hr' as Tab, label: 'HR Data', icon: Heart },
 ];
 
 function AvatarUpload({ avatarUrl, onUpload }: { avatarUrl?: string | null; onUpload: (url: string) => void }) {
@@ -74,7 +72,7 @@ function AvatarUpload({ avatarUrl, onUpload }: { avatarUrl?: string | null; onUp
               className="h-full w-full object-cover"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-blue-100 text-blue-600">
+            <div className="flex h-full w-full items-center justify-center bg-indigo-100 text-indigo-600">
               <User className="h-10 w-10" />
             </div>
           )}
@@ -82,7 +80,7 @@ function AvatarUpload({ avatarUrl, onUpload }: { avatarUrl?: string | null; onUp
         <button
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
-          className="absolute bottom-0 end-0 flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white shadow hover:bg-blue-700"
+          className="absolute bottom-0 end-0 flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-white shadow hover:bg-indigo-700"
         >
           {uploading ? (
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -131,7 +129,7 @@ function PersonalTab({ profile, user, onSave }: { profile: Record<string, unknow
         <input value={form.nationality} onChange={set('nationality')} placeholder="Nationality" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
       </div>
       <div className="space-y-3 border-t pt-4">
-            <div className="flex items-center gap-2"><Link className="h-4 w-4 text-blue-700" /><input value={form.linkedInUrl} onChange={set('linkedInUrl')} placeholder="https://linkedin.com/in/..." className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm" /></div>
+            <div className="flex items-center gap-2"><Link className="h-4 w-4 text-indigo-700" /><input value={form.linkedInUrl} onChange={set('linkedInUrl')} placeholder="https://linkedin.com/in/..." className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm" /></div>
         <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-sky-500" /><input value={form.twitterHandle} onChange={set('twitterHandle')} placeholder="@handle" className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm" /></div>
             <div className="flex items-center gap-2"><Globe className="h-4 w-4 text-gray-700" /><input value={form.githubHandle} onChange={set('githubHandle')} placeholder="github username" className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm" /></div>
       </div>
@@ -140,7 +138,7 @@ function PersonalTab({ profile, user, onSave }: { profile: Record<string, unknow
         <input value={form.city} onChange={set('city')} placeholder="City" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
       </div>
       <div className="flex justify-end">
-        <button type="submit" className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"><Save className="h-4 w-4" /> Save Personal Info</button>
+        <button type="submit" className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"><Save className="h-4 w-4" /> Save Personal Info</button>
       </div>
     </form>
   );
@@ -173,7 +171,7 @@ function ProfessionalTab({ profile, onSave }: { profile: Record<string, unknown>
         <input type="date" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
       </div>
       <div className="border-t pt-4">
-        <div className="mb-2 flex flex-wrap gap-2">{skills.map((skill) => <span key={skill} className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700">{skill}<button type="button" onClick={() => setSkills((s) => s.filter((x) => x !== skill))}><X className="h-3 w-3" /></button></span>)}</div>
+        <div className="mb-2 flex flex-wrap gap-2">{skills.map((skill) => <span key={skill} className="flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-1 text-xs text-indigo-700">{skill}<button type="button" onClick={() => setSkills((s) => s.filter((x) => x !== skill))}><X className="h-3 w-3" /></button></span>)}</div>
         <div className="flex gap-2">
           <input value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSkill())} placeholder="Add a skill" className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
           <button type="button" onClick={addSkill} className="rounded-lg bg-gray-100 px-3 py-2"><Plus className="h-4 w-4" /></button>
@@ -188,9 +186,9 @@ function ProfessionalTab({ profile, onSave }: { profile: Record<string, unknown>
             <button type="button" onClick={() => setCerts((all) => all.filter((_, idx) => idx !== i))}><X className="h-4 w-4 text-gray-500" /></button>
           </div>
         ))}
-        <button type="button" onClick={() => setCerts((all) => [...all, { name: '', issuer: '', year: '' }])} className="text-sm text-blue-600">Add Certification</button>
+        <button type="button" onClick={() => setCerts((all) => [...all, { name: '', issuer: '', year: '' }])} className="text-sm text-indigo-600">Add Certification</button>
       </div>
-      <div className="flex justify-end"><button type="submit" className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"><Save className="h-4 w-4" /> Save Professional Info</button></div>
+      <div className="flex justify-end"><button type="submit" className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"><Save className="h-4 w-4" /> Save Professional Info</button></div>
     </form>
   );
 }
@@ -209,16 +207,6 @@ function SecurityTab({ user }: { user: Record<string, unknown> }) {
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
         <p className="text-xs text-gray-500">Last login: {user.lastLoginAt ? new Date(user.lastLoginAt as string).toLocaleString() : 'Never'}</p>
       </div>
-    </div>
-  );
-}
-
-function HRTab() {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <Heart className="mb-4 h-12 w-12 text-gray-300" />
-      <h3 className="text-base font-semibold text-gray-500">HR Module Coming Soon</h3>
-      <p className="mt-2 max-w-sm text-sm text-gray-400">Leave management, payroll integration, and org charts will appear here when the HR module is built.</p>
     </div>
   );
 }
@@ -259,7 +247,7 @@ export default function ProfileSettingsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['profile', 'me'] }),
   });
 
-  if (isLoading) return <div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" /></div>;
+  if (isLoading) return <div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" /></div>;
 
   const user = data?.data || {};
   const profile = user.profile || {};
@@ -268,25 +256,24 @@ export default function ProfileSettingsPage() {
     personal: <PersonalTab profile={profile} user={user} onSave={save.mutate} />,
     professional: <ProfessionalTab profile={profile} onSave={save.mutate} />,
     security: <SecurityTab user={user} />,
-    hr: <HRTab />,
   };
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
       <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
       <div className="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex items-center gap-6 bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-6">
+        <div className="flex items-center gap-6 bg-gradient-to-r from-indigo-600 to-indigo-600 px-8 py-6">
           <AvatarUpload avatarUrl={user.avatarUrl as string | undefined} onUpload={(url) => uploadAvatar.mutate(url)} />
           <div className="text-white">
             <h2 className="text-xl font-bold">{user.firstName as string} {user.lastName as string}</h2>
-            <p className="mt-1 text-xs text-blue-200">{user.email as string}</p>
+            <p className="mt-1 text-xs text-indigo-200">{user.email as string}</p>
           </div>
         </div>
         <div className="flex border-b border-gray-200 bg-gray-50">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 border-b-2 px-6 py-3 text-sm font-medium ${activeTab === tab.id ? 'border-blue-600 bg-white text-blue-600' : 'border-transparent text-gray-600'}`}>
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 border-b-2 px-6 py-3 text-sm font-medium ${activeTab === tab.id ? 'border-indigo-600 bg-white text-indigo-600' : 'border-transparent text-gray-600'}`}>
                 <Icon className="h-4 w-4" />
                 {tab.label}
               </button>

@@ -44,7 +44,7 @@ export default function ContactDuplicatesPage() {
       <h1 className="text-2xl font-bold text-slate-900">Duplicate Contact Center</h1>
       <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => scan.mutate()} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white" disabled={scan.isPending}>Run duplicate scan</button>
+          <button onClick={() => scan.mutate()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white" disabled={scan.isPending}>Run duplicate scan</button>
           <p className="text-sm text-slate-600">{groups.length} potential duplicate groups found</p>
         </div>
         <div className="flex gap-2 text-sm"><select value={confidence} onChange={(e) => setConfidence(e.target.value as 'all' | 'high' | 'medium' | 'low')} className="rounded border border-slate-300 px-2 py-1"><option value="all">All confidence</option><option value="high">High {'>'}90%</option><option value="medium">Medium 60-90%</option><option value="low">Low {'<'}60%</option></select></div>
@@ -71,7 +71,7 @@ export default function ContactDuplicatesPage() {
               </div>
               <div className="mt-3 flex gap-2">
                 <button
-                  className="rounded bg-blue-600 px-3 py-2 text-sm text-white"
+                  className="rounded bg-indigo-600 px-3 py-2 text-sm text-white"
                   onClick={() => {
                     const masterId = master;
                     const mergeIds = group.contacts.map((c) => c.id).filter((id) => id !== masterId);

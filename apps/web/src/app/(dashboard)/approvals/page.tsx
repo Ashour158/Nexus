@@ -168,7 +168,7 @@ export default function ApprovalsPage() {
         <div className="grid gap-0 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="p-6 sm:p-8">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#005baf]">
+              <span className="inline-flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#4f46e5]">
                 <ShieldCheck className="h-4 w-4" />
                 Governance Queue
               </span>
@@ -224,8 +224,8 @@ export default function ApprovalsPage() {
                       className={cn(
                         'rounded-lg px-4 py-2 text-sm font-bold transition',
                         scope === item.value
-                          ? 'bg-[#137fec] text-white shadow-sm'
-                          : 'border border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-[#005baf]'
+                          ? 'bg-[#4f46e5] text-white shadow-sm'
+                          : 'border border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-[#4f46e5]'
                       )}
                     >
                       {item.label}
@@ -238,7 +238,7 @@ export default function ApprovalsPage() {
                     <input
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
-                      className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                      className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
                       placeholder="Search approvals..."
                       type="search"
                     />
@@ -302,7 +302,7 @@ export default function ApprovalsPage() {
                           <tr key={row.id} className="transition hover:bg-slate-50/80">
                             <td className="px-5 py-4">
                               <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-xs font-black text-[#005baf]">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-xs font-black text-[#4f46e5]">
                                   {initials(row.module)}
                                 </div>
                                 <div className="min-w-0">
@@ -327,7 +327,7 @@ export default function ApprovalsPage() {
                               <button
                                 type="button"
                                 onClick={() => setOpenId(row.id)}
-                                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-[#005baf] transition hover:bg-blue-50"
+                                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-[#4f46e5] transition hover:bg-indigo-50"
                               >
                                 Review
                               </button>
@@ -366,7 +366,7 @@ export default function ApprovalsPage() {
                   <h2 className="text-lg font-bold text-slate-950">Awaiting my decision</h2>
                   <p className="text-sm text-slate-500">Requests routed to you right now.</p>
                 </div>
-                <GitBranch className="h-5 w-5 text-[#005baf]" />
+                <GitBranch className="h-5 w-5 text-[#4f46e5]" />
               </div>
               <div className="mt-5 space-y-3">
                 {mineQuery.isError && !isDev ? (
@@ -377,7 +377,7 @@ export default function ApprovalsPage() {
                     key={`mine-${row.id}`}
                     type="button"
                     onClick={() => setOpenId(row.id)}
-                    className="block w-full rounded-lg border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-blue-200 hover:bg-blue-50"
+                    className="block w-full rounded-lg border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-indigo-200 hover:bg-indigo-50"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -506,7 +506,7 @@ function DiscountRequestCard({ onCreated }: { onCreated: () => void }) {
           <h2 className="text-lg font-bold text-slate-950">Create DRQ</h2>
           <p className="text-sm text-slate-500">Validated discount request with approval hierarchy.</p>
         </div>
-        <ShieldCheck className="h-5 w-5 text-[#005baf]" />
+        <ShieldCheck className="h-5 w-5 text-[#4f46e5]" />
       </div>
       <div className="mt-4 space-y-3">
         <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -514,7 +514,7 @@ function DiscountRequestCard({ onCreated }: { onCreated: () => void }) {
           <select
             value={form.quoteId}
             onChange={(e) => setForm((s) => ({ ...s, quoteId: e.target.value }))}
-            className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium normal-case text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium normal-case text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
           >
             {quoteOptions.map((quote) => (
               <option key={quote.id} value={quote.id}>
@@ -573,7 +573,7 @@ function DiscountRequestCard({ onCreated }: { onCreated: () => void }) {
           onChange={(e) => setForm((s) => ({ ...s, reasonNotes: e.target.value }))}
           rows={3}
           placeholder="Business reason, customer context, competitive pressure..."
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
         />
         <div className="grid gap-2">
           {[1, 2, 3].map((level) => (
@@ -598,7 +598,7 @@ function DiscountRequestCard({ onCreated }: { onCreated: () => void }) {
           type="button"
           onClick={() => createDrq.mutate()}
           disabled={createDrq.isPending}
-          className="w-full rounded-lg bg-[#137fec] px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-60"
+          className="w-full rounded-lg bg-[#4f46e5] px-4 py-2 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:opacity-60"
         >
           {createDrq.isPending ? 'Validating...' : 'Create DRQ workflow'}
         </button>
@@ -650,7 +650,7 @@ function MetricCard({
     amber: 'bg-amber-50 text-amber-600',
     orange: 'bg-orange-50 text-orange-600',
     emerald: 'bg-emerald-50 text-emerald-600',
-    blue: 'bg-blue-50 text-[#005baf]',
+    blue: 'bg-indigo-50 text-[#4f46e5]',
   };
   return (
     <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">

@@ -19,13 +19,13 @@ export default function FeedPage() {
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-lg border border-[#dbe7f3] bg-white shadow-sm">
-        <div className="h-1.5 bg-gradient-to-r from-blue-600 via-emerald-500 to-amber-400" />
+        <div className="h-1.5 bg-gradient-to-r from-indigo-600 via-emerald-500 to-amber-400" />
         <div className="flex items-start gap-3 p-4 sm:p-5">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-200">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm shadow-indigo-200">
             <Rss className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase text-blue-700">Your following feed</p>
+            <p className="text-xs font-semibold uppercase text-indigo-700">Your following feed</p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">Following</h1>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
               Recent activity across the accounts and contacts you follow. Follow a record
@@ -74,10 +74,10 @@ function FeedItem({ item }: { item: FeedActivity }) {
     entitySegment && item.entityId ? `/${entitySegment}/${item.entityId}` : undefined;
 
   const body = (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-200 hover:bg-blue-50/30">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-indigo-200 hover:bg-indigo-50/30">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="rounded-lg bg-blue-50 p-1.5 text-blue-700">
+          <span className="rounded-lg bg-indigo-50 p-1.5 text-indigo-700">
             <Activity className="h-4 w-4" />
           </span>
           <p className="truncate text-sm font-bold text-slate-950">{title}</p>

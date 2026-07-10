@@ -636,7 +636,7 @@ export function DealForm({
                     <button
                       type="button"
                       onClick={() => setShowQuickCreate(true)}
-                      className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+                      className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700"
                     >
                       <UserPlus className="h-4 w-4" /> New contact
                     </button>

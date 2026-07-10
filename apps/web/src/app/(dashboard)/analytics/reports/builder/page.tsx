@@ -27,9 +27,9 @@ import {
 import { formatCurrency } from '@/lib/format';
 
 const selectCls =
-  'rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500';
+  'rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500';
 const inputCls =
-  'rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500';
+  'rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500';
 
 export default function ReportBuilderPage(): ReactElement {
   const [name, setName] = useState('');
@@ -170,7 +170,7 @@ export default function ReportBuilderPage(): ReactElement {
 
           <div className="flex items-center gap-2 border-t border-slate-100 pt-4">
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Report name to save" className={cn(inputCls, 'flex-1')} />
-            <button onClick={save} disabled={!spec || !name.trim() || createReport.isPending} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+            <button onClick={save} disabled={!spec || !name.trim() || createReport.isPending} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
               <Save className="h-4 w-4" /> Save
             </button>
           </div>
@@ -244,7 +244,7 @@ function SectionHeader({ label, onAdd }: { label: string; onAdd: () => void }): 
   return (
     <div className="flex items-center justify-between">
       <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</span>
-      <button onClick={onAdd} className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50">
+      <button onClick={onAdd} className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-50">
         <Plus className="h-3.5 w-3.5" /> Add
       </button>
     </div>

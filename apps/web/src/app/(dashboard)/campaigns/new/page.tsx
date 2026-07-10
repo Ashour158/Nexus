@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/crm';
 
 const inputClass =
-  'h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100';
+  'h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100';
 const labelClass = 'block text-xs font-bold uppercase tracking-wider text-slate-500';
 
 export default function NewCampaignPage() {
@@ -177,7 +177,7 @@ export default function NewCampaignPage() {
             onChange={(e) => setContentHtml(e.target.value)}
             rows={8}
             placeholder="<h1>Hello {{first_name}}</h1>…"
-            className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-900 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+            className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-900 outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
           />
         </div>
 
@@ -192,7 +192,7 @@ export default function NewCampaignPage() {
             type="button"
             onClick={handleSubmit}
             disabled={create.isPending || !name.trim()}
-            className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#137fec] px-5 text-sm font-bold text-white hover:bg-[#005baf] disabled:opacity-50"
+            className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#4f46e5] px-5 text-sm font-bold text-white hover:bg-[#4f46e5] disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
             {create.isPending ? 'Creating…' : 'Create campaign'}

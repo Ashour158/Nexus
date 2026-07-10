@@ -4,7 +4,7 @@ export default function RouteLoading() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
       <div>
-        <div className="inline-flex rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-blue-700">
+        <div className="inline-flex rounded-lg bg-indigo-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-indigo-700">
           Loading pipeline
         </div>
         <Skeleton className="mt-3 h-9 w-72" />

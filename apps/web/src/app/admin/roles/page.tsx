@@ -158,7 +158,7 @@ export default function AdminRolesPage() {
         <h2 className="text-2xl font-bold">Roles &amp; Permissions</h2>
         <button
           onClick={() => setShowCreate(true)}
-          className="rounded bg-blue-600 px-3 py-2 text-sm hover:bg-blue-500"
+          className="rounded bg-indigo-600 px-3 py-2 text-sm hover:bg-indigo-500"
         >
           Create custom role
         </button>
@@ -174,7 +174,7 @@ export default function AdminRolesPage() {
               <div
                 key={r.id}
                 className={`flex items-center justify-between rounded px-3 py-2 text-sm ${
-                  r.id === selectedId ? 'bg-blue-900/40' : 'hover:bg-gray-800'
+                  r.id === selectedId ? 'bg-indigo-900/40' : 'hover:bg-gray-800'
                 }`}
               >
                 <button className="flex-1 text-left" onClick={() => selectRole(r)}>
@@ -281,7 +281,7 @@ export default function AdminRolesPage() {
               </button>
               <button
                 onClick={createRole}
-                className="rounded bg-blue-600 px-3 py-1.5 text-sm hover:bg-blue-500"
+                className="rounded bg-indigo-600 px-3 py-1.5 text-sm hover:bg-indigo-500"
               >
                 Create
               </button>

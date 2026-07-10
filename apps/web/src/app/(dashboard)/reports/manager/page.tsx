@@ -110,7 +110,7 @@ export default function ManagerDashboardPage() {
           value={totalQuota > 0 ? `${Math.round((totalRevenue / totalQuota) * 100)}%` : 'N/A'}
           delta={8.2}
           icon={<TrendingDown className="h-5 w-5" />}
-          iconBg="bg-blue-100 text-blue-700"
+          iconBg="bg-indigo-100 text-indigo-700"
         />
         <StatCard
           label="Reps on track"
@@ -194,7 +194,7 @@ export default function ManagerDashboardPage() {
                   {signal.metric} · {signal.deviation}
                 </p>
               </div>
-              <button className="rounded border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">
+              <button className="rounded border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50">
                 Schedule 1:1
               </button>
             </li>

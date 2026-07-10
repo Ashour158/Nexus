@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { HelpCircle, Menu, Moon, Sun } from 'lucide-react';
+import { HelpCircle, Menu, Moon, Sparkles, Sun } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/auth.store';
@@ -16,6 +16,7 @@ import {
 import { LocaleSwitcher } from '@/components/ui/locale-switcher';
 import { GlobalSearch } from '@/components/search/global-search';
 import { NotificationBell } from '@/components/notifications/notification-bell';
+import { HelpDrawer } from '@/components/help/help-drawer';
 
 /**
  * Top navigation bar. Shows breadcrumbs derived from the current pathname,
@@ -42,6 +43,19 @@ const LABEL_OVERRIDES: Record<string, string> = {
   login: 'Login',
 };
 
+/**
+ * Fallback slug → Title Case for any segment without an explicit override:
+ * split on `-`, capitalize each word. Turns "command-center" → "Command Center"
+ * and "win-loss" → "Win Loss" instead of the raw-cased "Command-center".
+ */
+function slugToTitle(slug: string): string {
+  return slug
+    .split('-')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 function toCrumbs(pathname: string): Crumb[] {
   const segments = pathname
     .split('/')
@@ -59,10 +73,7 @@ function toCrumbs(pathname: string): Crumb[] {
       // Looks like a cuid / id — shorten it.
       crumbs.push({ label: `${seg.slice(0, 6)}…`, href: acc });
     } else {
-      crumbs.push({
-        label: seg.charAt(0).toUpperCase() + seg.slice(1),
-        href: acc,
-      });
+      crumbs.push({ label: slugToTitle(seg), href: acc });
     }
   }
   return crumbs;
@@ -82,6 +93,7 @@ export function Topbar(): ReactElement {
   const pageTitle = crumbs.at(-1)?.label ?? 'Dashboard';
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [currentLocale, setCurrentLocale] = useState('en');
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -126,39 +138,39 @@ export function Topbar(): ReactElement {
   };
 
   return (
-    <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/90 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-3 border-b border-outline-variant bg-surface/80 px-4 py-2 backdrop-blur-md sm:px-6 lg:px-8">
       {/* Mobile sidebar toggle */}
       <button
         type="button"
         onClick={() => setMobileOpen(true)}
-        className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 md:hidden"
+        className="rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high md:hidden"
         aria-label="Open navigation"
         title="Open navigation"
       >
-        <Menu className="h-5 w-5 text-gray-600" />
+        <Menu className="h-5 w-5" />
       </button>
 
       <div className="flex min-w-0 flex-1 items-center gap-4 xl:gap-6">
         <div className="min-w-[120px]">
-          <h2 className="truncate text-lg font-semibold tracking-tight text-slate-900">{pageTitle}</h2>
+          <h2 className="truncate text-lg font-semibold tracking-tight text-on-surface">{pageTitle}</h2>
           <nav aria-label="Breadcrumb" className="mt-0.5 flex min-w-0 items-center gap-1">
             <Link
               href="/"
-              className="truncate text-xs font-medium text-slate-400 hover:text-slate-700"
+              className="truncate text-xs font-medium text-on-surface-variant hover:text-on-surface"
             >
               Home
             </Link>
             {crumbs.map((c, i) => (
               <span key={c.href} className="flex items-center gap-1">
-                <span className="text-slate-300">/</span>
+                <span className="text-outline">/</span>
                 <Link
                   href={c.href}
                   aria-current={i === crumbs.length - 1 ? 'page' : undefined}
                   className={cn(
                     'truncate text-xs font-medium',
                     i === crumbs.length - 1
-                      ? 'text-slate-700'
-                      : 'text-slate-400 hover:text-slate-700'
+                      ? 'text-on-surface'
+                      : 'text-on-surface-variant hover:text-on-surface'
                   )}
                 >
                   {c.label}
@@ -172,36 +184,38 @@ export function Topbar(): ReactElement {
         </div>
       </div>
 
-      <div className="mx-1 hidden h-6 w-px bg-slate-200 xl:block" />
+      <div className="mx-1 hidden h-6 w-px bg-outline-variant xl:block" />
       <div className="hidden md:block xl:hidden">
         <GlobalSearch compact />
       </div>
-      {/* RR-H19: the dark-mode toggle is hidden until the design-token migration
-          reaches full `dark:` coverage. Only ~17% of surfaces were themed, so
-          enabling it produced a broken mixed light/dark UI. Re-add
-          `<DarkModeToggle />` here once dark: coverage is complete. */}
       <LocaleSwitcher currentLocale={currentLocale} />
+      <DarkModeToggle />
       <NotificationBell />
       <button
         type="button"
-        className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#005baf]"
+        onClick={() => setHelpOpen(true)}
+        className="rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-primary"
+        aria-label="Help and Knowledge Base"
+        aria-haspopup="dialog"
+        aria-expanded={helpOpen}
         title="Help"
       >
         <HelpCircle className="h-5 w-5" />
       </button>
+      <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} />
 
       {/* User menu */}
       <div ref={menuRef} className="relative">
         <button
           type="button"
           onClick={() => setMenuOpen((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100"
+          className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-container-high"
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           aria-label="Account menu"
           title="Account menu"
         >
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-on-primary">
             {(userId ?? 'NX').slice(0, 2).toUpperCase()}
           </span>
           <ChevronDownIcon size={14} />
@@ -209,20 +223,20 @@ export function Topbar(): ReactElement {
         {menuOpen ? (
           <div
             role="menu"
-            className="absolute end-0 mt-1 w-56 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900"
+            className="absolute end-0 mt-1 w-56 overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-modal"
           >
-            <div className="border-b border-slate-100 px-3 py-2">
-              <div className="truncate text-sm font-semibold text-slate-900">
+            <div className="border-b border-outline-variant px-3 py-2">
+              <div className="truncate text-sm font-semibold text-on-surface">
                 {userId ?? 'Not signed in'}
               </div>
-              <div className="truncate text-xs text-slate-500">
+              <div className="truncate text-xs text-on-surface-variant">
                 {tenantId ?? 'No tenant'}
               </div>
             </div>
             <Link
               href="/settings/profile"
               onClick={() => setMenuOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              className="flex items-center gap-2 px-3 py-2 text-sm text-on-surface hover:bg-surface-container-high"
               role="menuitem"
             >
               <UsersIcon size={14} /> Profile
@@ -230,17 +244,25 @@ export function Topbar(): ReactElement {
             <Link
               href="/settings"
               onClick={() => setMenuOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              className="flex items-center gap-2 px-3 py-2 text-sm text-on-surface hover:bg-surface-container-high"
               role="menuitem"
               aria-label="Settings"
               title="Settings"
             >
               <SettingsIcon size={14} /> Settings
             </Link>
+            <Link
+              href="/whats-new"
+              onClick={() => setMenuOpen(false)}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-on-surface hover:bg-surface-container-high"
+              role="menuitem"
+            >
+              <Sparkles size={14} /> What&apos;s new
+            </Link>
             <button
               type="button"
               onClick={onLogout}
-              className="flex w-full items-center gap-2 border-t border-slate-100 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+              className="flex w-full items-center gap-2 border-t border-outline-variant px-3 py-2 text-sm text-error hover:bg-error-container hover:text-on-error-container"
               role="menuitem"
             >
               <LogOutIcon size={14} /> Sign out
@@ -280,7 +302,7 @@ export function DarkModeToggle() {
     <button
       type="button"
       onClick={toggle}
-      className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#005baf] dark:hover:bg-slate-800"
+      className="rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-primary"
       title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}

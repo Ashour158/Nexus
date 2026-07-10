@@ -42,7 +42,7 @@ function Field({
 }
 
 const inputClass =
-  'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#137fec] disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500';
+  'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500';
 
 export default function CompanyProfilePage() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
@@ -115,7 +115,7 @@ export default function CompanyProfilePage() {
   return (
     <div className="max-w-3xl p-6">
       <div className="mb-6 flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-[#137fec]">
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-[#4f46e5]">
           <Building2 className="h-5 w-5" />
         </span>
         <div>
@@ -308,7 +308,7 @@ export default function CompanyProfilePage() {
 
           {canEdit ? (
             <div className="flex items-center justify-end gap-3">
-              <Button type="submit" isLoading={upsert.isPending} className="bg-[#137fec] hover:bg-[#0f6fd4]">
+              <Button type="submit" isLoading={upsert.isPending} className="bg-[#4f46e5] hover:bg-[#0f6fd4]">
                 Save changes
               </Button>
             </div>

@@ -106,7 +106,7 @@ export default function CampaignsPage() {
             </button>
             <Link
               href="/campaigns/new"
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#137fec] px-4 text-sm font-bold text-white hover:bg-[#005baf]"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#4f46e5] px-4 text-sm font-bold text-white hover:bg-[#4f46e5]"
             >
               <Plus className="h-4 w-4" />
               New campaign
@@ -123,13 +123,13 @@ export default function CampaignsPage() {
               value={search}
               onChange={(e) => resetPage(setSearch)(e.target.value)}
               placeholder="Search name or subject"
-              className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+              className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
             />
           </div>
           <select
             value={type}
             onChange={(e) => resetPage(setType)(e.target.value as CampaignType | '')}
-            className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
           >
             <option value="">All types</option>
             {CAMPAIGN_TYPES.map((t) => (
@@ -141,7 +141,7 @@ export default function CampaignsPage() {
           <select
             value={status}
             onChange={(e) => resetPage(setStatus)(e.target.value as CampaignStatus | '')}
-            className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
           >
             <option value="">All statuses</option>
             {CAMPAIGN_STATUSES.map((s) => (
@@ -154,7 +154,7 @@ export default function CampaignsPage() {
             value={ownerId}
             onChange={(e) => resetPage(setOwnerId)(e.target.value)}
             placeholder="Filter by owner id"
-            className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+            className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
           />
         </div>
       </CRMToolbar>
@@ -193,7 +193,7 @@ export default function CampaignsPage() {
                     <td className="px-5 py-4">
                       <Link
                         href={`/campaigns/${row.id}`}
-                        className="font-bold text-slate-950 hover:text-[#005baf]"
+                        className="font-bold text-slate-950 hover:text-[#4f46e5]"
                       >
                         {row.name}
                       </Link>
@@ -226,7 +226,7 @@ export default function CampaignsPage() {
                           !isLoading ? (
                             <Link
                               href="/campaigns/new"
-                              className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#137fec] px-4 text-sm font-bold text-white hover:bg-[#005baf]"
+                              className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#4f46e5] px-4 text-sm font-bold text-white hover:bg-[#4f46e5]"
                             >
                               <Plus className="h-4 w-4" />
                               New campaign

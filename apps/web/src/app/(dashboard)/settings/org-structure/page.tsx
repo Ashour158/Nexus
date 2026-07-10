@@ -23,7 +23,7 @@ import {
 } from '@/hooks/use-org';
 
 const inputClass =
-  'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#137fec]';
+  'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5]';
 
 // ===========================================================================
 // Departments tab
@@ -173,7 +173,7 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
               <button
                 type="button"
                 onClick={() => openCreate(node.id)}
-                className="rounded p-1.5 text-slate-400 hover:bg-slate-50 hover:text-[#137fec]"
+                className="rounded p-1.5 text-slate-400 hover:bg-slate-50 hover:text-[#4f46e5]"
                 title="Add sub-department"
               >
                 <Plus className="h-4 w-4" />
@@ -181,7 +181,7 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
               <button
                 type="button"
                 onClick={() => openEdit(node)}
-                className="rounded p-1.5 text-slate-400 hover:bg-slate-50 hover:text-[#137fec]"
+                className="rounded p-1.5 text-slate-400 hover:bg-slate-50 hover:text-[#4f46e5]"
                 title="Edit"
               >
                 <Pencil className="h-4 w-4" />
@@ -210,7 +210,7 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500">Model your organization&apos;s reporting departments.</p>
         {canEdit ? (
-          <Button onClick={() => openCreate()} className="bg-[#137fec] hover:bg-[#0f6fd4]">
+          <Button onClick={() => openCreate()} className="bg-[#4f46e5] hover:bg-[#0f6fd4]">
             <Plus className="h-4 w-4" /> New department
           </Button>
         ) : null}
@@ -322,7 +322,7 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
               <Button
                 type="submit"
                 isLoading={createDept.isPending || updateDept.isPending}
-                className="bg-[#137fec] hover:bg-[#0f6fd4]"
+                className="bg-[#4f46e5] hover:bg-[#0f6fd4]"
               >
                 {form.id ? 'Save' : 'Create'}
               </Button>
@@ -420,7 +420,7 @@ function LevelsTab({ canEdit }: { canEdit: boolean }) {
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500">Seniority levels, ordered by rank (lowest rank = most senior).</p>
         {canEdit ? (
-          <Button onClick={openCreate} className="bg-[#137fec] hover:bg-[#0f6fd4]">
+          <Button onClick={openCreate} className="bg-[#4f46e5] hover:bg-[#0f6fd4]">
             <Plus className="h-4 w-4" /> New level
           </Button>
         ) : null}
@@ -472,7 +472,7 @@ function LevelsTab({ canEdit }: { canEdit: boolean }) {
                       <div className="flex justify-end gap-1">
                         <button
                           onClick={() => openEdit(l)}
-                          className="rounded p-1.5 text-slate-400 hover:bg-slate-50 hover:text-[#137fec]"
+                          className="rounded p-1.5 text-slate-400 hover:bg-slate-50 hover:text-[#4f46e5]"
                           title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
@@ -539,7 +539,7 @@ function LevelsTab({ canEdit }: { canEdit: boolean }) {
               <Button
                 type="submit"
                 isLoading={createLevel.isPending || updateLevel.isPending}
-                className="bg-[#137fec] hover:bg-[#0f6fd4]"
+                className="bg-[#4f46e5] hover:bg-[#0f6fd4]"
               >
                 {form.id ? 'Save' : 'Create'}
               </Button>
@@ -574,7 +574,7 @@ export default function OrgStructurePage() {
   return (
     <div className="max-w-4xl p-6">
       <div className="mb-6 flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-[#137fec]">
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-[#4f46e5]">
           <Network className="h-5 w-5" />
         </span>
         <div>
@@ -590,7 +590,7 @@ export default function OrgStructurePage() {
             onClick={() => setTab(t)}
             className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium capitalize transition ${
               tab === t
-                ? 'border-[#137fec] text-[#137fec]'
+                ? 'border-[#4f46e5] text-[#4f46e5]'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >

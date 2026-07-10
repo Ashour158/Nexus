@@ -41,9 +41,9 @@ interface FilterRow {
 }
 
 const selectCls =
-  'rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500';
+  'rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500';
 const inputCls =
-  'rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500';
+  'rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500';
 
 export function WidgetBuilder({
   initial,
@@ -405,7 +405,7 @@ export function WidgetBuilder({
           <button
             disabled={!canSave || saving}
             onClick={() => spec && onSave({ title: title.trim(), chartType, spec })}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
           >
             {saving ? 'Saving…' : initial ? 'Save changes' : 'Add widget'}
           </button>
@@ -443,7 +443,7 @@ function Section({
         </span>
         <button
           onClick={onAdd}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50"
+          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-50"
         >
           <Plus className="h-3.5 w-3.5" /> Add
         </button>

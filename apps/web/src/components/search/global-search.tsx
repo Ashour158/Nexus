@@ -20,7 +20,7 @@ interface SearchResult {
 }
 
 const TYPE_CONFIG = {
-  contact: { icon: User, label: 'Contact', color: 'text-blue-600', bg: 'bg-blue-50' },
+  contact: { icon: User, label: 'Contact', color: 'text-indigo-600', bg: 'bg-indigo-50' },
   deal: { icon: TrendingUp, label: 'Deal', color: 'text-green-600', bg: 'bg-green-50' },
   lead: { icon: User, label: 'Lead', color: 'text-purple-600', bg: 'bg-purple-50' },
   account: { icon: Building2, label: 'Account', color: 'text-indigo-600', bg: 'bg-indigo-50' },
@@ -28,7 +28,7 @@ const TYPE_CONFIG = {
 } as const;
 
 const TYPE_BADGES: Record<string, { label: string; color: string }> = {
-  contact: { label: 'Contact', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  contact: { label: 'Contact', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   deal: { label: 'Deal', color: 'bg-green-50 text-green-700 border-green-200' },
   company: { label: 'Company', color: 'bg-purple-50 text-purple-700 border-purple-200' },
   document: { label: 'Doc', color: 'bg-orange-50 text-orange-700 border-orange-200' },
@@ -167,8 +167,8 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
         title="Search (?K)"
         className={
           compact
-            ? 'flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-500 transition-colors hover:border-blue-200 hover:bg-white hover:text-slate-700'
-            : 'flex h-11 w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 text-sm text-slate-500 transition-colors hover:border-blue-200 hover:bg-white hover:text-slate-700'
+            ? 'flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-500 transition-colors hover:border-indigo-200 hover:bg-white hover:text-slate-700'
+            : 'flex h-11 w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 text-sm text-slate-500 transition-colors hover:border-indigo-200 hover:bg-white hover:text-slate-700'
         }
       >
         <Search className="h-4 w-4 shrink-0" />
@@ -208,8 +208,8 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
                 aria-label={alreadySaved ? 'Search saved' : 'Save this search'}
                 className={`flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium transition-colors ${
                   alreadySaved
-                    ? 'text-blue-600'
-                    : 'text-gray-400 hover:bg-blue-50 hover:text-blue-600'
+                    ? 'text-indigo-600'
+                    : 'text-gray-400 hover:bg-indigo-50 hover:text-indigo-600'
                 } disabled:cursor-default`}
               >
                 {alreadySaved ? <Bookmark className="h-4 w-4 fill-current" /> : <BookmarkPlus className="h-4 w-4" />}
@@ -255,7 +255,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
                       key={s.id}
                       className="group flex items-center gap-3 px-4 py-2 transition-colors hover:bg-gray-50"
                     >
-                      <Bookmark className="h-3.5 w-3.5 flex-shrink-0 fill-current text-blue-500" />
+                      <Bookmark className="h-3.5 w-3.5 flex-shrink-0 fill-current text-indigo-500" />
                       <button
                         onClick={() => {
                           setQuery(s.query);
@@ -306,7 +306,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
                       setOpen(false);
                       setQuery('');
                     }}
-                    className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${i === active ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                    className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${i === active ? 'bg-indigo-50' : 'hover:bg-gray-50'}`}
                   >
                     <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md ${cfg.bg}`}>
                       <Icon className={`h-3.5 w-3.5 ${cfg.color}`} />

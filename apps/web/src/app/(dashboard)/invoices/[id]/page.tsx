@@ -279,7 +279,7 @@ export default function InvoiceDetailPage() {
               <div className="flex justify-between gap-2">
                 <dt>Account</dt>
                 <dd className="font-mono text-xs">
-                  <Link href={`/accounts/${inv.accountId}`} className="text-blue-700 hover:underline">
+                  <Link href={`/accounts/${inv.accountId}`} className="text-indigo-700 hover:underline">
                     {inv.accountId.slice(0, 10)}…
                   </Link>
                 </dd>

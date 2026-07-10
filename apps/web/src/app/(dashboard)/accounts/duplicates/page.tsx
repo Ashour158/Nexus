@@ -114,7 +114,7 @@ export default function AccountDuplicatesPage() {
         <button
           onClick={() => scan.mutate()}
           disabled={scan.isPending}
-          className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
+          className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
         >
           {scan.isPending ? 'Starting…' : 'Run duplicate scan'}
         </button>
@@ -171,7 +171,7 @@ export default function AccountDuplicatesPage() {
                 </div>
                 <div className="mt-3 flex gap-2">
                   <button
-                    className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
+                    className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
                     onClick={() => master && merge.mutate({ groupId: group.id, masterId: master })}
                     disabled={merge.isPending || !master}
                   >

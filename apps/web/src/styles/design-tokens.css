@@ -1,26 +1,155 @@
-/* Vars without @layer: postcss hoists @import before @tailwind directives. */
+/*
+ * Nexus CRM — Stitch design system tokens.
+ *
+ * A Material-3 style token set seeded from Nexus Indigo (#4F46E5) over a slate
+ * neutral canvas, mirroring the Stitch "Nexus CRM Design System" project. Every
+ * token is stored as space-separated RGB channels so Tailwind can apply opacity
+ * modifiers (e.g. `bg-primary/20`, `ring-primary/30`) via
+ * `rgb(var(--md-*) / <alpha-value>)`.
+ *
+ * postcss hoists this @import above the @tailwind directives, so keeping the
+ * declarations outside @layer guarantees they win the cascade.
+ */
 :root {
-  --color-primary: #4F6CF7;
-  --color-primary-dark: #3D56C5;
-  --color-success: #10B981;
-  --color-warning: #F59E0B;
-  --color-danger: #EF4444;
-  --color-surface: #FFFFFF;
-  --color-background: #F8FAFC;
-  --color-text-primary: #1E293B;
-  --color-text-secondary: #64748B;
+  /* ---- Neutral surfaces (tonal elevation) ---- */
+  --md-background: 247 248 252;
+  --md-surface: 255 255 255;
+  --md-surface-dim: 220 216 229;
+  --md-surface-bright: 255 255 255;
+  --md-surface-container-lowest: 255 255 255;
+  --md-surface-container-low: 248 249 252;
+  --md-surface-container: 241 242 249;
+  --md-surface-container-high: 234 236 245;
+  --md-surface-container-highest: 227 230 241;
+  --md-on-surface: 27 27 36;
+  --md-on-surface-variant: 69 69 90;
+  --md-inverse-surface: 47 47 57;
+  --md-inverse-on-surface: 243 239 252;
+  --md-outline: 119 117 135;
+  --md-outline-variant: 205 207 224;
+
+  /* ---- Primary (Nexus Indigo) ---- */
+  --md-primary: 79 70 229;
+  --md-on-primary: 255 255 255;
+  --md-primary-container: 224 231 255;
+  --md-on-primary-container: 38 35 122;
+  --md-inverse-primary: 165 180 252;
+  --md-primary-fixed-dim: 199 210 254;
+
+  /* ---- Secondary ---- */
+  --md-secondary: 91 100 114;
+  --md-on-secondary: 255 255 255;
+  --md-secondary-container: 221 227 240;
+  --md-on-secondary-container: 43 50 64;
+
+  /* ---- Tertiary (muted violet accent) ---- */
+  --md-tertiary: 107 93 138;
+  --md-on-tertiary: 255 255 255;
+  --md-tertiary-container: 235 224 255;
+  --md-on-tertiary-container: 58 45 92;
+
+  /* ---- Semantic ---- */
+  --md-success: 22 163 74;
+  --md-on-success: 255 255 255;
+  --md-success-container: 220 252 231;
+  --md-on-success-container: 20 83 45;
+
+  --md-warning: 217 119 6;
+  --md-on-warning: 255 255 255;
+  --md-warning-container: 255 237 213;
+  --md-on-warning-container: 124 45 18;
+
+  --md-error: 220 38 38;
+  --md-on-error: 255 255 255;
+  --md-error-container: 254 226 226;
+  --md-on-error-container: 127 29 29;
+
+  --md-info: 37 99 235;
+  --md-on-info: 255 255 255;
+  --md-info-container: 219 234 254;
+  --md-on-info-container: 30 58 138;
+
+  /* ---- Legacy aliases (kept so existing token consumers recolor) ---- */
+  --color-primary: #4f46e5;
+  --color-primary-dark: #4338ca;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+  --color-surface: #ffffff;
+  --color-background: #f7f8fc;
+  --color-text-primary: #1b1b24;
+  --color-text-secondary: #45455a;
   --spacing-base: 4px;
   --font-family: 'Inter', system-ui, sans-serif;
 }
 
 .dark {
-  --color-primary: #4F6CF7;
-  --color-primary-dark: #3D56C5;
-  --color-success: #10B981;
-  --color-warning: #F59E0B;
-  --color-danger: #EF4444;
-  --color-surface: #0F172A;
-  --color-background: #1E293B;
-  --color-text-primary: #F1F5F9;
-  --color-text-secondary: #94A3B8;
+  /* ---- Neutral surfaces (deep "Void" slate; elevation lightens surface) ---- */
+  --md-background: 11 11 18;
+  --md-surface: 19 19 24;
+  --md-surface-dim: 19 19 24;
+  --md-surface-bright: 58 57 66;
+  --md-surface-container-lowest: 14 14 20;
+  --md-surface-container-low: 26 26 33;
+  --md-surface-container: 30 30 38;
+  --md-surface-container-high: 41 41 51;
+  --md-surface-container-highest: 52 52 63;
+  --md-on-surface: 229 225 233;
+  --md-on-surface-variant: 200 197 214;
+  --md-inverse-surface: 229 225 233;
+  --md-inverse-on-surface: 47 47 57;
+  --md-outline: 146 143 161;
+  --md-outline-variant: 69 69 90;
+
+  /* ---- Primary ---- */
+  --md-primary: 165 180 252;
+  --md-on-primary: 33 33 94;
+  --md-primary-container: 55 48 163;
+  --md-on-primary-container: 224 231 255;
+  --md-inverse-primary: 79 70 229;
+  --md-primary-fixed-dim: 79 70 229;
+
+  /* ---- Secondary ---- */
+  --md-secondary: 193 199 214;
+  --md-on-secondary: 43 50 64;
+  --md-secondary-container: 59 66 80;
+  --md-on-secondary-container: 221 227 240;
+
+  /* ---- Tertiary ---- */
+  --md-tertiary: 212 196 245;
+  --md-on-tertiary: 58 45 92;
+  --md-tertiary-container: 74 61 107;
+  --md-on-tertiary-container: 235 224 255;
+
+  /* ---- Semantic ---- */
+  --md-success: 74 222 128;
+  --md-on-success: 5 46 22;
+  --md-success-container: 20 83 45;
+  --md-on-success-container: 220 252 231;
+
+  --md-warning: 251 191 36;
+  --md-on-warning: 69 26 3;
+  --md-warning-container: 124 45 18;
+  --md-on-warning-container: 255 237 213;
+
+  --md-error: 248 113 113;
+  --md-on-error: 69 10 10;
+  --md-error-container: 127 29 29;
+  --md-on-error-container: 254 226 226;
+
+  --md-info: 96 165 250;
+  --md-on-info: 15 23 42;
+  --md-info-container: 30 58 138;
+  --md-on-info-container: 219 234 254;
+
+  /* ---- Legacy aliases ---- */
+  --color-primary: #a5b4fc;
+  --color-primary-dark: #818cf8;
+  --color-success: #4ade80;
+  --color-warning: #fbbf24;
+  --color-danger: #f87171;
+  --color-surface: #131318;
+  --color-background: #0b0b12;
+  --color-text-primary: #e5e1e9;
+  --color-text-secondary: #c8c5d6;
 }

@@ -1,8 +1,18 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
+import { Inter } from 'next/font/google';
 import { getLocale } from 'next-intl/server';
 import { AppProviders } from './providers';
+import { CookieConsent } from '@/components/consent/cookie-consent';
 import './globals.css';
+
+// Nexus CRM standardises on Inter (Stitch design system). Exposed as the
+// `--font-family` CSS variable consumed by globals.css / Tailwind's `font-sans`.
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-family',
+});
 
 export const metadata: Metadata = {
   title: 'Nexus CRM',
@@ -28,8 +38,22 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const dir = locale === 'ar' ? 'rtl' : 'ltr';
 
   return (
-    <html lang={locale} dir={dir}>
+    <html lang={locale} dir={dir} className={inter.variable}>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              /* Apply the user's saved theme before first paint to avoid a
+                 light-to-dark flash. Dark mode activates on explicit choice
+                 only (see DarkModeToggle). */
+              try {
+                if (localStorage.getItem('theme') === 'dark') {
+                  document.documentElement.classList.add('dark');
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -53,8 +77,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           }}
         />
       </head>
-      <body>
+      <body className={inter.className}>
         <AppProviders>{children}</AppProviders>
+        <CookieConsent />
       </body>
     </html>
   );

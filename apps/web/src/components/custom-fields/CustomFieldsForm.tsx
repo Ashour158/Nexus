@@ -70,7 +70,7 @@ export default function CustomFieldsForm({ entityType, entityId, currentValues, 
             ) : null}
             {field.fieldType === 'checkbox' ? (
               <label className="flex cursor-pointer items-center gap-2">
-                <input type="checkbox" checked={(values[field.apiKey] as boolean) ?? false} onChange={(e) => setValues((v) => ({ ...v, [field.apiKey]: e.target.checked }))} disabled={readOnly} className="h-4 w-4 accent-blue-600" />
+                <input type="checkbox" checked={(values[field.apiKey] as boolean) ?? false} onChange={(e) => setValues((v) => ({ ...v, [field.apiKey]: e.target.checked }))} disabled={readOnly} className="h-4 w-4 accent-indigo-600" />
                 <span className="text-sm text-gray-600">Yes</span>
               </label>
             ) : null}
@@ -81,7 +81,7 @@ export default function CustomFieldsForm({ entityType, entityId, currentValues, 
         ))}
       </div>
       {!readOnly ? (
-        <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+        <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
           {saveMutation.isPending ? 'Saving...' : 'Save Custom Fields'}
         </button>
       ) : null}

@@ -144,7 +144,7 @@ export default function RolesPage(): JSX.Element {
                   </td>
                   <td className="px-4 py-3 text-center">
                     {role.isSystem ? (
-                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">System</span>
+                      <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-700">System</span>
                     ) : (
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">Custom</span>
                     )}

@@ -114,7 +114,7 @@ export default function CurrenciesPage(): JSX.Element {
           />
           <button
             onClick={() => create.mutate()}
-            className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white"
+            className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white"
           >
             Add Currency
           </button>

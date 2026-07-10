@@ -61,13 +61,13 @@ interface PerformanceReport {
 
 const STATUS_STYLES: Record<DealStatus, string> = {
   'CLOSED WON': 'bg-emerald-100 text-emerald-700',
-  'IN PROGRESS': 'bg-blue-100 text-blue-700',
+  'IN PROGRESS': 'bg-indigo-100 text-indigo-700',
   'PENDING APPROVAL': 'bg-amber-100 text-amber-700',
   'CLOSED LOST': 'bg-rose-100 text-rose-700',
 };
 
 const avatarTones = [
-  'bg-blue-100 text-blue-600',
+  'bg-indigo-100 text-indigo-600',
   'bg-purple-100 text-purple-600',
   'bg-amber-100 text-amber-600',
   'bg-indigo-100 text-indigo-600',
@@ -152,11 +152,11 @@ export default function AnalyticsPage(): ReactElement {
         </div>
 
         <div className="flex items-center gap-2">
-          <button className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500 transition hover:border-blue-200 hover:text-blue-600" title="More filters">
+          <button className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500 transition hover:border-indigo-200 hover:text-indigo-600" title="More filters">
             <Filter className="h-5 w-5" />
           </button>
           <button
-            className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500 transition hover:border-blue-200 hover:text-blue-600"
+            className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500 transition hover:border-indigo-200 hover:text-indigo-600"
             title="Refresh"
             onClick={() => void refetch()}
           >
@@ -166,7 +166,7 @@ export default function AnalyticsPage(): ReactElement {
             <Share2 className="h-4 w-4" />
             Share
           </button>
-          <button className="hidden items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 sm:inline-flex">
+          <button className="hidden items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 sm:inline-flex">
             Export
           </button>
         </div>
@@ -193,7 +193,7 @@ export default function AnalyticsPage(): ReactElement {
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-200 bg-slate-100 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100 sm:w-64"
+                className="h-10 w-full rounded-lg border border-slate-200 bg-slate-100 pl-9 pr-3 text-sm outline-none focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100 sm:w-64"
                 placeholder="Search performance..."
               />
             </label>
@@ -251,7 +251,7 @@ export default function AnalyticsPage(): ReactElement {
                     </span>
                   </td>
                   <td className="p-4 text-right">
-                    <button className="text-slate-400 hover:text-blue-600" title="Actions">
+                    <button className="text-slate-400 hover:text-indigo-600" title="Actions">
                       <MoreVertical className="h-5 w-5" />
                     </button>
                   </td>
@@ -267,7 +267,7 @@ export default function AnalyticsPage(): ReactElement {
             <button className="rounded border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-600 opacity-50" disabled>
               Previous
             </button>
-            <button className="h-6 w-6 rounded bg-blue-600 text-[10px] font-bold text-white">1</button>
+            <button className="h-6 w-6 rounded bg-indigo-600 text-[10px] font-bold text-white">1</button>
             <button className="rounded border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50">
               Next
             </button>
@@ -279,7 +279,7 @@ export default function AnalyticsPage(): ReactElement {
         <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm lg:col-span-2">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-900">Revenue by Territory</h2>
-            <span className="text-xs font-bold text-blue-600">View Map</span>
+            <span className="text-xs font-bold text-indigo-600">View Map</span>
           </div>
           <div className="space-y-5">
             {(data.territory ?? []).map((territory) => {
@@ -296,7 +296,7 @@ export default function AnalyticsPage(): ReactElement {
                     </span>
                   </div>
                   <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full rounded-full bg-blue-500" style={{ width: `${width}%` }} />
+                    <div className="h-full rounded-full bg-indigo-500" style={{ width: `${width}%` }} />
                   </div>
                 </div>
               );
@@ -309,8 +309,8 @@ export default function AnalyticsPage(): ReactElement {
           <h2 className="mb-6 text-lg font-bold text-white">Recent Events</h2>
           <div className="relative z-10 space-y-4">
             {(data.events ?? []).slice(0, 4).map((event, index) => (
-              <div key={event.id} className={cn('flex gap-3 border-l-2 pl-4 py-1', index === 0 ? 'border-blue-500' : 'border-slate-700')}>
-                <div className={cn('w-14 text-[10px] font-bold uppercase', index === 0 ? 'text-blue-400' : 'text-slate-500')}>
+              <div key={event.id} className={cn('flex gap-3 border-l-2 pl-4 py-1', index === 0 ? 'border-indigo-500' : 'border-slate-700')}>
+                <div className={cn('w-14 text-[10px] font-bold uppercase', index === 0 ? 'text-indigo-400' : 'text-slate-500')}>
                   {index === 0 ? '2m ago' : event.timestamp}
                 </div>
                 <p className="flex-1 text-xs leading-5 text-slate-300">
@@ -345,7 +345,7 @@ function SelectControl({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="min-w-[150px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
+        className="min-w-[150px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500"
       >
         {options.map(([optionValue, optionLabel]) => (
           <option key={optionValue} value={optionValue}>{optionLabel}</option>
@@ -367,7 +367,7 @@ function SparkMetric({
   sparkline: number[];
 }): ReactElement {
   const colors = {
-    blue: 'bg-blue-50 from-blue-400/20 to-blue-600/40',
+    blue: 'bg-indigo-50 from-indigo-400/20 to-indigo-600/40',
     emerald: 'bg-emerald-50 from-emerald-400/20 to-emerald-600/40',
     amber: 'bg-amber-50 from-amber-400/20 to-amber-600/40',
     indigo: 'bg-indigo-50 from-indigo-400/20 to-indigo-600/40',

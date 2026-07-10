@@ -37,21 +37,21 @@ export function EmailStepEditor({ value, onChange, placeholder = 'Write your ema
         <button
           type="button"
           onClick={() => editor?.chain().focus().toggleBold().run()}
-          className={`rounded px-2 py-1 text-sm font-bold ${editor?.isActive('bold') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-200'}`}
+          className={`rounded px-2 py-1 text-sm font-bold ${editor?.isActive('bold') ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-gray-200'}`}
         >
           B
         </button>
         <button
           type="button"
           onClick={() => editor?.chain().focus().toggleItalic().run()}
-          className={`rounded px-2 py-1 text-sm italic ${editor?.isActive('italic') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-200'}`}
+          className={`rounded px-2 py-1 text-sm italic ${editor?.isActive('italic') ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-gray-200'}`}
         >
           I
         </button>
         <button
           type="button"
           onClick={() => editor?.chain().focus().toggleBulletList().run()}
-          className={`rounded px-2 py-1 text-sm ${editor?.isActive('bulletList') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-200'}`}
+          className={`rounded px-2 py-1 text-sm ${editor?.isActive('bulletList') ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-gray-200'}`}
         >
           • List
         </button>
@@ -62,7 +62,7 @@ export function EmailStepEditor({ value, onChange, placeholder = 'Write your ema
             type="button"
             key={token}
             onClick={() => insertToken(token)}
-            className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-700 hover:bg-blue-100"
+            className="rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700 hover:bg-indigo-100"
           >
             {token}
           </button>

@@ -71,7 +71,7 @@ export default function OrgChartPage() {
   return (
     <div className="max-w-4xl p-6">
       <div className="mb-6 flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-[#137fec]">
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-[#4f46e5]">
           <Users className="h-5 w-5" />
         </span>
         <div>

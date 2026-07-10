@@ -131,7 +131,7 @@ export default function ConnectionsAndSyncPage(): JSX.Element {
                     <div className="flex items-center gap-3">
                       <span
                         className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold"
-                        style={{ backgroundColor: '#eef6ff', color: '#005baf' }}
+                        style={{ backgroundColor: '#eef6ff', color: '#4f46e5' }}
                       >
                         {connection.provider.charAt(0).toUpperCase()}
                       </span>

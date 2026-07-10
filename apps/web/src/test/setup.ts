@@ -44,6 +44,10 @@ vi.mock('@/stores/auth.store', () => {
     clearSession: vi.fn(),
     setAccessToken: vi.fn(),
     refreshToken: 'mock-refresh-token',
+    // Permission gate used by many pages; default-allow in tests so page bodies
+    // (not just the "no access" branch) render for accessibility scanning.
+    hasPermission: () => true,
+    hasRole: () => true,
   };
   const useAuthStore = (selector?: (s: typeof state) => unknown) =>
     selector ? selector(state) : state;

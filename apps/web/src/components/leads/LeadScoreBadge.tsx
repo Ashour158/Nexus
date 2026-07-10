@@ -14,7 +14,7 @@ interface LeadScoreData {
 const tierConfig: Record<ScoreTier, { label: string; bg: string; text: string; dot: string }> = {
   hot: { label: 'Hot', bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-500' },
   warm: { label: 'Warm', bg: 'bg-amber-100', text: 'text-amber-700', dot: 'bg-amber-500' },
-  cold: { label: 'Cold', bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-400' },
+  cold: { label: 'Cold', bg: 'bg-indigo-100', text: 'text-indigo-700', dot: 'bg-indigo-400' },
 };
 
 export function LeadScoreBadge({ leadId, showTooltip = true }: { leadId: string; showTooltip?: boolean }) {

@@ -267,7 +267,7 @@ export default function AccountDetailPage() {
         <div className="grid gap-6 p-6 xl:grid-cols-[320px_minmax(0,1fr)]">
           <aside className="space-y-4">
             <div className="rounded-xl border border-slate-100 bg-white p-5">
-              <p className="font-mono text-xs font-bold uppercase tracking-wider text-blue-700">{account.code ?? account.id}</p>
+              <p className="font-mono text-xs font-bold uppercase tracking-wider text-indigo-700">{account.code ?? account.id}</p>
               <h1 className="mt-2 text-2xl font-bold text-slate-950">{account.name}</h1>
               <p className="mt-1 text-sm text-slate-500">{account.legalName ?? account.tradeName ?? 'Legal name not captured'}</p>
               <div className="mt-4 flex flex-wrap gap-2">
@@ -370,7 +370,7 @@ export default function AccountDetailPage() {
               className={cn(
                 'rounded-lg border px-3 py-2 text-sm font-semibold transition',
                 tab === item.id
-                  ? 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm'
+                  ? 'border-indigo-200 bg-indigo-50 text-indigo-700 shadow-sm'
                   : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'
               )}
             >
@@ -482,7 +482,7 @@ function InfoCard({ title, icon, children }: { title: string; icon: ReactNode; c
   return (
     <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-900">
-        <span className="text-blue-600">{icon}</span>
+        <span className="text-indigo-600">{icon}</span>
         {title}
       </div>
       <dl className="space-y-2 text-sm">{children}</dl>
@@ -501,7 +501,7 @@ function DetailItem({ label, value }: { label: string; value: ReactNode }) {
 
 function Badge({ children, tone = 'blue' }: { children: ReactNode; tone?: 'blue' | 'emerald' | 'amber' | 'rose' }) {
   const tones = {
-    blue: 'bg-blue-50 text-blue-700',
+    blue: 'bg-indigo-50 text-indigo-700',
     emerald: 'bg-emerald-50 text-emerald-700',
     amber: 'bg-amber-50 text-amber-700',
     rose: 'bg-rose-50 text-rose-700',
@@ -518,7 +518,7 @@ function HealthBlock({ health, fallbackScore }: { health: AccountHealthInsight |
         <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{health?.status ?? 'UNKNOWN'}</span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-        <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.max(0, Math.min(100, score))}%` }} />
+        <div className="h-full rounded-full bg-indigo-600" style={{ width: `${Math.max(0, Math.min(100, score))}%` }} />
       </div>
       {(health?.factors ?? []).slice(0, 2).map((factor) => (
         <p key={factor.code} className="text-xs text-slate-500">
@@ -552,7 +552,7 @@ function CommercialTab({ rows, isLoading, empty, icon }: { rows: Record<string, 
         <div key={String(row.id)} className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="font-mono text-xs font-bold text-blue-700">{String(row.quoteNumber ?? row.orderNumber ?? row.id)}</p>
+              <p className="font-mono text-xs font-bold text-indigo-700">{String(row.quoteNumber ?? row.orderNumber ?? row.id)}</p>
               <h3 className="mt-1 text-sm font-bold text-slate-950">{String(row.name ?? 'Commercial record')}</h3>
             </div>
             <Badge tone={String(row.status).includes('PENDING') ? 'amber' : 'blue'}>{String(row.status ?? 'OPEN')}</Badge>
@@ -576,7 +576,7 @@ function ContactsTab({ data, isLoading }: { data: PaginatedResult<Contact> | und
   return (
     <div className="grid gap-3 lg:grid-cols-2">
       {contacts.map((contact) => (
-        <Link key={contact.id} href={`/contacts/${contact.id}`} className="rounded-xl border border-slate-200 bg-white p-4 hover:border-blue-200 hover:bg-blue-50/30">
+        <Link key={contact.id} href={`/contacts/${contact.id}`} className="rounded-xl border border-slate-200 bg-white p-4 hover:border-indigo-200 hover:bg-indigo-50/30">
           <p className="text-sm font-bold text-slate-950">{contact.firstName} {contact.lastName}</p>
           <p className="mt-1 text-xs text-slate-500">{contact.jobTitle ?? 'Stakeholder'} · {contact.email ?? 'No email'}</p>
         </Link>
@@ -592,7 +592,7 @@ function DealsTab({ data, isLoading }: { data: PaginatedResult<Deal> | undefined
   return (
     <div className="grid gap-3 lg:grid-cols-2">
       {deals.map((deal) => (
-        <Link key={deal.id} href={`/deals/${deal.id}`} className="rounded-xl border border-slate-200 bg-white p-4 hover:border-blue-200 hover:bg-blue-50/30">
+        <Link key={deal.id} href={`/deals/${deal.id}`} className="rounded-xl border border-slate-200 bg-white p-4 hover:border-indigo-200 hover:bg-indigo-50/30">
           <p className="text-sm font-bold text-slate-950">{deal.name}</p>
           <p className="mt-1 text-xs text-slate-500">{formatCurrency(deal.amount, deal.currency)} · {deal.probability}% · {deal.status}</p>
         </Link>
@@ -753,7 +753,7 @@ function DocumentsTab({
           {rows.map((row) => (
             <div key={String(row.id ?? row.fileName)} className="rounded-xl border border-slate-200 bg-white p-4">
               <div className="flex items-start gap-3">
-                <div className="rounded-lg bg-blue-50 p-2 text-blue-700">
+                <div className="rounded-lg bg-indigo-50 p-2 text-indigo-700">
                   <FileText className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -810,7 +810,7 @@ function AccountEditPanel({
 }) {
   return (
     <form
-      className="rounded-xl border border-blue-100 bg-blue-50/40 p-5"
+      className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-5"
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
@@ -920,7 +920,7 @@ function EditField({ label, name, value, type = 'text', required = false }: { la
         type={type}
         required={required}
         defaultValue={value === null || value === undefined ? '' : String(value)}
-        className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
       />
     </label>
   );
@@ -947,7 +947,7 @@ function TagCloud({ values }: { values: string[] }) {
 function link(value: string | null | undefined) {
   if (!value) return 'Not set';
   return (
-    <a href={value} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-blue-700 hover:underline">
+    <a href={value} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-indigo-700 hover:underline">
       <Globe2 className="h-3.5 w-3.5" />
       {value}
     </a>

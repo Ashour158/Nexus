@@ -108,7 +108,7 @@ export default function CadencesPage() {
               <RefreshCw className="h-4 w-4" />
               Refresh
             </button>
-            <Link href="/cadences/enroll" className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#137fec] px-4 text-sm font-bold text-white hover:bg-[#005baf]">
+            <Link href="/cadences/enroll" className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#4f46e5] px-4 text-sm font-bold text-white hover:bg-[#4f46e5]">
               <Send className="h-4 w-4" />
               Quick enroll
             </Link>
@@ -122,18 +122,18 @@ export default function CadencesPage() {
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Cadence name"
-            className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+            className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
           />
           <input
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             placeholder="Description"
-            className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+            className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
           />
           <select
             value={objectType}
             onChange={(event) => setObjectType(event.target.value as 'CONTACT' | 'LEAD')}
-            className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
           >
             <option value="CONTACT">Contacts</option>
             <option value="LEAD">Leads</option>
@@ -142,7 +142,7 @@ export default function CadencesPage() {
             type="button"
             onClick={() => create.mutate()}
             disabled={!name.trim() || create.isPending}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#137fec] px-4 text-sm font-bold text-white hover:bg-[#005baf] disabled:opacity-50"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#4f46e5] px-4 text-sm font-bold text-white hover:bg-[#4f46e5] disabled:opacity-50"
           >
             <Plus className="h-4 w-4" />
             {create.isPending ? 'Creating...' : 'Create'}
@@ -158,8 +158,8 @@ export default function CadencesPage() {
             onClick={() => setFilter(item)}
             className={`rounded-lg px-4 py-2 text-sm font-bold transition ${
               filter === item
-                ? 'bg-[#137fec] text-white shadow-sm'
-                : 'border border-slate-200 bg-white text-slate-600 hover:bg-blue-50 hover:text-[#005baf]'
+                ? 'bg-[#4f46e5] text-white shadow-sm'
+                : 'border border-slate-200 bg-white text-slate-600 hover:bg-indigo-50 hover:text-[#4f46e5]'
             }`}
           >
             {item === 'ALL' ? 'All cadences' : item === 'CONTACT' ? 'Contacts' : 'Leads'}
@@ -184,7 +184,7 @@ export default function CadencesPage() {
               {filteredRows.map((row) => (
                 <tr key={row.id} className="hover:bg-slate-50">
                   <td className="px-5 py-4">
-                    <Link href={`/cadences/${row.id}`} className="font-bold text-slate-950 hover:text-[#005baf]">
+                    <Link href={`/cadences/${row.id}`} className="font-bold text-slate-950 hover:text-[#4f46e5]">
                       {row.name}
                     </Link>
                     {row.description ? <p className="mt-1 text-xs text-slate-500">{row.description}</p> : null}

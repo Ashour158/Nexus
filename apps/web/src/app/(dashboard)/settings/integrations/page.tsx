@@ -78,7 +78,7 @@ function ConnectorCard({
         <div className="flex items-start gap-3">
           <span
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
-            style={{ backgroundColor: '#eef6ff', color: '#005baf' }}
+            style={{ backgroundColor: '#eef6ff', color: '#4f46e5' }}
             aria-hidden="true"
           >
             {connectorInitial(connector.name)}
@@ -115,7 +115,7 @@ function ConnectorCard({
               href={connector.docsUrl}
               target="_blank"
               rel="noreferrer"
-              className="text-xs font-medium text-[#005baf] hover:underline"
+              className="text-xs font-medium text-[#4f46e5] hover:underline"
             >
               Docs
             </a>
@@ -130,7 +130,7 @@ function ConnectorCard({
               {managePath ? (
                 <Link
                   href={managePath}
-                  className="text-xs font-medium text-[#005baf] hover:underline"
+                  className="text-xs font-medium text-[#4f46e5] hover:underline"
                 >
                   Manage
                 </Link>

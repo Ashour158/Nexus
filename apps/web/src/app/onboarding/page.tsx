@@ -43,7 +43,7 @@ const STEPS = [
 ] as const;
 
 const inputClass =
-  'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#137fec]';
+  'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5]';
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -160,7 +160,7 @@ export default function OnboardingPage() {
                   onClick={() => { if (reachable) setStepIndex(i); }}
                   className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors disabled:cursor-not-allowed ${
                     isActive
-                      ? 'border-[#137fec] bg-[#137fec] text-white'
+                      ? 'border-[#4f46e5] bg-[#4f46e5] text-white'
                       : isComplete
                         ? 'border-emerald-500 bg-emerald-500 text-white'
                         : 'border-slate-200 bg-white text-slate-400'
@@ -279,7 +279,7 @@ function CompanyStep({ onSaved }: { onSaved: () => void }) {
         </Field>
       </div>
       <div className="mt-6 flex items-center justify-end">
-        <Button type="submit" isLoading={upsert.isPending} className="bg-[#137fec] hover:bg-[#0f6fd4]">
+        <Button type="submit" isLoading={upsert.isPending} className="bg-[#4f46e5] hover:bg-[#0f6fd4]">
           Save &amp; continue <ArrowRight className="h-4 w-4" />
         </Button>
       </div>
@@ -341,7 +341,7 @@ function PipelineStep({ onCreated, onBack }: { onCreated: () => void; onBack: ()
         <Button type="button" variant="ghost" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
-        <Button type="submit" isLoading={createPipeline.isPending} className="bg-[#137fec] hover:bg-[#0f6fd4]">
+        <Button type="submit" isLoading={createPipeline.isPending} className="bg-[#4f46e5] hover:bg-[#0f6fd4]">
           Create &amp; continue <ArrowRight className="h-4 w-4" />
         </Button>
       </div>
@@ -450,7 +450,7 @@ function TeamStep({
           <Button type="button" variant="outline" onClick={onNext}>
             {invited ? 'Continue' : 'Skip'}
           </Button>
-          <Button type="submit" isLoading={invite.isPending} className="bg-[#137fec] hover:bg-[#0f6fd4]">
+          <Button type="submit" isLoading={invite.isPending} className="bg-[#4f46e5] hover:bg-[#0f6fd4]">
             Send invite
           </Button>
         </div>
@@ -475,9 +475,9 @@ function ImportStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
         href="/settings/migration"
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-3 rounded-xl border-2 border-dashed border-slate-300 p-5 transition-colors hover:border-[#137fec] hover:bg-blue-50/40"
+        className="flex items-center gap-3 rounded-xl border-2 border-dashed border-slate-300 p-5 transition-colors hover:border-[#4f46e5] hover:bg-indigo-50/40"
       >
-        <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-50 text-[#137fec]">
+        <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-indigo-50 text-[#4f46e5]">
           <Upload className="h-5 w-5" />
         </span>
         <span>
@@ -490,7 +490,7 @@ function ImportStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
         <Button type="button" variant="ghost" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
-        <Button type="button" onClick={onNext} className="bg-[#137fec] hover:bg-[#0f6fd4]">
+        <Button type="button" onClick={onNext} className="bg-[#4f46e5] hover:bg-[#0f6fd4]">
           Continue <ArrowRight className="h-4 w-4" />
         </Button>
       </div>
@@ -523,7 +523,7 @@ function DoneStep({ onFinish, isSaving }: { onFinish: () => void; isSaving: bool
           <Link
             key={l.href}
             href={l.href}
-            className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:border-[#137fec] hover:text-[#137fec]"
+            className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5]"
           >
             {l.label}
           </Link>
@@ -534,7 +534,7 @@ function DoneStep({ onFinish, isSaving }: { onFinish: () => void; isSaving: bool
         onClick={onFinish}
         isLoading={isSaving}
         fullWidth
-        className="bg-[#137fec] hover:bg-[#0f6fd4]"
+        className="bg-[#4f46e5] hover:bg-[#0f6fd4]"
       >
         Finish &amp; go to dashboard
       </Button>

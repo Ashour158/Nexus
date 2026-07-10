@@ -34,7 +34,7 @@ const eventIcons: Record<FeedEvent['type'], LucideIcon> = {
 };
 
 const eventColors: Record<FeedEvent['type'], string> = {
-  deal_moved: 'text-blue-600 bg-blue-50',
+  deal_moved: 'text-indigo-600 bg-indigo-50',
   contact_created: 'text-emerald-600 bg-emerald-50',
   email_sent: 'text-slate-600 bg-slate-50',
   deal_won: 'text-emerald-600 bg-emerald-50',

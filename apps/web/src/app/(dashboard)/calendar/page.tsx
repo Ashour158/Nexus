@@ -18,7 +18,7 @@ type CalendarEvent = {
 };
 
 const TYPE_COLORS: Record<EventType, string> = {
-  meeting: 'bg-blue-100 text-blue-800',
+  meeting: 'bg-indigo-100 text-indigo-800',
   task: 'bg-orange-100 text-orange-800',
   call: 'bg-emerald-100 text-emerald-800',
   deadline: 'bg-red-100 text-red-800',
@@ -84,7 +84,7 @@ export default function CalendarPage() {
           <select value={view} onChange={(e) => setView(e.target.value as 'day' | 'week' | 'month')} className="rounded border border-slate-300 px-2 py-2 text-sm">
             <option value="day">Day</option><option value="week">Week</option><option value="month">Month</option>
           </select>
-          <button onClick={() => setShowCreate(true)} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white">Create event</button>
+          <button onClick={() => setShowCreate(true)} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white">Create event</button>
         </div>
       </header>
 
@@ -178,7 +178,7 @@ export default function CalendarPage() {
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" onClick={() => setShowCreate(false)} className="rounded border border-slate-300 px-4 py-2 text-sm text-slate-700">Cancel</button>
-          <button type="button" onClick={() => create.mutate()} disabled={!form.title || !form.date || !form.time || create.isPending} className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50">Save event</button>
+          <button type="button" onClick={() => create.mutate()} disabled={!form.title || !form.date || !form.time || create.isPending} className="rounded bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50">Save event</button>
         </div>
       </Modal>
     </main>

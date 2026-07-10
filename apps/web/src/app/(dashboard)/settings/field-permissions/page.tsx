@@ -72,7 +72,7 @@ export default function FieldPermissionsSettingsPage() {
     <div className="mx-auto max-w-4xl space-y-6 p-6">
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-          <ShieldCheck className="h-6 w-6 text-blue-600" /> Field Permissions
+          <ShieldCheck className="h-6 w-6 text-indigo-600" /> Field Permissions
         </h1>
         <p className="mt-1 text-sm text-gray-500">
           Restrict who can read and write specific fields. Only the selected roles may access a
@@ -86,7 +86,7 @@ export default function FieldPermissionsSettingsPage() {
             key={tab.key}
             onClick={() => setObjectType(tab.key)}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
-              objectType === tab.key ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+              objectType === tab.key ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'
             }`}
           >
             {tab.label}
@@ -94,8 +94,8 @@ export default function FieldPermissionsSettingsPage() {
         ))}
       </div>
 
-      <div className="space-y-4 rounded-xl border border-blue-200 bg-blue-50 p-5">
-        <h3 className="font-semibold text-blue-900">
+      <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50 p-5">
+        <h3 className="font-semibold text-indigo-900">
           New rule on {OBJECT_TABS.find((t) => t.key === objectType)?.label}
         </h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -126,7 +126,7 @@ export default function FieldPermissionsSettingsPage() {
                       onClick={() => toggleRole(role.name)}
                       className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                         active
-                          ? 'bg-blue-600 text-white'
+                          ? 'bg-indigo-600 text-white'
                           : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
                       }`}
                     >
@@ -142,7 +142,7 @@ export default function FieldPermissionsSettingsPage() {
           <button
             onClick={add}
             disabled={createRule.isPending || !fieldName.trim() || selectedRoles.length === 0}
-            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
           >
             <Plus className="h-4 w-4" /> {createRule.isPending ? 'Adding…' : 'Add rule'}
           </button>
@@ -173,7 +173,7 @@ export default function FieldPermissionsSettingsPage() {
               {rows.map((rule, i) => (
                 <tr
                   key={rule.id}
-                  className={`border-b border-gray-50 ${i % 2 === 0 ? '' : 'bg-gray-50/50'} hover:bg-blue-50/30`}
+                  className={`border-b border-gray-50 ${i % 2 === 0 ? '' : 'bg-gray-50/50'} hover:bg-indigo-50/30`}
                 >
                   <td className="px-5 py-3 font-mono text-xs text-gray-900">{rule.fieldName}</td>
                   <td className="px-5 py-3">
@@ -184,7 +184,7 @@ export default function FieldPermissionsSettingsPage() {
                         rule.allowedRoles.map((r) => (
                           <span
                             key={r}
-                            className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
+                            className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700"
                           >
                             {r}
                           </span>

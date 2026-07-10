@@ -13,7 +13,7 @@ import {
 } from '@/hooks/use-org';
 
 const inputClass =
-  'mt-1 w-full rounded border border-gray-700 bg-gray-950 px-2 py-2 text-sm text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60';
+  'mt-1 w-full rounded border border-gray-700 bg-gray-950 px-2 py-2 text-sm text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-60';
 
 /**
  * Org assignment (manager / department / level / job title) for a single user.
@@ -148,7 +148,7 @@ export function OrgAssignmentPanel({
       </div>
       {canEdit ? (
         <div className="flex justify-end">
-          <Button onClick={save} isLoading={assign.isPending} className="bg-blue-600 hover:bg-blue-500">
+          <Button onClick={save} isLoading={assign.isPending} className="bg-indigo-600 hover:bg-indigo-500">
             Save org assignment
           </Button>
         </div>

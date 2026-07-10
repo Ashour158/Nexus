@@ -85,25 +85,32 @@ jobs:
         id: smoke_test
         uses: appleboy/ssh-action@v1
         if: always() && steps.ssh_deploy.outcome == 'success'
+        env:
+          DEPLOY_IMAGE_TAG: ${{ github.event.inputs.image_tag || github.sha }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT || 22 }}
+          envs: DEPLOY_IMAGE_TAG
           script_stop: true
           script: |
             set -euo pipefail
             echo "Running smoke tests..."
             cd /opt/nexus
             bash scripts/health-check.sh || {
-              echo "❌ Smoke tests failed — initiating rollback..."
-              docker compose down
-              docker compose up -d --wait
-              bash scripts/health-check.sh || exit 1
-              echo "✅ Rollback complete"
+              echo "❌ Smoke tests failed — rolling back to last known-good..."
+              # Restores the previously RECORDED good tag/commit. The old behaviour
+              # (`docker compose down && up`) restarted the SAME tag and never reverted.
+              bash scripts/rollback.sh || {
+                echo "❌ Rollback failed (nothing recorded, or restore errored)." >&2
+                exit 1
+              }
               exit 1
             }
             echo "✅ Smoke tests passed"
+            # Only now is this deploy known-good — record it as the rollback target.
+            IMAGE_TAG="$DEPLOY_IMAGE_TAG" bash scripts/rollback.sh record
 
       - name: Update deployment status
         if: always()

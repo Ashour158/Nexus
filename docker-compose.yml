@@ -175,7 +175,7 @@ services:
     container_name: nexus-auth
     restart: unless-stopped
     ports:
-      - '3000:3000'
+      - '127.0.0.1:3000:3000'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
@@ -203,7 +203,7 @@ services:
     container_name: nexus-crm
     restart: unless-stopped
     ports:
-      - '3001:3001'
+      - '127.0.0.1:3001:3001'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
@@ -239,7 +239,7 @@ services:
     container_name: nexus-finance
     restart: unless-stopped
     ports:
-      - '3002:3002'
+      - '127.0.0.1:3002:3002'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
@@ -266,7 +266,7 @@ services:
     container_name: nexus-billing
     restart: unless-stopped
     ports:
-      - '3011:3011'
+      - '127.0.0.1:3011:3011'
     environment:
       PORT: '3011'
       BILLING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_billing
@@ -322,7 +322,7 @@ services:
     container_name: nexus-activities
     restart: unless-stopped
     ports:
-      - '3043:3043'
+      - '127.0.0.1:3043:3043'
     environment:
       PORT: '3043'
       ACTIVITIES_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_activities
@@ -352,7 +352,7 @@ services:
     container_name: nexus-notes
     restart: unless-stopped
     ports:
-      - '3032:3032'
+      - '127.0.0.1:3032:3032'
     environment:
       PORT: '3032'
       NOTES_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_notes
@@ -388,7 +388,7 @@ services:
     container_name: nexus-notifications
     restart: unless-stopped
     ports:
-      - '3003:3003'
+      - '127.0.0.1:3003:3003'
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_notification
       KAFKA_BROKERS: kafka:29092
@@ -414,7 +414,7 @@ services:
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
     restart: unless-stopped
     ports:
-      - '3005:3005'
+      - '127.0.0.1:3005:3005'
     depends_on:
       kafka:
         condition: service_started
@@ -428,7 +428,7 @@ services:
     container_name: nexus-search
     restart: unless-stopped
     ports:
-      - '3006:3006'
+      - '127.0.0.1:3006:3006'
     environment:
       PORT: '3006'
       KAFKA_BROKERS: kafka:29092
@@ -452,7 +452,7 @@ services:
     container_name: nexus-workflow
     restart: unless-stopped
     ports:
-      - '3007:3007'
+      - '127.0.0.1:3007:3007'
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_workflow
       KAFKA_BROKERS: kafka:29092
@@ -473,7 +473,7 @@ services:
     container_name: nexus-integration
     restart: unless-stopped
     ports:
-      - '3012:3012'
+      - '127.0.0.1:3012:3012'
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_integration
       INTEGRATION_SECRET_KEY: nexus_integration_secret_key_32b
@@ -495,7 +495,7 @@ services:
     container_name: nexus-blueprint
     restart: unless-stopped
     ports:
-      - '3013:3013'
+      - '127.0.0.1:3013:3013'
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_blueprint
       KAFKA_BROKERS: kafka:29092
@@ -522,7 +522,7 @@ services:
     container_name: nexus-analytics
     restart: unless-stopped
     ports:
-      - '3008:3008'
+      - '127.0.0.1:3008:3008'
     environment:
       KAFKA_BROKERS: kafka:29092
       JWT_SECRET: ${JWT_SECRET}
@@ -660,7 +660,7 @@ services:
     container_name: nexus-comm
     restart: unless-stopped
     ports:
-      - '3009:3009'
+      - '127.0.0.1:3009:3009'
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_comm
       KAFKA_BROKERS: kafka:29092
@@ -688,7 +688,7 @@ services:
     container_name: nexus-storage
     restart: unless-stopped
     ports:
-      - '3010:3010'
+      - '127.0.0.1:3010:3010'
     environment:
       MINIO_ENDPOINT: minio
       MINIO_PORT: '9000'
@@ -712,7 +712,7 @@ services:
     container_name: nexus-approval
     restart: unless-stopped
     ports:
-      - '3014:3014'
+      - '127.0.0.1:3014:3014'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
@@ -737,7 +737,7 @@ services:
     container_name: nexus-data
     restart: unless-stopped
     ports:
-      - '3015:3015'
+      - '127.0.0.1:3015:3015'
     environment:
       PORT: '3015'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_data
@@ -771,7 +771,7 @@ services:
     container_name: nexus-document
     restart: unless-stopped
     ports:
-      - '3016:3016'
+      - '127.0.0.1:3016:3016'
     environment:
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
@@ -794,7 +794,7 @@ services:
     container_name: nexus-chatbot
     restart: unless-stopped
     ports:
-      - '3017:3017'
+      - '127.0.0.1:3017:3017'
     environment:
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
@@ -819,8 +819,13 @@ services:
     container_name: nexus-cadence
     restart: unless-stopped
     ports:
-      - '3018:3018'
+      - '127.0.0.1:3018:3018'
     environment:
+      # crm calls POST /api/v1/internal/cadence/auto-enroll; the step-runner calls
+      # crm's /internal/automation/activities — both use x-service-token.
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3018'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_cadence
       KAFKA_BROKERS: kafka:29092
@@ -841,8 +846,12 @@ services:
     container_name: nexus-territory
     restart: unless-stopped
     ports:
-      - '3019:3019'
+      - '127.0.0.1:3019:3019'
     environment:
+      # crm calls POST /api/v1/internal/territories/assign with x-service-token.
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3019'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_territory
       KAFKA_BROKERS: kafka:29092
@@ -862,7 +871,7 @@ services:
     container_name: nexus-planning
     restart: unless-stopped
     ports:
-      - '3020:3020'
+      - '127.0.0.1:3020:3020'
     environment:
       PORT: '3020'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_planning
@@ -888,7 +897,7 @@ services:
     container_name: nexus-reporting
     restart: unless-stopped
     ports:
-      - '3021:3021'
+      - '127.0.0.1:3021:3021'
     environment:
       PORT: '3021'
       REPORTING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_reporting
@@ -913,7 +922,7 @@ services:
     container_name: nexus-portal
     restart: unless-stopped
     ports:
-      - '3022:3022'
+      - '127.0.0.1:3022:3022'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
@@ -940,7 +949,7 @@ services:
     container_name: nexus-knowledge
     restart: unless-stopped
     ports:
-      - '3023:3023'
+      - '127.0.0.1:3023:3023'
     environment:
       PORT: '3023'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_knowledge
@@ -960,7 +969,7 @@ services:
     container_name: nexus-incentive
     restart: unless-stopped
     ports:
-      - '3024:3024'
+      - '127.0.0.1:3024:3024'
     environment:
       PORT: '3024'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_incentive
@@ -982,7 +991,7 @@ services:
     container_name: nexus-email-sync
     restart: unless-stopped
     ports:
-      - '3026:3026'
+      - '127.0.0.1:3026:3026'
     environment:
       EMAIL_SYNC_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_email_sync
       KAFKA_BROKERS: kafka:29092
@@ -1003,7 +1012,7 @@ services:
     container_name: nexus-metadata
     restart: unless-stopped
     ports:
-      - '3004:3004'
+      - '127.0.0.1:3004:3004'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
@@ -1042,7 +1051,7 @@ services:
     container_name: nexus-audit-consumer
     restart: unless-stopped
     ports:
-      - '3028:3028'
+      - '127.0.0.1:3028:3028'
     environment:
       PORT: '3028'
       AUDIT_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_audit
@@ -1064,7 +1073,7 @@ services:
     container_name: nexus-outbox-relay
     restart: unless-stopped
     ports:
-      - '3027:3027'
+      - '127.0.0.1:3027:3027'
     environment:
       PORT: '3027'
       KAFKA_BROKERS: kafka:29092

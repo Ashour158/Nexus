@@ -19,6 +19,7 @@ import { createCatalogService } from './services/catalog.service.js';
 import { createSyncService } from './services/sync.service.js';
 import { createOauthService } from './services/oauth.service.js';
 import { createGoogleCalendarService } from './services/google-calendar.service.js';
+import { createMicrosoftCalendarService } from './services/microsoft-calendar.service.js';
 import { createGoogleGmailService } from './services/google-gmail.service.js';
 import { createGeocodingService } from './services/geocoding.service.js';
 import { registerWebhooksRoutes } from './routes/webhooks.routes.js';
@@ -84,6 +85,7 @@ const catalog = createCatalogService(prisma);
 const sync = createSyncService(prisma, producer, crypto);
 const oauth = createOauthService(prisma, crypto);
 const calendar = createGoogleCalendarService(prisma, crypto);
+const microsoftCalendar = createMicrosoftCalendarService(prisma, crypto, oauth);
 const gmail = createGoogleGmailService(prisma, crypto, oauth);
 const geocoding = createGeocodingService(prisma);
 
@@ -129,6 +131,6 @@ await startService(app, port, async (a) => {
   await registerCatalogRoutes(a, catalog);
   await registerSyncRoutes(a, sync);
   await registerOauthRoutes(a, oauth);
-  await registerCalendarRoutes(a, prisma, calendar, crypto);
+  await registerCalendarRoutes(a, prisma, calendar, crypto, microsoftCalendar);
   await registerEmailRoutes(a, gmail);
 });

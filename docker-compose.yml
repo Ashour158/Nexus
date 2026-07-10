@@ -210,6 +210,11 @@ services:
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_crm
       METADATA_SERVICE_URL: http://metadata-service:3004
+      # Lead/deal create -> territory auto-routing + cadence auto-enroll (fail-open).
+      TERRITORY_SERVICE_URL: http://territory-service:3019
+      CADENCE_SERVICE_URL: http://cadence-service:3018
+      # Meeting calendar sync (Google wired; MS Graph in progress).
+      INTEGRATION_SERVICE_URL: http://integration-service:3012
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
@@ -915,6 +920,10 @@ services:
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3022'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_portal
+      # Portal reads the customer's own quotes/orders/invoices/tickets via
+      # internal account-scoped endpoints on finance/ticket.
+      FINANCE_SERVICE_URL: http://finance-service:3002
+      TICKET_SERVICE_URL: http://ticket-service:3029
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}

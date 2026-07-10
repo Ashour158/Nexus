@@ -362,6 +362,18 @@ export function createInvoicesService(
       if (invoice.status === 'PAID') {
         throw new ConflictError('Invoice', 'paid');
       }
+      // COM-02 (root cause): a payment in a different currency than the invoice
+      // cannot be summed against the invoice total (no FX rate is threaded into
+      // this path). Previously such payments were accepted, then silently
+      // EXCLUDED from the paid-total below — leaving the invoice OPEN and
+      // dunning a customer who had actually paid. Reject at the source instead
+      // of accepting money we cannot reconcile.
+      if (data.currency !== invoice.currency) {
+        throw new BusinessRuleError(
+          `Payment currency ${data.currency} does not match invoice currency ${invoice.currency}. ` +
+            `Convert the payment before recording it, or issue the invoice in ${data.currency}.`
+        );
+      }
 
       const { payment, updated } = await prisma.$transaction(async (tx) => {
         const p = await tx.payment.create({

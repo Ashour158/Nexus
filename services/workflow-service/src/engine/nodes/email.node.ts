@@ -21,7 +21,7 @@ export async function handleEmailNode(
     body?: string;
     actionUrl?: string;
   };
-  if (!context.producer) return { output: { skipped: true, reason: 'no_producer' } };
+  if (!context.simulate && !context.producer) return { output: { skipped: true, reason: 'no_producer' } };
 
   const to =
     cfg.to ??
@@ -31,9 +31,13 @@ export async function handleEmailNode(
     : String(context.triggerPayload.ownerId ?? '') || undefined;
   if (!to && !recipientId) return { output: { skipped: true, reason: 'missing_recipient' } };
 
-  await context.producer.publish(TOPICS.NOTIFICATIONS, {
+  // AU-5: forward the incremented cause-chain depth (loop guard).
+  const nextDepth = (context.causationDepth ?? 0) + 1;
+  const event = {
     type: 'notification.requested',
     tenantId: context.tenantId,
+    causationDepth: nextDepth,
+    ...(context.rootEventId ? { rootEventId: context.rootEventId } : {}),
     payload: {
       channel: 'email',
       to,
@@ -45,7 +49,14 @@ export async function handleEmailNode(
       actionUrl: cfg.actionUrl,
       metadata: { executionId: context.executionId, workflowId: context.workflowId },
     },
-  });
+  };
+
+  // Dry-run (AU-3): describe the event that would be published; do not publish.
+  if (context.simulate) {
+    return { output: { simulated: true, wouldPublish: { topic: TOPICS.NOTIFICATIONS, event } } };
+  }
+
+  await context.producer!.publish(TOPICS.NOTIFICATIONS, event);
 
   return { output: { delivered: 'notification.requested', channel: 'email', to: to ?? null, recipientId: recipientId ?? null } };
 }

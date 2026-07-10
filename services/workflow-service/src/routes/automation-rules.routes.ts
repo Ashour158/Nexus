@@ -80,6 +80,16 @@ const RunsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
+const TestSchema = z.object({
+  // A sample domain-event payload to evaluate the rule against (dry-run).
+  payload: z.record(z.unknown()).default({}),
+});
+
+const VersionParamSchema = z.object({
+  id: z.string().cuid(),
+  version: z.coerce.number().int().min(1),
+});
+
 export async function registerAutomationRulesRoutes(
   app: FastifyInstance,
   prisma: WorkflowPrisma
@@ -140,8 +150,58 @@ export async function registerAutomationRulesRoutes(
           const parsed = UpdateRuleSchema.safeParse(request.body);
           if (!parsed.success) throw new ValidationError('Invalid body', parsed.error.flatten());
           const jwt = request.user as JwtPayload;
-          const row = await svc.update(jwt.tenantId, id, parsed.data as Partial<AutomationRuleInput>);
+          const row = await svc.update(jwt.tenantId, id, parsed.data as Partial<AutomationRuleInput>, jwt.sub);
           return reply.send({ success: true, data: row });
+        }
+      );
+
+      // ─── AU-3: dry-run / test ────────────────────────────────────────────
+      // Evaluate conditions against a sample payload and SIMULATE the actions
+      // (resolve target URL/body/event — no side effects, no run recorded).
+      r.post(
+        '/automation-rules/:id/test',
+        { preHandler: requirePermission(PERMISSIONS.WORKFLOWS.READ) },
+        async (request, reply) => {
+          const id = IdParamSchema.parse(request.params).id;
+          const parsed = TestSchema.safeParse(request.body ?? {});
+          if (!parsed.success) throw new ValidationError('Invalid body', parsed.error.flatten());
+          const jwt = request.user as JwtPayload;
+          const result = await svc.test(jwt.tenantId, id, parsed.data.payload);
+          return reply.send({ success: true, data: result });
+        }
+      );
+
+      // ─── AU-3: version history + rollback ────────────────────────────────
+      r.get(
+        '/automation-rules/:id/versions',
+        { preHandler: requirePermission(PERMISSIONS.WORKFLOWS.READ) },
+        async (request, reply) => {
+          const id = IdParamSchema.parse(request.params).id;
+          const jwt = request.user as JwtPayload;
+          const rows = await svc.listVersions(jwt.tenantId, id);
+          return reply.send({ success: true, data: rows });
+        }
+      );
+
+      r.get(
+        '/automation-rules/:id/versions/:version',
+        { preHandler: requirePermission(PERMISSIONS.WORKFLOWS.READ) },
+        async (request, reply) => {
+          const params = VersionParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const row = await svc.getVersion(jwt.tenantId, params.id, params.version);
+          return reply.send({ success: true, data: row });
+        }
+      );
+
+      r.post(
+        '/automation-rules/:id/rollback/:version',
+        { preHandler: requirePermission(PERMISSIONS.WORKFLOWS.UPDATE) },
+        async (request, reply) => {
+          const params = VersionParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const result = await svc.rollback(jwt.tenantId, params.id, params.version, jwt.sub);
+          return reply.send({ success: true, data: result });
         }
       );
 

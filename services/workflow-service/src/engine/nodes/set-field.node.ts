@@ -1,5 +1,6 @@
 import type { ExecutionContext, NodeResult, WorkflowNode } from '../types.js';
 import { handleActionNode } from './action.node.js';
+import { causationBody, causationHeaders } from './causation.util.js';
 
 /** Entities the CRM internal set-field route accepts (singular). */
 const INTERNAL_ENTITIES = new Set(['deal', 'lead', 'contact', 'account']);
@@ -40,12 +41,13 @@ export async function handleSetFieldNode(
       config: {
         url: `${base}/api/v1/internal/automation/set-field`,
         method: 'POST',
-        headers: { 'x-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '' },
+        headers: { 'x-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '', ...causationHeaders(context) },
         body: {
           tenantId: context.tenantId,
           entity,
           id,
           fields: { [cfg.field]: cfg.value },
+          ...causationBody(context),
         },
       },
     },

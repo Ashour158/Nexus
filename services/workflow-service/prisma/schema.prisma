@@ -275,10 +275,32 @@ model AutomationRule {
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
   runs         AutomationRuleRun[]
+  versions     AutomationRuleVersion[]
 
   @@index([tenantId, module, triggerEvent])
   @@index([tenantId, isActive])
   @@unique([id, tenantId])
+}
+
+// Immutable snapshot of a rule's authored state (conditions + actions + meta),
+// written on every create/update/rollback. Powers version history + rollback
+// (AU-3): a mis-authored edit can be reverted to any prior committed state.
+model AutomationRuleVersion {
+  id        String         @id @default(cuid())
+  tenantId  String
+  ruleId    String
+  rule      AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  version   Int            // monotonic per rule, starting at 1
+  // { name, description, module, triggerEvent, conditions, actions, isActive }
+  snapshot  Json
+  // Free-text note: 'create' | 'update' | 'rollback:<n>' | 'pre-rollback'
+  reason    String?
+  createdBy String
+  createdAt DateTime       @default(now())
+
+  @@unique([ruleId, version])
+  @@index([tenantId, ruleId])
+  @@index([ruleId, version])
 }
 
 model AutomationRuleRun {

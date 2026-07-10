@@ -1,6 +1,7 @@
 import type { ExecutionContext, NodeResult, WorkflowNode } from '../types.js';
 import { handleActionNode } from './action.node.js';
 import { normaliseEntity } from './set-field.node.js';
+import { causationBody, causationHeaders } from './causation.util.js';
 
 export async function handleAssignNode(
   node: WorkflowNode,
@@ -25,12 +26,13 @@ export async function handleAssignNode(
       config: {
         url: `${base}/api/v1/internal/automation/assign`,
         method: 'POST',
-        headers: { 'x-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '' },
+        headers: { 'x-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '', ...causationHeaders(context) },
         body: {
           tenantId: context.tenantId,
           entity,
           id,
           ownerId,
+          ...causationBody(context),
         },
       },
     },

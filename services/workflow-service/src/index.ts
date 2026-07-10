@@ -17,6 +17,7 @@ import { createWorkflowPrisma } from './prisma.js';
 import { registerRoutes } from './routes/index.js';
 import { startTriggerConsumer } from './consumers/trigger.consumer.js';
 import { startAutomationConsumer } from './consumers/automation.consumer.js';
+import { startAutomationDlqReplayConsumer } from './consumers/automation-dlq.consumer.js';
 import { startBranchConsumer } from './consumers/branch.consumer.js';
 import { startApprovalConsumer } from './consumers/approval.consumer.js';
 import { startGdprConsumer } from './consumers/gdpr.consumer.js';
@@ -92,6 +93,7 @@ let approvalConsumer: Awaited<ReturnType<typeof startApprovalConsumer>> | null =
 let gdprConsumer: Awaited<ReturnType<typeof startGdprConsumer>> | null = null;
 let journeyEnrollmentConsumer: Awaited<ReturnType<typeof startJourneyEnrollmentConsumer>> | null = null;
 let automationConsumer: Awaited<ReturnType<typeof startAutomationConsumer>> | null = null;
+let automationDlqReplayConsumer: Awaited<ReturnType<typeof startAutomationDlqReplayConsumer>> | null = null;
 try {
   await producer.connect();
   await startTriggerConsumer(prisma, producer);
@@ -100,6 +102,15 @@ try {
     automationConsumer = await startAutomationConsumer(prisma, producer);
   } catch (err) {
     app.log.warn({ err }, 'Automation-rules consumer failed to start');
+  }
+  // AU-4 DLQ replay — opt-in re-driver for parked automation events.
+  if (process.env.AUTOMATION_DLQ_REPLAY_ENABLED === 'true') {
+    try {
+      automationDlqReplayConsumer = await startAutomationDlqReplayConsumer(prisma, producer);
+      app.log.info('Automation DLQ replay consumer started');
+    } catch (err) {
+      app.log.warn({ err }, 'Automation DLQ replay consumer failed to start');
+    }
   }
   branchConsumer = await startBranchConsumer(prisma, producer);
   approvalConsumer = await startApprovalConsumer(prisma, producer, app.log);
@@ -121,6 +132,7 @@ app.addHook('onClose', async () => {
   try { await gdprConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'GDPR consumer disconnect failed'); }
   try { await journeyEnrollmentConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Journey enrollment consumer disconnect failed'); }
   try { await automationConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Automation-rules consumer disconnect failed'); }
+  try { await automationDlqReplayConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Automation DLQ replay consumer disconnect failed'); }
   try { await producer.disconnect(); } catch (err) { app.log.warn({ err }, 'Producer disconnect failed'); }
 });
 

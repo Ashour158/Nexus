@@ -22,15 +22,20 @@ export async function handleNotifyNode(
   };
   const userId = String(context.triggerPayload[cfg.userIdField ?? 'ownerId'] ?? '');
   if (!userId) return { output: { skipped: true, reason: 'missing_recipient' } };
-  if (!context.producer) return { output: { skipped: true, reason: 'no_producer' } };
+  if (!context.simulate && !context.producer) return { output: { skipped: true, reason: 'no_producer' } };
 
   const entityId = cfg.entityIdField
     ? String(context.triggerPayload[cfg.entityIdField] ?? '') || undefined
     : undefined;
 
-  await context.producer.publish(TOPICS.NOTIFICATIONS, {
+  // AU-5: forward the incremented cause-chain depth so any rule listening on the
+  // resulting event sees the running depth (loop guard).
+  const nextDepth = (context.causationDepth ?? 0) + 1;
+  const event = {
     type: 'notification.requested',
     tenantId: context.tenantId,
+    causationDepth: nextDepth,
+    ...(context.rootEventId ? { rootEventId: context.rootEventId } : {}),
     payload: {
       channel: 'in_app',
       recipientId: userId,
@@ -42,7 +47,14 @@ export async function handleNotifyNode(
       entityId,
       metadata: { executionId: context.executionId, workflowId: context.workflowId },
     },
-  });
+  };
+
+  // Dry-run (AU-3): describe the event that would be published; do not publish.
+  if (context.simulate) {
+    return { output: { simulated: true, wouldPublish: { topic: TOPICS.NOTIFICATIONS, event } } };
+  }
+
+  await context.producer!.publish(TOPICS.NOTIFICATIONS, event);
 
   return { output: { delivered: 'notification.requested', recipientId: userId, channel: 'in_app' } };
 }

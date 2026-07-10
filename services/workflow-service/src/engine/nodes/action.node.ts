@@ -67,6 +67,28 @@ export async function handleActionNode(
   const method = cfg.method ?? 'POST';
   const body = cfg.body ?? context.triggerPayload;
 
+  // Dry-run (AU-3): the full request is resolved above (URL, method, body, SSRF
+  // checks) but we return the plan instead of issuing the fetch. Any secret in
+  // the headers (e.g. x-service-token) is redacted so `/test` output is safe to
+  // surface in the admin UI.
+  if (context.simulate) {
+    const safeHeaders: Record<string, string> = {};
+    for (const [k, v] of Object.entries(cfg.headers ?? {})) {
+      safeHeaders[k] = /token|authorization|secret|key/i.test(k) ? '***redacted***' : v;
+    }
+    return {
+      output: {
+        simulated: true,
+        request: {
+          url: cfg.url,
+          method,
+          headers: safeHeaders,
+          body: method === 'GET' ? undefined : body,
+        },
+      },
+    };
+  }
+
   // The fetch + response-status check live INSIDE the resilience callback so a
   // non-2xx response counts as a failed attempt: 5xx/429 is retried, and the
   // final failure propagates as a throw (never resolves as success — RR-C2).

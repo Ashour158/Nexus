@@ -1,7 +1,14 @@
 import { Decimal } from 'decimal.js';
 import { NexusProducer, TOPICS } from '@nexus/kafka';
 import type { BillingPrisma } from '../prisma.js';
-import { aggregateUnbilledUsage, computeInvoiceBalance, money, toDecimal } from './billing-math.js';
+import {
+  aggregateUnbilledUsage,
+  computeInvoiceBalance,
+  computeTax,
+  money,
+  resolveTaxRatePercent,
+  toDecimal,
+} from './billing-math.js';
 import { attemptDunningCharge, getStripe } from './stripe.js';
 
 /**
@@ -13,11 +20,17 @@ import { attemptDunningCharge, getStripe } from './stripe.js';
  * Renewal invoices carry a deterministic number (`SUB-<sub>-<periodEnd>`) so the
  * unique `[tenantId, number]` constraint makes re-invoicing a period a no-op.
  *
- * Each tick performs four passes:
+ * Each tick performs five passes:
  *   1. detectPastDue — ACTIVE subs with an overdue unpaid invoice → PAST_DUE.
- *   2. renewals      — due periods with autoRenew → advance + invoice + emit.
- *   3. cancelAtPeriodEnd — due periods flagged to cancel → CANCELLED.
- *   4. dunning       — PAST_DUE subs → day 1/3/5/7 retries, then EXPIRE.
+ *   2. convertTrials — TRIALING subs whose trialEnd elapsed → ACTIVE + first
+ *      (taxed) invoice, so trials actually start billing.
+ *   3. renewals      — due periods with autoRenew → advance + invoice + emit.
+ *   4. cancelAtPeriodEnd — due periods flagged to cancel → CANCELLED.
+ *   5. dunning       — PAST_DUE subs → day 1/3/5/7 retries, then EXPIRE.
+ *
+ * Renewal AND trial-conversion invoices carry tenant tax via
+ * `resolveTaxRatePercent` (see billing-math) so recurring revenue is never
+ * invoiced tax-free. finance-service remains the canonical tax authority.
  *
  * Dunning performs a REAL payment retry (`stripe.invoices.pay()`) against the
  * customer's stored payment method when STRIPE_SECRET_KEY is set; a successful
@@ -73,6 +86,7 @@ function periodStamp(d: Date): string {
 
 export interface PollerCounts {
   pastDue: number;
+  trialsConverted: number;
   renewed: number;
   cancelled: number;
   dunningRetries: number;
@@ -140,7 +154,220 @@ async function detectPastDue(
   return count;
 }
 
-// ─── Pass 2: renewals ───────────────────────────────────────────────────────────
+// Minimal shape the invoice issuer needs from a subscription+plan row.
+interface SubscriptionForInvoice {
+  id: string;
+  tenantId: string;
+  customerId: string;
+  plan: {
+    name?: string | null;
+    amount?: unknown;
+    currency?: string | null;
+    taxRate?: unknown;
+  } | null;
+}
+
+interface IssuedInvoice {
+  invoiceId: string | null;
+  amount: string;
+  currency: string;
+  taxAmount: string;
+}
+
+/**
+ * Builds and persists ONE subscription invoice (recurring base + metered usage +
+ * tenant tax), idempotent on the unique `[tenantId, number]`. Shared by the
+ * renewal and trial-conversion passes so both go through the SAME taxed path —
+ * there is a single money-math authority in billing, and finance owns the
+ * canonical cross-service tax calc (see resolveTaxRatePercent).
+ *
+ * Event emission is left to the caller (renewal vs. activation differ). Metered
+ * usage in [usageFrom, usageTo] is folded in and marked billed against the new
+ * invoice; the `billedInvoiceId: null` guard keeps that idempotent.
+ */
+async function issueSubscriptionInvoice(
+  prisma: BillingPrisma,
+  log: LoggerLike,
+  args: {
+    sub: SubscriptionForInvoice;
+    number: string;
+    labelStart: Date;
+    labelEnd: Date;
+    usageFrom: Date;
+    usageTo: Date;
+    dueDate: Date;
+    now: Date;
+  }
+): Promise<IssuedInvoice> {
+  const { sub, number, labelStart, labelEnd, usageFrom, usageTo, dueDate, now } = args;
+  const currency = sub.plan?.currency ?? 'USD';
+
+  // Base recurring charge + metered usage for the billed window.
+  const base = money(toDecimal(sub.plan?.amount ?? 0));
+  const usage = await aggregateUnbilledUsage(prisma, {
+    tenantId: sub.tenantId,
+    subscriptionId: sub.id,
+    from: usageFrom,
+    to: usageTo,
+  });
+  const subtotal = money(base.plus(usage.total));
+
+  // Tenant tax — finance owns the canonical calc; we replicate the default rate.
+  const taxRate = resolveTaxRatePercent(sub.plan);
+  const tax = computeTax(subtotal, taxRate);
+  const total = money(subtotal.plus(tax));
+
+  const lineItems = [
+    {
+      description: `${sub.plan?.name ?? 'Subscription'} (${labelStart.toISOString().slice(0, 10)} → ${labelEnd.toISOString().slice(0, 10)})`,
+      quantity: 1,
+      unitPrice: base.toNumber(),
+    },
+    ...usage.lines.map((l) => ({
+      description: `Usage: ${l.metric}`,
+      quantity: Number(l.quantity),
+      unitPrice: Number(l.unitPrice),
+    })),
+    ...(tax.greaterThan(0)
+      ? [
+          {
+            description: `Tax (${taxRate.toFixed(2)}%)`,
+            quantity: 1,
+            unitPrice: tax.toNumber(),
+          },
+        ]
+      : []),
+  ];
+
+  let invoiceId: string | null = null;
+  try {
+    const invoice = await prisma.invoice.create({
+      data: {
+        tenantId: sub.tenantId,
+        subscriptionId: sub.id,
+        customerId: sub.customerId,
+        number,
+        amount: total.toFixed(2),
+        currency,
+        status: 'OPEN',
+        dueDate,
+        lineItems,
+      },
+    });
+    invoiceId = invoice.id;
+  } catch (err) {
+    // Unique [tenantId, number] → this period was already invoiced. Resolve the
+    // existing id so the caller can still emit correctly. Idempotent.
+    if ((err as { code?: string }).code === 'P2002') {
+      log.info({ subscriptionId: sub.id, number }, 'Subscription invoice already exists; reusing');
+      const existing = await prisma.invoice.findFirst({
+        where: { tenantId: sub.tenantId, number },
+        select: { id: true },
+      });
+      invoiceId = existing?.id ?? null;
+    } else {
+      throw err;
+    }
+  }
+
+  // Mark the metered usage records as billed against the new invoice.
+  if (invoiceId && usage.recordIds.length > 0) {
+    await prisma.usageRecord.updateMany({
+      where: { id: { in: usage.recordIds }, billedInvoiceId: null },
+      data: { billedInvoiceId: invoiceId, billedAt: now },
+    });
+  }
+
+  return { invoiceId, amount: total.toFixed(2), currency, taxAmount: tax.toFixed(2) };
+}
+
+// ─── Pass 2: convert expired trials ──────────────────────────────────────────────
+// TRIALING subscriptions whose trialEnd has elapsed are transitioned to ACTIVE
+// and issued their first (taxed) invoice for the current period. Without this,
+// trials store trialEnd but no pass ever consults it, so they never convert or
+// bill. Idempotent (deterministic invoice number) + reentrancy-guarded (only the
+// tick that wins the TRIALING→ACTIVE claim emits).
+async function convertTrials(
+  prisma: BillingPrisma,
+  producer: NexusProducer,
+  log: LoggerLike,
+  now: Date
+): Promise<number> {
+  const due = await prisma.subscription.findMany({
+    where: {
+      status: 'TRIALING',
+      trialEnd: { not: null, lte: now },
+      deletedAt: null,
+    },
+    include: { plan: true },
+    take: MAX_PER_TICK,
+    orderBy: { trialEnd: 'asc' },
+  });
+
+  let count = 0;
+  for (const sub of due) {
+    try {
+      // Distinct from renewal numbers (which key off period END) so a trial's
+      // first invoice never collides with a later renewal for the same period.
+      const number = `SUB-${sub.id}-INIT-${periodStamp(sub.currentPeriodStart)}`;
+      const issued = await issueSubscriptionInvoice(prisma, log, {
+        sub,
+        number,
+        labelStart: sub.currentPeriodStart,
+        labelEnd: sub.currentPeriodEnd,
+        usageFrom: sub.currentPeriodStart,
+        usageTo: now,
+        dueDate: now,
+        now,
+      });
+
+      // Claim the conversion: only the tick that flips TRIALING→ACTIVE emits, so
+      // concurrent ticks / restarts never double-emit. The invoice above is
+      // already idempotent on its own.
+      const claim = await prisma.subscription.updateMany({
+        where: { id: sub.id, status: 'TRIALING' },
+        data: { status: 'ACTIVE' },
+      });
+      if (claim.count === 0) continue; // another tick already converted it
+      count += 1;
+
+      await producer.publish(TOPICS.PAYMENTS, {
+        type: 'subscription.activated',
+        tenantId: sub.tenantId,
+        payload: {
+          subscriptionId: sub.id,
+          planId: sub.planId,
+          reason: 'trial_converted',
+          invoiceId: issued.invoiceId,
+          invoiceNumber: number,
+          amount: issued.amount,
+          taxAmount: issued.taxAmount,
+          currency: issued.currency,
+        },
+      });
+      if (issued.invoiceId) {
+        await producer.publish(TOPICS.INVOICES, {
+          type: 'invoice.created',
+          tenantId: sub.tenantId,
+          payload: {
+            invoiceId: issued.invoiceId,
+            number,
+            subscriptionId: sub.id,
+            customerId: sub.customerId,
+            amount: issued.amount,
+            currency: issued.currency,
+            source: 'subscription.trial_conversion',
+          },
+        });
+      }
+    } catch (err) {
+      log.warn({ err, subscriptionId: sub.id }, 'convertTrials: skipping subscription');
+    }
+  }
+  return count;
+}
+
+// ─── Pass 3: renewals ───────────────────────────────────────────────────────────
 async function renewDue(
   prisma: BillingPrisma,
   producer: NexusProducer,
@@ -183,62 +410,18 @@ async function renewDue(
       });
       if (claim.count === 0) continue; // another tick already renewed it
 
-      // Base recurring charge + metered usage for the period just ended.
-      const base = money(toDecimal(sub.plan?.amount ?? 0));
-      const usage = await aggregateUnbilledUsage(prisma, {
-        tenantId: sub.tenantId,
-        subscriptionId: sub.id,
-        from: oldStart,
-        to: oldEnd,
-      });
-      const total = money(base.plus(usage.total));
-
-      const lineItems = [
-        {
-          description: `${sub.plan?.name ?? 'Subscription'} (${oldStart.toISOString().slice(0, 10)} → ${oldEnd.toISOString().slice(0, 10)})`,
-          quantity: 1,
-          unitPrice: base.toNumber(),
-        },
-        ...usage.lines.map((l) => ({
-          description: `Usage: ${l.metric}`,
-          quantity: Number(l.quantity),
-          unitPrice: Number(l.unitPrice),
-        })),
-      ];
-
+      // Base + usage + tenant tax for the period just ended (shared taxed path).
       const number = `SUB-${sub.id}-${periodStamp(oldEnd)}`;
-      let invoiceId: string | null = null;
-      try {
-        const invoice = await prisma.invoice.create({
-          data: {
-            tenantId: sub.tenantId,
-            subscriptionId: sub.id,
-            customerId: sub.customerId,
-            number,
-            amount: total.toFixed(2),
-            currency: sub.plan?.currency ?? 'USD',
-            status: 'OPEN',
-            dueDate: newStart,
-            lineItems,
-          },
-        });
-        invoiceId = invoice.id;
-      } catch (err) {
-        // Unique [tenantId, number] → this period was already invoiced. Idempotent.
-        if ((err as { code?: string }).code === 'P2002') {
-          log.info({ subscriptionId: sub.id, number }, 'Renewal invoice already exists; skipping');
-        } else {
-          throw err;
-        }
-      }
-
-      // Mark the metered usage records as billed against the new invoice.
-      if (invoiceId && usage.recordIds.length > 0) {
-        await prisma.usageRecord.updateMany({
-          where: { id: { in: usage.recordIds }, billedInvoiceId: null },
-          data: { billedInvoiceId: invoiceId, billedAt: now },
-        });
-      }
+      const issued = await issueSubscriptionInvoice(prisma, log, {
+        sub,
+        number,
+        labelStart: oldStart,
+        labelEnd: oldEnd,
+        usageFrom: oldStart,
+        usageTo: oldEnd,
+        dueDate: newStart,
+        now,
+      });
 
       count += 1;
       await producer.publish(TOPICS.PAYMENTS, {
@@ -247,25 +430,26 @@ async function renewDue(
         payload: {
           subscriptionId: sub.id,
           planId: sub.planId,
-          invoiceId,
+          invoiceId: issued.invoiceId,
           invoiceNumber: number,
           currentPeriodStart: newStart.toISOString(),
           currentPeriodEnd: newEnd.toISOString(),
-          amount: total.toFixed(2),
-          currency: sub.plan?.currency ?? 'USD',
+          amount: issued.amount,
+          taxAmount: issued.taxAmount,
+          currency: issued.currency,
         },
       });
-      if (invoiceId) {
+      if (issued.invoiceId) {
         await producer.publish(TOPICS.INVOICES, {
           type: 'invoice.created',
           tenantId: sub.tenantId,
           payload: {
-            invoiceId,
+            invoiceId: issued.invoiceId,
             number,
             subscriptionId: sub.id,
             customerId: sub.customerId,
-            amount: total.toFixed(2),
-            currency: sub.plan?.currency ?? 'USD',
+            amount: issued.amount,
+            currency: issued.currency,
             source: 'subscription.renewal',
           },
         });
@@ -277,7 +461,7 @@ async function renewDue(
   return count;
 }
 
-// ─── Pass 3: cancelAtPeriodEnd ──────────────────────────────────────────────────
+// ─── Pass 4: cancelAtPeriodEnd ──────────────────────────────────────────────────
 async function cancelAtPeriodEnd(
   prisma: BillingPrisma,
   producer: NexusProducer,
@@ -315,7 +499,7 @@ async function cancelAtPeriodEnd(
   return count;
 }
 
-// ─── Pass 4: dunning ────────────────────────────────────────────────────────────
+// ─── Pass 5: dunning ────────────────────────────────────────────────────────────
 async function runDunning(
   prisma: BillingPrisma,
   producer: NexusProducer,
@@ -456,10 +640,18 @@ async function tick(
 ): Promise<PollerCounts> {
   const now = new Date();
   const pastDue = await detectPastDue(prisma, producer, log, now);
+  const trialsConverted = await convertTrials(prisma, producer, log, now);
   const renewed = await renewDue(prisma, producer, log, now);
   const cancelled = await cancelAtPeriodEnd(prisma, producer, log, now);
   const dunning = await runDunning(prisma, producer, log, now);
-  return { pastDue, renewed, cancelled, dunningRetries: dunning.retries, expired: dunning.expired };
+  return {
+    pastDue,
+    trialsConverted,
+    renewed,
+    cancelled,
+    dunningRetries: dunning.retries,
+    expired: dunning.expired,
+  };
 }
 
 export function startSubscriptionPoller(
@@ -472,7 +664,14 @@ export function startSubscriptionPoller(
   let running = false;
 
   const runOnce = async (): Promise<PollerCounts> => {
-    const empty: PollerCounts = { pastDue: 0, renewed: 0, cancelled: 0, dunningRetries: 0, expired: 0 };
+    const empty: PollerCounts = {
+      pastDue: 0,
+      trialsConverted: 0,
+      renewed: 0,
+      cancelled: 0,
+      dunningRetries: 0,
+      expired: 0,
+    };
     if (running) return empty;
     running = true;
     try {

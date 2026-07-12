@@ -28,10 +28,10 @@ export function TicketStatusPill({ status }: { status: TicketStatus }) {
 }
 
 const PRIORITY_STYLE: Record<TicketPriority, string> = {
-  LOW: 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800/50 dark:text-slate-400 dark:border-slate-700',
-  MEDIUM: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-300 dark:border-indigo-800',
-  HIGH: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800',
-  URGENT: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-800',
+  LOW: 'bg-surface-container-low text-on-surface-variant border-outline-variant dark:bg-surface-container-high/50 dark:text-on-surface-variant dark:border-outline-variant',
+  MEDIUM: 'bg-primary-container text-primary border-primary/40 ',
+  HIGH: 'bg-warning-container text-warning border-warning/30 ',
+  URGENT: 'bg-error-container text-error border-error/30 ',
 };
 
 export function TicketPriorityPill({ priority }: { priority: TicketPriority }) {
@@ -50,7 +50,7 @@ export function TicketPriorityPill({ priority }: { priority: TicketPriority }) {
 export function SlaBreachBadge({ breached }: { breached: boolean }) {
   if (!breached) return null;
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300">
+    <span className="inline-flex items-center gap-1 rounded-full border border-error/30 bg-error-container px-2 py-0.5 text-xs font-medium text-error ">
       <AlertTriangle className="h-3 w-3" />
       SLA breached
     </span>

@@ -52,7 +52,7 @@ export function FeedbackWidget() {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg transition-colors hover:bg-indigo-700"
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-on-primary shadow-modal transition-colors hover:opacity-90"
         aria-label="Send feedback"
       >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -63,25 +63,25 @@ export function FeedbackWidget() {
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-end p-6" role="dialog" aria-modal="true" aria-labelledby="feedback-title">
-          <div className="fixed inset-0 bg-black/20" onClick={() => setIsOpen(false)} />
-          <div className="relative w-full max-w-sm rounded-xl border border-gray-200 bg-white p-5 shadow-xl">
+          <div className="fixed inset-0 bg-on-surface/20" onClick={() => setIsOpen(false)} />
+          <div className="relative w-full max-w-sm rounded-xl border border-outline-variant bg-surface p-5 shadow-xl">
             {submitted ? (
               <div className="py-6 text-center">
-                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-                  <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-success-container">
+                  <svg className="h-6 w-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <p className="text-sm font-medium text-gray-900">Thank you for your feedback!</p>
+                <p className="text-sm font-medium text-on-surface">Thank you for your feedback!</p>
               </div>
             ) : (
               <form onSubmit={handleSubmit}>
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-gray-900">Send Feedback</h3>
+                  <h3 className="text-sm font-semibold text-on-surface">Send Feedback</h3>
                   <button
                     type="button"
                     onClick={() => setIsOpen(false)}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="text-on-surface-variant hover:text-on-surface-variant"
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -97,8 +97,8 @@ export function FeedbackWidget() {
                       onClick={() => setType(t)}
                       className={`flex-1 rounded-md border py-1.5 text-xs font-medium transition-colors ${
                         type === t
-                          ? 'border-indigo-600 bg-indigo-600 text-white'
-                          : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
+                          ? 'border-primary bg-primary text-on-primary'
+                          : 'border-outline-variant bg-surface text-on-surface-variant hover:border-outline'
                       }`}
                     >
                       {t === 'bug' ? 'Bug' : t === 'feature' ? 'Feature' : 'General'}
@@ -112,13 +112,13 @@ export function FeedbackWidget() {
                   placeholder="Tell us what you think or describe a bug..."
                   rows={4}
                   required
-                  className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full resize-none rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
 
                 <button
                   type="submit"
                   disabled={isSubmitting || !message.trim()}
-                  className="mt-3 w-full rounded-lg bg-indigo-600 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-3 w-full rounded-lg bg-primary py-2 text-sm font-medium text-on-primary transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isSubmitting ? 'Sending...' : 'Submit Feedback'}
                 </button>

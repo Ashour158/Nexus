@@ -37,7 +37,7 @@ function ToolbarButton({
         'p-1.5 rounded-md transition-colors',
         active
           ? 'bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300'
-          : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+          : 'text-on-surface-variant hover:bg-surface-container-high dark:text-on-surface-variant dark:hover:bg-surface-container-highest'
       )}
     >
       <Icon className="w-4 h-4" />
@@ -72,12 +72,12 @@ export function RichTextEditor({
   return (
     <div
       className={cn(
-        'border rounded-lg overflow-hidden bg-white dark:bg-gray-900',
+        'border rounded-lg overflow-hidden bg-surface dark:bg-surface',
         disabled && 'opacity-60 pointer-events-none',
         className
       )}
     >
-      <div className="flex items-center gap-1 px-2 py-1.5 border-b bg-gray-50 dark:bg-gray-800">
+      <div className="flex items-center gap-1 px-2 py-1.5 border-b bg-surface-container-low dark:bg-surface-container-high">
         <ToolbarButton
           editor={editor}
           action={() => editor.chain().focus().toggleBold().run()}
@@ -92,7 +92,7 @@ export function RichTextEditor({
           icon={Italic}
           title="Italic"
         />
-        <div className="w-px h-4 bg-gray-300 mx-1" />
+        <div className="w-px h-4 bg-surface-container-highest mx-1" />
         <ToolbarButton
           editor={editor}
           action={() => editor.chain().focus().toggleBulletList().run()}
@@ -114,7 +114,7 @@ export function RichTextEditor({
           icon={Quote}
           title="Quote"
         />
-        <div className="w-px h-4 bg-gray-300 mx-1" />
+        <div className="w-px h-4 bg-surface-container-highest mx-1" />
         <ToolbarButton
           editor={editor}
           action={() => editor.chain().focus().undo().run()}

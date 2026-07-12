@@ -32,37 +32,37 @@ export function EmailStepEditor({ value, onChange, placeholder = 'Write your ema
   };
 
   return (
-    <div className="overflow-hidden rounded-lg border border-gray-200">
-      <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 bg-gray-50 px-3 py-2">
+    <div className="overflow-hidden rounded-lg border border-outline-variant">
+      <div className="flex flex-wrap items-center gap-1 border-b border-outline-variant bg-surface-container-low px-3 py-2">
         <button
           type="button"
           onClick={() => editor?.chain().focus().toggleBold().run()}
-          className={`rounded px-2 py-1 text-sm font-bold ${editor?.isActive('bold') ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-gray-200'}`}
+          className={`rounded px-2 py-1 text-sm font-bold ${editor?.isActive('bold') ? 'bg-primary-container text-primary' : 'text-on-surface-variant hover:bg-surface-container-highest'}`}
         >
           B
         </button>
         <button
           type="button"
           onClick={() => editor?.chain().focus().toggleItalic().run()}
-          className={`rounded px-2 py-1 text-sm italic ${editor?.isActive('italic') ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-gray-200'}`}
+          className={`rounded px-2 py-1 text-sm italic ${editor?.isActive('italic') ? 'bg-primary-container text-primary' : 'text-on-surface-variant hover:bg-surface-container-highest'}`}
         >
           I
         </button>
         <button
           type="button"
           onClick={() => editor?.chain().focus().toggleBulletList().run()}
-          className={`rounded px-2 py-1 text-sm ${editor?.isActive('bulletList') ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-gray-200'}`}
+          className={`rounded px-2 py-1 text-sm ${editor?.isActive('bulletList') ? 'bg-primary-container text-primary' : 'text-on-surface-variant hover:bg-surface-container-highest'}`}
         >
           • List
         </button>
-        <div className="mx-1 h-4 w-px bg-gray-300" />
-        <span className="me-1 text-xs text-gray-500">Insert:</span>
+        <div className="mx-1 h-4 w-px bg-surface-container-highest" />
+        <span className="me-1 text-xs text-on-surface-variant">Insert:</span>
         {TOKENS.map((token) => (
           <button
             type="button"
             key={token}
             onClick={() => insertToken(token)}
-            className="rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700 hover:bg-indigo-100"
+            className="rounded border border-primary/40 bg-primary-container px-2 py-0.5 text-xs text-primary hover:bg-primary-container"
           >
             {token}
           </button>

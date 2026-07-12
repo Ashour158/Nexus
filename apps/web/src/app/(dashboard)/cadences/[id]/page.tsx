@@ -15,7 +15,7 @@ import {
   type BackendCadenceStep,
 } from '@/hooks/use-cadences';
 
-const EmailStepEditor = dynamic(() => import('@/components/cadences/EmailStepEditor').then((m) => m.EmailStepEditor), { ssr: false, loading: () => <div className="h-[200px] animate-pulse rounded-lg bg-gray-100" /> });
+const EmailStepEditor = dynamic(() => import('@/components/cadences/EmailStepEditor').then((m) => m.EmailStepEditor), { ssr: false, loading: () => <div className="h-[200px] animate-pulse rounded-lg bg-surface-container-high" /> });
 
 type StepType = 'email' | 'task' | 'wait';
 type Step = {
@@ -209,7 +209,7 @@ export default function CadenceBuilderPage() {
   if (!canRead) {
     return (
       <main className="p-4">
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="rounded-xl border border-warning/30 bg-warning-container p-4 text-sm text-on-warning-container">
           You do not have permission to view cadences.
         </div>
       </main>
@@ -263,23 +263,23 @@ export default function CadenceBuilderPage() {
   if (!isNew && isLoading) {
     return (
       <main className="grid gap-4 p-4 lg:grid-cols-12">
-        <section className="space-y-2 lg:col-span-3 rounded-xl border border-slate-200 bg-white p-3">
+        <section className="space-y-2 lg:col-span-3 rounded-xl border border-outline-variant bg-surface p-3">
           <Skeleton className="h-4 w-1/2" />
           <Skeleton className="h-16" />
           <Skeleton className="h-16" />
           <Skeleton className="h-16" />
         </section>
-        <section className="space-y-3 lg:col-span-6 rounded-xl border border-slate-200 bg-white p-4">
+        <section className="space-y-3 lg:col-span-6 rounded-xl border border-outline-variant bg-surface p-4">
           <Skeleton className="h-4 w-1/3" />
           <Skeleton className="h-32" />
         </section>
-        <aside className="space-y-3 lg:col-span-3 rounded-xl border border-slate-200 bg-white p-4">
+        <aside className="space-y-3 lg:col-span-3 rounded-xl border border-outline-variant bg-surface p-4">
           <Skeleton className="h-4 w-1/3" />
           <Skeleton className="h-8" />
           <Skeleton className="h-8" />
           <Skeleton className="h-8" />
         </aside>
-        <section className="lg:col-span-12 rounded-xl border border-slate-200 bg-white p-4">
+        <section className="lg:col-span-12 rounded-xl border border-outline-variant bg-surface p-4">
           <Skeleton className="h-4 w-1/4" />
           <Skeleton className="h-24 mt-2" />
         </section>
@@ -290,7 +290,7 @@ export default function CadenceBuilderPage() {
   if (!isNew && error) {
     return (
       <main className="p-4">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+        <div className="rounded-xl border border-error/30 bg-error-container p-4 text-error">
           Failed to load cadence.{' '}
           <button onClick={() => window.location.reload()} className="underline">
             Retry
@@ -302,50 +302,50 @@ export default function CadenceBuilderPage() {
 
   return (
     <main className="grid gap-4 p-4 lg:grid-cols-12">
-      <section className="space-y-2 lg:col-span-3 rounded-xl border border-slate-200 bg-white p-3">
-        <h2 className="text-sm font-semibold text-slate-900">Step timeline</h2>
+      <section className="space-y-2 lg:col-span-3 rounded-xl border border-outline-variant bg-surface p-3">
+        <h2 className="text-sm font-semibold text-on-surface">Step timeline</h2>
         {steps.map((step, idx) => (
-          <div key={step.id} className={`rounded-lg border p-2 ${selected?.id === step.id ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'}`}>
+          <div key={step.id} className={`rounded-lg border p-2 ${selected?.id === step.id ? 'border-primary bg-primary-container' : 'border-outline-variant'}`}>
             <button onClick={() => setSelectedId(step.id)} className="w-full text-start">
-              <p className="text-xs text-slate-500">Step {idx + 1} � Day {step.day}</p>
+              <p className="text-xs text-on-surface-variant">Step {idx + 1} � Day {step.day}</p>
               <p className="text-sm font-medium capitalize flex items-center gap-1">{step.type === 'email' ? <Mail className="h-3.5 w-3.5" /> : step.type === 'task' ? '??' : <PauseCircle className="h-3.5 w-3.5" />}{step.type}</p>
-              <p className="text-xs text-slate-500 truncate">{step.subject ?? step.instructions ?? `Wait ${step.waitDuration ?? 1} ${step.waitUnit ?? 'days'}`}</p>
+              <p className="text-xs text-on-surface-variant truncate">{step.subject ?? step.instructions ?? `Wait ${step.waitDuration ?? 1} ${step.waitUnit ?? 'days'}`}</p>
             </button>
             <div className="mt-2 flex gap-1">
-              <button onClick={() => idx > 0 && setSteps((prev) => { const n=[...prev]; [n[idx-1], n[idx]]=[n[idx], n[idx-1]]; return n; })} className="rounded border border-slate-200 p-1"><ArrowUp className="h-3 w-3" /></button>
-              <button onClick={() => idx < steps.length - 1 && setSteps((prev) => { const n=[...prev]; [n[idx+1], n[idx]]=[n[idx], n[idx+1]]; return n; })} className="rounded border border-slate-200 p-1"><ArrowDown className="h-3 w-3" /></button>
-              <button onClick={() => setSteps((prev) => prev.filter((s) => s.id !== step.id))} className="rounded border border-red-200 p-1 text-red-600"><Trash2 className="h-3 w-3" /></button>
+              <button onClick={() => idx > 0 && setSteps((prev) => { const n=[...prev]; [n[idx-1], n[idx]]=[n[idx], n[idx-1]]; return n; })} className="rounded border border-outline-variant p-1"><ArrowUp className="h-3 w-3" /></button>
+              <button onClick={() => idx < steps.length - 1 && setSteps((prev) => { const n=[...prev]; [n[idx+1], n[idx]]=[n[idx], n[idx+1]]; return n; })} className="rounded border border-outline-variant p-1"><ArrowDown className="h-3 w-3" /></button>
+              <button onClick={() => setSteps((prev) => prev.filter((s) => s.id !== step.id))} className="rounded border border-error/30 p-1 text-error"><Trash2 className="h-3 w-3" /></button>
             </div>
           </div>
         ))}
-        <button onClick={() => setSteps((prev) => [...prev, { id: crypto.randomUUID(), type: 'email', day: prev.length + 1, subject: '' }])} className="w-full rounded border border-dashed border-slate-300 px-3 py-2 text-sm">+ Add step</button>
+        <button onClick={() => setSteps((prev) => [...prev, { id: crypto.randomUUID(), type: 'email', day: prev.length + 1, subject: '' }])} className="w-full rounded border border-dashed border-outline-variant px-3 py-2 text-sm">+ Add step</button>
       </section>
 
-      <section className="space-y-3 lg:col-span-6 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">Step editor</h2>
+      <section className="space-y-3 lg:col-span-6 rounded-xl border border-outline-variant bg-surface p-4">
+        <h2 className="text-sm font-semibold text-on-surface">Step editor</h2>
         {steps.length === 0 ? (
-          <p className="text-sm text-slate-500">No steps yet. Add a step from the timeline to get started.</p>
+          <p className="text-sm text-on-surface-variant">No steps yet. Add a step from the timeline to get started.</p>
         ) : (
           <>
-            <label className="block text-sm">Step type<select value={selected?.type} onChange={(e) => updateStep({ type: e.target.value as StepType })} className="mt-1 w-full rounded border border-slate-300 px-2 py-2"><option value="email">Email</option><option value="task">Task</option><option value="wait">Wait</option></select></label>
-            {errors.type ? <p className="text-xs text-red-500">{errors.type}</p> : null}
+            <label className="block text-sm">Step type<select value={selected?.type} onChange={(e) => updateStep({ type: e.target.value as StepType })} className="mt-1 w-full rounded border border-outline-variant px-2 py-2"><option value="email">Email</option><option value="task">Task</option><option value="wait">Wait</option></select></label>
+            {errors.type ? <p className="text-xs text-error">{errors.type}</p> : null}
 
             {selected?.type === 'email' ? (
               <div className="space-y-2">
-                <input value={selected.subject ?? ''} onChange={(e) => updateStep({ subject: e.target.value })} placeholder="Subject" className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
-                {errors.subject ? <p className="text-xs text-red-500">{errors.subject}</p> : null}
-                <input value={sender} onChange={(e) => setSender(e.target.value)} placeholder="From name / reply-to" className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+                <input value={selected.subject ?? ''} onChange={(e) => updateStep({ subject: e.target.value })} placeholder="Subject" className="w-full rounded border border-outline-variant px-3 py-2 text-sm" />
+                {errors.subject ? <p className="text-xs text-error">{errors.subject}</p> : null}
+                <input value={sender} onChange={(e) => setSender(e.target.value)} placeholder="From name / reply-to" className="w-full rounded border border-outline-variant px-3 py-2 text-sm" />
                 <EmailStepEditor value={selected.body ?? ''} onChange={(html) => updateStep({ body: html })} />
-                <div className="rounded border border-slate-200 bg-slate-50 p-2 text-xs">Tokens: {TOKENS.join(' � ')}</div>
+                <div className="rounded border border-outline-variant bg-surface-container-low p-2 text-xs">Tokens: {TOKENS.join(' � ')}</div>
                 <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={selected.abTest ?? false} onChange={(e) => updateStep({ abTest: e.target.checked })} />Enable A/B test</label>
                 {selected.abTest ? (
                   <>
-                    <input value={selected.subjectB ?? ''} onChange={(e) => updateStep({ subjectB: e.target.value })} placeholder="Subject B" className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
-                    <textarea value={selected.bodyB ?? ''} onChange={(e) => updateStep({ bodyB: e.target.value })} rows={6} placeholder="Body B" className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+                    <input value={selected.subjectB ?? ''} onChange={(e) => updateStep({ subjectB: e.target.value })} placeholder="Subject B" className="w-full rounded border border-outline-variant px-3 py-2 text-sm" />
+                    <textarea value={selected.bodyB ?? ''} onChange={(e) => updateStep({ bodyB: e.target.value })} rows={6} placeholder="Body B" className="w-full rounded border border-outline-variant px-3 py-2 text-sm" />
                   </>
                 ) : null}
                 <div className="grid gap-2 md:grid-cols-2">
-                  <input type="time" value={selected.sendTime ?? '09:00'} onChange={(e) => updateStep({ sendTime: e.target.value })} className="rounded border border-slate-300 px-3 py-2 text-sm" />
+                  <input type="time" value={selected.sendTime ?? '09:00'} onChange={(e) => updateStep({ sendTime: e.target.value })} className="rounded border border-outline-variant px-3 py-2 text-sm" />
                   <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={selected.excludeWeekends ?? false} onChange={(e) => updateStep({ excludeWeekends: e.target.checked })} />Exclude weekends</label>
                 </div>
               </div>
@@ -353,43 +353,43 @@ export default function CadenceBuilderPage() {
 
             {selected?.type === 'task' ? (
               <div className="space-y-2">
-                <select value={selected.taskType ?? 'Call'} onChange={(e) => updateStep({ taskType: e.target.value as Step['taskType'] })} className="w-full rounded border border-slate-300 px-3 py-2 text-sm"><option>Call</option><option>LinkedIn</option><option>Custom</option></select>
-                <textarea value={selected.instructions ?? ''} onChange={(e) => updateStep({ instructions: e.target.value })} rows={6} placeholder="Instructions" className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
-                <select value={selected.dueOffset ?? 'same day'} onChange={(e) => updateStep({ dueOffset: e.target.value as Step['dueOffset'] })} className="w-full rounded border border-slate-300 px-3 py-2 text-sm"><option>same day</option><option>+1 day</option><option>+2 days</option></select>
+                <select value={selected.taskType ?? 'Call'} onChange={(e) => updateStep({ taskType: e.target.value as Step['taskType'] })} className="w-full rounded border border-outline-variant px-3 py-2 text-sm"><option>Call</option><option>LinkedIn</option><option>Custom</option></select>
+                <textarea value={selected.instructions ?? ''} onChange={(e) => updateStep({ instructions: e.target.value })} rows={6} placeholder="Instructions" className="w-full rounded border border-outline-variant px-3 py-2 text-sm" />
+                <select value={selected.dueOffset ?? 'same day'} onChange={(e) => updateStep({ dueOffset: e.target.value as Step['dueOffset'] })} className="w-full rounded border border-outline-variant px-3 py-2 text-sm"><option>same day</option><option>+1 day</option><option>+2 days</option></select>
               </div>
             ) : null}
 
             {selected?.type === 'wait' ? (
               <div className="grid gap-2 md:grid-cols-2">
-                <input type="number" value={selected.waitDuration ?? 1} onChange={(e) => updateStep({ waitDuration: Number(e.target.value || 1) })} className="rounded border border-slate-300 px-3 py-2 text-sm" />
-                {errors.waitDuration ? <p className="text-xs text-red-500">{errors.waitDuration}</p> : null}
-                <select value={selected.waitUnit ?? 'days'} onChange={(e) => updateStep({ waitUnit: e.target.value as Step['waitUnit'] })} className="rounded border border-slate-300 px-3 py-2 text-sm"><option>hours</option><option>days</option><option>business days</option></select>
+                <input type="number" value={selected.waitDuration ?? 1} onChange={(e) => updateStep({ waitDuration: Number(e.target.value || 1) })} className="rounded border border-outline-variant px-3 py-2 text-sm" />
+                {errors.waitDuration ? <p className="text-xs text-error">{errors.waitDuration}</p> : null}
+                <select value={selected.waitUnit ?? 'days'} onChange={(e) => updateStep({ waitUnit: e.target.value as Step['waitUnit'] })} className="rounded border border-outline-variant px-3 py-2 text-sm"><option>hours</option><option>days</option><option>business days</option></select>
               </div>
             ) : null}
           </>
         )}
       </section>
 
-      <aside className="space-y-3 lg:col-span-3 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">Settings</h2>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Cadence name" className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
-        <input value={sender} onChange={(e) => setSender(e.target.value)} placeholder="Default sender" className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
-        <label className="text-xs uppercase text-slate-500">Exit conditions</label>
+      <aside className="space-y-3 lg:col-span-3 rounded-xl border border-outline-variant bg-surface p-4">
+        <h2 className="text-sm font-semibold text-on-surface">Settings</h2>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Cadence name" className="w-full rounded border border-outline-variant px-3 py-2 text-sm" />
+        <input value={sender} onChange={(e) => setSender(e.target.value)} placeholder="Default sender" className="w-full rounded border border-outline-variant px-3 py-2 text-sm" />
+        <label className="text-xs uppercase text-on-surface-variant">Exit conditions</label>
         <div className="space-y-1 text-sm">{['replied', 'bounced', 'deal stage changed', 'unsubscribed'].map((c) => <label key={c} className="flex items-center gap-2"><input type="checkbox" checked={exitConditions.includes(c)} onChange={(e) => setExitConditions((prev) => e.target.checked ? [...prev, c] : prev.filter((x) => x !== c))} />{c}</label>)}</div>
-        <select value={goal} onChange={(e) => setGoal(e.target.value)} className="w-full rounded border border-slate-300 px-3 py-2 text-sm"><option>meeting booked</option><option>demo completed</option><option>contact stage changed</option></select>
-        <select value={enrollFrom} onChange={(e) => setEnrollFrom(e.target.value)} className="w-full rounded border border-slate-300 px-3 py-2 text-sm"><option>contact list</option><option>deal stage</option><option>manually</option></select>
+        <select value={goal} onChange={(e) => setGoal(e.target.value)} className="w-full rounded border border-outline-variant px-3 py-2 text-sm"><option>meeting booked</option><option>demo completed</option><option>contact stage changed</option></select>
+        <select value={enrollFrom} onChange={(e) => setEnrollFrom(e.target.value)} className="w-full rounded border border-outline-variant px-3 py-2 text-sm"><option>contact list</option><option>deal stage</option><option>manually</option></select>
         <button
           onClick={handleSave}
           disabled={createMutation.isPending || updateMutation.isPending}
-          className="w-full rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="w-full rounded bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           {isNew ? 'Create cadence' : 'Save changes'}
         </button>
       </aside>
 
-      <section className="lg:col-span-12 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Metrics panel</h2>
-        <table className="min-w-full text-sm"><thead className="text-start text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-2 py-2">Step</th><th className="px-2 py-2">Sent</th><th className="px-2 py-2">Opened</th><th className="px-2 py-2">Clicked</th><th className="px-2 py-2">Replied</th><th className="px-2 py-2">Unsubscribed</th></tr></thead><tbody>{steps.map((s, i) => <tr key={s.id} className="border-t border-slate-100"><td className="px-2 py-2">Step {i + 1} � {s.type}</td><td className="px-2 py-2">{120 - i * 8}</td><td className="px-2 py-2">{70 - i * 6}</td><td className="px-2 py-2">{34 - i * 3}</td><td className="px-2 py-2">{18 - i * 2}</td><td className="px-2 py-2">{Math.max(0, 5 - i)}</td></tr>)}{steps.length===0?<tr><td colSpan={6} className="px-2 py-4 text-center text-slate-500">No steps yet.</td></tr>:null}</tbody></table>
+      <section className="lg:col-span-12 rounded-xl border border-outline-variant bg-surface p-4">
+        <h2 className="mb-3 text-sm font-semibold text-on-surface">Metrics panel</h2>
+        <table className="min-w-full text-sm"><thead className="text-start text-xs uppercase tracking-wide text-on-surface-variant"><tr><th className="px-2 py-2">Step</th><th className="px-2 py-2">Sent</th><th className="px-2 py-2">Opened</th><th className="px-2 py-2">Clicked</th><th className="px-2 py-2">Replied</th><th className="px-2 py-2">Unsubscribed</th></tr></thead><tbody>{steps.map((s, i) => <tr key={s.id} className="border-t border-outline-variant"><td className="px-2 py-2">Step {i + 1} � {s.type}</td><td className="px-2 py-2">{120 - i * 8}</td><td className="px-2 py-2">{70 - i * 6}</td><td className="px-2 py-2">{34 - i * 3}</td><td className="px-2 py-2">{18 - i * 2}</td><td className="px-2 py-2">{Math.max(0, 5 - i)}</td></tr>)}{steps.length===0?<tr><td colSpan={6} className="px-2 py-4 text-center text-on-surface-variant">No steps yet.</td></tr>:null}</tbody></table>
       </section>
     </main>
   );

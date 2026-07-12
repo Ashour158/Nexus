@@ -36,8 +36,8 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
             href={tab.href}
             className={`rounded-md px-3 py-1.5 text-sm font-medium ${
               pathname?.startsWith(tab.href)
-                ? 'bg-slate-900 text-white'
-                : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                ? 'bg-inverse-surface text-white'
+                : 'border border-outline-variant bg-surface text-on-surface hover:bg-surface-container-low'
             }`}
           >
             <span className="inline-flex items-center gap-1.5">

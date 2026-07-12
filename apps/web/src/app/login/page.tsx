@@ -108,10 +108,10 @@ export default function LoginPage() {
     <main className="mx-auto flex min-h-screen max-w-md items-center px-6">
       <form
         onSubmit={onSubmit}
-        className="w-full rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
+        className="w-full rounded-lg border border-outline-variant bg-surface p-6 shadow-sm"
       >
-        <h1 className="text-xl font-bold text-slate-900">Sign in to Nexus</h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <h1 className="text-xl font-bold text-on-surface">Sign in to Nexus</h1>
+        <p className="mt-1 text-sm text-on-surface-variant">
           Use your corporate email and password.
         </p>
 
@@ -143,7 +143,7 @@ export default function LoginPage() {
         </div>
 
         {error ? (
-          <p role="alert" className="mt-4 text-sm text-red-600">
+          <p role="alert" className="mt-4 text-sm text-error">
             {error}
           </p>
         ) : null}
@@ -154,10 +154,10 @@ export default function LoginPage() {
           </Button>
         </div>
 
-        <p className="mt-6 text-center text-xs text-slate-400">
+        <p className="mt-6 text-center text-xs text-on-surface-variant">
           By signing in you agree to our{' '}
-          <a href="/legal/terms" className="underline hover:text-slate-600">Terms</a>{' '}and{' '}
-          <a href="/legal/privacy" className="underline hover:text-slate-600">Privacy Policy</a>.
+          <a href="/legal/terms" className="underline hover:text-on-surface-variant">Terms</a>{' '}and{' '}
+          <a href="/legal/privacy" className="underline hover:text-on-surface-variant">Privacy Policy</a>.
         </p>
       </form>
     </main>

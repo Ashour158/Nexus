@@ -40,12 +40,12 @@ export function DocumentUpload() {
   }
 
   return (
-    <section className="space-y-3 rounded-xl border border-dashed border-slate-300 bg-white p-4">
-      <label className="block cursor-pointer rounded border border-slate-200 bg-slate-50 p-4 text-center text-sm">
+    <section className="space-y-3 rounded-xl border border-dashed border-outline-variant bg-surface p-4">
+      <label className="block cursor-pointer rounded border border-outline-variant bg-surface-container-low p-4 text-center text-sm">
         Drag-drop or click to upload (PDF, DOCX, XLSX, PNG, JPG, CSV  max 50MB)
         <input type="file" multiple className="hidden" accept=".pdf,.docx,.xlsx,.png,.jpg,.jpeg,.csv" onChange={(e) => onFiles(e.target.files)} />
       </label>
-      <ul className="space-y-2">{uploads.map((u) => <li key={u.id} className="rounded border border-slate-200 p-2 text-sm"><div className="flex items-center justify-between"><span>{u.name} · {(u.size / 1024 / 1024).toFixed(1)}MB</span><button onClick={() => setUploads((prev) => prev.filter((x) => x.id !== u.id))} className="text-xs text-red-600">Remove</button></div><div className="mt-1 h-2 rounded bg-slate-100"><div className="h-2 rounded bg-indigo-600" style={{ width: `${u.progress}%` }} /></div></li>)}</ul>
+      <ul className="space-y-2">{uploads.map((u) => <li key={u.id} className="rounded border border-outline-variant p-2 text-sm"><div className="flex items-center justify-between"><span>{u.name} · {(u.size / 1024 / 1024).toFixed(1)}MB</span><button onClick={() => setUploads((prev) => prev.filter((x) => x.id !== u.id))} className="text-xs text-error">Remove</button></div><div className="mt-1 h-2 rounded bg-surface-container-high"><div className="h-2 rounded bg-primary" style={{ width: `${u.progress}%` }} /></div></li>)}</ul>
     </section>
   );
 }

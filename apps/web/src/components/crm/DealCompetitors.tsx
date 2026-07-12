@@ -48,29 +48,29 @@ export function DealCompetitors({ dealId }: { dealId: string }) {
   };
 
   const outcomeColors: Record<string, string> = {
-    WON_AGAINST: 'bg-green-100 text-green-700',
-    LOST_TO: 'bg-red-100 text-red-700',
-    TIED: 'bg-gray-100 text-gray-600',
-    UNKNOWN: 'bg-yellow-50 text-yellow-600',
+    WON_AGAINST: 'bg-success-container text-success',
+    LOST_TO: 'bg-error-container text-error',
+    TIED: 'bg-surface-container-high text-on-surface-variant',
+    UNKNOWN: 'bg-warning-container text-warning',
   };
 
   return (
-    <div className="mt-4 rounded-lg border border-slate-200 p-4">
+    <div className="mt-4 rounded-lg border border-outline-variant p-4">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-700">Competitors in this Deal</h3>
+        <h3 className="text-sm font-semibold text-on-surface">Competitors in this Deal</h3>
         <button
           type="button"
           onClick={() => setShowAdd(true)}
-          className="text-xs text-indigo-600 hover:underline"
+          className="text-xs text-primary hover:underline"
         >
           + Add
         </button>
       </div>
 
       {showAdd ? (
-        <div className="mb-3 space-y-2 rounded-lg bg-slate-50 p-3">
+        <div className="mb-3 space-y-2 rounded-lg bg-surface-container-low p-3">
           <select
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm"
             value={form.competitorId}
             onChange={(e) => setForm((f) => ({ ...f, competitorId: e.target.value }))}
           >
@@ -82,7 +82,7 @@ export function DealCompetitors({ dealId }: { dealId: string }) {
             ))}
           </select>
           <select
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm"
             value={form.outcome}
             onChange={(e) => setForm((f) => ({ ...f, outcome: e.target.value }))}
           >
@@ -93,7 +93,7 @@ export function DealCompetitors({ dealId }: { dealId: string }) {
           </select>
           <input
             placeholder="Notes (optional)"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm"
             value={form.notes}
             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
           />
@@ -101,14 +101,14 @@ export function DealCompetitors({ dealId }: { dealId: string }) {
             <button
               type="button"
               onClick={handleAdd}
-              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs text-white"
+              className="rounded-lg bg-primary px-3 py-1.5 text-xs text-white"
             >
               Add
             </button>
             <button
               type="button"
               onClick={() => setShowAdd(false)}
-              className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs text-slate-700"
+              className="rounded-lg bg-surface-container-highest px-3 py-1.5 text-xs text-on-surface"
             >
               Cancel
             </button>
@@ -117,15 +117,15 @@ export function DealCompetitors({ dealId }: { dealId: string }) {
       ) : null}
 
       {items.length === 0 && !showAdd ? (
-        <p className="py-2 text-xs text-slate-400">No competitors tracked for this deal</p>
+        <p className="py-2 text-xs text-on-surface-variant">No competitors tracked for this deal</p>
       ) : (
         <div className="space-y-2">
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex items-center gap-3 rounded-lg border border-slate-100 bg-white p-2.5"
+              className="flex items-center gap-3 rounded-lg border border-outline-variant bg-surface p-2.5"
             >
-              <span className="text-sm font-medium text-slate-900">{item.competitor.name}</span>
+              <span className="text-sm font-medium text-on-surface">{item.competitor.name}</span>
               {item.outcome ? (
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${outcomeColors[item.outcome] || outcomeColors.UNKNOWN}`}
@@ -133,7 +133,7 @@ export function DealCompetitors({ dealId }: { dealId: string }) {
                   {item.outcome.replace(/_/g, ' ')}
                 </span>
               ) : null}
-              {item.notes ? <span className="flex-1 text-xs text-slate-400">{item.notes}</span> : null}
+              {item.notes ? <span className="flex-1 text-xs text-on-surface-variant">{item.notes}</span> : null}
             </div>
           ))}
         </div>

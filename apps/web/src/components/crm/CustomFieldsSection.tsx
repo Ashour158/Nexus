@@ -92,15 +92,15 @@ export function CustomFieldsSection({
   }, [definitions, customFields]);
 
   if (defsQuery.isLoading) {
-    return <div className="h-24 animate-pulse rounded-xl bg-slate-100" />;
+    return <div className="h-24 animate-pulse rounded-xl bg-surface-container-high" />;
   }
 
   if (definitions.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-200 bg-white p-6 text-center">
-        <SlidersHorizontal className="mx-auto h-6 w-6 text-slate-300" />
-        <p className="mt-2 text-sm font-semibold text-slate-700">No custom fields defined</p>
-        <p className="mt-1 text-xs text-slate-500">
+      <div className="rounded-xl border border-dashed border-outline-variant bg-surface p-6 text-center">
+        <SlidersHorizontal className="mx-auto h-6 w-6 text-outline" />
+        <p className="mt-2 text-sm font-semibold text-on-surface">No custom fields defined</p>
+        <p className="mt-1 text-xs text-on-surface-variant">
           Custom fields for {entityType}s are configured in Settings. Once created they appear here for editing.
         </p>
       </div>
@@ -120,10 +120,10 @@ export function CustomFieldsSection({
   };
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-outline-variant bg-surface p-5 shadow-sm">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
-          <SlidersHorizontal className="h-4 w-4 text-indigo-600" />
+        <div className="flex items-center gap-2 text-sm font-bold text-on-surface">
+          <SlidersHorizontal className="h-4 w-4 text-primary" />
           Custom fields
         </div>
         {canUpdate ? (
@@ -131,7 +131,7 @@ export function CustomFieldsSection({
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="inline-flex items-center gap-2 rounded-lg bg-inverse-surface px-3 py-2 text-sm font-semibold text-white transition hover:bg-surface-container-highest disabled:cursor-not-allowed disabled:bg-surface-container-highest"
           >
             <Save className="h-4 w-4" />
             {isSaving ? 'Saving' : 'Save custom fields'}
@@ -167,24 +167,24 @@ function FieldInput({
 }) {
   const type = def.fieldType.toLowerCase();
   const label = (
-    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+    <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
       {def.name}
-      {def.required ? <span className="ml-1 text-rose-500">*</span> : null}
+      {def.required ? <span className="ml-1 text-error">*</span> : null}
     </span>
   );
   const inputCls =
-    'mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:bg-slate-50 disabled:text-slate-400';
+    'mt-1 h-10 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 disabled:bg-surface-container-low disabled:text-on-surface-variant';
 
   if (type === 'boolean' || type === 'checkbox') {
     return (
-      <label className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700">
+      <label className="flex items-center justify-between gap-3 rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2.5 text-sm font-medium text-on-surface">
         {def.name}
         <input
           type="checkbox"
           checked={Boolean(value)}
           disabled={disabled}
           onChange={(e) => onChange(e.target.checked)}
-          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+          className="rounded border-outline-variant text-primary focus:ring-primary"
         />
       </label>
     );

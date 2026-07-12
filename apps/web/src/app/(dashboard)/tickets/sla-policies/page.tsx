@@ -93,7 +93,7 @@ export default function SlaPoliciesPage() {
       {policiesQuery.isError ? (
         <div
           role="alert"
-          className="mb-4 rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
+          className="mb-4 rounded-md border border-error/40 bg-error-container p-4 text-sm text-on-error-container "
         >
           Failed to load SLA policies.
         </div>
@@ -141,8 +141,8 @@ export default function SlaPoliciesPage() {
               <span
                 className={
                   row.active
-                    ? 'rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
-                    : 'rounded-full bg-slate-50 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800/50'
+                    ? 'rounded-full bg-success-container px-2 py-0.5 text-xs text-success '
+                    : 'rounded-full bg-surface-container-low px-2 py-0.5 text-xs text-on-surface-variant dark:bg-surface-container-high/50'
                 }
               >
                 {row.active ? 'Active' : 'Inactive'}
@@ -161,7 +161,7 @@ export default function SlaPoliciesPage() {
                     setEditing(row);
                     setFormOpen(true);
                   }}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-surface-container-high dark:hover:bg-surface-container-highest"
                   style={{ color: 'var(--text-muted)' }}
                   aria-label="Edit policy"
                 >
@@ -175,7 +175,7 @@ export default function SlaPoliciesPage() {
                         deletePolicy.mutate(row.id);
                       }
                     }}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-error hover:bg-error-container "
                     aria-label="Delete policy"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -257,7 +257,7 @@ function SlaPolicyForm({ policy, onClose }: { policy: SlaPolicy | null; onClose:
       <form onSubmit={submit} className="space-y-4">
         <div>
           <label className={labelClass} style={labelStyle} htmlFor="sla-name">
-            Name <span className="text-rose-500">*</span>
+            Name <span className="text-error">*</span>
           </label>
           <input
             id="sla-name"
@@ -294,7 +294,7 @@ function SlaPolicyForm({ policy, onClose }: { policy: SlaPolicy | null; onClose:
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className={labelClass} style={labelStyle} htmlFor="sla-fr">
-              First response (mins) <span className="text-rose-500">*</span>
+              First response (mins) <span className="text-error">*</span>
             </label>
             <input
               id="sla-fr"
@@ -309,7 +309,7 @@ function SlaPolicyForm({ policy, onClose }: { policy: SlaPolicy | null; onClose:
           </div>
           <div>
             <label className={labelClass} style={labelStyle} htmlFor="sla-res">
-              Resolution (mins) <span className="text-rose-500">*</span>
+              Resolution (mins) <span className="text-error">*</span>
             </label>
             <input
               id="sla-res"
@@ -330,7 +330,7 @@ function SlaPolicyForm({ policy, onClose }: { policy: SlaPolicy | null; onClose:
               type="checkbox"
               checked={businessHoursOnly}
               onChange={(e) => setBusinessHoursOnly(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"
             />
             Business hours only
           </label>
@@ -339,7 +339,7 @@ function SlaPolicyForm({ policy, onClose }: { policy: SlaPolicy | null; onClose:
               type="checkbox"
               checked={isDefault}
               onChange={(e) => setIsDefault(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"
             />
             Default policy (used when no priority-specific policy matches)
           </label>
@@ -348,7 +348,7 @@ function SlaPolicyForm({ policy, onClose }: { policy: SlaPolicy | null; onClose:
               type="checkbox"
               checked={active}
               onChange={(e) => setActive(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"
             />
             Active
           </label>

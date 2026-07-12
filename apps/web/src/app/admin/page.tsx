@@ -43,7 +43,7 @@ export default function AdminHubPage() {
     <div className="space-y-8">
       <div>
         <h2 className="text-2xl font-bold">Admin Panel</h2>
-        <p className="mt-1 text-sm text-gray-400">
+        <p className="mt-1 text-sm text-on-surface-variant">
           Every administrative and configuration surface, organized in one place.
         </p>
       </div>
@@ -51,8 +51,8 @@ export default function AdminHubPage() {
       {/* Platform KPIs */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {stats.map((s) => (
-          <div key={s.label} className="rounded-xl border border-gray-800 bg-gray-900 p-4">
-            <div className="flex items-center justify-between text-gray-400">
+          <div key={s.label} className="rounded-xl border border-outline-variant bg-inverse-surface p-4">
+            <div className="flex items-center justify-between text-on-surface-variant">
               <span className="text-sm">{s.label}</span>
               <s.icon className="h-4 w-4" />
             </div>
@@ -68,11 +68,11 @@ export default function AdminHubPage() {
           return (
             <section key={group.id}>
               <div className="mb-3 flex items-center gap-2.5">
-                <GroupIcon className="h-4 w-4 text-indigo-400" />
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-300">
+                <GroupIcon className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-outline">
                   {group.label}
                 </h3>
-                <span className="text-xs text-gray-500">{group.description}</span>
+                <span className="text-xs text-on-surface-variant">{group.description}</span>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {group.features.map((feature) => {
@@ -81,21 +81,21 @@ export default function AdminHubPage() {
                     <Link
                       key={feature.id}
                       href={feature.href}
-                      className="group flex items-start gap-3 rounded-xl border border-gray-800 bg-gray-900 p-4 transition-colors hover:border-indigo-600 hover:bg-gray-850"
+                      className="group flex items-start gap-3 rounded-xl border border-outline-variant bg-inverse-surface p-4 transition-colors hover:border-primary hover:bg-surface-container-highest"
                     >
-                      <span className="mt-0.5 rounded-lg bg-gray-800 p-2 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white">
+                      <span className="mt-0.5 rounded-lg bg-surface-container-highest p-2 text-primary group-hover:bg-primary group-hover:text-white">
                         <Icon className="h-4 w-4" />
                       </span>
                       <span className="min-w-0">
                         <span className="flex items-center gap-2">
                           <span className="text-sm font-medium text-white">{feature.label}</span>
                           {feature.placeholder ? (
-                            <span className="rounded bg-gray-700 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-gray-300">
+                            <span className="rounded bg-surface-container-high px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-outline">
                               soon
                             </span>
                           ) : null}
                         </span>
-                        <span className="mt-0.5 block text-xs text-gray-400">{feature.description}</span>
+                        <span className="mt-0.5 block text-xs text-on-surface-variant">{feature.description}</span>
                       </span>
                     </Link>
                   );
@@ -108,14 +108,14 @@ export default function AdminHubPage() {
 
       {/* Recent activity + alerts */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-xl border border-gray-800 bg-gray-900 p-4">
-          <h3 className="mb-3 text-sm font-semibold text-gray-200">Recent signups</h3>
+        <section className="rounded-xl border border-outline-variant bg-inverse-surface p-4">
+          <h3 className="mb-3 text-sm font-semibold text-outline">Recent signups</h3>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wide text-gray-400">
+              <thead className="text-left text-xs uppercase tracking-wide text-on-surface-variant">
                 <tr><th>Name</th><th>Email</th><th>Tenant</th><th>Joined</th></tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-outline-variant">
                 {(data?.recentSignups ?? []).map((s) => (
                   <tr key={s.id}>
                     <td className="py-2">{s.name}</td>
@@ -129,17 +129,17 @@ export default function AdminHubPage() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-gray-800 bg-gray-900 p-4">
-          <h3 className="mb-3 text-sm font-semibold text-gray-200">System alerts</h3>
+        <section className="rounded-xl border border-outline-variant bg-inverse-surface p-4">
+          <h3 className="mb-3 text-sm font-semibold text-outline">System alerts</h3>
           <ul className="space-y-2">
             {(data?.alerts ?? []).map((a) => (
-              <li key={a.id} className="rounded-lg border border-gray-800 bg-gray-950 p-3 text-sm">
+              <li key={a.id} className="rounded-lg border border-outline-variant bg-inverse-surface p-3 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{a.service}</span>
-                  <span className={`rounded px-2 py-0.5 text-xs ${a.severity === 'high' ? 'bg-red-600' : a.severity === 'medium' ? 'bg-yellow-600' : 'bg-gray-700'}`}>{a.severity}</span>
+                  <span className={`rounded px-2 py-0.5 text-xs ${a.severity === 'high' ? 'bg-error' : a.severity === 'medium' ? 'bg-warning' : 'bg-surface-container-high'}`}>{a.severity}</span>
                 </div>
-                <p className="mt-1 text-gray-300">{a.message}</p>
-                <p className="mt-1 text-xs text-gray-500">{new Date(a.timestamp).toLocaleString()}</p>
+                <p className="mt-1 text-outline">{a.message}</p>
+                <p className="mt-1 text-xs text-on-surface-variant">{new Date(a.timestamp).toLocaleString()}</p>
               </li>
             ))}
           </ul>

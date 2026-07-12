@@ -41,9 +41,9 @@ interface FilterRow {
 }
 
 const selectCls =
-  'rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500';
+  'rounded-lg border border-outline-variant bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-primary';
 const inputCls =
-  'rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500';
+  'rounded-lg border border-outline-variant bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-primary';
 
 export function WidgetBuilder({
   initial,
@@ -117,20 +117,20 @@ export function WidgetBuilder({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
-        <header className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/40 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-surface shadow-xl">
+        <header className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
+          <h2 className="text-lg font-bold text-on-surface">
             {initial ? 'Edit widget' : 'Add widget'}
           </h2>
-          <button onClick={onCancel} className="text-slate-400 hover:text-slate-700" title="Close">
+          <button onClick={onCancel} className="text-on-surface-variant hover:text-on-surface" title="Close">
             <X className="h-5 w-5" />
           </button>
         </header>
 
         <div className="grid flex-1 grid-cols-1 gap-0 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           {/* Config panel */}
-          <div className="space-y-5 border-r border-slate-100 p-6">
+          <div className="space-y-5 border-r border-outline-variant p-6">
             <Field label="Title">
               <input
                 value={title}
@@ -170,7 +170,7 @@ export function WidgetBuilder({
             </div>
 
             {catalogLoading ? (
-              <p className="text-sm text-slate-400">Loading fields…</p>
+              <p className="text-sm text-on-surface-variant">Loading fields…</p>
             ) : (
               <>
                 {/* Measures */}
@@ -184,7 +184,7 @@ export function WidgetBuilder({
                   }
                 >
                   {measures.length === 0 && (
-                    <p className="text-xs text-slate-400">Add at least one measure.</p>
+                    <p className="text-xs text-on-surface-variant">Add at least one measure.</p>
                   )}
                   {measures.map((m, index) => (
                     <div key={index} className="flex items-center gap-2">
@@ -235,7 +235,7 @@ export function WidgetBuilder({
                   }
                 >
                   {dimensions.length === 0 && (
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-on-surface-variant">
                       Optional. No dimension = single aggregate value.
                     </p>
                   )}
@@ -303,7 +303,7 @@ export function WidgetBuilder({
                   }
                 >
                   {filters.length === 0 && (
-                    <p className="text-xs text-slate-400">Optional.</p>
+                    <p className="text-xs text-on-surface-variant">Optional.</p>
                   )}
                   {filters.map((f, index) => (
                     <div key={index} className="flex items-center gap-2">
@@ -372,20 +372,20 @@ export function WidgetBuilder({
 
           {/* Preview panel */}
           <div className="space-y-3 p-6">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
               Live preview
             </h3>
-            <div className="min-h-[280px] rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+            <div className="min-h-[280px] rounded-xl border border-outline-variant bg-surface-container-low/50 p-4">
               {!spec ? (
-                <div className="flex h-[260px] items-center justify-center text-sm text-slate-400">
+                <div className="flex h-[260px] items-center justify-center text-sm text-on-surface-variant">
                   Add a measure to preview
                 </div>
               ) : preview.isLoading ? (
-                <div className="flex h-[260px] items-center justify-center text-sm text-slate-400">
+                <div className="flex h-[260px] items-center justify-center text-sm text-on-surface-variant">
                   Running query…
                 </div>
               ) : preview.error ? (
-                <div className="flex h-[260px] items-center justify-center text-center text-sm text-rose-600">
+                <div className="flex h-[260px] items-center justify-center text-center text-sm text-error">
                   {(preview.error as Error).message || 'Query failed'}
                 </div>
               ) : preview.data ? (
@@ -395,17 +395,17 @@ export function WidgetBuilder({
           </div>
         </div>
 
-        <footer className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
+        <footer className="flex items-center justify-end gap-3 border-t border-outline-variant px-6 py-4">
           <button
             onClick={onCancel}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+            className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low"
           >
             Cancel
           </button>
           <button
             disabled={!canSave || saving}
             onClick={() => spec && onSave({ title: title.trim(), chartType, spec })}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary disabled:opacity-50"
           >
             {saving ? 'Saving…' : initial ? 'Save changes' : 'Add widget'}
           </button>
@@ -418,7 +418,7 @@ export function WidgetBuilder({
 function Field({ label, children }: { label: string; children: React.ReactNode }): ReactElement {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
         {label}
       </span>
       {children}
@@ -438,12 +438,12 @@ function Section({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
           {title}
         </span>
         <button
           onClick={onAdd}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-50"
+          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-primary hover:bg-primary-container"
         >
           <Plus className="h-3.5 w-3.5" /> Add
         </button>
@@ -457,7 +457,7 @@ function RemoveBtn({ onClick }: { onClick: () => void }): ReactElement {
   return (
     <button
       onClick={onClick}
-      className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+      className="rounded-md p-1.5 text-on-surface-variant hover:bg-error-container hover:text-error"
       title="Remove"
     >
       <Trash2 className="h-4 w-4" />

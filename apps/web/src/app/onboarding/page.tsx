@@ -43,12 +43,12 @@ const STEPS = [
 ] as const;
 
 const inputClass =
-  'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5]';
+  'w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5]';
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-slate-600">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-on-surface-variant">{label}</span>
       {children}
     </label>
   );
@@ -61,8 +61,8 @@ function Banner({ kind, text }: { kind: 'ok' | 'err'; text: string }) {
       aria-live={kind === 'err' ? 'assertive' : 'polite'}
       className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
         kind === 'ok'
-          ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-          : 'border-red-200 bg-red-50 text-red-900'
+          ? 'border-success/30 bg-success-container text-on-success-container'
+          : 'border-error/30 bg-error-container text-on-error-container'
       }`}
     >
       {text}
@@ -136,11 +136,11 @@ export default function OnboardingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className="min-h-screen bg-surface-container-low">
       <div className="mx-auto max-w-2xl px-4 py-10 sm:py-14">
         <header className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-slate-900">Welcome to NEXUS</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-on-surface">Welcome to NEXUS</h1>
+          <p className="mt-1 text-sm text-on-surface-variant">
             A few quick steps to set up your workspace. You can skip optional steps and finish later.
           </p>
         </header>
@@ -162,8 +162,8 @@ export default function OnboardingPage() {
                     isActive
                       ? 'border-[#4f46e5] bg-[#4f46e5] text-white'
                       : isComplete
-                        ? 'border-emerald-500 bg-emerald-500 text-white'
-                        : 'border-slate-200 bg-white text-slate-400'
+                        ? 'border-success bg-success text-white'
+                        : 'border-outline-variant bg-surface text-on-surface-variant'
                   }`}
                   aria-current={isActive ? 'step' : undefined}
                   aria-label={s.label}
@@ -172,7 +172,7 @@ export default function OnboardingPage() {
                 </button>
                 <span
                   className={`mt-2 hidden text-xs sm:block ${
-                    isActive ? 'font-semibold text-slate-900' : 'text-slate-400'
+                    isActive ? 'font-semibold text-on-surface' : 'text-on-surface-variant'
                   }`}
                 >
                   {s.label}
@@ -182,7 +182,7 @@ export default function OnboardingPage() {
           })}
         </ol>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border border-outline-variant bg-surface p-6 shadow-sm">
           {step.id === 'profile' ? (
             <CompanyStep onSaved={() => { markStepDone('profile'); goNext(); }} />
           ) : null}
@@ -205,7 +205,7 @@ export default function OnboardingPage() {
         </div>
 
         <div className="mt-6 text-center">
-          <Link href="/" className="text-xs text-slate-400 hover:text-slate-600">
+          <Link href="/" className="text-xs text-on-surface-variant hover:text-on-surface-variant">
             Skip onboarding for now
           </Link>
         </div>
@@ -248,8 +248,8 @@ function CompanyStep({ onSaved }: { onSaved: () => void }) {
 
   return (
     <form onSubmit={onSubmit}>
-      <h2 className="mb-1 text-lg font-semibold text-slate-900">Tell us about your company</h2>
-      <p className="mb-5 text-sm text-slate-500">This appears across your workspace. You can refine it later in Settings.</p>
+      <h2 className="mb-1 text-lg font-semibold text-on-surface">Tell us about your company</h2>
+      <p className="mb-5 text-sm text-on-surface-variant">This appears across your workspace. You can refine it later in Settings.</p>
       {banner ? <Banner kind={banner.kind} text={banner.text} /> : null}
       <div className="space-y-4">
         <Field label="Company name *">
@@ -318,8 +318,8 @@ function PipelineStep({ onCreated, onBack }: { onCreated: () => void; onBack: ()
 
   return (
     <form onSubmit={onSubmit}>
-      <h2 className="mb-1 text-lg font-semibold text-slate-900">Create your first pipeline</h2>
-      <p className="mb-5 text-sm text-slate-500">
+      <h2 className="mb-1 text-lg font-semibold text-on-surface">Create your first pipeline</h2>
+      <p className="mb-5 text-sm text-on-surface-variant">
         We&apos;ll create a pipeline with a starter stage. Add and rename stages any time in Settings.
       </p>
       {banner ? <Banner kind={banner.kind} text={banner.text} /> : null}
@@ -407,8 +407,8 @@ function TeamStep({
 
   return (
     <form onSubmit={onSubmit}>
-      <h2 className="mb-1 text-lg font-semibold text-slate-900">Invite your team</h2>
-      <p className="mb-5 text-sm text-slate-500">
+      <h2 className="mb-1 text-lg font-semibold text-on-surface">Invite your team</h2>
+      <p className="mb-5 text-sm text-on-surface-variant">
         Send an invite to a teammate, or skip and add people later from Settings.
       </p>
       {banner ? <Banner kind={banner.kind} text={banner.text} /> : null}
@@ -466,8 +466,8 @@ function TeamStep({
 function ImportStep({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
   return (
     <div>
-      <h2 className="mb-1 text-lg font-semibold text-slate-900">Import your existing data</h2>
-      <p className="mb-5 text-sm text-slate-500">
+      <h2 className="mb-1 text-lg font-semibold text-on-surface">Import your existing data</h2>
+      <p className="mb-5 text-sm text-on-surface-variant">
         Bring contacts and accounts from Salesforce, HubSpot, or a CSV export. This opens the migration
         wizard in a new tab so you can return here when you&apos;re done.
       </p>
@@ -475,16 +475,16 @@ function ImportStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
         href="/settings/migration"
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-3 rounded-xl border-2 border-dashed border-slate-300 p-5 transition-colors hover:border-[#4f46e5] hover:bg-indigo-50/40"
+        className="flex items-center gap-3 rounded-xl border-2 border-dashed border-outline-variant p-5 transition-colors hover:border-[#4f46e5] hover:bg-primary-container/40"
       >
-        <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-indigo-50 text-[#4f46e5]">
+        <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary-container text-[#4f46e5]">
           <Upload className="h-5 w-5" />
         </span>
         <span>
-          <span className="block text-sm font-medium text-slate-900">Open CSV / CRM import wizard</span>
-          <span className="block text-xs text-slate-500">Salesforce, HubSpot, or generic CSV</span>
+          <span className="block text-sm font-medium text-on-surface">Open CSV / CRM import wizard</span>
+          <span className="block text-xs text-on-surface-variant">Salesforce, HubSpot, or generic CSV</span>
         </span>
-        <ArrowRight className="ml-auto h-4 w-4 text-slate-400" />
+        <ArrowRight className="ml-auto h-4 w-4 text-on-surface-variant" />
       </Link>
       <div className="mt-6 flex items-center justify-between">
         <Button type="button" variant="ghost" onClick={onBack}>
@@ -511,11 +511,11 @@ function DoneStep({ onFinish, isSaving }: { onFinish: () => void; isSaving: bool
   ];
   return (
     <div className="text-center">
-      <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+      <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-success-container text-success">
         <PartyPopper className="h-7 w-7" />
       </span>
-      <h2 className="mb-1 text-lg font-semibold text-slate-900">You&apos;re all set</h2>
-      <p className="mb-6 text-sm text-slate-500">
+      <h2 className="mb-1 text-lg font-semibold text-on-surface">You&apos;re all set</h2>
+      <p className="mb-6 text-sm text-on-surface-variant">
         Your workspace is ready. Jump into the app — you can always revisit Settings to fine-tune things.
       </p>
       <div className="mb-6 grid grid-cols-2 gap-3">
@@ -523,7 +523,7 @@ function DoneStep({ onFinish, isSaving }: { onFinish: () => void; isSaving: bool
           <Link
             key={l.href}
             href={l.href}
-            className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5]"
+            className="rounded-lg border border-outline-variant px-4 py-3 text-sm font-medium text-on-surface transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5]"
           >
             {l.label}
           </Link>

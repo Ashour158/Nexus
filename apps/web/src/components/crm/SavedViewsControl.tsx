@@ -73,12 +73,12 @@ export function SavedViewsControl({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-xs font-bold text-slate-600 hover:bg-slate-50"
+        className="inline-flex h-9 items-center gap-2 rounded-md border border-outline-variant px-3 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low"
       >
         <Bookmark className="h-3.5 w-3.5" />
         Views
         {views.length > 0 ? (
-          <span className="rounded-full bg-slate-100 px-1.5 text-[10px] text-slate-500">
+          <span className="rounded-full bg-surface-container-high px-1.5 text-[10px] text-on-surface-variant">
             {views.length}
           </span>
         ) : null}
@@ -86,12 +86,12 @@ export function SavedViewsControl({
       </button>
 
       {open ? (
-        <div className="absolute right-0 z-40 mt-2 w-72 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+        <div className="absolute right-0 z-40 mt-2 w-72 overflow-hidden rounded-lg border border-outline-variant bg-surface shadow-lg">
           <div className="max-h-64 overflow-y-auto p-1">
             {viewsQuery.isLoading ? (
-              <p className="px-3 py-4 text-center text-xs text-slate-400">Loading views…</p>
+              <p className="px-3 py-4 text-center text-xs text-on-surface-variant">Loading views…</p>
             ) : views.length === 0 ? (
-              <p className="px-3 py-4 text-center text-xs text-slate-400">
+              <p className="px-3 py-4 text-center text-xs text-on-surface-variant">
                 No saved views yet.
               </p>
             ) : (
@@ -110,7 +110,7 @@ export function SavedViewsControl({
             )}
           </div>
 
-          <div className="border-t border-slate-100 p-2">
+          <div className="border-t border-outline-variant p-2">
             {saving ? (
               <div className="space-y-2">
                 <input
@@ -122,14 +122,14 @@ export function SavedViewsControl({
                     if (e.key === 'Escape') setSaving(false);
                   }}
                   placeholder="View name…"
-                  className="h-9 w-full rounded-md border border-slate-200 px-2.5 text-sm outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                  className="h-9 w-full rounded-md border border-outline-variant px-2.5 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/30"
                 />
-                <label className="flex items-center gap-2 px-0.5 text-xs text-slate-600">
+                <label className="flex items-center gap-2 px-0.5 text-xs text-on-surface-variant">
                   <input
                     type="checkbox"
                     checked={isShared}
                     onChange={(e) => setIsShared(e.target.checked)}
-                    className="rounded border-slate-300"
+                    className="rounded border-outline-variant"
                   />
                   <Users className="h-3.5 w-3.5" />
                   Share with team
@@ -139,7 +139,7 @@ export function SavedViewsControl({
                     type="button"
                     onClick={handleSave}
                     disabled={!name.trim() || createView.isPending}
-                    className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md bg-indigo-600 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
+                    className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md bg-primary text-xs font-bold text-white hover:bg-primary disabled:opacity-60"
                   >
                     <Check className="h-3.5 w-3.5" />
                     {createView.isPending ? 'Saving…' : 'Save'}
@@ -147,7 +147,7 @@ export function SavedViewsControl({
                   <button
                     type="button"
                     onClick={() => setSaving(false)}
-                    className="inline-flex h-9 items-center justify-center rounded-md border border-slate-200 px-3 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                    className="inline-flex h-9 items-center justify-center rounded-md border border-outline-variant px-3 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low"
                   >
                     Cancel
                   </button>
@@ -157,7 +157,7 @@ export function SavedViewsControl({
               <button
                 type="button"
                 onClick={() => setSaving(true)}
-                className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-outline-variant text-xs font-bold text-on-surface hover:bg-surface-container-low"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Save current view
@@ -182,16 +182,16 @@ function ViewRow({
   deleting: boolean;
 }) {
   return (
-    <div className="group flex items-center gap-1 rounded-md px-1 hover:bg-slate-50">
+    <div className="group flex items-center gap-1 rounded-md px-1 hover:bg-surface-container-low">
       <button
         type="button"
         onClick={onApply}
-        className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left text-sm text-slate-700"
+        className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left text-sm text-on-surface"
       >
-        <Bookmark className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+        <Bookmark className="h-3.5 w-3.5 shrink-0 text-on-surface-variant" />
         <span className="truncate">{view.name}</span>
         {view.isShared ? (
-          <Users className="h-3 w-3 shrink-0 text-slate-400" aria-label="Shared" />
+          <Users className="h-3 w-3 shrink-0 text-on-surface-variant" aria-label="Shared" />
         ) : null}
       </button>
       <button
@@ -200,7 +200,7 @@ function ViewRow({
         disabled={deleting}
         aria-label={`Delete view ${view.name}`}
         className={cn(
-          'shrink-0 rounded p-1.5 text-slate-400 opacity-0 transition hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100',
+          'shrink-0 rounded p-1.5 text-on-surface-variant opacity-0 transition hover:bg-error-container hover:text-error group-hover:opacity-100',
           deleting && 'opacity-100'
         )}
       >

@@ -18,16 +18,16 @@ export default function FeedPage() {
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-lg border border-[#dbe7f3] bg-white shadow-sm">
-        <div className="h-1.5 bg-gradient-to-r from-indigo-600 via-emerald-500 to-amber-400" />
+      <section className="overflow-hidden rounded-lg border border-[#dbe7f3] bg-surface shadow-sm">
+        <div className="h-1.5 bg-gradient-to-r from-primary via-success to-warning" />
         <div className="flex items-start gap-3 p-4 sm:p-5">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm shadow-indigo-200">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-sm shadow-primary/30">
             <Rss className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase text-indigo-700">Your following feed</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">Following</h1>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+            <p className="text-xs font-semibold uppercase text-primary">Your following feed</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-on-surface">Following</h1>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
               Recent activity across the accounts and contacts you follow. Follow a record
               from its detail page to see its updates here.
             </p>
@@ -35,7 +35,7 @@ export default function FeedPage() {
         </div>
       </section>
 
-      <section className="rounded-lg border border-[#e7edf3] bg-white p-4 shadow-sm">
+      <section className="rounded-lg border border-[#e7edf3] bg-surface p-4 shadow-sm">
         {feedQuery.isLoading ? (
           <div className="space-y-3">
             <Skeleton className="h-16" />
@@ -74,26 +74,26 @@ function FeedItem({ item }: { item: FeedActivity }) {
     entitySegment && item.entityId ? `/${entitySegment}/${item.entityId}` : undefined;
 
   const body = (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-indigo-200 hover:bg-indigo-50/30">
+    <div className="rounded-xl border border-outline-variant bg-surface p-4 transition hover:border-primary/40 hover:bg-primary-container/30">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="rounded-lg bg-indigo-50 p-1.5 text-indigo-700">
+          <span className="rounded-lg bg-primary-container p-1.5 text-primary">
             <Activity className="h-4 w-4" />
           </span>
-          <p className="truncate text-sm font-bold text-slate-950">{title}</p>
+          <p className="truncate text-sm font-bold text-on-surface">{title}</p>
         </div>
-        {when ? <span className="text-xs text-slate-400">{formatDateTime(when)}</span> : null}
+        {when ? <span className="text-xs text-on-surface-variant">{formatDateTime(when)}</span> : null}
       </div>
       {item.description ? (
-        <p className="mt-2 text-xs text-slate-500">{item.description}</p>
+        <p className="mt-2 text-xs text-on-surface-variant">{item.description}</p>
       ) : null}
       <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
         {item.entityName ? (
-          <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600">
+          <span className="rounded bg-surface-container-high px-1.5 py-0.5 font-semibold text-on-surface-variant">
             {item.entityName}
           </span>
         ) : null}
-        {item.actorName ? <span className="text-slate-400">by {item.actorName}</span> : null}
+        {item.actorName ? <span className="text-on-surface-variant">by {item.actorName}</span> : null}
       </div>
     </div>
   );

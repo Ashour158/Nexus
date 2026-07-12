@@ -73,11 +73,11 @@ const PREVIEW_APPROVALS: ApprovalRequest[] = [
 ];
 
 function statusClass(status: ApprovalStatus): string {
-  if (status === 'PENDING') return 'bg-amber-100 text-amber-800 ring-amber-200';
-  if (status === 'ESCALATED') return 'bg-orange-100 text-orange-800 ring-orange-200';
-  if (status === 'APPROVED') return 'bg-emerald-100 text-emerald-800 ring-emerald-200';
-  if (status === 'CANCELLED') return 'bg-slate-100 text-slate-600 ring-slate-200';
-  return 'bg-rose-100 text-rose-700 ring-rose-200';
+  if (status === 'PENDING') return 'bg-warning-container text-on-warning-container ring-warning/30';
+  if (status === 'ESCALATED') return 'bg-warning-container text-on-warning-container ring-warning/30';
+  if (status === 'APPROVED') return 'bg-success-container text-on-success-container ring-success/30';
+  if (status === 'CANCELLED') return 'bg-surface-container-high text-on-surface-variant ring-outline-variant';
+  return 'bg-error-container text-error ring-error/30';
 }
 
 function money(value: unknown): string {
@@ -164,23 +164,23 @@ export default function ApprovalsPage() {
 
   return (
     <div className="space-y-8">
-      <section className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
         <div className="grid gap-0 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="p-6 sm:p-8">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#4f46e5]">
+              <span className="inline-flex items-center gap-2 rounded-lg bg-primary-container px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#4f46e5]">
                 <ShieldCheck className="h-4 w-4" />
                 Governance Queue
               </span>
-              <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
+              <span className="rounded-lg bg-surface-container-high px-3 py-2 text-xs font-semibold text-on-surface-variant">
                 Approval engine
               </span>
             </div>
             <div className="mt-5 max-w-3xl">
-              <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+              <h1 className="text-3xl font-black tracking-tight text-on-surface sm:text-4xl">
                 Approval command center
               </h1>
-              <p className="mt-3 text-sm leading-6 text-slate-500 sm:text-base">
+              <p className="mt-3 text-sm leading-6 text-on-surface-variant sm:text-base">
                 Review multi-level approval requests across every module, act on your queue, and govern
                 the routing policies behind them.
               </p>
@@ -197,7 +197,7 @@ export default function ApprovalsPage() {
               ) : null}
             </div>
           </div>
-          <div className="border-t border-slate-100 bg-slate-50 p-6 lg:border-l lg:border-t-0">
+          <div className="border-t border-outline-variant bg-surface-container-low p-6 lg:border-l lg:border-t-0">
             <div className="grid grid-cols-2 gap-3">
               <MetricCard icon={Clock3} label="Pending" value={stats.pending} tone="amber" />
               <MetricCard icon={AlertCircle} label="Escalated" value={stats.escalated} tone="orange" />
@@ -213,7 +213,7 @@ export default function ApprovalsPage() {
       ) : (
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="min-w-0 space-y-6">
-            <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
               <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div className="flex flex-wrap gap-2">
                   {SCOPES.map((item) => (
@@ -225,7 +225,7 @@ export default function ApprovalsPage() {
                         'rounded-lg px-4 py-2 text-sm font-bold transition',
                         scope === item.value
                           ? 'bg-[#4f46e5] text-white shadow-sm'
-                          : 'border border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-[#4f46e5]'
+                          : 'border border-outline-variant bg-surface text-on-surface-variant hover:border-primary/40 hover:bg-primary-container hover:text-[#4f46e5]'
                       )}
                     >
                       {item.label}
@@ -234,11 +234,11 @@ export default function ApprovalsPage() {
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   <label className="relative block min-w-0 sm:w-72">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
                     <input
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
-                      className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                      className="h-11 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-10 pr-3 text-sm text-on-surface outline-none transition focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
                       placeholder="Search approvals..."
                       type="search"
                     />
@@ -246,7 +246,7 @@ export default function ApprovalsPage() {
                   <button
                     type="button"
                     onClick={refresh}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 text-sm font-bold text-on-surface-variant transition hover:bg-surface-container-low"
                   >
                     <RefreshCw className="h-4 w-4" />
                     Refresh
@@ -255,22 +255,22 @@ export default function ApprovalsPage() {
               </div>
             </div>
 
-            <section className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+            <section className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant px-5 py-4">
                 <div>
-                  <h2 className="text-lg font-bold text-slate-950">Decision inbox</h2>
-                  <p className="text-sm text-slate-500">
+                  <h2 className="text-lg font-bold text-on-surface">Decision inbox</h2>
+                  <p className="text-sm text-on-surface-variant">
                     {listLoading ? 'Loading approvals...' : `${rows.length} records in view`}
                   </p>
                 </div>
-                <span className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                <span className="inline-flex items-center gap-2 rounded-lg bg-surface-container-high px-3 py-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                   <Filter className="h-4 w-4" />
                   {scope}
                 </span>
               </div>
 
               {usingPreview ? (
-                <div className="border-b border-amber-100 bg-amber-50 px-5 py-3 text-sm font-medium text-amber-800">
+                <div className="border-b border-warning/30 bg-warning-container px-5 py-3 text-sm font-medium text-on-warning-container">
                   Approval service is offline — showing development preview records.
                 </div>
               ) : null}
@@ -284,7 +284,7 @@ export default function ApprovalsPage() {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[900px] text-left text-sm">
-                    <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500">
+                    <thead className="bg-surface-container-low text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                       <tr>
                         <th className="px-5 py-3">Request</th>
                         <th className="px-5 py-3">Commercial impact</th>
@@ -295,29 +295,29 @@ export default function ApprovalsPage() {
                         <th className="px-5 py-3 text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-outline-variant">
                       {rows.map((row) => {
                         const data = row.data ?? {};
                         return (
-                          <tr key={row.id} className="transition hover:bg-slate-50/80">
+                          <tr key={row.id} className="transition hover:bg-surface-container-low/80">
                             <td className="px-5 py-4">
                               <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-xs font-black text-[#4f46e5]">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-container text-xs font-black text-[#4f46e5]">
                                   {initials(row.module)}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="truncate font-bold text-slate-950">{row.module}</p>
-                                  <p className="mt-0.5 font-mono text-xs text-slate-500">{row.recordId}</p>
+                                  <p className="truncate font-bold text-on-surface">{row.module}</p>
+                                  <p className="mt-0.5 font-mono text-xs text-on-surface-variant">{row.recordId}</p>
                                 </div>
                               </div>
                             </td>
                             <td className="px-5 py-4">
-                              <p className="font-bold text-slate-950">{money(data.dealValue)}</p>
-                              <p className="text-xs text-slate-500">Discount {discount(data.requestedDiscountPercent)}</p>
+                              <p className="font-bold text-on-surface">{money(data.dealValue)}</p>
+                              <p className="text-xs text-on-surface-variant">Discount {discount(data.requestedDiscountPercent)}</p>
                             </td>
-                            <td className="px-5 py-4 font-medium text-slate-700">{row.requestedBy}</td>
-                            <td className="px-5 py-4 text-slate-600">L{row.currentStep}</td>
-                            <td className="px-5 py-4 text-slate-600">{formatDate(row.createdAt)}</td>
+                            <td className="px-5 py-4 font-medium text-on-surface">{row.requestedBy}</td>
+                            <td className="px-5 py-4 text-on-surface-variant">L{row.currentStep}</td>
+                            <td className="px-5 py-4 text-on-surface-variant">{formatDate(row.createdAt)}</td>
                             <td className="px-5 py-4">
                               <span className={cn('inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-bold ring-1', statusClass(row.status))}>
                                 {row.status}
@@ -327,7 +327,7 @@ export default function ApprovalsPage() {
                               <button
                                 type="button"
                                 onClick={() => setOpenId(row.id)}
-                                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-[#4f46e5] transition hover:bg-indigo-50"
+                                className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-xs font-bold text-[#4f46e5] transition hover:bg-primary-container"
                               >
                                 Review
                               </button>
@@ -360,11 +360,11 @@ export default function ApprovalsPage() {
           <aside className="space-y-6">
             <DiscountRequestCard onCreated={refresh} />
 
-            <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+            <section className="rounded-xl border border-outline-variant bg-surface p-5 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-lg font-bold text-slate-950">Awaiting my decision</h2>
-                  <p className="text-sm text-slate-500">Requests routed to you right now.</p>
+                  <h2 className="text-lg font-bold text-on-surface">Awaiting my decision</h2>
+                  <p className="text-sm text-on-surface-variant">Requests routed to you right now.</p>
                 </div>
                 <GitBranch className="h-5 w-5 text-[#4f46e5]" />
               </div>
@@ -377,12 +377,12 @@ export default function ApprovalsPage() {
                     key={`mine-${row.id}`}
                     type="button"
                     onClick={() => setOpenId(row.id)}
-                    className="block w-full rounded-lg border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-indigo-200 hover:bg-indigo-50"
+                    className="block w-full rounded-lg border border-outline-variant bg-surface-container-low p-4 text-left transition hover:border-primary/40 hover:bg-primary-container"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate font-bold text-slate-950">{row.module}</p>
-                        <p className="mt-1 truncate font-mono text-xs text-slate-500">{row.recordId}</p>
+                        <p className="truncate font-bold text-on-surface">{row.module}</p>
+                        <p className="mt-1 truncate font-mono text-xs text-on-surface-variant">{row.recordId}</p>
                       </div>
                       <span className={cn('shrink-0 rounded px-2 py-1 text-[10px] font-bold ring-1', statusClass(row.status))}>
                         {row.status}
@@ -401,9 +401,9 @@ export default function ApprovalsPage() {
               </div>
             </section>
 
-            <section className="rounded-xl bg-slate-950 p-5 text-white shadow-sm">
+            <section className="rounded-xl bg-inverse-surface p-5 text-white shadow-sm">
               <h2 className="text-lg font-bold">Approval controls</h2>
-              <div className="mt-4 space-y-4 text-sm text-slate-300">
+              <div className="mt-4 space-y-4 text-sm text-outline">
                 <ControlLine label="Routing engine" value="Policy + hierarchy" />
                 <ControlLine label="Quorum" value="ALL / ANY / N-of-M" />
                 <ControlLine label="Audit trail" value="Immutable events" />
@@ -500,21 +500,21 @@ function DiscountRequestCard({ onCreated }: { onCreated: () => void }) {
   });
 
   return (
-    <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+    <section className="rounded-xl border border-outline-variant bg-surface p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-slate-950">Create DRQ</h2>
-          <p className="text-sm text-slate-500">Validated discount request with approval hierarchy.</p>
+          <h2 className="text-lg font-bold text-on-surface">Create DRQ</h2>
+          <p className="text-sm text-on-surface-variant">Validated discount request with approval hierarchy.</p>
         </div>
         <ShieldCheck className="h-5 w-5 text-[#4f46e5]" />
       </div>
       <div className="mt-4 space-y-3">
-        <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+        <label className="block text-xs font-bold uppercase tracking-wide text-on-surface-variant">
           Quote
           <select
             value={form.quoteId}
             onChange={(e) => setForm((s) => ({ ...s, quoteId: e.target.value }))}
-            className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium normal-case text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            className="mt-1 h-10 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm font-medium normal-case text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
           >
             {quoteOptions.map((quote) => (
               <option key={quote.id} value={quote.id}>
@@ -527,7 +527,7 @@ function DiscountRequestCard({ onCreated }: { onCreated: () => void }) {
           </select>
         </label>
         <div className="grid grid-cols-2 gap-3">
-          <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+          <label className="block text-xs font-bold uppercase tracking-wide text-on-surface-variant">
             Discount %
             <input
               value={form.requestedDiscountPercent}
@@ -535,10 +535,10 @@ function DiscountRequestCard({ onCreated }: { onCreated: () => void }) {
               max="80"
               type="number"
               onChange={(e) => setForm((s) => ({ ...s, requestedDiscountPercent: e.target.value }))}
-              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm normal-case"
+              className="mt-1 h-10 w-full rounded-lg border border-outline-variant px-3 text-sm normal-case"
             />
           </label>
-          <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+          <label className="block text-xs font-bold uppercase tracking-wide text-on-surface-variant">
             Win %
             <input
               value={form.winningProbabilityIfApproved}
@@ -546,16 +546,16 @@ function DiscountRequestCard({ onCreated }: { onCreated: () => void }) {
               max="100"
               type="number"
               onChange={(e) => setForm((s) => ({ ...s, winningProbabilityIfApproved: e.target.value }))}
-              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm normal-case"
+              className="mt-1 h-10 w-full rounded-lg border border-outline-variant px-3 text-sm normal-case"
             />
           </label>
         </div>
-        <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+        <label className="block text-xs font-bold uppercase tracking-wide text-on-surface-variant">
           Prevalidated reason
           <select
             value={form.reasonCode}
             onChange={(e) => setForm((s) => ({ ...s, reasonCode: e.target.value }))}
-            className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium normal-case text-slate-700"
+            className="mt-1 h-10 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm font-medium normal-case text-on-surface"
           >
             {reasons.length > 0 ? (
               reasons.map((reason) => (
@@ -573,7 +573,7 @@ function DiscountRequestCard({ onCreated }: { onCreated: () => void }) {
           onChange={(e) => setForm((s) => ({ ...s, reasonNotes: e.target.value }))}
           rows={3}
           placeholder="Business reason, customer context, competitive pressure..."
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+          className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
         />
         <div className="grid gap-2">
           {[1, 2, 3].map((level) => (
@@ -582,15 +582,15 @@ function DiscountRequestCard({ onCreated }: { onCreated: () => void }) {
               value={form[`level${level}` as 'level1']}
               onChange={(e) => setForm((s) => ({ ...s, [`level${level}`]: e.target.value }))}
               placeholder={`Approval level ${level}${level === 3 ? ' (optional)' : ''}`}
-              className="h-9 rounded-lg border border-slate-200 px-3 text-sm"
+              className="h-9 rounded-lg border border-outline-variant px-3 text-sm"
             />
           ))}
         </div>
         {createDrq.isError ? (
-          <p className="rounded-lg bg-rose-50 p-2 text-xs font-semibold text-rose-700">{createDrq.error.message}</p>
+          <p className="rounded-lg bg-error-container p-2 text-xs font-semibold text-error">{createDrq.error.message}</p>
         ) : null}
         {createDrq.isSuccess ? (
-          <p className="rounded-lg bg-emerald-50 p-2 text-xs font-semibold text-emerald-700">
+          <p className="rounded-lg bg-success-container p-2 text-xs font-semibold text-success">
             DRQ created and routed to the approval workflow.
           </p>
         ) : null}
@@ -598,7 +598,7 @@ function DiscountRequestCard({ onCreated }: { onCreated: () => void }) {
           type="button"
           onClick={() => createDrq.mutate()}
           disabled={createDrq.isPending}
-          className="w-full rounded-lg bg-[#4f46e5] px-4 py-2 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+          className="w-full rounded-lg bg-[#4f46e5] px-4 py-2 text-sm font-bold text-white transition hover:bg-primary disabled:opacity-60"
         >
           {createDrq.isPending ? 'Validating...' : 'Create DRQ workflow'}
         </button>
@@ -625,8 +625,8 @@ function ViewTab({
       className={cn(
         'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition',
         active
-          ? 'bg-slate-950 text-white'
-          : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+          ? 'bg-inverse-surface text-white'
+          : 'border border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container-low'
       )}
     >
       <Icon className="h-4 w-4" />
@@ -647,18 +647,18 @@ function MetricCard({
   tone: 'amber' | 'orange' | 'emerald' | 'blue';
 }) {
   const tones = {
-    amber: 'bg-amber-50 text-amber-600',
-    orange: 'bg-orange-50 text-orange-600',
-    emerald: 'bg-emerald-50 text-emerald-600',
-    blue: 'bg-indigo-50 text-[#4f46e5]',
+    amber: 'bg-warning-container text-warning',
+    orange: 'bg-warning-container text-warning',
+    emerald: 'bg-success-container text-success',
+    blue: 'bg-primary-container text-[#4f46e5]',
   };
   return (
-    <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
       <div className={cn('mb-3 inline-flex rounded-lg p-2', tones[tone])}>
         <Icon className="h-4 w-4" />
       </div>
-      <p className="text-2xl font-black text-slate-950">{value}</p>
-      <p className="mt-1 text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="text-2xl font-black text-on-surface">{value}</p>
+      <p className="mt-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant">{label}</p>
     </div>
   );
 }
@@ -676,18 +676,18 @@ function StatePanel({
 }) {
   return (
     <div className={cn('flex flex-col items-center justify-center text-center', compact ? 'py-5' : 'py-10')}>
-      <div className="rounded-lg bg-slate-100 p-3 text-slate-500">
+      <div className="rounded-lg bg-surface-container-high p-3 text-on-surface-variant">
         <Icon className="h-5 w-5" />
       </div>
-      <p className="mt-3 font-bold text-slate-900">{title}</p>
-      <p className="mt-1 max-w-md text-sm leading-6 text-slate-500">{body}</p>
+      <p className="mt-3 font-bold text-on-surface">{title}</p>
+      <p className="mt-1 max-w-md text-sm leading-6 text-on-surface-variant">{body}</p>
     </div>
   );
 }
 
 function ControlLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-3 last:border-0 last:pb-0">
+    <div className="flex items-center justify-between gap-4 border-b border-surface/10 pb-3 last:border-0 last:pb-0">
       <span>{label}</span>
       <span className="font-bold text-white">{value}</span>
     </div>

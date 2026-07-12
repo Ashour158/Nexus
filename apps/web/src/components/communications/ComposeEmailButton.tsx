@@ -136,7 +136,7 @@ export function ComposeEmailButton({
         <div className="space-y-4">
           {templates.length > 0 ? (
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Template</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface">Template</label>
               <select
                 value={templateId}
                 onChange={(e) => applyTemplate(e.target.value)}
@@ -153,7 +153,7 @@ export function ComposeEmailButton({
           ) : null}
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">To</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface">To</label>
             <Input
               value={toAddress}
               onChange={(e) => setToAddress(e.target.value)}
@@ -163,7 +163,7 @@ export function ComposeEmailButton({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Subject</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface">Subject</label>
             <Input
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
@@ -172,7 +172,7 @@ export function ComposeEmailButton({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Message</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface">Message</label>
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}

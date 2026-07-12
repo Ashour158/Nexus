@@ -60,18 +60,18 @@ interface PerformanceReport {
 }
 
 const STATUS_STYLES: Record<DealStatus, string> = {
-  'CLOSED WON': 'bg-emerald-100 text-emerald-700',
-  'IN PROGRESS': 'bg-indigo-100 text-indigo-700',
-  'PENDING APPROVAL': 'bg-amber-100 text-amber-700',
-  'CLOSED LOST': 'bg-rose-100 text-rose-700',
+  'CLOSED WON': 'bg-success-container text-success',
+  'IN PROGRESS': 'bg-primary-container text-primary',
+  'PENDING APPROVAL': 'bg-warning-container text-warning',
+  'CLOSED LOST': 'bg-error-container text-error',
 };
 
 const avatarTones = [
-  'bg-indigo-100 text-indigo-600',
-  'bg-purple-100 text-purple-600',
-  'bg-amber-100 text-amber-600',
-  'bg-indigo-100 text-indigo-600',
-  'bg-rose-100 text-rose-600',
+  'bg-primary-container text-primary',
+  'bg-tertiary-container text-tertiary',
+  'bg-warning-container text-warning',
+  'bg-primary-container text-primary',
+  'bg-error-container text-error',
 ];
 
 export default function AnalyticsPage(): ReactElement {
@@ -118,12 +118,12 @@ export default function AnalyticsPage(): ReactElement {
   const maxTerritory = Math.max(...(data?.territory ?? []).map((row) => row.value), 1);
 
   if (isLoading) {
-    return <div className="rounded-xl border border-slate-100 bg-white p-10 text-center text-sm text-slate-500">Loading analytics...</div>;
+    return <div className="rounded-xl border border-outline-variant bg-surface p-10 text-center text-sm text-on-surface-variant">Loading analytics...</div>;
   }
 
   if (error || !data) {
     return (
-      <div className="rounded-xl border border-red-100 bg-red-50 p-8 text-sm text-red-700">
+      <div className="rounded-xl border border-error/30 bg-error-container p-8 text-sm text-error">
         Analytics data is not available. Please check the reporting preview API.
       </div>
     );
@@ -152,21 +152,21 @@ export default function AnalyticsPage(): ReactElement {
         </div>
 
         <div className="flex items-center gap-2">
-          <button className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500 transition hover:border-indigo-200 hover:text-indigo-600" title="More filters">
+          <button className="rounded-lg border border-outline-variant bg-surface p-2 text-on-surface-variant transition hover:border-primary/40 hover:text-primary" title="More filters">
             <Filter className="h-5 w-5" />
           </button>
           <button
-            className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500 transition hover:border-indigo-200 hover:text-indigo-600"
+            className="rounded-lg border border-outline-variant bg-surface p-2 text-on-surface-variant transition hover:border-primary/40 hover:text-primary"
             title="Refresh"
             onClick={() => void refetch()}
           >
             <RefreshCw className={cn('h-5 w-5', isFetching && 'animate-spin')} />
           </button>
-          <button className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:inline-flex">
+          <button className="hidden items-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 py-2 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low sm:inline-flex">
             <Share2 className="h-4 w-4" />
             Share
           </button>
-          <button className="hidden items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 sm:inline-flex">
+          <button className="hidden items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary sm:inline-flex">
             Export
           </button>
         </div>
@@ -179,31 +179,31 @@ export default function AnalyticsPage(): ReactElement {
         <SparkMetric label="Avg Deal Size" value={formatCurrency(avgDealSize)} tone="indigo" sparkline={data.kpis?.avgDealSizeSparkline ?? []} />
       </section>
 
-      <section className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-slate-100 p-6 lg:flex-row lg:items-center lg:justify-between">
+      <section className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
+        <div className="flex flex-col gap-4 border-b border-outline-variant p-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-lg font-bold text-slate-900">Detailed Performance Log</h1>
-            <p className="text-sm text-slate-500">
+            <h1 className="text-lg font-bold text-on-surface">Detailed Performance Log</h1>
+            <p className="text-sm text-on-surface-variant">
               Showing {rows.length.toLocaleString()} transactions across {(data.territory ?? []).length} territories
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <label className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-200 bg-slate-100 pl-9 pr-3 text-sm outline-none focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100 sm:w-64"
+                className="h-10 w-full rounded-lg border border-outline-variant bg-surface-container-high pl-9 pr-3 text-sm outline-none focus:border-primary/40 focus:bg-surface focus:ring-2 focus:ring-primary/30 sm:w-64"
                 placeholder="Search performance..."
               />
             </label>
-            <span className="text-xs font-semibold text-slate-400">Rows per page: 25</span>
-            <div className="flex rounded-lg border border-slate-200">
-              <button className="border-r border-slate-200 p-2 hover:bg-slate-50" title="Previous">
-                <ChevronLeft className="h-4 w-4 text-slate-500" />
+            <span className="text-xs font-semibold text-on-surface-variant">Rows per page: 25</span>
+            <div className="flex rounded-lg border border-outline-variant">
+              <button className="border-r border-outline-variant p-2 hover:bg-surface-container-low" title="Previous">
+                <ChevronLeft className="h-4 w-4 text-on-surface-variant" />
               </button>
-              <button className="p-2 hover:bg-slate-50" title="Next">
-                <ChevronRight className="h-4 w-4 text-slate-500" />
+              <button className="p-2 hover:bg-surface-container-low" title="Next">
+                <ChevronRight className="h-4 w-4 text-on-surface-variant" />
               </button>
             </div>
           </div>
@@ -212,7 +212,7 @@ export default function AnalyticsPage(): ReactElement {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] border-collapse text-left">
             <thead>
-              <tr className="bg-slate-50/80">
+              <tr className="bg-surface-container-low/80">
                 <TableHead>Date</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Owner</TableHead>
@@ -221,37 +221,37 @@ export default function AnalyticsPage(): ReactElement {
                 <TableHead className="text-right">Actions</TableHead>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-outline-variant">
               {rows.map((row, index) => (
-                <tr key={row.id} className="transition-colors hover:bg-slate-50/80">
-                  <td className="p-4 text-sm font-medium text-slate-600">{formatDate(row.date)}</td>
+                <tr key={row.id} className="transition-colors hover:bg-surface-container-low/80">
+                  <td className="p-4 text-sm font-medium text-on-surface-variant">{formatDate(row.date)}</td>
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       <div className={cn('flex h-8 w-8 items-center justify-center rounded text-xs font-bold', avatarTones[index % avatarTones.length])}>
                         {initials(row.customer)}
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-slate-900">{row.customer}</p>
-                        <p className="text-xs text-slate-400">{row.customerSubtitle}</p>
+                        <p className="text-sm font-bold text-on-surface">{row.customer}</p>
+                        <p className="text-xs text-on-surface-variant">{row.customerSubtitle}</p>
                       </div>
                     </div>
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-bold text-white">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-inverse-surface text-[10px] font-bold text-white">
                         {initials(row.ownerName)}
                       </div>
-                      <span className="text-sm text-slate-600">{row.ownerName}</span>
+                      <span className="text-sm text-on-surface-variant">{row.ownerName}</span>
                     </div>
                   </td>
-                  <td className="p-4 text-sm font-bold text-slate-900">{formatCurrency(row.dealValue)}</td>
+                  <td className="p-4 text-sm font-bold text-on-surface">{formatCurrency(row.dealValue)}</td>
                   <td className="p-4">
                     <span className={cn('rounded px-2 py-1 text-[10px] font-bold uppercase tracking-tight', STATUS_STYLES[row.status])}>
                       {row.status}
                     </span>
                   </td>
                   <td className="p-4 text-right">
-                    <button className="text-slate-400 hover:text-indigo-600" title="Actions">
+                    <button className="text-on-surface-variant hover:text-primary" title="Actions">
                       <MoreVertical className="h-5 w-5" />
                     </button>
                   </td>
@@ -261,14 +261,14 @@ export default function AnalyticsPage(): ReactElement {
           </table>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs font-medium text-slate-500">Page 1 of 1</p>
+        <div className="flex flex-col gap-3 border-t border-outline-variant bg-surface-container-low p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs font-medium text-on-surface-variant">Page 1 of 1</p>
           <div className="flex items-center gap-2">
-            <button className="rounded border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-600 opacity-50" disabled>
+            <button className="rounded border border-outline-variant bg-surface px-3 py-1 text-xs font-bold text-on-surface-variant opacity-50" disabled>
               Previous
             </button>
-            <button className="h-6 w-6 rounded bg-indigo-600 text-[10px] font-bold text-white">1</button>
-            <button className="rounded border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50">
+            <button className="h-6 w-6 rounded bg-primary text-[10px] font-bold text-white">1</button>
+            <button className="rounded border border-outline-variant bg-surface px-3 py-1 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low">
               Next
             </button>
           </div>
@@ -276,10 +276,10 @@ export default function AnalyticsPage(): ReactElement {
       </section>
 
       <section className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm lg:col-span-2">
+        <div className="rounded-xl border border-outline-variant bg-surface p-6 shadow-sm lg:col-span-2">
           <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-slate-900">Revenue by Territory</h2>
-            <span className="text-xs font-bold text-indigo-600">View Map</span>
+            <h2 className="text-lg font-bold text-on-surface">Revenue by Territory</h2>
+            <span className="text-xs font-bold text-primary">View Map</span>
           </div>
           <div className="space-y-5">
             {(data.territory ?? []).map((territory) => {
@@ -287,16 +287,16 @@ export default function AnalyticsPage(): ReactElement {
               return (
                 <div key={territory.name} className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">{territory.name}</span>
-                    <span className="font-bold text-slate-900">
+                    <span className="text-on-surface-variant">{territory.name}</span>
+                    <span className="font-bold text-on-surface">
                       {formatCurrency(territory.value)}
-                      <span className={cn('ml-1 text-xs font-normal', territory.delta >= 0 ? 'text-emerald-500' : 'text-rose-500')}>
+                      <span className={cn('ml-1 text-xs font-normal', territory.delta >= 0 ? 'text-success' : 'text-error')}>
                         {territory.delta >= 0 ? <TrendingUp className="inline h-3 w-3" /> : <TrendingDown className="inline h-3 w-3" />} {Math.abs(territory.delta)}%
                       </span>
                     </span>
                   </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full rounded-full bg-indigo-500" style={{ width: `${width}%` }} />
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-surface-container-high">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${width}%` }} />
                   </div>
                 </div>
               );
@@ -304,22 +304,22 @@ export default function AnalyticsPage(): ReactElement {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl bg-slate-900 p-6 text-white shadow-lg">
+        <div className="relative overflow-hidden rounded-xl bg-inverse-surface p-6 text-white shadow-lg">
           <HelpCircle className="absolute right-4 top-4 h-16 w-16 text-white opacity-10" />
           <h2 className="mb-6 text-lg font-bold text-white">Recent Events</h2>
           <div className="relative z-10 space-y-4">
             {(data.events ?? []).slice(0, 4).map((event, index) => (
-              <div key={event.id} className={cn('flex gap-3 border-l-2 pl-4 py-1', index === 0 ? 'border-indigo-500' : 'border-slate-700')}>
-                <div className={cn('w-14 text-[10px] font-bold uppercase', index === 0 ? 'text-indigo-400' : 'text-slate-500')}>
+              <div key={event.id} className={cn('flex gap-3 border-l-2 pl-4 py-1', index === 0 ? 'border-primary' : 'border-outline-variant')}>
+                <div className={cn('w-14 text-[10px] font-bold uppercase', index === 0 ? 'text-primary' : 'text-on-surface-variant')}>
                   {index === 0 ? '2m ago' : event.timestamp}
                 </div>
-                <p className="flex-1 text-xs leading-5 text-slate-300">
+                <p className="flex-1 text-xs leading-5 text-outline">
                   <span className="font-bold text-white">{event.actor}</span> {event.action}
                 </p>
               </div>
             ))}
           </div>
-          <button className="mt-6 w-full rounded-lg bg-slate-800 py-2 text-xs font-bold text-slate-300 transition-colors hover:bg-slate-700">
+          <button className="mt-6 w-full rounded-lg bg-surface-container-highest py-2 text-xs font-bold text-outline transition-colors hover:bg-surface-container-high">
             View Audit Log
           </button>
         </div>
@@ -341,11 +341,11 @@ function SelectControl({
 }): ReactElement {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
+      <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="min-w-[150px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500"
+        className="min-w-[150px] rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
       >
         {options.map(([optionValue, optionLabel]) => (
           <option key={optionValue} value={optionValue}>{optionLabel}</option>
@@ -367,10 +367,10 @@ function SparkMetric({
   sparkline: number[];
 }): ReactElement {
   const colors = {
-    blue: 'bg-indigo-50 from-indigo-400/20 to-indigo-600/40',
-    emerald: 'bg-emerald-50 from-emerald-400/20 to-emerald-600/40',
-    amber: 'bg-amber-50 from-amber-400/20 to-amber-600/40',
-    indigo: 'bg-indigo-50 from-indigo-400/20 to-indigo-600/40',
+    blue: 'bg-primary-container from-primary/20 to-primary/40',
+    emerald: 'bg-success-container from-success/20 to-success/40',
+    amber: 'bg-warning-container from-warning/20 to-warning/40',
+    indigo: 'bg-primary-container from-primary/20 to-primary/40',
   }[tone];
   const points = sparkline.length ? sparkline : [10, 20, 16, 32, 24, 40];
   const max = Math.max(...points, 1);
@@ -379,10 +379,10 @@ function SparkMetric({
     .join(', ');
 
   return (
-    <div className="flex h-32 flex-col justify-between rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+    <div className="flex h-32 flex-col justify-between rounded-xl border border-outline-variant bg-surface p-6 shadow-sm">
       <div>
-        <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
-        <h3 className="mt-1 text-2xl font-bold text-slate-900">{value}</h3>
+        <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">{label}</p>
+        <h3 className="mt-1 text-2xl font-bold text-on-surface">{value}</h3>
       </div>
       <div className={cn('relative h-8 w-full overflow-hidden rounded', colors.split(' ')[0])}>
         <div
@@ -396,7 +396,7 @@ function SparkMetric({
 
 function TableHead({ children, className }: { children: React.ReactNode; className?: string }): ReactElement {
   return (
-    <th className={cn('border-b border-slate-100 p-4 text-xs font-semibold uppercase tracking-wider text-slate-500', className)}>
+    <th className={cn('border-b border-outline-variant p-4 text-xs font-semibold uppercase tracking-wider text-on-surface-variant', className)}>
       {children}
     </th>
   );

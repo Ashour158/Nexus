@@ -55,8 +55,8 @@ export default function RecycleBinPage() {
   return (
     <main className="space-y-4 px-6 py-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">Recycle Bin</h1>
-        <div className="flex items-center gap-2 text-sm text-slate-500">
+        <h1 className="text-2xl font-bold text-on-surface">Recycle Bin</h1>
+        <div className="flex items-center gap-2 text-sm text-on-surface-variant">
           <AlertTriangle className="h-4 w-4" />
           Items are permanently deleted after 30 days
         </div>
@@ -65,7 +65,7 @@ export default function RecycleBinPage() {
       <div className="flex gap-2">
         <button
           onClick={() => setModuleFilter('')}
-          className={`rounded-md px-3 py-1.5 text-sm ${!moduleFilter ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}
+          className={`rounded-md px-3 py-1.5 text-sm ${!moduleFilter ? 'bg-inverse-surface text-white' : 'border border-outline-variant bg-surface text-on-surface'}`}
         >
           All
         </button>
@@ -73,7 +73,7 @@ export default function RecycleBinPage() {
           <button
             key={m}
             onClick={() => setModuleFilter(m)}
-            className={`rounded-md px-3 py-1.5 text-sm capitalize ${moduleFilter === m ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}
+            className={`rounded-md px-3 py-1.5 text-sm capitalize ${moduleFilter === m ? 'bg-inverse-surface text-white' : 'border border-outline-variant bg-surface text-on-surface'}`}
           >
             {m}
           </button>
@@ -81,16 +81,16 @@ export default function RecycleBinPage() {
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-on-surface-variant">Loading…</p>
       ) : items.length === 0 ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center">
-          <Trash2 className="mx-auto h-8 w-8 text-slate-300" />
-          <p className="mt-2 text-sm text-slate-500">Recycle bin is empty</p>
+        <div className="rounded-lg border border-outline-variant bg-surface p-8 text-center">
+          <Trash2 className="mx-auto h-8 w-8 text-outline" />
+          <p className="mt-2 text-sm text-on-surface-variant">Recycle bin is empty</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+            <thead className="bg-surface-container-low text-left text-xs uppercase text-on-surface-variant">
               <tr>
                 <th className="px-4 py-3">Module</th>
                 <th className="px-4 py-3">Record</th>
@@ -100,9 +100,9 @@ export default function RecycleBinPage() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-outline-variant">
               {items.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50">
+                <tr key={item.id} className="hover:bg-surface-container-low">
                   <td className="px-4 py-3 capitalize">{item.module}</td>
                   <td className="px-4 py-3">
                     {(item.recordSnapshot.name as string) ??
@@ -111,14 +111,14 @@ export default function RecycleBinPage() {
                         : item.recordId}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs">{item.deletedBy.slice(0, 8)}</td>
-                  <td className="px-4 py-3 text-slate-500">{formatDateTime(item.deletedAt)}</td>
-                  <td className="px-4 py-3 text-slate-500">{formatDateTime(item.expiresAt)}</td>
+                  <td className="px-4 py-3 text-on-surface-variant">{formatDateTime(item.deletedAt)}</td>
+                  <td className="px-4 py-3 text-on-surface-variant">{formatDateTime(item.expiresAt)}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => restoreMutation.mutate(item.id)}
                         disabled={restoreMutation.isPending}
-                        className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs hover:bg-slate-50"
+                        className="inline-flex items-center gap-1 rounded-md border border-outline-variant bg-surface px-2 py-1 text-xs hover:bg-surface-container-low"
                         title="Restore"
                       >
                         <RefreshCw className="h-3 w-3" /> Restore
@@ -130,7 +130,7 @@ export default function RecycleBinPage() {
                           }
                         }}
                         disabled={purgeMutation.isPending}
-                        className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-white px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                        className="inline-flex items-center gap-1 rounded-md border border-error/30 bg-surface px-2 py-1 text-xs text-error hover:bg-error-container"
                         title="Delete forever"
                       >
                         <Trash2 className="h-3 w-3" /> Delete

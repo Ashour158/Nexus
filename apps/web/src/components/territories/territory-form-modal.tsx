@@ -135,11 +135,11 @@ export function TerritoryFormModal({
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">Name *</label>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">Name *</label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="EMEA Enterprise" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">Type *</label>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">Type *</label>
             <Select value={type} onChange={(e) => setType(e.target.value as TerritoryType)}>
               {TERRITORY_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>
@@ -151,7 +151,7 @@ export function TerritoryFormModal({
         </div>
 
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Description</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Description</label>
           <Textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -162,9 +162,9 @@ export function TerritoryFormModal({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">
               Priority
-              <span className="ms-1 font-normal text-gray-400">(higher wins first)</span>
+              <span className="ms-1 font-normal text-on-surface-variant">(higher wins first)</span>
             </label>
             <Input
               type="number"
@@ -173,15 +173,15 @@ export function TerritoryFormModal({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">Team ID</label>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">Team ID</label>
             <Input value={teamId} onChange={(e) => setTeamId(e.target.value)} placeholder="Optional team id" />
           </div>
         </div>
 
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">
             Owners
-            <span className="ms-1 font-normal text-gray-400">
+            <span className="ms-1 font-normal text-on-surface-variant">
               (2+ owners → round-robin assignment)
             </span>
           </label>
@@ -195,7 +195,7 @@ export function TerritoryFormModal({
           />
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-gray-700">
+        <label className="flex items-center gap-2 text-sm text-on-surface">
           <input
             type="checkbox"
             checked={isDefault}
@@ -207,9 +207,9 @@ export function TerritoryFormModal({
 
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <label className="block text-xs font-medium text-gray-600">
+            <label className="block text-xs font-medium text-on-surface-variant">
               Routing Rules
-              <span className="ms-1 font-normal text-gray-400">(all rules must match — logical AND)</span>
+              <span className="ms-1 font-normal text-on-surface-variant">(all rules must match — logical AND)</span>
             </label>
             <Button type="button" variant="secondary" size="sm" onClick={() => setRules((p) => [...p, newRule()])}>
               + Add rule
@@ -217,7 +217,7 @@ export function TerritoryFormModal({
           </div>
 
           {rules.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-gray-200 px-3 py-4 text-center text-xs text-gray-400">
+            <p className="rounded-lg border border-dashed border-outline-variant px-3 py-4 text-center text-xs text-on-surface-variant">
               No rules. A rule-less territory only matches records via the default fallback.
             </p>
           ) : (
@@ -254,7 +254,7 @@ export function TerritoryFormModal({
                   <button
                     type="button"
                     onClick={() => setRules((p) => p.filter((r) => r.key !== rule.key))}
-                    className="rounded-lg px-2 py-1 text-red-400 hover:bg-red-50 hover:text-red-600"
+                    className="rounded-lg px-2 py-1 text-error hover:bg-error-container hover:text-error"
                     aria-label="Remove rule"
                   >
                     ×
@@ -265,9 +265,9 @@ export function TerritoryFormModal({
           )}
         </div>
 
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-error">{error}</p> : null}
 
-        <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
+        <div className="flex justify-end gap-2 border-t border-outline-variant pt-4">
           <Button variant="outline" onClick={onClose} disabled={isSaving}>
             Cancel
           </Button>

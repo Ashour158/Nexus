@@ -68,14 +68,14 @@ export function DetailQuickActions({ contactId, accountId, invalidateKeys = [] }
       </Button>
 
       {noteOpen ? (
-        <div className="absolute right-0 top-full z-40 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+        <div className="absolute right-0 top-full z-40 mt-2 w-80 rounded-xl border border-outline-variant bg-surface p-3 shadow-xl">
           <textarea
             autoFocus
             rows={3}
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Quick note…"
-            className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-indigo-500"
+            className="w-full resize-none rounded-lg border border-outline-variant px-3 py-2 text-sm text-on-surface focus:border-primary focus:ring-primary"
           />
           <div className="mt-2 flex justify-end gap-2">
             <button
@@ -84,7 +84,7 @@ export function DetailQuickActions({ contactId, accountId, invalidateKeys = [] }
                 setNoteOpen(false);
                 setNote('');
               }}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+              className="rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low"
             >
               Cancel
             </button>

@@ -31,13 +31,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [hydrated, isAdmin, router]);
 
   if (!hydrated || !isAdmin) {
-    return <div className="p-8 text-sm text-gray-300">Redirecting...</div>;
+    return <div className="p-8 text-sm text-outline">Redirecting...</div>;
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-950 text-white">
+    <div className="flex h-screen overflow-hidden bg-inverse-surface text-white">
       <AdminSidebar />
-      <main className="flex-1 overflow-y-auto bg-gray-950">
+      <main className="flex-1 overflow-y-auto bg-inverse-surface">
         <div className="mx-auto max-w-7xl px-6 py-8">{children}</div>
       </main>
     </div>

@@ -98,8 +98,8 @@ export default function AiModelsPage() {
   return (
     <div className="mx-auto max-w-3xl p-6">
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">AI Models</h1>
-        <p className="mt-0.5 text-sm text-gray-500">
+        <h1 className="text-xl font-bold text-on-surface">AI Models</h1>
+        <p className="mt-0.5 text-sm text-on-surface-variant">
           Explainable prediction models for deal win and lead conversion. Retraining
           is honest — if there isn&apos;t enough labelled history yet, the model keeps
           its priors and tells you why.
@@ -107,7 +107,7 @@ export default function AiModelsPage() {
       </div>
 
       {error ? (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="mb-4 rounded-lg border border-warning/30 bg-warning-container px-4 py-3 text-sm text-on-warning-container">
           {error}
         </div>
       ) : null}
@@ -116,8 +116,8 @@ export default function AiModelsPage() {
         <div
           className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
             lastResult.retrained
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-              : 'border-amber-200 bg-amber-50 text-amber-900'
+              ? 'border-success/30 bg-success-container text-on-success-container'
+              : 'border-warning/30 bg-warning-container text-on-warning-container'
           }`}
         >
           <p className="font-semibold">
@@ -157,39 +157,39 @@ export default function AiModelsPage() {
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
         <table className="w-full text-sm">
-          <thead className="border-b border-gray-100 bg-gray-50">
+          <thead className="border-b border-outline-variant bg-surface-container-low">
             <tr>
-              <th className="px-4 py-3 text-start font-medium text-gray-500">Model</th>
-              <th className="px-4 py-3 text-start font-medium text-gray-500">Version</th>
-              <th className="px-4 py-3 text-end font-medium text-gray-500">Samples</th>
-              <th className="px-4 py-3 text-start font-medium text-gray-500">Metrics</th>
-              <th className="px-4 py-3 text-center font-medium text-gray-500">Active</th>
+              <th className="px-4 py-3 text-start font-medium text-on-surface-variant">Model</th>
+              <th className="px-4 py-3 text-start font-medium text-on-surface-variant">Version</th>
+              <th className="px-4 py-3 text-end font-medium text-on-surface-variant">Samples</th>
+              <th className="px-4 py-3 text-start font-medium text-on-surface-variant">Metrics</th>
+              <th className="px-4 py-3 text-center font-medium text-on-surface-variant">Active</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-outline-variant">
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={5} className="px-4 py-8 text-center text-on-surface-variant">
                   Loading models…
                 </td>
               </tr>
             ) : models.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={5} className="px-4 py-8 text-center text-on-surface-variant">
                   No models trained yet.
                 </td>
               </tr>
             ) : (
               models.map((model) => (
                 <tr key={model.id} className={model.active === false ? 'opacity-50' : undefined}>
-                  <td className="px-4 py-3 font-medium capitalize text-gray-900">
+                  <td className="px-4 py-3 font-medium capitalize text-on-surface">
                     {model.kind.replace(/-/g, ' ')}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-gray-600">{model.version}</td>
-                  <td className="px-4 py-3 text-end text-gray-700">{model.sampleSize ?? '-'}</td>
-                  <td className="px-4 py-3 text-xs text-gray-500">
+                  <td className="px-4 py-3 font-mono text-xs text-on-surface-variant">{model.version}</td>
+                  <td className="px-4 py-3 text-end text-on-surface">{model.sampleSize ?? '-'}</td>
+                  <td className="px-4 py-3 text-xs text-on-surface-variant">
                     {model.metrics
                       ? Object.entries(model.metrics)
                           .map(([k, v]) => `${k}: ${v}`)
@@ -200,8 +200,8 @@ export default function AiModelsPage() {
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                         model.active === false
-                          ? 'bg-gray-100 text-gray-500'
-                          : 'bg-emerald-100 text-emerald-700'
+                          ? 'bg-surface-container-high text-on-surface-variant'
+                          : 'bg-success-container text-success'
                       }`}
                     >
                       {model.active === false ? 'Inactive' : 'Active'}

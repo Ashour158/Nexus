@@ -114,46 +114,46 @@ export default function WhatsAppInboxPage(): JSX.Element {
   const selected = contacts.find((c) => c.id === selectedContactId);
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-xl border border-gray-200 bg-white">
-      <div className="flex w-80 flex-col border-e border-gray-200">
-        <div className="border-b border-gray-200 p-4">
+    <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-xl border border-outline-variant bg-surface">
+      <div className="flex w-80 flex-col border-e border-outline-variant">
+        <div className="border-b border-outline-variant p-4">
           <h1 className="flex items-center gap-2 text-lg font-semibold">
-            <MessageSquare className="h-5 w-5 text-green-600" />
+            <MessageSquare className="h-5 w-5 text-success" />
             WhatsApp
           </h1>
           <div className="relative mt-3">
-            <Search className="absolute start-3 top-2.5 h-4 w-4 text-gray-400" />
+            <Search className="absolute start-3 top-2.5 h-4 w-4 text-on-surface-variant" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search contacts..."
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 ps-9 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full rounded-lg border border-outline-variant px-3 py-2 ps-9 text-sm focus:outline-none focus:ring-2 focus:ring-success"
             />
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
           {contactsQuery.isLoading ? (
-            <div className="p-4 text-sm text-gray-400">Loading contacts…</div>
+            <div className="p-4 text-sm text-on-surface-variant">Loading contacts…</div>
           ) : contacts.length === 0 ? (
-            <div className="p-8 text-center text-sm text-gray-400">No contacts with phone numbers</div>
+            <div className="p-8 text-center text-sm text-on-surface-variant">No contacts with phone numbers</div>
           ) : (
             contacts.map((c) => (
               <button
                 key={c.id}
                 type="button"
                 onClick={() => setSelectedContactId(c.id)}
-                className={`w-full border-b border-gray-100 px-4 py-3 text-start transition-colors hover:bg-gray-50 ${
-                  selectedContactId === c.id ? 'border-e-2 border-e-green-500 bg-green-50' : ''
+                className={`w-full border-b border-outline-variant px-4 py-3 text-start transition-colors hover:bg-surface-container-low ${
+                  selectedContactId === c.id ? 'border-e-2 border-e-green-500 bg-success-container' : ''
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 text-sm font-semibold text-green-700">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-success-container text-sm font-semibold text-success">
                     {contactDisplayName(c)[0]?.toUpperCase() ?? '?'}
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-gray-900">{contactDisplayName(c)}</p>
-                    <p className="flex items-center gap-1 truncate text-xs text-gray-500">
+                    <p className="truncate text-sm font-medium text-on-surface">{contactDisplayName(c)}</p>
+                    <p className="flex items-center gap-1 truncate text-xs text-on-surface-variant">
                       <Phone className="h-3 w-3" />
                       {phoneOf(c)}
                     </p>
@@ -167,7 +167,7 @@ export default function WhatsAppInboxPage(): JSX.Element {
 
       <div className="flex flex-1 flex-col">
         {!selectedContactId ? (
-          <div className="flex flex-1 items-center justify-center text-gray-400">
+          <div className="flex flex-1 items-center justify-center text-on-surface-variant">
             <div className="text-center">
               <MessageSquare className="mx-auto mb-3 h-12 w-12 opacity-20" />
               <p className="text-sm">Select a contact to start a conversation</p>
@@ -175,36 +175,36 @@ export default function WhatsAppInboxPage(): JSX.Element {
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-5 py-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-100 text-sm font-semibold text-green-700">
+            <div className="flex items-center gap-3 border-b border-outline-variant bg-surface px-5 py-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-success-container text-sm font-semibold text-success">
                 {selected ? contactDisplayName(selected)[0]?.toUpperCase() : '?'}
               </div>
               <div>
-                <p className="text-sm font-semibold text-gray-900">
+                <p className="text-sm font-semibold text-on-surface">
                   {selected ? contactDisplayName(selected) : ''}
                 </p>
-                <p className="text-xs text-gray-500">{selected ? phoneOf(selected) : ''}</p>
+                <p className="text-xs text-on-surface-variant">{selected ? phoneOf(selected) : ''}</p>
               </div>
             </div>
 
-            <div className="flex-1 space-y-3 overflow-y-auto bg-gray-50 p-5">
+            <div className="flex-1 space-y-3 overflow-y-auto bg-surface-container-low p-5">
               {threadQuery.isLoading ? (
-                <div className="py-8 text-center text-sm text-gray-400">Loading messages…</div>
+                <div className="py-8 text-center text-sm text-on-surface-variant">Loading messages…</div>
               ) : (threadQuery.data ?? []).length === 0 ? (
-                <div className="py-8 text-center text-sm text-gray-400">No messages yet. Send the first one!</div>
+                <div className="py-8 text-center text-sm text-on-surface-variant">No messages yet. Send the first one!</div>
               ) : (
                 (threadQuery.data ?? []).map((msg) => (
                   <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
                     <div
                       className={`max-w-xs rounded-2xl px-4 py-2 text-sm shadow-sm ${
                         msg.direction === 'outbound'
-                          ? 'rounded-br-sm bg-green-500 text-white'
-                          : 'rounded-bl-sm border border-gray-200 bg-white text-gray-900'
+                          ? 'rounded-br-sm bg-success text-white'
+                          : 'rounded-bl-sm border border-outline-variant bg-surface text-on-surface'
                       }`}
                     >
                       <p>{msg.body}</p>
                       <p
-                        className={`mt-1 text-xs ${msg.direction === 'outbound' ? 'text-green-100' : 'text-gray-400'}`}
+                        className={`mt-1 text-xs ${msg.direction === 'outbound' ? 'text-on-success-container' : 'text-on-surface-variant'}`}
                       >
                         {new Date(msg.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         {msg.direction === 'outbound' && (
@@ -217,7 +217,7 @@ export default function WhatsAppInboxPage(): JSX.Element {
               )}
             </div>
 
-            <div className="border-t border-gray-200 bg-white p-4">
+            <div className="border-t border-outline-variant bg-surface p-4">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -229,12 +229,12 @@ export default function WhatsAppInboxPage(): JSX.Element {
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   placeholder="Type a message…"
-                  className="flex-1 rounded-full border border-gray-200 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="flex-1 rounded-full border border-outline-variant px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-success"
                 />
                 <button
                   type="submit"
                   disabled={!draft.trim() || sendMessage.isPending}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-white transition-colors hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-success text-white transition-colors hover:bg-success disabled:cursor-not-allowed disabled:opacity-50"
                   aria-label="Send"
                 >
                   <Send className="h-4 w-4" />

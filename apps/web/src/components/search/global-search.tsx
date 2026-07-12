@@ -20,19 +20,19 @@ interface SearchResult {
 }
 
 const TYPE_CONFIG = {
-  contact: { icon: User, label: 'Contact', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-  deal: { icon: TrendingUp, label: 'Deal', color: 'text-green-600', bg: 'bg-green-50' },
-  lead: { icon: User, label: 'Lead', color: 'text-purple-600', bg: 'bg-purple-50' },
-  account: { icon: Building2, label: 'Account', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-  note: { icon: FileText, label: 'Note', color: 'text-gray-600', bg: 'bg-gray-50' },
+  contact: { icon: User, label: 'Contact', color: 'text-primary', bg: 'bg-primary-container' },
+  deal: { icon: TrendingUp, label: 'Deal', color: 'text-success', bg: 'bg-success-container' },
+  lead: { icon: User, label: 'Lead', color: 'text-tertiary', bg: 'bg-tertiary-container' },
+  account: { icon: Building2, label: 'Account', color: 'text-primary', bg: 'bg-primary-container' },
+  note: { icon: FileText, label: 'Note', color: 'text-on-surface-variant', bg: 'bg-surface-container-low' },
 } as const;
 
 const TYPE_BADGES: Record<string, { label: string; color: string }> = {
-  contact: { label: 'Contact', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-  deal: { label: 'Deal', color: 'bg-green-50 text-green-700 border-green-200' },
-  company: { label: 'Company', color: 'bg-purple-50 text-purple-700 border-purple-200' },
-  document: { label: 'Doc', color: 'bg-orange-50 text-orange-700 border-orange-200' },
-  activity: { label: 'Activity', color: 'bg-gray-50 text-gray-700 border-gray-200' },
+  contact: { label: 'Contact', color: 'bg-primary-container text-on-primary-container border-primary/40' },
+  deal: { label: 'Deal', color: 'bg-success-container text-success border-success/30' },
+  company: { label: 'Company', color: 'bg-tertiary-container text-tertiary border-tertiary/30' },
+  document: { label: 'Doc', color: 'bg-warning-container text-warning border-warning/30' },
+  activity: { label: 'Activity', color: 'bg-surface-container-low text-on-surface border-outline-variant' },
 };
 
 async function searchAll(q: string): Promise<SearchResult[]> {
@@ -167,15 +167,15 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
         title="Search (?K)"
         className={
           compact
-            ? 'flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-500 transition-colors hover:border-indigo-200 hover:bg-white hover:text-slate-700'
-            : 'flex h-11 w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 text-sm text-slate-500 transition-colors hover:border-indigo-200 hover:bg-white hover:text-slate-700'
+            ? 'flex h-11 w-11 items-center justify-center rounded-lg border border-outline-variant bg-surface-container-high text-on-surface-variant transition-colors hover:border-primary/40 hover:bg-surface hover:text-on-surface'
+            : 'flex h-11 w-full items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-high px-3 text-sm text-on-surface-variant transition-colors hover:border-primary/40 hover:bg-surface hover:text-on-surface'
         }
       >
         <Search className="h-4 w-4 shrink-0" />
         {!compact ? (
           <>
             <span className="min-w-0 flex-1 truncate text-start">Search contacts, deals, notes...</span>
-            <kbd className="ms-auto hidden items-center gap-0.5 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 sm:flex">
+            <kbd className="ms-auto hidden items-center gap-0.5 rounded border border-outline-variant bg-surface px-1.5 py-0.5 text-[10px] font-semibold text-on-surface-variant sm:flex">
               <Command className="h-3 w-3" />K
             </kbd>
           </>
@@ -186,19 +186,19 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
         <div
           className={
             compact
-              ? 'absolute end-0 top-full z-50 mt-1 w-[min(90vw,28rem)] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl'
-              : 'absolute start-0 end-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl'
+              ? 'absolute end-0 top-full z-50 mt-1 w-[min(90vw,28rem)] overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-xl'
+              : 'absolute start-0 end-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-xl'
           }
         >
-          <div className="flex items-center gap-2 border-b border-gray-100 px-3">
-            <Search className="h-4 w-4 flex-shrink-0 text-gray-400" />
+          <div className="flex items-center gap-2 border-b border-outline-variant px-3">
+            <Search className="h-4 w-4 flex-shrink-0 text-on-surface-variant" />
             <input
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onKeyDown}
               placeholder="Search across contacts, deals, leads, notes..."
-              className="flex-1 py-3 text-sm text-gray-900 outline-none placeholder-gray-400"
+              className="flex-1 py-3 text-sm text-on-surface outline-none placeholder-on-surface-variant/60"
             />
             {trimmed ? (
               <button
@@ -208,8 +208,8 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
                 aria-label={alreadySaved ? 'Search saved' : 'Save this search'}
                 className={`flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium transition-colors ${
                   alreadySaved
-                    ? 'text-indigo-600'
-                    : 'text-gray-400 hover:bg-indigo-50 hover:text-indigo-600'
+                    ? 'text-primary'
+                    : 'text-on-surface-variant hover:bg-primary-container hover:text-primary'
                 } disabled:cursor-default`}
               >
                 {alreadySaved ? <Bookmark className="h-4 w-4 fill-current" /> : <BookmarkPlus className="h-4 w-4" />}
@@ -217,7 +217,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
             ) : null}
             {query ? (
               <button onClick={() => setQuery('')} aria-label="Clear search">
-                <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                <X className="h-4 w-4 text-on-surface-variant hover:text-on-surface-variant" />
               </button>
             ) : null}
           </div>
@@ -226,7 +226,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
             <div className="max-h-72 overflow-y-auto py-1">
               {recent.length > 0 ? (
                 <div>
-                  <p className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                  <p className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-on-surface-variant">
                     Recent
                   </p>
                   {recent.map((r) => (
@@ -236,10 +236,10 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
                         setQuery(r.query);
                         setTimeout(() => inputRef.current?.focus(), 0);
                       }}
-                      className="flex w-full items-center gap-3 px-4 py-2 text-start transition-colors hover:bg-gray-50"
+                      className="flex w-full items-center gap-3 px-4 py-2 text-start transition-colors hover:bg-surface-container-low"
                     >
-                      <Clock className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
-                      <span className="truncate text-sm text-gray-700">{r.query}</span>
+                      <Clock className="h-3.5 w-3.5 flex-shrink-0 text-on-surface-variant" />
+                      <span className="truncate text-sm text-on-surface">{r.query}</span>
                     </button>
                   ))}
                 </div>
@@ -247,15 +247,15 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
 
               {saved.length > 0 ? (
                 <div>
-                  <p className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                  <p className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-on-surface-variant">
                     Saved
                   </p>
                   {saved.map((s) => (
                     <div
                       key={s.id}
-                      className="group flex items-center gap-3 px-4 py-2 transition-colors hover:bg-gray-50"
+                      className="group flex items-center gap-3 px-4 py-2 transition-colors hover:bg-surface-container-low"
                     >
-                      <Bookmark className="h-3.5 w-3.5 flex-shrink-0 fill-current text-indigo-500" />
+                      <Bookmark className="h-3.5 w-3.5 flex-shrink-0 fill-current text-primary" />
                       <button
                         onClick={() => {
                           setQuery(s.query);
@@ -263,15 +263,15 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
                         }}
                         className="min-w-0 flex-1 text-start"
                       >
-                        <span className="block truncate text-sm text-gray-700">{s.name}</span>
+                        <span className="block truncate text-sm text-on-surface">{s.name}</span>
                         {s.name !== s.query ? (
-                          <span className="block truncate text-xs text-gray-400">{s.query}</span>
+                          <span className="block truncate text-xs text-on-surface-variant">{s.query}</span>
                         ) : null}
                       </button>
                       <button
                         onClick={() => deleteSaved.mutate(s.id)}
                         aria-label={`Delete saved search ${s.name}`}
-                        className="flex-shrink-0 rounded p-1 text-gray-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+                        className="flex-shrink-0 rounded p-1 text-on-surface-variant opacity-0 transition hover:bg-error-container hover:text-error group-hover:opacity-100"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -281,16 +281,16 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
               ) : null}
 
               {recent.length === 0 && saved.length === 0 ? (
-                <div className="px-4 py-6 text-center text-sm text-gray-400">
+                <div className="px-4 py-6 text-center text-sm text-on-surface-variant">
                   Start typing to search across contacts, deals, leads and notes.
                 </div>
               ) : null}
             </div>
           ) : null}
 
-          {loading ? <div className="px-4 py-6 text-center text-sm text-gray-400">Searching...</div> : null}
+          {loading ? <div className="px-4 py-6 text-center text-sm text-on-surface-variant">Searching...</div> : null}
           {!loading && results.length === 0 && query.trim() ? (
-            <div className="px-4 py-6 text-center text-sm text-gray-400">No results for &quot;{query}&quot;</div>
+            <div className="px-4 py-6 text-center text-sm text-on-surface-variant">No results for &quot;{query}&quot;</div>
           ) : null}
 
           {!loading && results.length > 0 ? (
@@ -306,14 +306,14 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
                       setOpen(false);
                       setQuery('');
                     }}
-                    className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${i === active ? 'bg-indigo-50' : 'hover:bg-gray-50'}`}
+                    className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${i === active ? 'bg-primary-container' : 'hover:bg-surface-container-low'}`}
                   >
                     <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md ${cfg.bg}`}>
                       <Icon className={`h-3.5 w-3.5 ${cfg.color}`} />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-gray-900">{r.title}</p>
-                      <p className="truncate text-xs text-gray-500">{r.subtitle}</p>
+                      <p className="truncate text-sm font-medium text-on-surface">{r.title}</p>
+                      <p className="truncate text-xs text-on-surface-variant">{r.subtitle}</p>
                     </div>
                     {TYPE_BADGES[(r as unknown as { type: string }).type] ? (
                       <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-xs font-medium ${TYPE_BADGES[(r as unknown as { type: string }).type].color}`}>
@@ -328,7 +328,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
             </div>
           ) : null}
 
-          <div className="flex items-center gap-3 border-t border-gray-100 bg-gray-50 px-4 py-2 text-[11px] text-gray-400">
+          <div className="flex items-center gap-3 border-t border-outline-variant bg-surface-container-low px-4 py-2 text-[11px] text-on-surface-variant">
             <span>&#8593;&#8595; navigate</span>
             <span>&#8629; select</span>
             <span>Esc close</span>

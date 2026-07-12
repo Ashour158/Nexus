@@ -43,12 +43,12 @@ export default function PipelineAnalyticsPage() {
     return (
       <main className="space-y-6">
         <header>
-          <h1 className="text-2xl font-bold text-slate-900">Pipeline Analytics</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-on-surface">Pipeline Analytics</h1>
+          <p className="text-sm text-on-surface-variant">
             Deep visibility into conversions, velocity, and forecast confidence.
           </p>
         </header>
-        <div className="py-12 text-center text-slate-500">Loading analytics...</div>
+        <div className="py-12 text-center text-on-surface-variant">Loading analytics...</div>
       </main>
     );
   }
@@ -57,8 +57,8 @@ export default function PipelineAnalyticsPage() {
     return (
       <main className="space-y-6">
         <header>
-          <h1 className="text-2xl font-bold text-slate-900">Pipeline Analytics</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-on-surface">Pipeline Analytics</h1>
+          <p className="text-sm text-on-surface-variant">
             Deep visibility into conversions, velocity, and forecast confidence.
           </p>
         </header>
@@ -75,20 +75,20 @@ export default function PipelineAnalyticsPage() {
   return (
     <main className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold text-slate-900">Pipeline Analytics</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-bold text-on-surface">Pipeline Analytics</h1>
+        <p className="text-sm text-on-surface-variant">
           Deep visibility into conversions, velocity, and forecast confidence.
         </p>
       </header>
 
       <AnalyticsReadModelSection />
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Funnel visualization</h2>
+      <section className="rounded-xl border border-outline-variant bg-surface p-4">
+        <h2 className="mb-3 text-sm font-semibold text-on-surface">Funnel visualization</h2>
         <div className="h-72">
           <PipelineFunnelChart data={funnel} />
         </div>
-        <div className="grid gap-2 text-xs text-slate-500 md:grid-cols-5">
+        <div className="grid gap-2 text-xs text-on-surface-variant md:grid-cols-5">
           {funnel.map((row: any) => (
             <p key={row.stage}>
               {row.stage}: {row.deals} deals · ${row.value.toLocaleString()} · {row.conversion}%
@@ -103,7 +103,7 @@ export default function PipelineAnalyticsPage() {
           value={avgPipelineDays}
           delta={-4.2}
           icon={<Hourglass className="h-5 w-5" />}
-          iconBg="bg-amber-100 text-amber-700"
+          iconBg="bg-warning-container text-warning"
         />
         <StatCard
           label="Avg days per stage"
@@ -114,14 +114,14 @@ export default function PipelineAnalyticsPage() {
           }
           delta={2.4}
           icon={<Gauge className="h-5 w-5" />}
-          iconBg="bg-indigo-100 text-indigo-700"
+          iconBg="bg-primary-container text-primary"
         />
         <StatCard
           label="Deals stalled >14 days"
           value={stats.stalled ?? 0}
           delta={11.1}
           icon={<AlertTriangle className="h-5 w-5" />}
-          iconBg="bg-rose-100 text-rose-700"
+          iconBg="bg-error-container text-error"
         />
         <StatCard
           label="Projected close this month"
@@ -129,22 +129,22 @@ export default function PipelineAnalyticsPage() {
           format="currency"
           delta={6.5}
           icon={<Target className="h-5 w-5" />}
-          iconBg="bg-emerald-100 text-emerald-700"
+          iconBg="bg-success-container text-success"
         />
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Deal flow over time</h2>
+      <section className="rounded-xl border border-outline-variant bg-surface p-4">
+        <h2 className="mb-3 text-sm font-semibold text-on-surface">Deal flow over time</h2>
         <div className="h-72">
           <DealFlowChart data={dealFlow} />
         </div>
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Cohort table</h2>
+      <section className="rounded-xl border border-outline-variant bg-surface p-4">
+        <h2 className="mb-3 text-sm font-semibold text-on-surface">Cohort table</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
-            <thead className="text-start text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-start text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
                 <th className="px-2 py-2">Month created</th>
                 <th className="px-2 py-2">Qualification</th>
@@ -155,12 +155,12 @@ export default function PipelineAnalyticsPage() {
             </thead>
             <tbody>
               {cohort.map((row: any) => (
-                <tr key={row.month} className="border-t border-slate-100">
+                <tr key={row.month} className="border-t border-outline-variant">
                   <td className="px-2 py-2 font-medium">{row.month}</td>
                   <td className="px-2 py-2">{row.qualification}</td>
                   <td className="px-2 py-2">{row.proposal}</td>
                   <td className="px-2 py-2">{row.negotiation}</td>
-                  <td className={`px-2 py-2 ${row.commit <= 1 ? 'font-semibold text-rose-600' : ''}`}>
+                  <td className={`px-2 py-2 ${row.commit <= 1 ? 'font-semibold text-error' : ''}`}>
                     {row.commit}
                   </td>
                 </tr>

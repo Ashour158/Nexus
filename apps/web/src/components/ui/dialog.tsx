@@ -99,7 +99,7 @@ export function DialogContent({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-on-surface/40 p-4"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onOpenChange(false);
@@ -114,7 +114,7 @@ export function DialogContent({
         aria-describedby={descriptionId}
         tabIndex={-1}
         className={cn(
-          'relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-gray-200 bg-white p-6 shadow-xl outline-none',
+          'relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-outline-variant bg-surface p-6 shadow-xl outline-none',
           className
         )}
         {...props}
@@ -124,7 +124,7 @@ export function DialogContent({
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="absolute right-4 top-4 rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            className="absolute right-4 top-4 rounded-md p-1 text-on-surface-variant transition hover:bg-surface-container-high hover:text-on-surface-variant"
             aria-label="Close dialog"
           >
             <X className="h-4 w-4" />
@@ -153,7 +153,7 @@ export function DialogTitle({ className, ...props }: HTMLAttributes<HTMLHeadingE
   return (
     <h2
       id={ids?.titleId}
-      className={cn('text-lg font-semibold text-gray-900', className)}
+      className={cn('text-lg font-semibold text-on-surface', className)}
       {...props}
     />
   );
@@ -167,7 +167,7 @@ export function DialogDescription({
   return (
     <p
       id={ids?.descriptionId}
-      className={cn('text-sm text-gray-500', className)}
+      className={cn('text-sm text-on-surface-variant', className)}
       {...props}
     />
   );

@@ -25,15 +25,15 @@ import { cn } from '@/lib/cn';
 function stepTone(status: StepStatus): string {
   switch (status) {
     case 'APPROVED':
-      return 'bg-emerald-100 text-emerald-800 ring-emerald-200';
+      return 'bg-success-container text-on-success-container ring-success/30';
     case 'REJECTED':
-      return 'bg-rose-100 text-rose-700 ring-rose-200';
+      return 'bg-error-container text-error ring-error/30';
     case 'DELEGATED':
-      return 'bg-indigo-100 text-indigo-700 ring-indigo-200';
+      return 'bg-primary-container text-primary ring-primary/30';
     case 'SKIPPED':
-      return 'bg-slate-100 text-slate-500 ring-slate-200';
+      return 'bg-surface-container-high text-on-surface-variant ring-outline-variant';
     default:
-      return 'bg-amber-100 text-amber-800 ring-amber-200';
+      return 'bg-warning-container text-on-warning-container ring-warning/30';
   }
 }
 
@@ -122,30 +122,30 @@ export function ApprovalDetailDrawer({ requestId, onClose, currentUserId, isAdmi
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-50 flex justify-end bg-on-surface/40" onMouseDown={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Approval detail"
-        className="flex h-full w-full max-w-md flex-col overflow-y-auto bg-white shadow-2xl"
+        className="flex h-full w-full max-w-md flex-col overflow-y-auto bg-surface shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <header className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-100 bg-white px-5 py-4">
+        <header className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-outline-variant bg-surface px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 text-[#4f46e5]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-container text-[#4f46e5]">
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-950">
+              <h2 className="text-lg font-bold text-on-surface">
                 {request?.module ?? 'Approval'} request
               </h2>
-              <p className="font-mono text-xs text-slate-500">{request?.recordId ?? requestId}</p>
+              <p className="font-mono text-xs text-on-surface-variant">{request?.recordId ?? requestId}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-md p-1 text-on-surface-variant transition hover:bg-surface-container-high hover:text-on-surface-variant"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -154,11 +154,11 @@ export function ApprovalDetailDrawer({ requestId, onClose, currentUserId, isAdmi
 
         <div className="flex-1 space-y-6 px-5 py-5">
           {detail.isLoading ? (
-            <div className="flex items-center gap-2 text-sm text-slate-500">
+            <div className="flex items-center gap-2 text-sm text-on-surface-variant">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading request…
             </div>
           ) : detail.isError ? (
-            <div className="flex items-start gap-2 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">
+            <div className="flex items-start gap-2 rounded-lg bg-error-container p-3 text-sm text-error">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               Could not load this request. The approval service may be offline.
             </div>
@@ -173,7 +173,7 @@ export function ApprovalDetailDrawer({ requestId, onClose, currentUserId, isAdmi
               </dl>
 
               <section>
-                <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
+                <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                   Approval steps
                 </h3>
                 <ol className="space-y-4">
@@ -187,10 +187,10 @@ export function ApprovalDetailDrawer({ requestId, onClose, currentUserId, isAdmi
                           ? `${q.quorumSize ?? 1} of ${levelSteps.length}`
                           : 'All approvers';
                     return (
-                      <li key={order} className="rounded-lg border border-slate-200 p-3">
+                      <li key={order} className="rounded-lg border border-outline-variant p-3">
                         <div className="mb-2 flex items-center justify-between">
-                          <span className="text-sm font-bold text-slate-900">Level {order}</span>
-                          <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                          <span className="text-sm font-bold text-on-surface">Level {order}</span>
+                          <span className="rounded bg-surface-container-high px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
                             {quorumLabel}
                           </span>
                         </div>
@@ -198,17 +198,17 @@ export function ApprovalDetailDrawer({ requestId, onClose, currentUserId, isAdmi
                           {levelSteps.map((step: ApprovalStep) => (
                             <div key={step.id} className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-slate-700">
+                                <p className="truncate text-sm font-medium text-on-surface">
                                   {step.approverId}
                                   {step.approverId === currentUserId ? (
                                     <span className="ml-1 text-[10px] font-bold text-[#4f46e5]">(you)</span>
                                   ) : null}
                                 </p>
                                 {step.comment ? (
-                                  <p className="mt-0.5 text-xs text-slate-500">“{step.comment}”</p>
+                                  <p className="mt-0.5 text-xs text-on-surface-variant">“{step.comment}”</p>
                                 ) : null}
                                 {step.actionedAt ? (
-                                  <p className="mt-0.5 text-[11px] text-slate-400">
+                                  <p className="mt-0.5 text-[11px] text-on-surface-variant">
                                     {formatWhen(step.actionedAt)}
                                   </p>
                                 ) : null}
@@ -228,7 +228,7 @@ export function ApprovalDetailDrawer({ requestId, onClose, currentUserId, isAdmi
                     );
                   })}
                   {levels.length === 0 ? (
-                    <li className="rounded-lg border border-dashed border-slate-200 p-3 text-sm text-slate-500">
+                    <li className="rounded-lg border border-dashed border-outline-variant p-3 text-sm text-on-surface-variant">
                       No steps recorded for this request.
                     </li>
                   ) : null}
@@ -236,8 +236,8 @@ export function ApprovalDetailDrawer({ requestId, onClose, currentUserId, isAdmi
               </section>
 
               {(canDecide || canCancel) && (
-                <section className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                <section className="space-y-3 rounded-lg border border-outline-variant bg-surface-container-low p-4">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                     Take action
                   </h3>
                   {canDecide ? (
@@ -247,14 +247,14 @@ export function ApprovalDetailDrawer({ requestId, onClose, currentUserId, isAdmi
                         onChange={(e) => setComment(e.target.value)}
                         rows={2}
                         placeholder="Comment (required to reject)"
-                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                        className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                       />
                       <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={doApprove}
                           disabled={acting}
-                          className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                          className="flex-1 rounded-lg bg-success px-3 py-2 text-sm font-bold text-white transition hover:bg-success disabled:opacity-50"
                         >
                           <CheckCircle2 className="mr-1 inline h-4 w-4" /> Approve
                         </button>
@@ -262,7 +262,7 @@ export function ApprovalDetailDrawer({ requestId, onClose, currentUserId, isAdmi
                           type="button"
                           onClick={doReject}
                           disabled={acting}
-                          className="flex-1 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-bold text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                          className="flex-1 rounded-lg border border-error/30 bg-surface px-3 py-2 text-sm font-bold text-error transition hover:bg-error-container disabled:opacity-50"
                         >
                           <XCircle className="mr-1 inline h-4 w-4" /> Reject
                         </button>
@@ -272,13 +272,13 @@ export function ApprovalDetailDrawer({ requestId, onClose, currentUserId, isAdmi
                           value={delegateTo}
                           onChange={(e) => setDelegateTo(e.target.value)}
                           placeholder="Delegate to (user id / email)"
-                          className="h-9 flex-1 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                          className="h-9 flex-1 rounded-lg border border-outline-variant px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                         />
                         <button
                           type="button"
                           onClick={doDelegate}
                           disabled={acting}
-                          className="rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-bold text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-50"
+                          className="rounded-lg border border-primary/40 bg-surface px-3 py-2 text-sm font-bold text-primary transition hover:bg-primary-container disabled:opacity-50"
                         >
                           <UserCog className="mr-1 inline h-4 w-4" /> Delegate
                         </button>
@@ -290,14 +290,14 @@ export function ApprovalDetailDrawer({ requestId, onClose, currentUserId, isAdmi
                       type="button"
                       onClick={doCancel}
                       disabled={acting}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
+                      className="w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-bold text-on-surface-variant transition hover:bg-surface-container-high disabled:opacity-50"
                     >
                       Cancel request
                     </button>
                   ) : null}
-                  {error ? <p className="text-xs font-semibold text-rose-600">{error}</p> : null}
+                  {error ? <p className="text-xs font-semibold text-error">{error}</p> : null}
                   {acting ? (
-                    <p className="flex items-center gap-1.5 text-xs text-slate-500">
+                    <p className="flex items-center gap-1.5 text-xs text-on-surface-variant">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" /> Submitting…
                     </p>
                   ) : null}
@@ -305,7 +305,7 @@ export function ApprovalDetailDrawer({ requestId, onClose, currentUserId, isAdmi
               )}
 
               {!canDecide && !canCancel ? (
-                <p className="flex items-center gap-1.5 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+                <p className="flex items-center gap-1.5 rounded-lg bg-surface-container-low p-3 text-xs text-on-surface-variant">
                   <Clock3 className="h-4 w-4" />
                   {request.status === 'PENDING'
                     ? 'This request is awaiting another approver.'
@@ -323,8 +323,8 @@ export function ApprovalDetailDrawer({ requestId, onClose, currentUserId, isAdmi
 function Meta({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="mt-0.5 truncate font-medium text-slate-800">{value}</dd>
+      <dt className="text-[11px] font-bold uppercase tracking-wide text-on-surface-variant">{label}</dt>
+      <dd className="mt-0.5 truncate font-medium text-on-surface">{value}</dd>
     </div>
   );
 }

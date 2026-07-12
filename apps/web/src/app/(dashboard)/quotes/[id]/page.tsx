@@ -74,7 +74,7 @@ export default function QuoteDetailPage(): JSX.Element {
   if (!isHydrated) {
     return (
       <main className="px-6 py-6">
-        <p className="text-sm text-slate-500">Loading quote...</p>
+        <p className="text-sm text-on-surface-variant">Loading quote...</p>
       </main>
     );
   }
@@ -82,7 +82,7 @@ export default function QuoteDetailPage(): JSX.Element {
   if (!canRead) {
     return (
       <main className="px-6 py-6">
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="rounded-xl border border-warning/30 bg-warning-container p-4 text-sm text-on-warning-container">
           You do not have permission to view quotes.
         </div>
       </main>
@@ -135,7 +135,7 @@ export default function QuoteDetailPage(): JSX.Element {
   if (q.isLoading) {
     return (
       <main className="px-6 py-6">
-        <p className="text-sm text-slate-500">Loading quote…</p>
+        <p className="text-sm text-on-surface-variant">Loading quote…</p>
       </main>
     );
   }
@@ -143,7 +143,7 @@ export default function QuoteDetailPage(): JSX.Element {
   if (q.isError || q.data === undefined) {
     return (
       <main className="px-6 py-6">
-        <p className="text-sm text-red-600">
+        <p className="text-sm text-error">
           {q.error instanceof Error ? q.error.message : 'Quote not found'}
         </p>
         <Link href="/quotes" className="mt-2 inline-block text-sm underline">
@@ -225,22 +225,22 @@ export default function QuoteDetailPage(): JSX.Element {
     <main className="space-y-6 px-6 py-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="text-sm text-slate-500">
-            <Link href="/quotes" className="hover:text-slate-800">
+          <div className="text-sm text-on-surface-variant">
+            <Link href="/quotes" className="hover:text-on-surface">
               Quotes
             </Link>
             <span> / </span>
             <span className="font-mono text-xs">{quote.quoteNumber}</span>
           </div>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">{quote.name}</h1>
-          <p className="text-sm text-slate-600">
+          <h1 className="mt-1 text-2xl font-bold text-on-surface">{quote.name}</h1>
+          <p className="text-sm text-on-surface-variant">
             Status: <strong>{quote.status}</strong> · v{quote.version} ·{' '}
             {quote.currency}
           </p>
           <p className="mt-1 text-sm">
             <Link
               href={`/deals/${quote.dealId}`}
-              className="text-indigo-700 hover:underline"
+              className="text-primary hover:underline"
             >
               Open deal
             </Link>
@@ -290,10 +290,10 @@ export default function QuoteDetailPage(): JSX.Element {
       {showVoid ? (
         <form
           onSubmit={onVoid}
-          className="max-w-md space-y-2 rounded-lg border border-red-200 bg-red-50/40 p-4"
+          className="max-w-md space-y-2 rounded-lg border border-error/30 bg-error-container/40 p-4"
         >
           <label className="block text-sm">
-            <span className="text-xs font-medium text-red-800">Reason</span>
+            <span className="text-xs font-medium text-on-error-container">Reason</span>
             <Textarea
               value={voidReason}
               onChange={(e) => setVoidReason(e.target.value)}
@@ -318,8 +318,8 @@ export default function QuoteDetailPage(): JSX.Element {
       ) : null}
 
       {portalLink ? (
-        <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm">
-          <p className="font-medium text-indigo-900">Portal link copied</p>
+        <div className="rounded-lg border border-primary/40 bg-primary-container p-4 text-sm">
+          <p className="font-medium text-on-primary-container">Portal link copied</p>
           <Input className="mt-2" readOnly value={portalLink} onFocus={(e) => e.currentTarget.select()} />
         </div>
       ) : null}
@@ -332,17 +332,17 @@ export default function QuoteDetailPage(): JSX.Element {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Quote package</h2>
-          <p className="mt-1 text-xs text-slate-500">
+        <div className="rounded-lg border border-outline-variant bg-surface p-4">
+          <h2 className="text-sm font-semibold text-on-surface">Quote package</h2>
+          <p className="mt-1 text-xs text-on-surface-variant">
             Seller view keeps package artifacts read-only; template governance stays with admin quote settings.
           </p>
           {canManageQuotePackages ? (
             <div className="mt-3 grid gap-3">
-              <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              <label className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
                 Template
                 <select
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm normal-case text-slate-700"
+                  className="mt-1 h-9 w-full rounded-md border border-outline-variant bg-surface px-3 text-sm normal-case text-on-surface"
                   value={templateId}
                   onChange={(e) => setTemplateId(e.target.value)}
                 >
@@ -354,10 +354,10 @@ export default function QuoteDetailPage(): JSX.Element {
                   ))}
                 </select>
               </label>
-              <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              <label className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
                 Export format
                 <select
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm normal-case text-slate-700"
+                  className="mt-1 h-9 w-full rounded-md border border-outline-variant bg-surface px-3 text-sm normal-case text-on-surface"
                   value={documentFormat}
                   onChange={(e) => setDocumentFormat(e.target.value as 'HTML' | 'PDF' | 'DOCX')}
                 >
@@ -375,7 +375,7 @@ export default function QuoteDetailPage(): JSX.Element {
               </Button>
             </div>
           ) : (
-            <dl className="mt-3 space-y-2 text-sm text-slate-600">
+            <dl className="mt-3 space-y-2 text-sm text-on-surface-variant">
               <div className="flex justify-between gap-2">
                 <dt>Latest package</dt>
                 <dd className="text-right">{latestDocument?.fileName ?? 'No package rendered'}</dd>
@@ -392,9 +392,9 @@ export default function QuoteDetailPage(): JSX.Element {
           )}
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">E-sign lifecycle</h2>
-          <p className="mt-1 text-xs text-slate-500">
+        <div className="rounded-lg border border-outline-variant bg-surface p-4">
+          <h2 className="text-sm font-semibold text-on-surface">E-sign lifecycle</h2>
+          <p className="mt-1 text-xs text-on-surface-variant">
             Send the latest rendered quote document for signature and track the envelope state.
           </p>
           <div className="mt-3 grid gap-3">
@@ -420,9 +420,9 @@ export default function QuoteDetailPage(): JSX.Element {
           </div>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Governance state</h2>
-          <dl className="mt-3 space-y-2 text-sm text-slate-600">
+        <div className="rounded-lg border border-outline-variant bg-surface p-4">
+          <h2 className="text-sm font-semibold text-on-surface">Governance state</h2>
+          <dl className="mt-3 space-y-2 text-sm text-on-surface-variant">
             <div className="flex justify-between gap-2">
               <dt>Expiry date</dt>
               <dd>{formatDate(quote.expiresAt ?? quote.validUntil)}</dd>
@@ -444,63 +444,63 @@ export default function QuoteDetailPage(): JSX.Element {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <div className="rounded-lg border border-outline-variant bg-surface p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Discount requests</h2>
-              <p className="text-xs text-slate-500">
+              <h2 className="text-sm font-semibold text-on-surface">Discount requests</h2>
+              <p className="text-xs text-on-surface-variant">
                 DRQ workflow captures reason, requested discount, probability uplift, and approval state.
               </p>
             </div>
-            <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
+            <span className="rounded-full bg-warning-container px-2 py-1 text-xs font-semibold text-warning">
               {quote.approvalStatus ?? 'NOT_SUBMITTED'}
             </span>
           </div>
           <div className="mt-4 space-y-3">
             {(discountRequests.data?.data ?? []).map((request) => (
-              <div key={request.id} className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm">
+              <div key={request.id} className="rounded-lg border border-outline-variant bg-surface-container-low p-3 text-sm">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <p className="font-semibold text-slate-900">{request.reasonLabel}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="font-semibold text-on-surface">{request.reasonLabel}</p>
+                    <p className="text-xs text-on-surface-variant">
                       {request.requestedDiscountPercent}% requested · win probability {request.winningProbabilityIfApproved}%
                     </p>
                   </div>
-                  <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-700">
+                  <span className="rounded-full bg-surface px-2 py-0.5 text-xs font-semibold text-on-surface">
                     {request.status}
                   </span>
                 </div>
                 {request.reasonNotes ? (
-                  <p className="mt-2 text-xs text-slate-600">{request.reasonNotes}</p>
+                  <p className="mt-2 text-xs text-on-surface-variant">{request.reasonNotes}</p>
                 ) : null}
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-on-surface-variant">
                   Approval ref: {request.approvalRequestId ?? 'Pending workflow assignment'}
                 </p>
               </div>
             ))}
             {!discountRequests.isLoading && (discountRequests.data?.data ?? []).length === 0 ? (
-              <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500">
+              <p className="rounded-lg border border-dashed border-outline-variant p-4 text-center text-sm text-on-surface-variant">
                 No discount request submitted for this quote.
               </p>
             ) : null}
           </div>
         </div>
 
-        <form onSubmit={onSubmitDiscountRequest} className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Create DRQ</h2>
-          <div className="mt-2 rounded-md border border-slate-100 bg-slate-50 p-3 text-xs text-slate-600">
+        <form onSubmit={onSubmitDiscountRequest} className="rounded-lg border border-outline-variant bg-surface p-4">
+          <h2 className="text-sm font-semibold text-on-surface">Create DRQ</h2>
+          <div className="mt-2 rounded-md border border-outline-variant bg-surface-container-low p-3 text-xs text-on-surface-variant">
             {latestRevision?.id ? (
               <p>
                 DRQ applies to current quote revision v{latestRevision.version} ({latestRevision.id}).
               </p>
             ) : (
-              <p className="text-amber-700">
+              <p className="text-warning">
                 Current quote revision is missing; discount submission is blocked until a revision exists.
               </p>
             )}
           </div>
           <div className="mt-3 grid gap-3">
-            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
               Discount %
               <Input
                 className="mt-1"
@@ -512,10 +512,10 @@ export default function QuoteDetailPage(): JSX.Element {
                 onChange={(e) => setRequestedDiscountPercent(e.target.value)}
               />
             </label>
-            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
               Prevalidated reason
               <select
-                className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm normal-case text-slate-700"
+                className="mt-1 h-9 w-full rounded-md border border-outline-variant bg-surface px-3 text-sm normal-case text-on-surface"
                 value={discountReasonCode}
                 onChange={(e) => setDiscountReasonCode(e.target.value)}
               >
@@ -526,7 +526,7 @@ export default function QuoteDetailPage(): JSX.Element {
                 ))}
               </select>
             </label>
-            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
               Winning probability if approved
               <Input
                 className="mt-1"
@@ -537,7 +537,7 @@ export default function QuoteDetailPage(): JSX.Element {
                 onChange={(e) => setWinningProbability(e.target.value)}
               />
             </label>
-            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
               Business reason
               <Textarea
                 className="mt-1"
@@ -558,13 +558,13 @@ export default function QuoteDetailPage(): JSX.Element {
         </form>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white">
-        <div className="border-b border-slate-100 px-4 py-3">
-          <h2 className="text-sm font-semibold text-slate-900">Line items</h2>
+      <section className="rounded-lg border border-outline-variant bg-surface">
+        <div className="border-b border-outline-variant px-4 py-3">
+          <h2 className="text-sm font-semibold text-on-surface">Line items</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-start text-xs uppercase text-slate-500">
+            <thead className="bg-surface-container-low text-start text-xs uppercase text-on-surface-variant">
               <tr>
                 <th className="px-4 py-2">Product</th>
                 <th className="px-4 py-2 text-end">Qty</th>
@@ -573,15 +573,15 @@ export default function QuoteDetailPage(): JSX.Element {
                 <th className="px-4 py-2 text-end">Line total</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-outline-variant">
               {lines.map((line, idx) => (
                 <tr key={line.id ?? `${line.productId}-${idx}`}>
                   <td className="px-4 py-2">
-                    <div className="font-medium text-slate-900">
+                    <div className="font-medium text-on-surface">
                       {line.productName ?? line.productId.slice(0, 8)}
                     </div>
                     {line.description ? (
-                      <p className="text-xs text-slate-500">{line.description}</p>
+                      <p className="text-xs text-on-surface-variant">{line.description}</p>
                     ) : null}
                   </td>
                   <td className="px-4 py-2 text-end tabular-nums">{line.quantity}</td>
@@ -597,48 +597,48 @@ export default function QuoteDetailPage(): JSX.Element {
             </tbody>
           </table>
           {lines.length === 0 ? (
-            <p className="p-6 text-center text-sm text-slate-500">No line items.</p>
+            <p className="p-6 text-center text-sm text-on-surface-variant">No line items.</p>
           ) : null}
         </div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Immutable revisions</h2>
+        <div className="rounded-lg border border-outline-variant bg-surface p-4">
+          <h2 className="text-sm font-semibold text-on-surface">Immutable revisions</h2>
           <div className="mt-3 space-y-2">
             {(revisions.data ?? []).map((revision) => (
-              <div key={revision.id} className="rounded-md border border-slate-100 bg-slate-50 p-3 text-sm">
+              <div key={revision.id} className="rounded-md border border-outline-variant bg-surface-container-low p-3 text-sm">
                 <div className="flex items-center justify-between gap-2">
                   <strong>v{revision.version}</strong>
-                  <span className="text-xs text-slate-500">{formatDate(revision.createdAt)}</span>
+                  <span className="text-xs text-on-surface-variant">{formatDate(revision.createdAt)}</span>
                 </div>
-                <p className="mt-1 text-xs text-slate-600">{revision.reason} - {revision.status}</p>
+                <p className="mt-1 text-xs text-on-surface-variant">{revision.reason} - {revision.status}</p>
               </div>
             ))}
             {!revisions.isLoading && (revisions.data ?? []).length === 0 ? (
-              <p className="text-sm text-slate-500">No revision snapshots yet.</p>
+              <p className="text-sm text-on-surface-variant">No revision snapshots yet.</p>
             ) : null}
           </div>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Rendered documents</h2>
+        <div className="rounded-lg border border-outline-variant bg-surface p-4">
+          <h2 className="text-sm font-semibold text-on-surface">Rendered documents</h2>
           <div className="mt-3 space-y-2">
             {(documents.data ?? []).map((document) => (
-              <div key={document.id} className="rounded-md border border-slate-100 bg-slate-50 p-3 text-sm">
+              <div key={document.id} className="rounded-md border border-outline-variant bg-surface-container-low p-3 text-sm">
                 <div className="flex items-center justify-between gap-2">
                   <strong>{document.fileName}</strong>
-                  <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-700">{document.format}</span>
+                  <span className="rounded-full bg-surface px-2 py-0.5 text-xs font-semibold text-on-surface">{document.format}</span>
                 </div>
-                <p className="mt-1 text-xs text-slate-600">
+                <p className="mt-1 text-xs text-on-surface-variant">
                   {document.status} - {formatDate(document.createdAt)}
                   {document.contentSize ? ` - ${Math.ceil(document.contentSize / 1024)} KB` : ''}
                 </p>
                 {document.checksum ? (
-                  <p className="mt-1 truncate font-mono text-[11px] text-slate-500">SHA-256 {document.checksum}</p>
+                  <p className="mt-1 truncate font-mono text-[11px] text-on-surface-variant">SHA-256 {document.checksum}</p>
                 ) : null}
                 <a
-                  className="mt-2 inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                  className="mt-2 inline-flex h-8 items-center rounded-md border border-outline-variant bg-surface px-3 text-xs font-semibold text-primary hover:bg-primary-container"
                   href={`/api/quote-documents/${document.id}/download`}
                 >
                   Download package
@@ -646,34 +646,34 @@ export default function QuoteDetailPage(): JSX.Element {
               </div>
             ))}
             {!documents.isLoading && (documents.data ?? []).length === 0 ? (
-              <p className="text-sm text-slate-500">No rendered documents yet.</p>
+              <p className="text-sm text-on-surface-variant">No rendered documents yet.</p>
             ) : null}
           </div>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Signature envelopes</h2>
+        <div className="rounded-lg border border-outline-variant bg-surface p-4">
+          <h2 className="text-sm font-semibold text-on-surface">Signature envelopes</h2>
           <div className="mt-3 space-y-2">
             {(envelopes.data ?? []).map((envelope) => (
-              <div key={envelope.id} className="rounded-md border border-slate-100 bg-slate-50 p-3 text-sm">
+              <div key={envelope.id} className="rounded-md border border-outline-variant bg-surface-container-low p-3 text-sm">
                 <div className="flex items-center justify-between gap-2">
                   <strong>{envelope.recipientName}</strong>
-                  <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-700">{envelope.status}</span>
+                  <span className="rounded-full bg-surface px-2 py-0.5 text-xs font-semibold text-on-surface">{envelope.status}</span>
                 </div>
-                <p className="mt-1 text-xs text-slate-600">{envelope.recipientEmail}</p>
+                <p className="mt-1 text-xs text-on-surface-variant">{envelope.recipientEmail}</p>
               </div>
             ))}
             {!envelopes.isLoading && (envelopes.data ?? []).length === 0 ? (
-              <p className="text-sm text-slate-500">No signature envelope yet.</p>
+              <p className="text-sm text-on-surface-variant">No signature envelope yet.</p>
             ) : null}
           </div>
         </div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm">
-          <h2 className="font-semibold text-slate-900">Terms & dates</h2>
-          <dl className="mt-3 space-y-2 text-slate-600">
+        <div className="rounded-lg border border-outline-variant bg-surface p-4 text-sm">
+          <h2 className="font-semibold text-on-surface">Terms & dates</h2>
+          <dl className="mt-3 space-y-2 text-on-surface-variant">
             <div className="flex justify-between gap-2">
               <dt>Payment terms</dt>
               <dd className="font-mono text-xs">{quote.paymentTerms ?? '—'}</dd>
@@ -688,20 +688,20 @@ export default function QuoteDetailPage(): JSX.Element {
             </div>
           </dl>
           {quote.notes ? (
-            <div className="mt-4 border-t border-slate-100 pt-3">
-              <p className="text-xs font-medium uppercase text-slate-500">Notes</p>
-              <p className="mt-1 whitespace-pre-wrap text-slate-700">{quote.notes}</p>
+            <div className="mt-4 border-t border-outline-variant pt-3">
+              <p className="text-xs font-medium uppercase text-on-surface-variant">Notes</p>
+              <p className="mt-1 whitespace-pre-wrap text-on-surface">{quote.notes}</p>
             </div>
           ) : null}
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm">
-          <h2 className="font-semibold text-slate-900">Document controls</h2>
-          <p className="mt-2 text-slate-600">
+        <div className="rounded-lg border border-outline-variant bg-surface p-4 text-sm">
+          <h2 className="font-semibold text-on-surface">Document controls</h2>
+          <p className="mt-2 text-on-surface-variant">
             Quote packages are generated from governed templates, stored with
             content size and checksum, and downloaded from the quote document
             endpoint for audit-ready traceability.
           </p>
-          <dl className="mt-4 space-y-2 text-slate-600">
+          <dl className="mt-4 space-y-2 text-on-surface-variant">
             <div className="flex justify-between gap-2">
               <dt>Latest document</dt>
               <dd className="text-right">{latestDocument?.fileName ?? 'None rendered'}</dd>
@@ -723,11 +723,11 @@ export default function QuoteDetailPage(): JSX.Element {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+    <div className="rounded-lg border border-outline-variant bg-surface p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
         {label}
       </p>
-      <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
+      <p className="mt-1 text-lg font-bold text-on-surface">{value}</p>
     </div>
   );
 }

@@ -31,14 +31,14 @@ export default function CadenceEnrollPage() {
 
   return (
     <main className="space-y-4 p-4 max-w-3xl">
-      <h1 className="text-2xl font-bold text-slate-900">Quick Enroll</h1>
-      <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+      <h1 className="text-2xl font-bold text-on-surface">Quick Enroll</h1>
+      <section className="rounded-xl border border-outline-variant bg-surface p-4 space-y-3">
         <label className="block text-sm">
           Select cadence
           <select
             value={cadenceId}
             onChange={(e) => setCadenceId(e.target.value)}
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded border border-outline-variant px-3 py-2"
             disabled={isLoading}
           >
             <option value="">{isLoading ? 'Loading…' : '— choose a cadence —'}</option>
@@ -52,14 +52,14 @@ export default function CadenceEnrollPage() {
           onChange={(e) => setEmails(e.target.value)}
           rows={4}
           placeholder="Paste emails (comma or newline separated)"
-          className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+          className="w-full rounded border border-outline-variant px-3 py-2 text-sm"
         />
         <label className="block text-sm">
           Start at step
           <select
             value={startStep}
             onChange={(e) => setStartStep(Number(e.target.value))}
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+            className="mt-1 w-full rounded border border-outline-variant px-3 py-2"
           >
             {[1, 2, 3, 4, 5].map((n) => (
               <option key={n} value={n}>Step {n}</option>
@@ -69,11 +69,11 @@ export default function CadenceEnrollPage() {
         <button
           onClick={handleEnroll}
           disabled={submitting || !cadenceId}
-          className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           {submitting ? 'Enrolling…' : 'Confirm enrollment'}
         </button>
-        {done && <p className="text-sm text-emerald-700">Enrollment queued successfully.</p>}
+        {done && <p className="text-sm text-success">Enrollment queued successfully.</p>}
       </section>
     </main>
   );

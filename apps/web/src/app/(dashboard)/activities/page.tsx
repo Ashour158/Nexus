@@ -60,11 +60,11 @@ interface ActivityItem {
 }
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
-  CALL: <Phone className="h-4 w-4 text-green-600" />,
-  EMAIL: <Mail className="h-4 w-4 text-indigo-600" />,
-  MEETING: <Calendar className="h-4 w-4 text-purple-600" />,
-  NOTE: <FileText className="h-4 w-4 text-gray-600" />,
-  TASK: <MessageSquare className="h-4 w-4 text-orange-600" />,
+  CALL: <Phone className="h-4 w-4 text-success" />,
+  EMAIL: <Mail className="h-4 w-4 text-primary" />,
+  MEETING: <Calendar className="h-4 w-4 text-tertiary" />,
+  NOTE: <FileText className="h-4 w-4 text-on-surface-variant" />,
+  TASK: <MessageSquare className="h-4 w-4 text-warning" />,
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -76,16 +76,16 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
-  HIGH: 'bg-red-100 text-red-700',
-  NORMAL: 'bg-indigo-100 text-indigo-700',
-  LOW: 'bg-slate-100 text-slate-700',
+  HIGH: 'bg-error-container text-error',
+  NORMAL: 'bg-primary-container text-primary',
+  LOW: 'bg-surface-container-high text-on-surface',
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  TODO: 'bg-slate-100 text-slate-600',
-  IN_PROGRESS: 'bg-amber-100 text-amber-700',
-  DONE: 'bg-emerald-100 text-emerald-700',
-  CANCELLED: 'bg-gray-100 text-gray-500',
+  TODO: 'bg-surface-container-high text-on-surface-variant',
+  IN_PROGRESS: 'bg-warning-container text-warning',
+  DONE: 'bg-success-container text-success',
+  CANCELLED: 'bg-surface-container-high text-on-surface-variant',
 };
 
 function isOverdue(activity: ActivityItem): boolean {
@@ -174,7 +174,7 @@ export default function ActivitiesPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Activity Feed</h1>
+        <h1 className="text-2xl font-bold text-on-surface">Activity Feed</h1>
         <div className="flex items-center gap-3">
           <ExportButton module="activities" />
           <SavedViewsControl
@@ -195,7 +195,7 @@ export default function ActivitiesPage() {
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-              tab === t.id ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              tab === t.id ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'
             }`}
           >
             {t.icon}
@@ -207,7 +207,7 @@ export default function ActivitiesPage() {
       {activitiesQuery.isLoading ? (
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-20 animate-pulse rounded-xl bg-gray-100" />
+            <div key={i} className="h-20 animate-pulse rounded-xl bg-surface-container-high" />
           ))}
         </div>
       ) : (
@@ -219,14 +219,14 @@ export default function ActivitiesPage() {
             return (
               <div
                 key={act.id}
-                className={`flex items-start gap-4 rounded-xl border bg-white p-4 transition hover:shadow-sm ${
-                  overdue ? 'border-red-200' : 'border-gray-200'
+                className={`flex items-start gap-4 rounded-xl border bg-surface p-4 transition hover:shadow-sm ${
+                  overdue ? 'border-error/30' : 'border-outline-variant'
                 }`}
               >
-                <div className="mt-0.5 rounded-lg bg-gray-50 p-2">{icon}</div>
+                <div className="mt-0.5 rounded-lg bg-surface-container-low p-2">{icon}</div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium text-gray-900">{act.subject}</p>
+                    <p className="text-sm font-medium text-on-surface">{act.subject}</p>
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${PRIORITY_COLORS[act.priority] ?? PRIORITY_COLORS.NORMAL}`}>
                       {act.priority}
                     </span>
@@ -234,31 +234,31 @@ export default function ActivitiesPage() {
                       {act.status}
                     </span>
                     {overdue && (
-                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+                      <span className="rounded-full bg-error-container px-2 py-0.5 text-[10px] font-semibold text-error">
                         Overdue
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-on-surface-variant">
                     {typeLabel}
                     {act.dealId && (
-                      <> · <Link href={`/deals/${act.dealId}`} className="text-indigo-600 hover:underline">Deal</Link></>
+                      <> · <Link href={`/deals/${act.dealId}`} className="text-primary hover:underline">Deal</Link></>
                     )}
                     {act.contactId && (
-                      <> · <Link href={`/contacts/${act.contactId}`} className="text-indigo-600 hover:underline">Contact</Link></>
+                      <> · <Link href={`/contacts/${act.contactId}`} className="text-primary hover:underline">Contact</Link></>
                     )}
                     {act.leadId && (
-                      <> · <Link href={`/leads/${act.leadId}`} className="text-indigo-600 hover:underline">Lead</Link></>
+                      <> · <Link href={`/leads/${act.leadId}`} className="text-primary hover:underline">Lead</Link></>
                     )}
                   </p>
                   {act.dueDate && (
-                    <p className={`mt-0.5 text-xs ${overdue ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+                    <p className={`mt-0.5 text-xs ${overdue ? 'text-error font-medium' : 'text-on-surface-variant'}`}>
                       Due: {new Date(act.dueDate).toLocaleString()}
                     </p>
                   )}
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">
-                  <span className="text-xs text-gray-400">{new Date(act.createdAt).toLocaleDateString()}</span>
+                  <span className="text-xs text-on-surface-variant">{new Date(act.createdAt).toLocaleDateString()}</span>
                   {act.status !== 'DONE' && act.status !== 'CANCELLED' && (
                     <Button
                       variant="secondary"
@@ -292,7 +292,7 @@ export default function ActivitiesPage() {
           </DialogHeader>
           <form onSubmit={handleCreate} className="mt-4 space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Type</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface">Type</label>
               <select
                 value={draft.type}
                 onChange={(e) => setDraft((d) => ({ ...d, type: e.target.value }))}
@@ -304,7 +304,7 @@ export default function ActivitiesPage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Subject</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface">Subject</label>
               <Input
                 value={draft.subject}
                 onChange={(e) => setDraft((d) => ({ ...d, subject: e.target.value }))}
@@ -314,7 +314,7 @@ export default function ActivitiesPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Priority</label>
+                <label className="mb-1 block text-sm font-medium text-on-surface">Priority</label>
                 <select
                   value={draft.priority}
                   onChange={(e) => setDraft((d) => ({ ...d, priority: e.target.value }))}
@@ -327,7 +327,7 @@ export default function ActivitiesPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Due date</label>
+                <label className="mb-1 block text-sm font-medium text-on-surface">Due date</label>
                 <Input
                   type="datetime-local"
                   value={draft.dueDate}
@@ -337,7 +337,7 @@ export default function ActivitiesPage() {
             </div>
             <div className="grid grid-cols-[120px_1fr] gap-3">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Related to</label>
+                <label className="mb-1 block text-sm font-medium text-on-surface">Related to</label>
                 <select
                   value={draft.relatedToField}
                   onChange={(e) => setDraft((d) => ({ ...d, relatedToField: e.target.value as RelatedToField }))}
@@ -349,7 +349,7 @@ export default function ActivitiesPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Record ID</label>
+                <label className="mb-1 block text-sm font-medium text-on-surface">Record ID</label>
                 <Input
                   value={draft.relatedToId}
                   onChange={(e) => setDraft((d) => ({ ...d, relatedToId: e.target.value }))}

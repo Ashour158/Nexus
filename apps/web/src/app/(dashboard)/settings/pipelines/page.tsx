@@ -82,12 +82,12 @@ export default function SettingsPipelinesPage(): JSX.Element {
   return (
     <main className="space-y-4 px-6 py-6">
       <header>
-        <h1 className="text-2xl font-bold text-slate-900">Pipeline Settings</h1>
-        <p className="text-sm text-slate-600">Configure pipelines and stage progression.</p>
+        <h1 className="text-2xl font-bold text-on-surface">Pipeline Settings</h1>
+        <p className="text-sm text-on-surface-variant">Configure pipelines and stage progression.</p>
       </header>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">New Pipeline</h2>
+      <section className="rounded-lg border border-outline-variant bg-surface p-4">
+        <h2 className="text-sm font-semibold text-on-surface">New Pipeline</h2>
         <div className="mt-3 grid gap-3 md:grid-cols-[1fr_140px_auto]">
           <Input
             placeholder="Pipeline name"
@@ -122,17 +122,17 @@ export default function SettingsPipelinesPage(): JSX.Element {
           <Skeleton className="h-36 rounded-md" />
         ) : (
           pipelines.map((pipeline) => (
-            <div key={pipeline.id} className="rounded-lg border border-slate-200 bg-white">
+            <div key={pipeline.id} className="rounded-lg border border-outline-variant bg-surface">
               <div className="flex flex-wrap items-center justify-between gap-3 p-4">
                 <div>
-                  <h3 className="text-base font-semibold text-slate-900">{pipeline.name}</h3>
-                  <p className="text-xs text-slate-500">
+                  <h3 className="text-base font-semibold text-on-surface">{pipeline.name}</h3>
+                  <p className="text-xs text-on-surface-variant">
                     Currency {pipeline.currency} • {pipeline.isDefault ? 'Default pipeline' : 'Non-default'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   {pipeline.isDefault ? (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                    <span className="rounded-full bg-success-container px-2 py-0.5 text-xs font-semibold text-on-success-container">
                       Default
                     </span>
                   ) : null}
@@ -166,9 +166,9 @@ export default function SettingsPipelinesPage(): JSX.Element {
               </div>
 
               {expandedId === pipeline.id ? (
-                <div className="border-t border-slate-200 p-4">
+                <div className="border-t border-outline-variant p-4">
                   <div className="mb-3 flex items-center justify-between">
-                    <h4 className="text-sm font-semibold text-slate-900">Stages</h4>
+                    <h4 className="text-sm font-semibold text-on-surface">Stages</h4>
                     <div className="flex gap-2">
                       <Button
                         type="button"
@@ -274,11 +274,11 @@ function SortableStageRow({
     <div
       ref={setNodeRef}
       style={style}
-      className="grid gap-2 rounded-md border border-slate-200 p-3 md:grid-cols-[28px_1fr_120px_140px_auto]"
+      className="grid gap-2 rounded-md border border-outline-variant p-3 md:grid-cols-[28px_1fr_120px_140px_auto]"
     >
       <button
         type="button"
-        className="cursor-grab rounded border border-slate-300 text-xs text-slate-500 active:cursor-grabbing"
+        className="cursor-grab rounded border border-outline-variant text-xs text-on-surface-variant active:cursor-grabbing"
         {...attributes}
         {...listeners}
         aria-label="Reorder stage"
@@ -287,7 +287,7 @@ function SortableStageRow({
       </button>
       <Input value={stage.name} onChange={(e) => onChange({ name: e.target.value })} />
       <div>
-        <label className="mb-1 block text-xs text-slate-500">Probability</label>
+        <label className="mb-1 block text-xs text-on-surface-variant">Probability</label>
         <input
           type="range"
           min={0}
@@ -296,10 +296,10 @@ function SortableStageRow({
           onChange={(e) => onChange({ probability: Number(e.target.value) })}
           className="w-full accent-brand-600"
         />
-        <div className="text-end text-xs text-slate-600">{stage.probability}%</div>
+        <div className="text-end text-xs text-on-surface-variant">{stage.probability}%</div>
       </div>
       <div>
-        <label className="mb-1 block text-xs text-slate-500">Rotten days</label>
+        <label className="mb-1 block text-xs text-on-surface-variant">Rotten days</label>
         <Input
           type="number"
           min={1}

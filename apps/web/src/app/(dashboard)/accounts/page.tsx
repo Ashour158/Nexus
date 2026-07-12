@@ -147,11 +147,11 @@ export default function AccountsPage(): ReactElement {
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-lg border border-[#dbe7f3] bg-surface shadow-sm">
-        <div className="h-1.5 bg-gradient-to-r from-indigo-600 via-emerald-500 to-amber-400" />
+        <div className="h-1.5 bg-gradient-to-r from-primary via-success to-warning" />
         <div className="p-4 sm:p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-sm shadow-indigo-200">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-sm shadow-primary/30">
                 <Building2 className="h-5 w-5" />
               </div>
               <div className="min-w-0">
@@ -239,7 +239,7 @@ export default function AccountsPage(): ReactElement {
             setSearch(e.target.value);
           }}
           placeholder="Search account name…"
-          className="h-11 w-full rounded-lg border border-outline-variant bg-surface-container-high pl-10 pr-3 text-sm text-on-surface outline-none transition focus:border-primary/40 focus:bg-surface focus:ring-2 focus:ring-indigo-100"
+          className="h-11 w-full rounded-lg border border-outline-variant bg-surface-container-high pl-10 pr-3 text-sm text-on-surface outline-none transition focus:border-primary/40 focus:bg-surface focus:ring-2 focus:ring-primary/30"
         />
         </label>
         <select
@@ -249,7 +249,7 @@ export default function AccountsPage(): ReactElement {
             setPage(1);
             setIndustry(e.target.value);
           }}
-          className="h-11 rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary/40 focus:ring-2 focus:ring-indigo-100"
+          className="h-11 rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/30"
         >
           <option value="">All industries</option>
           {industries.map((i) => (
@@ -265,7 +265,7 @@ export default function AccountsPage(): ReactElement {
             setPage(1);
             setTier(e.target.value as AccountListFilters['tier'] | '');
           }}
-          className="h-11 rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary/40 focus:ring-2 focus:ring-indigo-100"
+          className="h-11 rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/30"
         >
           <option value="">All tiers</option>
           {TIERS.map((t) => (
@@ -281,7 +281,7 @@ export default function AccountsPage(): ReactElement {
             setPage(1);
             setOwnerId(e.target.value);
           }}
-          className="h-11 rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary/40 focus:ring-2 focus:ring-indigo-100"
+          className="h-11 rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/30"
         >
           <option value="">All owners</option>
           {(users.data?.data ?? []).map((u) => (
@@ -634,20 +634,20 @@ function StatCard({
 }): ReactElement {
   const tones = {
     blue: {
-      bar: 'from-indigo-500 to-cyan-400',
-      badge: 'border-indigo-100 bg-primary-container text-primary',
+      bar: 'from-primary to-info',
+      badge: 'border-primary/30 bg-primary-container text-primary',
     },
     emerald: {
-      bar: 'from-emerald-500 to-teal-400',
-      badge: 'border-emerald-100 bg-success-container text-success',
+      bar: 'from-success to-success',
+      badge: 'border-success/30 bg-success-container text-success',
     },
     amber: {
-      bar: 'from-amber-500 to-orange-400',
-      badge: 'border-amber-100 bg-warning-container text-warning',
+      bar: 'from-warning to-warning',
+      badge: 'border-warning/30 bg-warning-container text-warning',
     },
     violet: {
-      bar: 'from-violet-500 to-indigo-400',
-      badge: 'border-violet-100 bg-tertiary-container text-tertiary',
+      bar: 'from-tertiary to-primary',
+      badge: 'border-tertiary/30 bg-tertiary-container text-tertiary',
     },
   }[tone];
 

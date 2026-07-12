@@ -256,7 +256,7 @@ export default function TasksPage(): ReactElement {
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
       <section className="min-w-0 space-y-5">
         <div className="overflow-hidden rounded-lg border border-[#dbe7f3] bg-surface shadow-sm">
-          <div className="h-1.5 bg-gradient-to-r from-[#4A90E2] via-[#7ED321] to-amber-400" />
+          <div className="h-1.5 bg-gradient-to-r from-[#4A90E2] via-[#7ED321] to-warning" />
           <div className="p-4 sm:p-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
@@ -294,7 +294,7 @@ export default function TasksPage(): ReactElement {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search tasks..."
-                className="h-12 w-full rounded-lg border border-outline-variant bg-surface-container-high pl-10 pr-3 text-sm outline-none transition focus:border-primary/40 focus:bg-surface focus:ring-2 focus:ring-indigo-100"
+                className="h-12 w-full rounded-lg border border-outline-variant bg-surface-container-high pl-10 pr-3 text-sm outline-none transition focus:border-primary/40 focus:bg-surface focus:ring-2 focus:ring-primary/30"
               />
             </label>
             <FilterSelect label="Status" value={statusFilter} onChange={(value) => setStatusFilter(value as StatusFilter)} options={[
@@ -405,17 +405,17 @@ export default function TasksPage(): ReactElement {
         {selectedTask ? (
           <form className="mt-5 space-y-4" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
             <Field label="Task Name">
-              <input className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-indigo-400 focus:ring-indigo-100" value={draft.subject} onChange={(event) => setDraft((prev) => ({ ...prev, subject: event.target.value }))} />
+              <input className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.subject} onChange={(event) => setDraft((prev) => ({ ...prev, subject: event.target.value }))} />
             </Field>
             <Field label="Description">
-              <textarea className="form-textarea min-h-28 w-full resize-none rounded-lg border-outline-variant text-sm focus:border-indigo-400 focus:ring-indigo-100" value={draft.description} onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))} />
+              <textarea className="form-textarea min-h-28 w-full resize-none rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.description} onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))} />
             </Field>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
               <Field label="Due Date">
-                <input type="date" className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-indigo-400 focus:ring-indigo-100" value={draft.dueDate} onChange={(event) => setDraft((prev) => ({ ...prev, dueDate: event.target.value }))} />
+                <input type="date" className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.dueDate} onChange={(event) => setDraft((prev) => ({ ...prev, dueDate: event.target.value }))} />
               </Field>
               <Field label="Priority">
-                <select className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-indigo-400 focus:ring-indigo-100" value={draft.priority} onChange={(event) => setDraft((prev) => ({ ...prev, priority: event.target.value }))}>
+                <select className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.priority} onChange={(event) => setDraft((prev) => ({ ...prev, priority: event.target.value }))}>
                   <option value="LOW">Low</option>
                   <option value="NORMAL">Medium</option>
                   <option value="HIGH">High</option>
@@ -424,7 +424,7 @@ export default function TasksPage(): ReactElement {
             </div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
               <Field label="Assigned To">
-                <select className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-indigo-400 focus:ring-indigo-100" value={draft.ownerId} onChange={(event) => setDraft((prev) => ({ ...prev, ownerId: event.target.value }))}>
+                <select className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.ownerId} onChange={(event) => setDraft((prev) => ({ ...prev, ownerId: event.target.value }))}>
                   <option value="">Unassigned</option>
                   {(usersQuery.data?.data ?? []).map((user) => (
                     <option key={user.id} value={user.id}>{user.firstName} {user.lastName}</option>
@@ -432,7 +432,7 @@ export default function TasksPage(): ReactElement {
                 </select>
               </Field>
               <Field label="Status">
-                <select className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-indigo-400 focus:ring-indigo-100" value={draft.status} onChange={(event) => setDraft((prev) => ({ ...prev, status: event.target.value }))}>
+                <select className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.status} onChange={(event) => setDraft((prev) => ({ ...prev, status: event.target.value }))}>
                   <option value="TODO">Open</option>
                   <option value="PLANNED">Planned</option>
                   <option value="IN_PROGRESS">In Progress</option>
@@ -485,7 +485,7 @@ export default function TasksPage(): ReactElement {
           <form onSubmit={handleCreate} className="mt-4 space-y-4">
             <Field label="Title">
               <input
-                className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-indigo-400 focus:ring-indigo-100"
+                className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30"
                 value={createDraft.subject}
                 onChange={(event) => setCreateDraft((prev) => ({ ...prev, subject: event.target.value }))}
                 placeholder="Call back the prospect"
@@ -494,7 +494,7 @@ export default function TasksPage(): ReactElement {
             </Field>
             <Field label="Description">
               <textarea
-                className="form-textarea min-h-24 w-full resize-none rounded-lg border-outline-variant text-sm focus:border-indigo-400 focus:ring-indigo-100"
+                className="form-textarea min-h-24 w-full resize-none rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30"
                 value={createDraft.description}
                 onChange={(event) => setCreateDraft((prev) => ({ ...prev, description: event.target.value }))}
               />
@@ -503,14 +503,14 @@ export default function TasksPage(): ReactElement {
               <Field label="Due Date">
                 <input
                   type="date"
-                  className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-indigo-400 focus:ring-indigo-100"
+                  className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30"
                   value={createDraft.dueDate}
                   onChange={(event) => setCreateDraft((prev) => ({ ...prev, dueDate: event.target.value }))}
                 />
               </Field>
               <Field label="Priority">
                 <select
-                  className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-indigo-400 focus:ring-indigo-100"
+                  className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30"
                   value={createDraft.priority}
                   onChange={(event) => setCreateDraft((prev) => ({ ...prev, priority: event.target.value }))}
                 >
@@ -524,7 +524,7 @@ export default function TasksPage(): ReactElement {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Related To">
                 <select
-                  className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-indigo-400 focus:ring-indigo-100"
+                  className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30"
                   value={createDraft.relatedToField}
                   onChange={(event) => setCreateDraft((prev) => ({ ...prev, relatedToField: event.target.value as RelatedToField }))}
                 >
@@ -535,7 +535,7 @@ export default function TasksPage(): ReactElement {
               </Field>
               <Field label="Record ID">
                 <input
-                  className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-indigo-400 focus:ring-indigo-100"
+                  className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30"
                   value={createDraft.relatedToId}
                   onChange={(event) => setCreateDraft((prev) => ({ ...prev, relatedToId: event.target.value }))}
                   placeholder="Paste the record ID"
@@ -560,10 +560,10 @@ export default function TasksPage(): ReactElement {
 
 function Metric({ label, value, tone }: { label: string; value: string; tone: 'blue' | 'red' | 'amber' | 'green' }): ReactElement {
   const styles = {
-    blue: 'from-indigo-500 to-cyan-400 text-primary',
-    red: 'from-red-500 to-pink-400 text-error',
-    amber: 'from-amber-500 to-orange-400 text-warning',
-    green: 'from-emerald-500 to-lime-400 text-success',
+    blue: 'from-primary to-info text-primary',
+    red: 'from-error to-tertiary text-error',
+    amber: 'from-warning to-warning text-warning',
+    green: 'from-success to-success text-success',
   }[tone];
   return (
     <div className="overflow-hidden rounded-lg border border-[#e7edf3] bg-[#f9f9ff]">
@@ -594,7 +594,7 @@ function FilterSelect({
         value={value}
         aria-label={label}
         onChange={(event) => onChange(event.target.value)}
-        className="h-12 w-full rounded-lg border border-outline-variant bg-surface pl-9 pr-8 text-sm font-medium text-on-surface outline-none focus:border-primary/40 focus:ring-2 focus:ring-indigo-100"
+        className="h-12 w-full rounded-lg border border-outline-variant bg-surface pl-9 pr-8 text-sm font-medium text-on-surface outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/30"
       >
         {options.map(([optionValue, optionLabel]) => (
           <option key={optionValue} value={optionValue}>{label}: {optionLabel}</option>

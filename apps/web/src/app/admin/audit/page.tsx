@@ -270,7 +270,7 @@ export default function AuditLogPage() {
 
   if (!canReadAudit) {
     return (
-      <div className="rounded-xl border border-amber-700 bg-amber-950/40 p-6 text-sm text-amber-100">
+      <div className="rounded-xl border border-warning bg-warning-container/40 p-6 text-sm text-on-warning-container">
         You need admin or audit read permission to view operation audit records.
       </div>
     );
@@ -280,7 +280,7 @@ export default function AuditLogPage() {
     <div className="space-y-4">
       <div>
         <h2 className="text-2xl font-bold">Audit Log</h2>
-        <p className="mt-1 text-sm text-gray-400">
+        <p className="mt-1 text-sm text-on-surface-variant">
           Internal replay and reconciliation operation records from the durable audit stream.
         </p>
       </div>
@@ -291,30 +291,30 @@ export default function AuditLogPage() {
             key={filter.label}
             type="button"
             onClick={() => applyQuickFilter(filter)}
-            className="rounded border border-gray-700 px-3 py-1 text-xs text-gray-200 hover:bg-gray-800"
+            className="rounded border border-outline-variant px-3 py-1 text-xs text-outline hover:bg-surface-container-highest"
           >
             {filter.label}
           </button>
         ))}
       </div>
 
-      <div className="grid gap-2 rounded-xl border border-gray-800 bg-gray-900 p-3 md:grid-cols-4">
-        <label className="flex flex-col gap-1 text-xs text-gray-400">
+      <div className="grid gap-2 rounded-xl border border-outline-variant bg-inverse-surface p-3 md:grid-cols-4">
+        <label className="flex flex-col gap-1 text-xs text-on-surface-variant">
           Search
           <input
             value={query}
             onChange={(event) => resetCursorAndSet(() => setQuery(event.target.value))}
             placeholder="operator, op-, corr-"
-            className="rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100"
+            className="rounded border border-outline-variant bg-inverse-surface px-3 py-2 text-sm text-inverse-on-surface"
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-gray-400">
+        <label className="flex flex-col gap-1 text-xs text-on-surface-variant">
           Operation type
           <select
             aria-label="Operation type"
             value={operationType}
             onChange={(event) => resetCursorAndSet(() => setOperationType(event.target.value))}
-            className="rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100"
+            className="rounded border border-outline-variant bg-inverse-surface px-3 py-2 text-sm text-inverse-on-surface"
           >
             {OPERATION_TYPES.map((item) => (
               <option key={item} value={item}>
@@ -323,13 +323,13 @@ export default function AuditLogPage() {
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-xs text-gray-400">
+        <label className="flex flex-col gap-1 text-xs text-on-surface-variant">
           Status
           <select
             aria-label="Status"
             value={status}
             onChange={(event) => resetCursorAndSet(() => setStatus(event.target.value))}
-            className="rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100"
+            className="rounded border border-outline-variant bg-inverse-surface px-3 py-2 text-sm text-inverse-on-surface"
           >
             {STATUSES.map((item) => (
               <option key={item} value={item}>
@@ -338,26 +338,26 @@ export default function AuditLogPage() {
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-xs text-gray-400">
+        <label className="flex flex-col gap-1 text-xs text-on-surface-variant">
           Execution
           <select
             aria-label="Execution"
             value={executed}
             onChange={(event) => resetCursorAndSet(() => setExecuted(event.target.value))}
-            className="rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100"
+            className="rounded border border-outline-variant bg-inverse-surface px-3 py-2 text-sm text-inverse-on-surface"
           >
             <option value="all">All</option>
             <option value="true">Executed</option>
             <option value="false">Dry-run only</option>
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-xs text-gray-400">
+        <label className="flex flex-col gap-1 text-xs text-on-surface-variant">
           Source service
           <select
             aria-label="Source service"
             value={sourceService}
             onChange={(event) => resetCursorAndSet(() => setSourceService(event.target.value))}
-            className="rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100"
+            className="rounded border border-outline-variant bg-inverse-surface px-3 py-2 text-sm text-inverse-on-surface"
           >
             {SOURCE_SERVICES.map((item) => (
               <option key={item} value={item}>
@@ -366,13 +366,13 @@ export default function AuditLogPage() {
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-xs text-gray-400">
+        <label className="flex flex-col gap-1 text-xs text-on-surface-variant">
           Target
           <select
             aria-label="Target"
             value={targetDomain}
             onChange={(event) => resetCursorAndSet(() => setTargetDomain(event.target.value))}
-            className="rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100"
+            className="rounded border border-outline-variant bg-inverse-surface px-3 py-2 text-sm text-inverse-on-surface"
           >
             {TARGETS.map((item) => (
               <option key={item} value={item}>
@@ -381,13 +381,13 @@ export default function AuditLogPage() {
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-xs text-gray-400">
+        <label className="flex flex-col gap-1 text-xs text-on-surface-variant">
           Time range
           <select
             aria-label="Time range"
             value={timeRange}
             onChange={(event) => resetCursorAndSet(() => setTimeRange(event.target.value))}
-            className="rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100"
+            className="rounded border border-outline-variant bg-inverse-surface px-3 py-2 text-sm text-inverse-on-surface"
           >
             {TIME_RANGES.map((item) => (
               <option key={item} value={item}>
@@ -400,54 +400,54 @@ export default function AuditLogPage() {
           type="button"
           onClick={exportCsv}
           disabled={!filteredRecords.length}
-          className="self-end rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="self-end rounded bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           Export CSV
         </button>
       </div>
 
       <div className="grid gap-2 md:grid-cols-4">
-        <div className="rounded-lg border border-gray-800 bg-gray-900 p-3">
-          <p className="text-xs text-gray-500">Current results</p>
-          <p className="text-xl font-semibold text-gray-100">{summary.total}</p>
+        <div className="rounded-lg border border-outline-variant bg-inverse-surface p-3">
+          <p className="text-xs text-on-surface-variant">Current results</p>
+          <p className="text-xl font-semibold text-inverse-on-surface">{summary.total}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900 p-3">
-          <p className="text-xs text-gray-500">Attention</p>
-          <p className="text-sm text-gray-100">{summary.failed} failed</p>
-          <p className="text-sm text-gray-100">{summary.blocked} blocked</p>
-          <p className="text-sm text-gray-100">{summary.warnings} warning</p>
+        <div className="rounded-lg border border-outline-variant bg-inverse-surface p-3">
+          <p className="text-xs text-on-surface-variant">Attention</p>
+          <p className="text-sm text-inverse-on-surface">{summary.failed} failed</p>
+          <p className="text-sm text-inverse-on-surface">{summary.blocked} blocked</p>
+          <p className="text-sm text-inverse-on-surface">{summary.warnings} warning</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900 p-3">
-          <p className="text-xs text-gray-500">Mode</p>
-          <p className="text-sm text-gray-100">{summary.executedCount} executed</p>
-          <p className="text-sm text-gray-100">{summary.dryRuns} dry-run</p>
+        <div className="rounded-lg border border-outline-variant bg-inverse-surface p-3">
+          <p className="text-xs text-on-surface-variant">Mode</p>
+          <p className="text-sm text-inverse-on-surface">{summary.executedCount} executed</p>
+          <p className="text-sm text-inverse-on-surface">{summary.dryRuns} dry-run</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900 p-3">
-          <p className="text-xs text-gray-500">Top operation types</p>
-          <p className="text-sm text-gray-100">{summary.topOperationTypes}</p>
+        <div className="rounded-lg border border-outline-variant bg-inverse-surface p-3">
+          <p className="text-xs text-on-surface-variant">Top operation types</p>
+          <p className="text-sm text-inverse-on-surface">{summary.topOperationTypes}</p>
         </div>
       </div>
 
       {error ? (
-        <div className="rounded-xl border border-red-800 bg-red-950/40 p-4 text-sm text-red-100">
+        <div className="rounded-xl border border-error bg-error-container/40 p-4 text-sm text-on-error-container">
           {error}
         </div>
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-gray-400">Loading operation audit records...</p>
+        <p className="text-sm text-on-surface-variant">Loading operation audit records...</p>
       ) : !filteredRecords.length ? (
-        <div className="rounded-xl border border-gray-800 bg-gray-900 p-8 text-center">
-          <p className="text-sm text-gray-300">No internal operation audit records found.</p>
-          <p className="mt-1 text-xs text-gray-500">
+        <div className="rounded-xl border border-outline-variant bg-inverse-surface p-8 text-center">
+          <p className="text-sm text-outline">No internal operation audit records found.</p>
+          <p className="mt-1 text-xs text-on-surface-variant">
             Replay and reconciliation audit events will appear here after the audit consumer stores them.
           </p>
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-xl border border-gray-800 bg-gray-900">
+          <div className="overflow-x-auto rounded-xl border border-outline-variant bg-inverse-surface">
             <table className="min-w-full text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-gray-400">
+              <thead className="text-xs uppercase tracking-wide text-on-surface-variant">
                 <tr>
                   <th className="px-3 py-2">Created</th>
                   <th className="px-3 py-2">Operation</th>
@@ -459,37 +459,37 @@ export default function AuditLogPage() {
                   <th className="px-3 py-2">Notes</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-outline-variant">
                 {filteredRecords.map((record) => (
                   <tr key={record.auditId}>
-                    <td className="px-3 py-3 whitespace-nowrap text-gray-300">{formatDate(record.createdAt)}</td>
+                    <td className="px-3 py-3 whitespace-nowrap text-outline">{formatDate(record.createdAt)}</td>
                     <td className="px-3 py-3">
-                      <p className="font-medium text-gray-100">{record.operationType}</p>
-                      <p className="font-mono text-xs text-gray-500">{record.operationId ?? '-'}</p>
+                      <p className="font-medium text-inverse-on-surface">{record.operationType}</p>
+                      <p className="font-mono text-xs text-on-surface-variant">{record.operationId ?? '-'}</p>
                     </td>
                     <td className="px-3 py-3">
                       <p>{record.operatorId ?? 'system'}</p>
-                      <p className="text-xs text-gray-500">{record.sourceService ?? '-'}</p>
+                      <p className="text-xs text-on-surface-variant">{record.sourceService ?? '-'}</p>
                     </td>
                     <td className="px-3 py-3">
                       <p>{record.targetDomain ?? record.targetProjection ?? '-'}</p>
-                      <p className="font-mono text-xs text-gray-500">{record.correlationId ?? '-'}</p>
+                      <p className="font-mono text-xs text-on-surface-variant">{record.correlationId ?? '-'}</p>
                     </td>
                     <td className="px-3 py-3">
-                      <span className="rounded bg-gray-800 px-2 py-1 text-xs">
+                      <span className="rounded bg-surface-container-highest px-2 py-1 text-xs">
                         {record.executed ? 'executed' : record.dryRun ? 'dry-run' : 'reported'}
                       </span>
                     </td>
                     <td className="px-3 py-3">
-                      <span className="rounded bg-blue-950 px-2 py-1 text-xs text-indigo-100">
+                      <span className="rounded bg-info-container px-2 py-1 text-xs text-on-primary-container">
                         {record.status ?? '-'}
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-xs text-gray-300">{compactObject(record.counts)}</td>
-                    <td className="px-3 py-3 text-xs text-gray-300">
+                    <td className="px-3 py-3 text-xs text-outline">{compactObject(record.counts)}</td>
+                    <td className="px-3 py-3 text-xs text-outline">
                       <p>{record.reason ?? '-'}</p>
-                      {record.warnings.length ? <p className="mt-1 text-amber-300">{record.warnings.join('; ')}</p> : null}
-                      {record.errors.length ? <p className="mt-1 text-red-300">{record.errors.join('; ')}</p> : null}
+                      {record.warnings.length ? <p className="mt-1 text-warning">{record.warnings.join('; ')}</p> : null}
+                      {record.errors.length ? <p className="mt-1 text-error">{record.errors.join('; ')}</p> : null}
                     </td>
                   </tr>
                 ))}
@@ -501,7 +501,7 @@ export default function AuditLogPage() {
               type="button"
               disabled={!cursor}
               onClick={() => setCursor(null)}
-              className="rounded border border-gray-700 px-3 py-1 text-sm disabled:opacity-50"
+              className="rounded border border-outline-variant px-3 py-1 text-sm disabled:opacity-50"
             >
               First page
             </button>
@@ -509,7 +509,7 @@ export default function AuditLogPage() {
               type="button"
               disabled={!nextCursor}
               onClick={() => setCursor(nextCursor)}
-              className="rounded border border-gray-700 px-3 py-1 text-sm disabled:opacity-50"
+              className="rounded border border-outline-variant px-3 py-1 text-sm disabled:opacity-50"
             >
               Next
             </button>

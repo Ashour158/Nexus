@@ -123,14 +123,14 @@ export default function CampaignsPage() {
               value={search}
               onChange={(e) => resetPage(setSearch)(e.target.value)}
               placeholder="Search name or subject"
-              className="h-11 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-9 pr-3 text-sm text-on-surface outline-none focus:border-indigo-400 focus:bg-surface focus:ring-2 focus:ring-indigo-100"
+              className="h-11 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-9 pr-3 text-sm text-on-surface outline-none focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
             />
           </div>
           <select
             value={type}
             aria-label="Filter by campaign type"
             onChange={(e) => resetPage(setType)(e.target.value as CampaignType | '')}
-            className="h-11 rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            className="h-11 rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
           >
             <option value="">All types</option>
             {CAMPAIGN_TYPES.map((t) => (
@@ -143,7 +143,7 @@ export default function CampaignsPage() {
             value={status}
             aria-label="Filter by campaign status"
             onChange={(e) => resetPage(setStatus)(e.target.value as CampaignStatus | '')}
-            className="h-11 rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            className="h-11 rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
           >
             <option value="">All statuses</option>
             {CAMPAIGN_STATUSES.map((s) => (
@@ -156,7 +156,7 @@ export default function CampaignsPage() {
             value={ownerId}
             onChange={(e) => resetPage(setOwnerId)(e.target.value)}
             placeholder="Filter by owner id"
-            className="h-11 rounded-lg border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface outline-none focus:border-indigo-400 focus:bg-surface focus:ring-2 focus:ring-indigo-100"
+            className="h-11 rounded-lg border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface outline-none focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
           />
         </div>
       </CRMToolbar>

@@ -57,15 +57,15 @@ export function DashboardWidgetRenderer({ config }: DashboardWidgetRendererProps
   switch (widgetType) {
     case 'metric':
       return (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white p-6">
-          <span className="text-3xl font-bold text-gray-900">
+        <div className="flex flex-col items-center justify-center rounded-xl border border-outline-variant bg-surface p-6">
+          <span className="text-3xl font-bold text-on-surface">
             {metric?.value ?? '—'}
           </span>
-          <span className="mt-1 text-sm text-gray-500">{metric?.label ?? config.title}</span>
+          <span className="mt-1 text-sm text-on-surface-variant">{metric?.label ?? config.title}</span>
           {metric?.trend !== undefined && (
             <span
               className={`mt-1 text-xs font-medium ${
-                metric.trend >= 0 ? 'text-green-600' : 'text-red-600'
+                metric.trend >= 0 ? 'text-success' : 'text-error'
               }`}
             >
               {metric.trend >= 0 ? '↑' : '↓'} {Math.abs(metric.trend)}%
@@ -76,8 +76,8 @@ export function DashboardWidgetRenderer({ config }: DashboardWidgetRendererProps
 
     case 'bar_chart':
       return (
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <h3 className="mb-3 text-sm font-semibold text-gray-700">{config.title}</h3>
+        <div className="rounded-xl border border-outline-variant bg-surface p-4">
+          <h3 className="mb-3 text-sm font-semibold text-on-surface">{config.title}</h3>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -95,8 +95,8 @@ export function DashboardWidgetRenderer({ config }: DashboardWidgetRendererProps
 
     case 'line_chart':
       return (
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <h3 className="mb-3 text-sm font-semibold text-gray-700">{config.title}</h3>
+        <div className="rounded-xl border border-outline-variant bg-surface p-4">
+          <h3 className="mb-3 text-sm font-semibold text-on-surface">{config.title}</h3>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -120,8 +120,8 @@ export function DashboardWidgetRenderer({ config }: DashboardWidgetRendererProps
 
     case 'pie_chart':
       return (
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <h3 className="mb-3 text-sm font-semibold text-gray-700">{config.title}</h3>
+        <div className="rounded-xl border border-outline-variant bg-surface p-4">
+          <h3 className="mb-3 text-sm font-semibold text-on-surface">{config.title}</h3>
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie
@@ -146,28 +146,28 @@ export function DashboardWidgetRenderer({ config }: DashboardWidgetRendererProps
 
     case 'table':
       return (
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <h3 className="mb-3 text-sm font-semibold text-gray-700">{config.title}</h3>
+        <div className="rounded-xl border border-outline-variant bg-surface p-4">
+          <h3 className="mb-3 text-sm font-semibold text-on-surface">{config.title}</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-gray-100 bg-gray-50">
+              <thead className="border-b border-outline-variant bg-surface-container-low">
                 <tr>
                   {data.length > 0 &&
                     Object.keys(data[0]).map((col) => (
                       <th
                         key={col}
-                        className="px-3 py-2 text-start font-medium capitalize text-gray-500"
+                        className="px-3 py-2 text-start font-medium capitalize text-on-surface-variant"
                       >
                         {col.replace(/_/g, ' ')}
                       </th>
                     ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-outline-variant">
                 {data.map((row, i) => (
-                  <tr key={i} className="hover:bg-gray-50">
+                  <tr key={i} className="hover:bg-surface-container-low">
                     {Object.values(row).map((val, j) => (
-                      <td key={j} className="px-3 py-2 text-gray-700">
+                      <td key={j} className="px-3 py-2 text-on-surface">
                         {val === null || val === undefined ? '—' : String(val)}
                       </td>
                     ))}
@@ -181,7 +181,7 @@ export function DashboardWidgetRenderer({ config }: DashboardWidgetRendererProps
 
     default:
       return (
-        <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-400">
+        <div className="flex items-center justify-center rounded-xl border border-outline-variant bg-surface p-6 text-sm text-on-surface-variant">
           Unknown widget type: {widgetType}
         </div>
       );

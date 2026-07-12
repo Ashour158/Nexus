@@ -121,8 +121,8 @@ export default function SettingsWorkflowsPage(): JSX.Element {
     <main className="space-y-4 px-6 py-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Workflow Automation</h1>
-          <p className="text-sm text-slate-600">Build and run trigger-based automation flows.</p>
+          <h1 className="text-2xl font-bold text-on-surface">Workflow Automation</h1>
+          <p className="text-sm text-on-surface-variant">Build and run trigger-based automation flows.</p>
         </div>
         <Button type="button" onClick={() => setWizardOpen(true)}>
           + New Workflow
@@ -131,17 +131,17 @@ export default function SettingsWorkflowsPage(): JSX.Element {
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {cards.map((w) => (
-          <div key={w.id} className="rounded-lg border border-slate-200 bg-white p-4">
+          <div key={w.id} className="rounded-lg border border-outline-variant bg-surface p-4">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <h2 className="font-semibold text-slate-900">{w.name}</h2>
-                <p className="text-xs text-slate-500">Trigger: {w.trigger}</p>
+                <h2 className="font-semibold text-on-surface">{w.name}</h2>
+                <p className="text-xs text-on-surface-variant">Trigger: {w.trigger}</p>
               </div>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${w.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${w.isActive ? 'bg-success-container text-on-success-container' : 'bg-surface-container-high text-on-surface'}`}>
                 {w.isActive ? 'active' : 'inactive'}
               </span>
             </div>
-            <p className="mt-2 text-xs text-slate-500">Last updated {formatDateTime(w.updatedAt)}</p>
+            <p className="mt-2 text-xs text-on-surface-variant">Last updated {formatDateTime(w.updatedAt)}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button type="button" variant="secondary" onClick={() => (w.isActive ? deactivateWorkflow.mutate(w.id) : activateWorkflow.mutate(w.id))}>
                 {w.isActive ? 'Pause' : 'Activate'}
@@ -167,11 +167,11 @@ export default function SettingsWorkflowsPage(): JSX.Element {
       {wizardOpen ? (
         <Modal title="Workflow Wizard" onClose={() => setWizardOpen(false)}>
           <div className="space-y-3">
-            <p className="text-xs text-slate-500">Step {step} / 4</p>
+            <p className="text-xs text-on-surface-variant">Step {step} / 4</p>
             {step === 1 ? (
               <>
                 <Input placeholder="Workflow name" value={name} onChange={(e) => setName(e.target.value)} />
-                <select value={trigger} onChange={(e) => setTrigger(e.target.value)} className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm">
+                <select value={trigger} onChange={(e) => setTrigger(e.target.value)} className="h-9 w-full rounded-md border border-outline-variant px-3 text-sm">
                   <option value="deal.won">Deal Won</option>
                   <option value="deal.lost">Deal Lost</option>
                   <option value="deal.stage_changed">Stage Changed</option>
@@ -189,7 +189,7 @@ export default function SettingsWorkflowsPage(): JSX.Element {
             ) : null}
             {step === 3 ? (
               <>
-                <select value={actionType} onChange={(e) => setActionType(e.target.value)} className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm">
+                <select value={actionType} onChange={(e) => setActionType(e.target.value)} className="h-9 w-full rounded-md border border-outline-variant px-3 text-sm">
                   <option value="EMAIL">Send Email</option>
                   <option value="CREATE_ACTIVITY">Create Activity</option>
                   <option value="CREATE_TASK">Create Task</option>
@@ -201,7 +201,7 @@ export default function SettingsWorkflowsPage(): JSX.Element {
               </>
             ) : null}
             {step === 4 ? (
-              <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs">
+              <div className="rounded-md border border-outline-variant bg-surface-container-low p-3 text-xs">
                 <p><strong>Name:</strong> {name}</p>
                 <p><strong>Trigger:</strong> {trigger}</p>
                 <p><strong>Condition:</strong> {conditionField || '(none)'} = {conditionValue || '(none)'}</p>
@@ -230,7 +230,7 @@ export default function SettingsWorkflowsPage(): JSX.Element {
         <Modal title={`Execution history — ${historyFor.name}`} onClose={() => setHistoryFor(null)}>
           <div className="max-h-80 overflow-auto">
             <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+              <thead className="bg-surface-container-low text-xs uppercase tracking-wide text-on-surface-variant">
                 <tr>
                   <th className="px-2 py-1 text-start">Status</th>
                   <th className="px-2 py-1 text-start">Triggered at</th>
@@ -239,7 +239,7 @@ export default function SettingsWorkflowsPage(): JSX.Element {
               </thead>
               <tbody>
                 {(executionsQuery.data ?? []).map((e) => (
-                  <tr key={e.id} className="border-t border-slate-100">
+                  <tr key={e.id} className="border-t border-outline-variant">
                     <td className="px-2 py-1">{e.status}</td>
                     <td className="px-2 py-1">{formatDateTime(e.startedAt)}</td>
                     <td className="px-2 py-1">{e.completedAt ? formatDateTime(e.completedAt) : '—'}</td>
@@ -253,7 +253,7 @@ export default function SettingsWorkflowsPage(): JSX.Element {
 
       {testResult ? (
         <Modal title="Test run result" onClose={() => setTestResult(null)}>
-          <pre className="max-h-96 overflow-auto rounded bg-slate-950 p-3 text-xs text-emerald-100">{testResult}</pre>
+          <pre className="max-h-96 overflow-auto rounded bg-inverse-surface p-3 text-xs text-on-success-container">{testResult}</pre>
         </Modal>
       ) : null}
     </main>
@@ -270,11 +270,11 @@ function Modal({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-      <div className="w-full max-w-2xl rounded-lg bg-white p-4 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/50 p-4">
+      <div className="w-full max-w-2xl rounded-lg bg-surface p-4 shadow-xl">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold">{title}</h2>
-          <button type="button" onClick={onClose} className="rounded border border-slate-200 px-2 py-1 text-xs">
+          <button type="button" onClick={onClose} className="rounded border border-outline-variant px-2 py-1 text-xs">
             Close
           </button>
         </div>

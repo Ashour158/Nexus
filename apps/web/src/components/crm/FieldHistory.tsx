@@ -44,43 +44,43 @@ export function FieldHistory({
   });
 
   if (isLoading)
-    return <div className="h-20 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />;
+    return <div className="h-20 animate-pulse rounded-xl bg-surface-container-high dark:bg-surface-container-high" />;
   if (history.length === 0)
-    return <p className="py-4 text-center text-sm text-slate-400">No changes recorded yet</p>;
+    return <p className="py-4 text-center text-sm text-on-surface-variant">No changes recorded yet</p>;
 
   return (
     <div className="space-y-2">
       {history.map((entry) => (
         <div key={entry.id} className="flex items-start gap-3 text-sm">
-          <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-            <User className="h-3 w-3 text-slate-500" />
+          <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-container-high dark:bg-surface-container-high">
+            <User className="h-3 w-3 text-on-surface-variant" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-slate-700 dark:text-slate-300">
+            <p className="text-on-surface dark:text-outline">
               <span className="font-medium">{entry.changedByName ?? entry.changedBy}</span>
               {' changed '}
-              <span className="font-medium text-indigo-600 dark:text-indigo-400">
+              <span className="font-medium text-primary ">
                 {entry.fieldName}
               </span>
             </p>
             <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs">
               {entry.oldValue ? (
-                <span className="rounded bg-red-50 px-1.5 py-0.5 text-red-600 line-through dark:bg-red-950/30 dark:text-red-400">
+                <span className="rounded bg-error-container px-1.5 py-0.5 text-error line-through dark:text-error">
                   {entry.oldValue}
                 </span>
               ) : null}
-              {entry.oldValue && entry.newValue ? <span className="text-slate-400">→</span> : null}
+              {entry.oldValue && entry.newValue ? <span className="text-on-surface-variant">→</span> : null}
               {entry.newValue ? (
-                <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
+                <span className="rounded bg-success-container px-1.5 py-0.5 text-success dark:text-success">
                   {entry.newValue}
                 </span>
               ) : null}
               {!entry.newValue && !entry.oldValue ? (
-                <span className="italic text-slate-400">cleared</span>
+                <span className="italic text-on-surface-variant">cleared</span>
               ) : null}
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1 text-xs text-slate-400">
+          <div className="flex shrink-0 items-center gap-1 text-xs text-on-surface-variant">
             <Clock className="h-3 w-3" />
             {new Date(entry.changedAt).toLocaleDateString()}
           </div>

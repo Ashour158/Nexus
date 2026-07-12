@@ -10,7 +10,7 @@ export default function ValidationRulesSettingsRedirect() {
   }, [router]);
 
   return (
-    <div className="p-6 text-sm text-slate-500">
+    <div className="p-6 text-sm text-on-surface-variant">
       Field validation policy is admin controlled. Redirecting to the admin panel...
     </div>
   );

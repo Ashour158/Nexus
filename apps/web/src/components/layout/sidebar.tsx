@@ -116,7 +116,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps): ReactEleme
   return (
     <>
       {mobileOpen ? (
-        <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={onMobileClose} aria-hidden="true" />
+        <div className="fixed inset-0 z-30 bg-on-surface/40 md:hidden" onClick={onMobileClose} aria-hidden="true" />
       ) : null}
 
       <aside

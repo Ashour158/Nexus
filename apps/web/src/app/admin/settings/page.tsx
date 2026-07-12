@@ -82,7 +82,7 @@ export default function AdminSettingsPage() {
     return (
       <div className="space-y-4">
         <h2 className="text-2xl font-bold">System Settings</h2>
-        <div className="h-72 animate-pulse rounded-xl bg-gray-800" />
+        <div className="h-72 animate-pulse rounded-xl bg-surface-container-highest" />
       </div>
     );
   }
@@ -91,21 +91,21 @@ export default function AdminSettingsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">System Settings</h2>
-        {saving ? <span className="text-xs text-gray-400">Saving…</span> : null}
+        {saving ? <span className="text-xs text-on-surface-variant">Saving…</span> : null}
       </div>
 
       {error ? (
-        <div className="rounded-xl border border-red-800 bg-red-950/40 p-4 text-sm text-red-300">{error}</div>
+        <div className="rounded-xl border border-error bg-error-container/40 p-4 text-sm text-error">{error}</div>
       ) : null}
 
-      <form onSubmit={onSubmit} className="space-y-5 rounded-xl border border-gray-800 bg-gray-900 p-5">
+      <form onSubmit={onSubmit} className="space-y-5 rounded-xl border border-outline-variant bg-inverse-surface p-5">
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Default currency" hint="ISO 4217 code applied to new records">
             <input
               value={settings.defaultCurrency}
               onChange={(e) => set('defaultCurrency', e.target.value.toUpperCase())}
               maxLength={8}
-              className="w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm uppercase"
+              className="w-full rounded border border-outline-variant bg-inverse-surface px-3 py-2 text-sm uppercase"
             />
           </Field>
           <Field label="From email" hint="Sender address for system notifications">
@@ -114,7 +114,7 @@ export default function AdminSettingsPage() {
               value={settings.fromEmail}
               onChange={(e) => set('fromEmail', e.target.value)}
               placeholder="no-reply@nexus.local"
-              className="w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm"
+              className="w-full rounded border border-outline-variant bg-inverse-surface px-3 py-2 text-sm"
             />
           </Field>
           <Field label="Business hours start">
@@ -122,7 +122,7 @@ export default function AdminSettingsPage() {
               type="time"
               value={settings.businessHoursStart}
               onChange={(e) => set('businessHoursStart', e.target.value)}
-              className="w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm"
+              className="w-full rounded border border-outline-variant bg-inverse-surface px-3 py-2 text-sm"
             />
           </Field>
           <Field label="Business hours end">
@@ -130,14 +130,14 @@ export default function AdminSettingsPage() {
               type="time"
               value={settings.businessHoursEnd}
               onChange={(e) => set('businessHoursEnd', e.target.value)}
-              className="w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm"
+              className="w-full rounded border border-outline-variant bg-inverse-surface px-3 py-2 text-sm"
             />
           </Field>
           <Field label="Business timezone" hint="IANA timezone, e.g. Europe/London">
             <input
               value={settings.businessTimezone}
               onChange={(e) => set('businessTimezone', e.target.value)}
-              className="w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm"
+              className="w-full rounded border border-outline-variant bg-inverse-surface px-3 py-2 text-sm"
             />
           </Field>
           <Field label="Data retention (days)" hint="How long transactional data is kept (1–3650)">
@@ -147,13 +147,13 @@ export default function AdminSettingsPage() {
               max={3650}
               value={settings.dataRetentionDays}
               onChange={(e) => set('dataRetentionDays', Number(e.target.value) || 0)}
-              className="w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm"
+              className="w-full rounded border border-outline-variant bg-inverse-surface px-3 py-2 text-sm"
             />
           </Field>
         </div>
 
-        <div className="flex items-center justify-between border-t border-gray-800 pt-4">
-          <p className="text-xs text-gray-500">
+        <div className="flex items-center justify-between border-t border-outline-variant pt-4">
+          <p className="text-xs text-on-surface-variant">
             Last updated by {settings.updatedBy} at{' '}
             {settings.updatedAt && settings.updatedAt !== new Date(0).toISOString()
               ? new Date(settings.updatedAt).toLocaleString()
@@ -162,7 +162,7 @@ export default function AdminSettingsPage() {
           <button
             type="submit"
             disabled={saving}
-            className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="rounded bg-primary px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save settings'}
           </button>
@@ -175,9 +175,9 @@ export default function AdminSettingsPage() {
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="block text-sm">
-      <span className="font-medium text-gray-200">{label}</span>
+      <span className="font-medium text-outline">{label}</span>
       {children}
-      {hint ? <span className="mt-1 block text-xs text-gray-500">{hint}</span> : null}
+      {hint ? <span className="mt-1 block text-xs text-on-surface-variant">{hint}</span> : null}
     </label>
   );
 }

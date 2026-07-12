@@ -83,7 +83,7 @@ export default function CurrenciesPage(): JSX.Element {
     <main className="space-y-4 p-6">
       <h1 className="text-2xl font-bold">Currencies</h1>
 
-      <section className="rounded-lg border bg-white p-4">
+      <section className="rounded-lg border bg-surface p-4">
         <div className="grid gap-2 md:grid-cols-5">
           <input
             value={form.code}
@@ -114,16 +114,16 @@ export default function CurrenciesPage(): JSX.Element {
           />
           <button
             onClick={() => create.mutate()}
-            className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white"
+            className="rounded bg-primary px-3 py-2 text-sm font-medium text-white"
           >
             Add Currency
           </button>
         </div>
       </section>
 
-      <section className="rounded-lg border bg-white p-2">
+      <section className="rounded-lg border bg-surface p-2">
         <table className="w-full text-sm">
-          <thead className="text-start text-xs uppercase text-gray-500">
+          <thead className="text-start text-xs uppercase text-on-surface-variant">
             <tr>
               <th className="px-3 py-2">Code</th>
               <th className="px-3 py-2">Name</th>
@@ -150,7 +150,7 @@ export default function CurrenciesPage(): JSX.Element {
                       Set base
                     </button>
                   ) : (
-                    <span className="text-xs text-green-700">Default</span>
+                    <span className="text-xs text-success">Default</span>
                   )}
                 </td>
               </tr>

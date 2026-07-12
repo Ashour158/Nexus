@@ -84,8 +84,8 @@ export default function TerritoriesPage() {
     <div className="p-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Territories</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-on-surface">Territories</h1>
+          <p className="mt-1 text-sm text-on-surface-variant">
             Rule-based routing of leads and accounts to owners
           </p>
         </div>
@@ -94,7 +94,7 @@ export default function TerritoriesPage() {
         ) : null}
       </div>
 
-      <div className="mb-6 flex gap-1 border-b border-gray-200">
+      <div className="mb-6 flex gap-1 border-b border-outline-variant">
         {([
           ['territories', 'Territories'],
           ['routing-logs', 'Routing Logs'],
@@ -105,8 +105,8 @@ export default function TerritoriesPage() {
             onClick={() => setTab(value)}
             className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
               tab === value
-                ? 'border-indigo-600 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-on-surface-variant hover:text-on-surface'
             }`}
           >
             {label}
@@ -118,7 +118,7 @@ export default function TerritoriesPage() {
         isLoading ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-36 animate-pulse rounded-xl bg-gray-100" />
+              <div key={i} className="h-36 animate-pulse rounded-xl bg-surface-container-high" />
             ))}
           </div>
         ) : isError ? (
@@ -142,37 +142,37 @@ export default function TerritoriesPage() {
                 <button
                   key={t.id}
                   onClick={() => setSelectedId(t.id)}
-                  className={`rounded-xl border bg-white p-5 text-left transition-shadow hover:shadow-sm ${
-                    selectedId === t.id ? 'border-indigo-400 ring-1 ring-indigo-200' : 'border-gray-200'
+                  className={`rounded-xl border bg-surface p-5 text-left transition-shadow hover:shadow-sm ${
+                    selectedId === t.id ? 'border-primary ring-1 ring-primary/30' : 'border-outline-variant'
                   }`}
                 >
                   <div className="mb-2 flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-gray-900">{t.name}</h3>
+                    <h3 className="font-semibold text-on-surface">{t.name}</h3>
                     <div className="flex shrink-0 gap-1">
                       {t.isDefault ? (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
+                        <span className="rounded-full bg-warning-container px-2 py-0.5 text-xs text-warning">
                           Default
                         </span>
                       ) : null}
-                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs text-indigo-600">
+                      <span className="rounded-full bg-primary-container px-2 py-0.5 text-xs text-primary">
                         {TYPE_LABEL[t.type] ?? t.type}
                       </span>
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div>
-                      <p className="text-lg font-bold text-gray-900">{t.priority}</p>
-                      <p className="text-xs text-gray-500">Priority</p>
+                      <p className="text-lg font-bold text-on-surface">{t.priority}</p>
+                      <p className="text-xs text-on-surface-variant">Priority</p>
                     </div>
                     <div>
-                      <p className="text-lg font-bold text-gray-900">{t.ownerIds?.length ?? 0}</p>
-                      <p className="text-xs text-gray-500">Owners</p>
+                      <p className="text-lg font-bold text-on-surface">{t.ownerIds?.length ?? 0}</p>
+                      <p className="text-xs text-on-surface-variant">Owners</p>
                     </div>
                     <div>
-                      <p className="text-lg font-bold text-gray-900">
+                      <p className="text-lg font-bold text-on-surface">
                         {t.ruleCount ?? t.rules?.length ?? 0}
                       </p>
-                      <p className="text-xs text-gray-500">Rules</p>
+                      <p className="text-xs text-on-surface-variant">Rules</p>
                     </div>
                   </div>
                 </button>
@@ -181,11 +181,11 @@ export default function TerritoriesPage() {
 
             <div className="lg:col-span-1">
               {detail ? (
-                <div className="rounded-xl border border-gray-200 bg-white p-5">
+                <div className="rounded-xl border border-outline-variant bg-surface p-5">
                   <div className="mb-3 flex items-start justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{detail.name}</h3>
-                      <p className="text-sm text-gray-500">
+                      <h3 className="text-lg font-semibold text-on-surface">{detail.name}</h3>
+                      <p className="text-sm text-on-surface-variant">
                         {TYPE_LABEL[detail.type] ?? detail.type} · priority {detail.priority}
                       </p>
                     </div>
@@ -202,51 +202,51 @@ export default function TerritoriesPage() {
                   </div>
 
                   {detail.description ? (
-                    <p className="mb-3 text-sm text-gray-600">{detail.description}</p>
+                    <p className="mb-3 text-sm text-on-surface-variant">{detail.description}</p>
                   ) : null}
 
                   <div className="mb-4">
-                    <p className="mb-1 text-xs font-medium uppercase text-gray-400">
+                    <p className="mb-1 text-xs font-medium uppercase text-on-surface-variant">
                       Owners{' '}
                       {(detail.ownerIds?.length ?? 0) > 1 ? '(round-robin)' : ''}
                     </p>
                     {detail.ownerIds?.length ? (
-                      <ul className="space-y-1 text-sm text-gray-700">
+                      <ul className="space-y-1 text-sm text-on-surface">
                         {detail.ownerIds.map((id) => (
-                          <li key={id} className="rounded bg-gray-50 px-2 py-1">
+                          <li key={id} className="rounded bg-surface-container-low px-2 py-1">
                             {ownerName(id)}
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-sm text-gray-400">No owners assigned</p>
+                      <p className="text-sm text-on-surface-variant">No owners assigned</p>
                     )}
                   </div>
 
                   <div>
-                    <p className="mb-1 text-xs font-medium uppercase text-gray-400">Rules</p>
+                    <p className="mb-1 text-xs font-medium uppercase text-on-surface-variant">Rules</p>
                     {detail.rules?.length ? (
                       <ul className="space-y-1 text-sm">
                         {detail.rules.map((r, i) => (
                           <li
                             key={r.id ?? i}
-                            className="flex items-center gap-2 rounded bg-gray-50 px-2 py-1 font-mono text-xs text-gray-700"
+                            className="flex items-center gap-2 rounded bg-surface-container-low px-2 py-1 font-mono text-xs text-on-surface"
                           >
                             <span className="font-semibold">{r.field}</span>
-                            <span className="text-indigo-600">{r.operator}</span>
+                            <span className="text-primary">{r.operator}</span>
                             <span>{r.value}</span>
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-sm text-gray-400">
+                      <p className="text-sm text-on-surface-variant">
                         No rules — matches only via default fallback.
                       </p>
                     )}
                   </div>
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-400">
+                <div className="rounded-xl border border-dashed border-outline-variant p-8 text-center text-sm text-on-surface-variant">
                   Select a territory to view its rules and owners.
                 </div>
               )}

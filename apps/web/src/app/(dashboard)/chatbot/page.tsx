@@ -57,34 +57,34 @@ export default function ChatbotPage(): JSX.Element {
   return (
     <main className="space-y-4 px-6 py-6">
       <h1 className="text-2xl font-bold">Chatbot</h1>
-      <div className="flex gap-1 border-b border-slate-200">
+      <div className="flex gap-1 border-b border-outline-variant">
         {(['conversations', 'configuration', 'analytics'] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === t ? 'border-slate-900 font-semibold' : 'border-transparent text-slate-500'}`}>{t[0].toUpperCase() + t.slice(1)}</button>
+          <button key={t} onClick={() => setTab(t)} className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === t ? 'border-outline font-semibold' : 'border-transparent text-on-surface-variant'}`}>{t[0].toUpperCase() + t.slice(1)}</button>
         ))}
       </div>
 
       {tab === 'conversations' ? (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-start text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">Channel</th><th className="px-3 py-2">Customer ID</th><th className="px-3 py-2">State</th><th className="px-3 py-2">Last Activity</th></tr></thead>
-            <tbody className="divide-y divide-slate-100">{convRows.map((c) => <tr key={c.id}><td className="px-3 py-2">{c.channel}</td><td className="px-3 py-2">{c.externalId}</td><td className="px-3 py-2">{c.state}</td><td className="px-3 py-2">{new Date(c.lastMessageAt).toLocaleString()}</td></tr>)}</tbody>
+            <thead className="bg-surface-container-low text-start text-xs uppercase text-on-surface-variant"><tr><th className="px-3 py-2">Channel</th><th className="px-3 py-2">Customer ID</th><th className="px-3 py-2">State</th><th className="px-3 py-2">Last Activity</th></tr></thead>
+            <tbody className="divide-y divide-outline-variant">{convRows.map((c) => <tr key={c.id}><td className="px-3 py-2">{c.channel}</td><td className="px-3 py-2">{c.externalId}</td><td className="px-3 py-2">{c.state}</td><td className="px-3 py-2">{new Date(c.lastMessageAt).toLocaleString()}</td></tr>)}</tbody>
           </table>
         </div>
       ) : null}
 
       {tab === 'configuration' ? (
         <div className="grid gap-4 lg:grid-cols-2">
-          <section className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
+          <section className="space-y-2 rounded-lg border border-outline-variant bg-surface p-4">
             <h2 className="font-semibold">WhatsApp</h2>
-            <input className="h-9 w-full rounded border border-slate-200 px-3 text-sm" value={waPhoneId} onChange={(e) => setWaPhoneId(e.target.value)} placeholder="Phone ID" />
-            <input className="h-9 w-full rounded border border-slate-200 px-3 text-sm" value={waAccessToken} onChange={(e) => setWaAccessToken(e.target.value)} type="password" placeholder="Access Token" />
-            <input className="h-9 w-full rounded border border-slate-200 px-3 text-sm" value={waVerifyToken} onChange={(e) => setWaVerifyToken(e.target.value)} placeholder="Verify Token" />
-            <p className="text-xs text-slate-500">Webhook URL: /api/v1/webhooks/whatsapp</p>
+            <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={waPhoneId} onChange={(e) => setWaPhoneId(e.target.value)} placeholder="Phone ID" />
+            <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={waAccessToken} onChange={(e) => setWaAccessToken(e.target.value)} type="password" placeholder="Access Token" />
+            <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={waVerifyToken} onChange={(e) => setWaVerifyToken(e.target.value)} placeholder="Verify Token" />
+            <p className="text-xs text-on-surface-variant">Webhook URL: /api/v1/webhooks/whatsapp</p>
           </section>
-          <section className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
+          <section className="space-y-2 rounded-lg border border-outline-variant bg-surface p-4">
             <h2 className="font-semibold">Telegram</h2>
-            <input className="h-9 w-full rounded border border-slate-200 px-3 text-sm" value={tgToken} onChange={(e) => setTgToken(e.target.value)} type="password" placeholder="Bot Token" />
-            <p className="text-xs text-slate-500">Webhook URL: /api/v1/webhooks/telegram</p>
+            <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={tgToken} onChange={(e) => setTgToken(e.target.value)} type="password" placeholder="Bot Token" />
+            <p className="text-xs text-on-surface-variant">Webhook URL: /api/v1/webhooks/telegram</p>
           </section>
         </div>
       ) : null}
@@ -97,7 +97,7 @@ export default function ChatbotPage(): JSX.Element {
             <Metric label="Conversion Rate" value={`${analytics.conversionRate.toFixed(1)}%`} />
             <Metric label="Avg Messages per Quote" value={analytics.avgMsgsPerQuote.toFixed(1)} />
           </section>
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <section className="rounded-lg border border-outline-variant bg-surface p-4">
             <h2 className="mb-2 text-sm font-semibold">Conversations per day (14d)</h2>
             <div className="h-72">
               <ConversationsBarChart data={analytics.byDay.slice(-14)} />
@@ -110,5 +110,5 @@ export default function ChatbotPage(): JSX.Element {
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-lg border border-slate-200 bg-white p-3"><p className="text-xs uppercase text-slate-500">{label}</p><p className="mt-1 text-xl font-bold">{value}</p></div>;
+  return <div className="rounded-lg border border-outline-variant bg-surface p-3"><p className="text-xs uppercase text-on-surface-variant">{label}</p><p className="mt-1 text-xl font-bold">{value}</p></div>;
 }

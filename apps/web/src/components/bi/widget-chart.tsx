@@ -80,7 +80,7 @@ export function WidgetChart({
   if (!rows.length) {
     return (
       <div
-        className="flex items-center justify-center rounded-lg border border-dashed border-slate-200 text-sm text-slate-400"
+        className="flex items-center justify-center rounded-lg border border-dashed border-outline-variant text-sm text-on-surface-variant"
         style={{ height }}
       >
         No data for this configuration
@@ -93,10 +93,10 @@ export function WidgetChart({
     const value = primaryMeasure ? rows[0]?.[primaryMeasure.key] : undefined;
     return (
       <div className="flex h-full flex-col items-center justify-center gap-1 py-6">
-        <span className="text-4xl font-bold text-slate-900">
+        <span className="text-4xl font-bold text-on-surface">
           {fmt(value, primaryMeasure?.type)}
         </span>
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+        <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
           {primaryMeasure?.label ?? 'Value'}
         </span>
       </div>
@@ -109,22 +109,22 @@ export function WidgetChart({
       <div className="overflow-x-auto" style={{ maxHeight: height + 40 }}>
         <table className="w-full min-w-[320px] border-collapse text-left text-sm">
           <thead>
-            <tr className="bg-slate-50">
+            <tr className="bg-surface-container-low">
               {columns.map((col) => (
                 <th
                   key={col.key}
-                  className="border-b border-slate-100 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500"
+                  className="border-b border-outline-variant px-3 py-2 text-xs font-semibold uppercase tracking-wider text-on-surface-variant"
                 >
                   {col.label}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-outline-variant">
             {rows.map((row, index) => (
-              <tr key={index} className="hover:bg-slate-50">
+              <tr key={index} className="hover:bg-surface-container-low">
                 {columns.map((col) => (
-                  <td key={col.key} className="px-3 py-2 text-slate-700">
+                  <td key={col.key} className="px-3 py-2 text-on-surface">
                     {fmt(row[col.key], col.type)}
                   </td>
                 ))}

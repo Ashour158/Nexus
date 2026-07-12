@@ -23,7 +23,7 @@ import {
 } from '@/hooks/use-org';
 
 const inputClass =
-  'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5]';
+  'w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5]';
 
 // ===========================================================================
 // Departments tab
@@ -143,27 +143,27 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
     return (
       <div key={node.id}>
         <div
-          className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5"
+          className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface px-3 py-2.5"
           style={{ marginInlineStart: depth * 20 }}
         >
           <button
             type="button"
             onClick={() => setExpanded((p) => ({ ...p, [node.id]: !isOpen }))}
-            className={`text-slate-400 hover:text-slate-700 ${hasKids ? '' : 'invisible'}`}
+            className={`text-on-surface-variant hover:text-on-surface ${hasKids ? '' : 'invisible'}`}
             aria-label={isOpen ? 'Collapse' : 'Expand'}
           >
             {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </button>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-slate-900">{node.name}</span>
+              <span className="font-medium text-on-surface">{node.name}</span>
               {node.code ? (
-                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+                <span className="rounded bg-surface-container-high px-1.5 py-0.5 text-[10px] font-medium text-on-surface-variant">
                   {node.code}
                 </span>
               ) : null}
             </div>
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-on-surface-variant">
               {head ? `Head: ${head}` : 'No head assigned'}
               {typeof node.memberCount === 'number' ? ` · ${node.memberCount} members` : ''}
             </div>
@@ -173,7 +173,7 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
               <button
                 type="button"
                 onClick={() => openCreate(node.id)}
-                className="rounded p-1.5 text-slate-400 hover:bg-slate-50 hover:text-[#4f46e5]"
+                className="rounded p-1.5 text-on-surface-variant hover:bg-surface-container-low hover:text-[#4f46e5]"
                 title="Add sub-department"
               >
                 <Plus className="h-4 w-4" />
@@ -181,7 +181,7 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
               <button
                 type="button"
                 onClick={() => openEdit(node)}
-                className="rounded p-1.5 text-slate-400 hover:bg-slate-50 hover:text-[#4f46e5]"
+                className="rounded p-1.5 text-on-surface-variant hover:bg-surface-container-low hover:text-[#4f46e5]"
                 title="Edit"
               >
                 <Pencil className="h-4 w-4" />
@@ -189,7 +189,7 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
               <button
                 type="button"
                 onClick={() => remove(node)}
-                className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                className="rounded p-1.5 text-on-surface-variant hover:bg-error-container hover:text-error"
                 title="Delete"
               >
                 <Trash2 className="h-4 w-4" />
@@ -208,7 +208,7 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
     <div className="space-y-4">
       {ConfirmDialog}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">Model your organization&apos;s reporting departments.</p>
+        <p className="text-sm text-on-surface-variant">Model your organization&apos;s reporting departments.</p>
         {canEdit ? (
           <Button onClick={() => openCreate()} className="bg-[#4f46e5] hover:bg-[#0f6fd4]">
             <Plus className="h-4 w-4" /> New department
@@ -220,8 +220,8 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
         <div
           className={`rounded-lg border px-4 py-3 text-sm ${
             banner.kind === 'ok'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-              : 'border-red-200 bg-red-50 text-red-900'
+              ? 'border-success/30 bg-success-container text-on-success-container'
+              : 'border-error/30 bg-error-container text-on-error-container'
           }`}
         >
           {banner.text}
@@ -229,15 +229,15 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
       ) : null}
 
       {isError ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+        <div className="rounded-lg border border-error/30 bg-error-container px-4 py-3 text-sm text-on-error-container">
           Failed to load departments: {error instanceof Error ? error.message : 'Unknown error'}
         </div>
       ) : isLoading ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+        <div className="rounded-xl border border-outline-variant bg-surface p-8 text-center text-sm text-on-surface-variant">
           Loading departments…
         </div>
       ) : nodes.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+        <div className="rounded-xl border border-dashed border-outline-variant bg-surface p-8 text-center text-sm text-on-surface-variant">
           No departments yet.{canEdit ? ' Create your first department to get started.' : ''}
         </div>
       ) : (
@@ -245,19 +245,19 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
       )}
 
       {form ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <form onSubmit={submit} className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-on-surface/40 p-4">
+          <form onSubmit={submit} className="w-full max-w-lg rounded-xl border border-outline-variant bg-surface p-5 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-slate-900">
+              <h3 className="text-base font-semibold text-on-surface">
                 {form.id ? 'Edit department' : 'New department'}
               </h3>
-              <button type="button" onClick={() => setForm(null)} className="text-slate-400 hover:text-slate-700">
+              <button type="button" onClick={() => setForm(null)} className="text-on-surface-variant hover:text-on-surface">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="space-y-3">
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-slate-600">Name *</span>
+                <span className="mb-1 block text-xs font-medium text-on-surface-variant">Name *</span>
                 <input
                   className={inputClass}
                   value={form.name}
@@ -266,7 +266,7 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-slate-600">Code</span>
+                <span className="mb-1 block text-xs font-medium text-on-surface-variant">Code</span>
                 <input
                   className={inputClass}
                   value={form.code}
@@ -275,7 +275,7 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-slate-600">Description</span>
+                <span className="mb-1 block text-xs font-medium text-on-surface-variant">Description</span>
                 <textarea
                   className={`${inputClass} min-h-[64px]`}
                   value={form.description}
@@ -283,7 +283,7 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-slate-600">Parent department</span>
+                <span className="mb-1 block text-xs font-medium text-on-surface-variant">Parent department</span>
                 <select
                   className={inputClass}
                   value={form.parentDepartmentId}
@@ -300,7 +300,7 @@ function DepartmentsTab({ canEdit }: { canEdit: boolean }) {
                 </select>
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-slate-600">Department head</span>
+                <span className="mb-1 block text-xs font-medium text-on-surface-variant">Department head</span>
                 <select
                   className={inputClass}
                   value={form.headUserId}
@@ -418,7 +418,7 @@ function LevelsTab({ canEdit }: { canEdit: boolean }) {
     <div className="space-y-4">
       {ConfirmDialog}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">Seniority levels, ordered by rank (lowest rank = most senior).</p>
+        <p className="text-sm text-on-surface-variant">Seniority levels, ordered by rank (lowest rank = most senior).</p>
         {canEdit ? (
           <Button onClick={openCreate} className="bg-[#4f46e5] hover:bg-[#0f6fd4]">
             <Plus className="h-4 w-4" /> New level
@@ -430,8 +430,8 @@ function LevelsTab({ canEdit }: { canEdit: boolean }) {
         <div
           className={`rounded-lg border px-4 py-3 text-sm ${
             banner.kind === 'ok'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-              : 'border-red-200 bg-red-50 text-red-900'
+              ? 'border-success/30 bg-success-container text-on-success-container'
+              : 'border-error/30 bg-error-container text-on-error-container'
           }`}
         >
           {banner.text}
@@ -439,47 +439,47 @@ function LevelsTab({ canEdit }: { canEdit: boolean }) {
       ) : null}
 
       {isError ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+        <div className="rounded-lg border border-error/30 bg-error-container px-4 py-3 text-sm text-on-error-container">
           Failed to load levels: {error instanceof Error ? error.message : 'Unknown error'}
         </div>
       ) : isLoading ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+        <div className="rounded-xl border border-outline-variant bg-surface p-8 text-center text-sm text-on-surface-variant">
           Loading levels…
         </div>
       ) : levels.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+        <div className="rounded-xl border border-dashed border-outline-variant bg-surface p-8 text-center text-sm text-on-surface-variant">
           No levels yet.{canEdit ? ' Create your first seniority level.' : ''}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50">
+            <thead className="border-b border-outline-variant bg-surface-container-low">
               <tr>
-                <th className="w-16 px-4 py-3 text-start font-medium text-slate-500">Rank</th>
-                <th className="px-4 py-3 text-start font-medium text-slate-500">Level</th>
-                <th className="px-4 py-3 text-start font-medium text-slate-500">Description</th>
+                <th className="w-16 px-4 py-3 text-start font-medium text-on-surface-variant">Rank</th>
+                <th className="px-4 py-3 text-start font-medium text-on-surface-variant">Level</th>
+                <th className="px-4 py-3 text-start font-medium text-on-surface-variant">Description</th>
                 {canEdit ? <th className="w-24 px-4 py-3" /> : null}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-outline-variant">
               {levels.map((l) => (
                 <tr key={l.id}>
-                  <td className="px-4 py-3 font-mono text-slate-500">{l.rank}</td>
-                  <td className="px-4 py-3 font-medium text-slate-900">{l.name}</td>
-                  <td className="px-4 py-3 text-slate-600">{l.description || '—'}</td>
+                  <td className="px-4 py-3 font-mono text-on-surface-variant">{l.rank}</td>
+                  <td className="px-4 py-3 font-medium text-on-surface">{l.name}</td>
+                  <td className="px-4 py-3 text-on-surface-variant">{l.description || '—'}</td>
                   {canEdit ? (
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
                         <button
                           onClick={() => openEdit(l)}
-                          className="rounded p-1.5 text-slate-400 hover:bg-slate-50 hover:text-[#4f46e5]"
+                          className="rounded p-1.5 text-on-surface-variant hover:bg-surface-container-low hover:text-[#4f46e5]"
                           title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => remove(l)}
-                          className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                          className="rounded p-1.5 text-on-surface-variant hover:bg-error-container hover:text-error"
                           title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -495,17 +495,17 @@ function LevelsTab({ canEdit }: { canEdit: boolean }) {
       )}
 
       {form ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <form onSubmit={submit} className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-on-surface/40 p-4">
+          <form onSubmit={submit} className="w-full max-w-md rounded-xl border border-outline-variant bg-surface p-5 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-slate-900">{form.id ? 'Edit level' : 'New level'}</h3>
-              <button type="button" onClick={() => setForm(null)} className="text-slate-400 hover:text-slate-700">
+              <h3 className="text-base font-semibold text-on-surface">{form.id ? 'Edit level' : 'New level'}</h3>
+              <button type="button" onClick={() => setForm(null)} className="text-on-surface-variant hover:text-on-surface">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="space-y-3">
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-slate-600">Name *</span>
+                <span className="mb-1 block text-xs font-medium text-on-surface-variant">Name *</span>
                 <input
                   className={inputClass}
                   value={form.name}
@@ -515,7 +515,7 @@ function LevelsTab({ canEdit }: { canEdit: boolean }) {
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-slate-600">Rank *</span>
+                <span className="mb-1 block text-xs font-medium text-on-surface-variant">Rank *</span>
                 <input
                   type="number"
                   className={inputClass}
@@ -524,7 +524,7 @@ function LevelsTab({ canEdit }: { canEdit: boolean }) {
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-slate-600">Description</span>
+                <span className="mb-1 block text-xs font-medium text-on-surface-variant">Description</span>
                 <textarea
                   className={`${inputClass} min-h-[64px]`}
                   value={form.description}
@@ -564,7 +564,7 @@ export default function OrgStructurePage() {
   if (!canView) {
     return (
       <div className="p-6">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="rounded-lg border border-warning/30 bg-warning-container px-4 py-3 text-sm text-on-warning-container">
           You do not have permission to view org structure (requires settings:read).
         </div>
       </div>
@@ -574,16 +574,16 @@ export default function OrgStructurePage() {
   return (
     <div className="max-w-4xl p-6">
       <div className="mb-6 flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-[#4f46e5]">
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-container text-[#4f46e5]">
           <Network className="h-5 w-5" />
         </span>
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Org Structure</h1>
-          <p className="mt-0.5 text-sm text-slate-500">Departments and seniority levels for your organization.</p>
+          <h1 className="text-xl font-bold text-on-surface">Org Structure</h1>
+          <p className="mt-0.5 text-sm text-on-surface-variant">Departments and seniority levels for your organization.</p>
         </div>
       </div>
 
-      <div className="mb-5 flex gap-2 border-b border-slate-200">
+      <div className="mb-5 flex gap-2 border-b border-outline-variant">
         {(['departments', 'levels'] as const).map((t) => (
           <button
             key={t}
@@ -591,7 +591,7 @@ export default function OrgStructurePage() {
             className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium capitalize transition ${
               tab === t
                 ? 'border-[#4f46e5] text-[#4f46e5]'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
+                : 'border-transparent text-on-surface-variant hover:text-on-surface'
             }`}
           >
             {t}

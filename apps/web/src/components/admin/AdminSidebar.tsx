@@ -35,10 +35,10 @@ export function AdminSidebar() {
   const toggle = (id: string) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
 
   return (
-    <aside className="flex h-screen w-72 flex-col border-r border-gray-800 bg-gray-900 text-white">
-      <div className="border-b border-gray-800 px-5 py-4">
-        <p className="text-xs uppercase tracking-[0.2em] text-gray-400">Control Center</p>
-        <Link href="/admin" className="mt-1 block text-lg font-semibold hover:text-indigo-300">
+    <aside className="flex h-screen w-72 flex-col border-r border-outline-variant bg-inverse-surface text-white">
+      <div className="border-b border-outline-variant px-5 py-4">
+        <p className="text-xs uppercase tracking-[0.2em] text-on-surface-variant">Control Center</p>
+        <Link href="/admin" className="mt-1 block text-lg font-semibold hover:text-primary">
           NEXUS Admin
         </Link>
       </div>
@@ -52,7 +52,7 @@ export function AdminSidebar() {
               <button
                 type="button"
                 onClick={() => toggle(group.id)}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-200"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:bg-surface-container-highest hover:text-outline"
                 aria-expanded={isExpanded}
                 aria-controls={`admin-group-${group.id}`}
               >
@@ -73,13 +73,13 @@ export function AdminSidebar() {
                       key={feature.id}
                       href={feature.href}
                       className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
-                        active ? 'bg-indigo-600 text-white' : 'text-gray-200 hover:bg-gray-800'
+                        active ? 'bg-primary text-white' : 'text-outline hover:bg-surface-container-highest'
                       }`}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
                       <span className="flex-1">{feature.label}</span>
                       {feature.placeholder ? (
-                        <span className="rounded bg-gray-700 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-gray-300">
+                        <span className="rounded bg-surface-container-high px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-outline">
                           soon
                         </span>
                       ) : null}
@@ -92,10 +92,10 @@ export function AdminSidebar() {
         })}
       </nav>
 
-      <div className="border-t border-gray-800 p-3">
+      <div className="border-t border-outline-variant p-3">
         <Link
           href="/"
-          className="block rounded-lg px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-gray-800"
+          className="block rounded-lg px-3 py-2 text-sm text-outline transition-colors hover:bg-surface-container-highest"
         >
           &larr; Back to NEXUS
         </Link>

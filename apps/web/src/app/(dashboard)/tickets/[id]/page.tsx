@@ -235,7 +235,7 @@ export default function TicketDetailPage() {
             <InfoRow label="Resolved" value={formatDateTime(ticket.resolvedAt)} />
             <InfoRow
               label="Status"
-              value={ticket.slaBreached ? <SlaBreachBadge breached /> : <span className="text-emerald-600">On track</span>}
+              value={ticket.slaBreached ? <SlaBreachBadge breached /> : <span className="text-success">On track</span>}
             />
           </InfoCard>
 
@@ -252,7 +252,7 @@ export default function TicketDetailPage() {
                     {ticket.tags.map((t) => (
                       <span
                         key={t}
-                        className="rounded-full bg-gray-100 px-2 py-0.5 text-xs dark:bg-slate-800"
+                        className="rounded-full bg-surface-container-high px-2 py-0.5 text-xs dark:bg-surface-container-high"
                         style={{ color: 'var(--text-secondary)' }}
                       >
                         {t}
@@ -300,7 +300,7 @@ function CommentsTab({
         <textarea
           className={cn(
             'min-h-[80px] w-full rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:border-primary',
-            isInternal && 'border-amber-300 dark:border-amber-800'
+            isInternal && 'border-warning/40 '
           )}
           style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
           placeholder={isInternal ? 'Internal note (not visible to the requester)…' : 'Reply to the requester…'}
@@ -313,7 +313,7 @@ function CommentsTab({
               type="checkbox"
               checked={isInternal}
               onChange={(e) => setIsInternal(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"
             />
             <Lock className="h-3.5 w-3.5" /> Internal note
           </label>
@@ -341,7 +341,7 @@ function CommentsTab({
               className={cn(
                 'rounded-lg border p-3',
                 c.isInternal
-                  ? 'border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20'
+                  ? 'border-warning/30 bg-warning-container '
                   : 'border-[var(--border-color)]'
               )}
             >
@@ -352,7 +352,7 @@ function CommentsTab({
                     {userName(c.authorId)}
                   </span>
                   {c.isInternal ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-warning-container px-1.5 py-0.5 text-[10px] font-medium text-warning ">
                       <Lock className="h-3 w-3" /> Internal
                     </span>
                   ) : null}
@@ -470,7 +470,7 @@ function TabButton({
       onClick={onClick}
       className={cn(
         'inline-flex items-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-colors',
-        active ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'
+        active ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'
       )}
       aria-pressed={active}
     >

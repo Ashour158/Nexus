@@ -23,9 +23,9 @@ interface HealthResponse {
 const REFRESH_MS = 30_000;
 
 const STATUS_STYLES: Record<Status, string> = {
-  healthy: 'bg-green-700',
-  degraded: 'bg-yellow-700',
-  down: 'bg-red-700',
+  healthy: 'bg-success',
+  degraded: 'bg-warning',
+  down: 'bg-error',
 };
 
 const STATUS_LABEL: Record<Status, string> = {
@@ -80,11 +80,11 @@ export default function AdminHealthPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-bold">System Health</h2>
-        <div className="flex items-center gap-3 text-xs text-gray-400">
+        <div className="flex items-center gap-3 text-xs text-on-surface-variant">
           {refreshedAt ? <span>Last refreshed {refreshedAt}</span> : null}
           <button
             onClick={() => void load()}
-            className="rounded border border-gray-700 px-3 py-1.5 text-xs text-gray-200 hover:bg-gray-800"
+            className="rounded border border-outline-variant px-3 py-1.5 text-xs text-outline hover:bg-surface-container-highest"
           >
             Refresh
           </button>
@@ -101,7 +101,7 @@ export default function AdminHealthPage() {
       ) : null}
 
       {error ? (
-        <div className="rounded-xl border border-red-800 bg-red-950/40 p-4 text-sm text-red-300">
+        <div className="rounded-xl border border-error bg-error-container/40 p-4 text-sm text-error">
           {error}
         </div>
       ) : null}
@@ -109,36 +109,36 @@ export default function AdminHealthPage() {
       {loading && !data ? (
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded-xl bg-gray-800" />
+            <div key={i} className="h-24 animate-pulse rounded-xl bg-surface-container-highest" />
           ))}
         </section>
       ) : (
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {services.map((s) => (
-            <div key={s.service} className="rounded-xl border border-gray-800 bg-gray-900 p-3 text-sm">
+            <div key={s.service} className="rounded-xl border border-outline-variant bg-inverse-surface p-3 text-sm">
               <div className="flex items-center justify-between">
                 <span className="font-semibold">{s.service}</span>
                 <span className={`rounded px-2 py-0.5 text-xs ${STATUS_STYLES[s.status]}`}>{STATUS_LABEL[s.status]}</span>
               </div>
-              <p className="mt-2 text-gray-300">
+              <p className="mt-2 text-outline">
                 {s.latencyMs != null ? `${s.latencyMs} ms` : '—'}
                 {s.httpStatus != null ? ` · HTTP ${s.httpStatus}` : ''}
               </p>
               {s.detail && s.status !== 'healthy' ? (
-                <p className="mt-1 text-xs text-gray-500">{s.detail}</p>
+                <p className="mt-1 text-xs text-on-surface-variant">{s.detail}</p>
               ) : null}
-              <p className="mt-1 truncate text-[11px] text-gray-600" title={s.url}>{s.url}</p>
+              <p className="mt-1 truncate text-[11px] text-on-surface-variant" title={s.url}>{s.url}</p>
             </div>
           ))}
           {services.length === 0 && !error ? (
-            <p className="col-span-full text-sm text-gray-400">No services reported.</p>
+            <p className="col-span-full text-sm text-on-surface-variant">No services reported.</p>
           ) : null}
         </section>
       )}
 
       {data ? (
-        <p className="text-xs text-gray-500">
-          Statuses polled server-side from each service&apos;s <code className="text-gray-400">/health</code> endpoint at{' '}
+        <p className="text-xs text-on-surface-variant">
+          Statuses polled server-side from each service&apos;s <code className="text-on-surface-variant">/health</code> endpoint at{' '}
           {new Date(data.checkedAt).toLocaleTimeString()}.
         </p>
       ) : null}
@@ -148,14 +148,14 @@ export default function AdminHealthPage() {
 
 function SummaryCard({ label, value, tone }: { label: string; value: number; tone: 'neutral' | 'green' | 'yellow' | 'red' }) {
   const toneStyles: Record<typeof tone, string> = {
-    neutral: 'text-gray-100',
-    green: 'text-green-400',
-    yellow: 'text-yellow-400',
-    red: 'text-red-400',
+    neutral: 'text-inverse-on-surface',
+    green: 'text-success',
+    yellow: 'text-warning',
+    red: 'text-error',
   };
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900 p-4">
-      <p className="text-xs uppercase tracking-wider text-gray-500">{label}</p>
+    <div className="rounded-xl border border-outline-variant bg-inverse-surface p-4">
+      <p className="text-xs uppercase tracking-wider text-on-surface-variant">{label}</p>
       <p className={`mt-1 text-2xl font-bold ${toneStyles[tone]}`}>{value}</p>
     </div>
   );

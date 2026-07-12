@@ -102,13 +102,13 @@ export default function SchedulerPage(): JSX.Element {
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-6">
       <header>
-        <p className="text-sm uppercase tracking-wide text-slate-500">Nexus Scheduler</p>
-        <h1 className="mt-1 text-2xl font-semibold text-slate-900">
+        <p className="text-sm uppercase tracking-wide text-on-surface-variant">Nexus Scheduler</p>
+        <h1 className="mt-1 text-2xl font-semibold text-on-surface">
           Book a meeting{availability ? ` with ${availability.rep.firstName}` : ''}
         </h1>
       </header>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="rounded-lg border border-outline-variant bg-surface p-4">
         <div className="flex flex-wrap gap-2">
           {dates.map((d) => (
             <button
@@ -119,7 +119,7 @@ export default function SchedulerPage(): JSX.Element {
                 setSelectedSlot('');
               }}
               className={`rounded-md border px-3 py-2 text-sm ${
-                selectedDate === d ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200'
+                selectedDate === d ? 'border-outline bg-inverse-surface text-white' : 'border-outline-variant'
               }`}
             >
               {new Date(d).toLocaleDateString()}
@@ -134,8 +134,8 @@ export default function SchedulerPage(): JSX.Element {
               onClick={() => setSelectedSlot(slot)}
               className={`rounded-md border px-3 py-2 text-sm ${
                 selectedSlot === slot
-                  ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
-                  : 'border-slate-200'
+                  ? 'border-success bg-success-container text-success'
+                  : 'border-outline-variant'
               }`}
             >
               {new Date(slot).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -144,28 +144,28 @@ export default function SchedulerPage(): JSX.Element {
         </div>
       </section>
 
-      <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4">
+      <section className="grid gap-3 rounded-lg border border-outline-variant bg-surface p-4">
         <input
           value={customerName}
           onChange={(e) => setCustomerName(e.target.value)}
           placeholder="Your name"
-          className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+          className="rounded-md border border-outline-variant px-3 py-2 text-sm"
         />
         <input
           value={customerEmail}
           onChange={(e) => setCustomerEmail(e.target.value)}
           placeholder="you@example.com"
           type="email"
-          className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+          className="rounded-md border border-outline-variant px-3 py-2 text-sm"
         />
         <button
           type="button"
           onClick={book}
-          className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
+          className="rounded-md bg-inverse-surface px-3 py-2 text-sm font-medium text-white"
         >
           Book selected slot
         </button>
-        {status ? <p className="text-sm text-slate-600">{status}</p> : null}
+        {status ? <p className="text-sm text-on-surface-variant">{status}</p> : null}
       </section>
     </main>
   );

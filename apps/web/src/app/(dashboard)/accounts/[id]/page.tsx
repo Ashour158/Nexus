@@ -162,7 +162,7 @@ export default function AccountDetailPage() {
   if (!canRead) {
     return (
       <div className="px-6 py-8">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
+        <div className="rounded-lg border border-warning/30 bg-warning-container p-6 text-sm text-on-warning-container">
           You do not have permission to view accounts.
         </div>
       </div>
@@ -181,7 +181,7 @@ export default function AccountDetailPage() {
   if (accountQuery.isError || !account) {
     return (
       <div className="px-6 py-8">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+        <div className="rounded-lg border border-error/30 bg-error-container p-6 text-sm text-error">
           Failed to load account: {accountQuery.error instanceof Error ? accountQuery.error.message : 'Unknown error'}
         </div>
       </div>
@@ -214,14 +214,14 @@ export default function AccountDetailPage() {
   ];
 
   return (
-    <div className="space-y-6 bg-slate-50 px-4 py-6 sm:px-6">
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-6 py-5">
+    <div className="space-y-6 bg-surface-container-low px-4 py-6 sm:px-6">
+      <section className="overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-sm">
+        <div className="border-b border-outline-variant px-6 py-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <button
               type="button"
               onClick={() => router.push('/accounts')}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center gap-2 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-bold text-on-surface hover:bg-surface-container-low"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to accounts
@@ -256,7 +256,7 @@ export default function AccountDetailPage() {
                 </Button>
                 </>
               ) : (
-                <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+                <p className="rounded-lg border border-warning/30 bg-warning-container px-3 py-2 text-xs font-medium text-warning">
                   Editing is restricted by role permissions.
                 </p>
               )}
@@ -266,10 +266,10 @@ export default function AccountDetailPage() {
 
         <div className="grid gap-6 p-6 xl:grid-cols-[320px_minmax(0,1fr)]">
           <aside className="space-y-4">
-            <div className="rounded-xl border border-slate-100 bg-white p-5">
-              <p className="font-mono text-xs font-bold uppercase tracking-wider text-indigo-700">{account.code ?? account.id}</p>
-              <h1 className="mt-2 text-2xl font-bold text-slate-950">{account.name}</h1>
-              <p className="mt-1 text-sm text-slate-500">{account.legalName ?? account.tradeName ?? 'Legal name not captured'}</p>
+            <div className="rounded-xl border border-outline-variant bg-surface p-5">
+              <p className="font-mono text-xs font-bold uppercase tracking-wider text-primary">{account.code ?? account.id}</p>
+              <h1 className="mt-2 text-2xl font-bold text-on-surface">{account.name}</h1>
+              <p className="mt-1 text-sm text-on-surface-variant">{account.legalName ?? account.tradeName ?? 'Legal name not captured'}</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Badge>{account.type}</Badge>
                 <Badge>{account.tier}</Badge>
@@ -354,14 +354,14 @@ export default function AccountDetailPage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
+      <section className="rounded-2xl border border-outline-variant bg-surface shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant px-6 py-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-950">Account Workspace</h2>
-            <p className="mt-1 text-sm text-slate-500">Company master data connected to quotes, orders, contacts, and deals.</p>
+            <h2 className="text-lg font-bold text-on-surface">Account Workspace</h2>
+            <p className="mt-1 text-sm text-on-surface-variant">Company master data connected to quotes, orders, contacts, and deals.</p>
           </div>
         </div>
-        <div className="grid gap-2 border-b border-slate-200 px-6 py-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+        <div className="grid gap-2 border-b border-outline-variant px-6 py-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
           {tabs.map((item) => (
             <button
               key={item.id}
@@ -370,8 +370,8 @@ export default function AccountDetailPage() {
               className={cn(
                 'rounded-lg border px-3 py-2 text-sm font-semibold transition',
                 tab === item.id
-                  ? 'border-indigo-200 bg-indigo-50 text-indigo-700 shadow-sm'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'
+                  ? 'border-primary/40 bg-primary-container text-primary shadow-sm'
+                  : 'border-outline-variant bg-surface text-on-surface-variant hover:border-outline-variant hover:bg-surface-container-low hover:text-on-surface'
               )}
             >
               {item.label}
@@ -393,8 +393,8 @@ export default function AccountDetailPage() {
             />
           )}
           {tab === 'history' && (
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="mb-4 text-sm font-bold text-slate-950">Field change history</h3>
+            <div className="rounded-xl border border-outline-variant bg-surface p-5 shadow-sm">
+              <h3 className="mb-4 text-sm font-bold text-on-surface">Field change history</h3>
               <FieldHistory objectType="account" objectId={account.id} />
             </div>
           )}
@@ -480,9 +480,9 @@ function OverviewTab({ account, health, ownerName }: { account: Account; health:
 
 function InfoCard({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-900">
-        <span className="text-indigo-600">{icon}</span>
+    <div className="rounded-xl border border-outline-variant bg-surface p-5 shadow-sm">
+      <div className="mb-4 flex items-center gap-2 text-sm font-bold text-on-surface">
+        <span className="text-primary">{icon}</span>
         {title}
       </div>
       <dl className="space-y-2 text-sm">{children}</dl>
@@ -493,18 +493,18 @@ function InfoCard({ title, icon, children }: { title: string; icon: ReactNode; c
 function DetailItem({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="grid grid-cols-[132px_minmax(0,1fr)] gap-3">
-      <dt className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</dt>
-      <dd className="min-w-0 break-words text-slate-700">{value || 'Not set'}</dd>
+      <dt className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">{label}</dt>
+      <dd className="min-w-0 break-words text-on-surface">{value || 'Not set'}</dd>
     </div>
   );
 }
 
 function Badge({ children, tone = 'blue' }: { children: ReactNode; tone?: 'blue' | 'emerald' | 'amber' | 'rose' }) {
   const tones = {
-    blue: 'bg-indigo-50 text-indigo-700',
-    emerald: 'bg-emerald-50 text-emerald-700',
-    amber: 'bg-amber-50 text-amber-700',
-    rose: 'bg-rose-50 text-rose-700',
+    blue: 'bg-primary-container text-primary',
+    emerald: 'bg-success-container text-success',
+    amber: 'bg-warning-container text-warning',
+    rose: 'bg-error-container text-error',
   };
   return <span className={cn('rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider', tones[tone])}>{children}</span>;
 }
@@ -514,15 +514,15 @@ function HealthBlock({ health, fallbackScore }: { health: AccountHealthInsight |
   return (
     <div className="space-y-3">
       <div className="flex items-end justify-between">
-        <span className="text-3xl font-bold text-slate-950">{score}</span>
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{health?.status ?? 'UNKNOWN'}</span>
+        <span className="text-3xl font-bold text-on-surface">{score}</span>
+        <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">{health?.status ?? 'UNKNOWN'}</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-        <div className="h-full rounded-full bg-indigo-600" style={{ width: `${Math.max(0, Math.min(100, score))}%` }} />
+      <div className="h-2 overflow-hidden rounded-full bg-surface-container-high">
+        <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, score))}%` }} />
       </div>
       {(health?.factors ?? []).slice(0, 2).map((factor) => (
-        <p key={factor.code} className="text-xs text-slate-500">
-          {factor.label}: <span className="font-semibold text-slate-700">{String(factor.value)}</span>
+        <p key={factor.code} className="text-xs text-on-surface-variant">
+          {factor.label}: <span className="font-semibold text-on-surface">{String(factor.value)}</span>
         </p>
       ))}
     </div>
@@ -549,11 +549,11 @@ function CommercialTab({ rows, isLoading, empty, icon }: { rows: Record<string, 
   return (
     <div className="grid gap-3 lg:grid-cols-2">
       {rows.map((row) => (
-        <div key={String(row.id)} className="rounded-xl border border-slate-200 bg-white p-4">
+        <div key={String(row.id)} className="rounded-xl border border-outline-variant bg-surface p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="font-mono text-xs font-bold text-indigo-700">{String(row.quoteNumber ?? row.orderNumber ?? row.id)}</p>
-              <h3 className="mt-1 text-sm font-bold text-slate-950">{String(row.name ?? 'Commercial record')}</h3>
+              <p className="font-mono text-xs font-bold text-primary">{String(row.quoteNumber ?? row.orderNumber ?? row.id)}</p>
+              <h3 className="mt-1 text-sm font-bold text-on-surface">{String(row.name ?? 'Commercial record')}</h3>
             </div>
             <Badge tone={String(row.status).includes('PENDING') ? 'amber' : 'blue'}>{String(row.status ?? 'OPEN')}</Badge>
           </div>
@@ -576,9 +576,9 @@ function ContactsTab({ data, isLoading }: { data: PaginatedResult<Contact> | und
   return (
     <div className="grid gap-3 lg:grid-cols-2">
       {contacts.map((contact) => (
-        <Link key={contact.id} href={`/contacts/${contact.id}`} className="rounded-xl border border-slate-200 bg-white p-4 hover:border-indigo-200 hover:bg-indigo-50/30">
-          <p className="text-sm font-bold text-slate-950">{contact.firstName} {contact.lastName}</p>
-          <p className="mt-1 text-xs text-slate-500">{contact.jobTitle ?? 'Stakeholder'} · {contact.email ?? 'No email'}</p>
+        <Link key={contact.id} href={`/contacts/${contact.id}`} className="rounded-xl border border-outline-variant bg-surface p-4 hover:border-primary/40 hover:bg-primary-container/30">
+          <p className="text-sm font-bold text-on-surface">{contact.firstName} {contact.lastName}</p>
+          <p className="mt-1 text-xs text-on-surface-variant">{contact.jobTitle ?? 'Stakeholder'} · {contact.email ?? 'No email'}</p>
         </Link>
       ))}
     </div>
@@ -592,9 +592,9 @@ function DealsTab({ data, isLoading }: { data: PaginatedResult<Deal> | undefined
   return (
     <div className="grid gap-3 lg:grid-cols-2">
       {deals.map((deal) => (
-        <Link key={deal.id} href={`/deals/${deal.id}`} className="rounded-xl border border-slate-200 bg-white p-4 hover:border-indigo-200 hover:bg-indigo-50/30">
-          <p className="text-sm font-bold text-slate-950">{deal.name}</p>
-          <p className="mt-1 text-xs text-slate-500">{formatCurrency(deal.amount, deal.currency)} · {deal.probability}% · {deal.status}</p>
+        <Link key={deal.id} href={`/deals/${deal.id}`} className="rounded-xl border border-outline-variant bg-surface p-4 hover:border-primary/40 hover:bg-primary-container/30">
+          <p className="text-sm font-bold text-on-surface">{deal.name}</p>
+          <p className="mt-1 text-xs text-on-surface-variant">{formatCurrency(deal.amount, deal.currency)} · {deal.probability}% · {deal.status}</p>
         </Link>
       ))}
     </div>
@@ -613,7 +613,7 @@ function TimelineTab({
   if (isLoading) return <Skeleton className="h-48" />;
   if (isError) {
     return (
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+      <div className="rounded-xl border border-warning/30 bg-warning-container p-4 text-sm text-on-warning-container">
         The account timeline could not be loaded right now.
       </div>
     );
@@ -625,13 +625,13 @@ function TimelineTab({
   return (
     <div className="space-y-3">
       {events.map((evt) => (
-        <div key={evt.id} className="rounded-xl border border-slate-200 bg-white p-4">
+        <div key={evt.id} className="rounded-xl border border-outline-variant bg-surface p-4">
           <div className="flex flex-wrap items-start justify-between gap-2">
-            <p className="text-sm font-bold text-slate-950">{evt.title}</p>
-            <span className="text-xs text-slate-400">{formatDateTime(evt.at)}</span>
+            <p className="text-sm font-bold text-on-surface">{evt.title}</p>
+            <span className="text-xs text-on-surface-variant">{formatDateTime(evt.at)}</span>
           </div>
-          {evt.description ? <p className="mt-1 text-xs text-slate-500">{evt.description}</p> : null}
-          <span className="mt-2 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{evt.type}</span>
+          {evt.description ? <p className="mt-1 text-xs text-on-surface-variant">{evt.description}</p> : null}
+          <span className="mt-2 inline-block rounded bg-surface-container-high px-1.5 py-0.5 text-[10px] font-semibold text-on-surface-variant">{evt.type}</span>
         </div>
       ))}
     </div>
@@ -654,7 +654,7 @@ function HierarchyTab({ data, isLoading, currency }: { data: HierarchyResponse |
         </div>
       ) : null}
       <div>
-        <h3 className="mb-3 text-sm font-bold text-slate-950">Account tree</h3>
+        <h3 className="mb-3 text-sm font-bold text-on-surface">Account tree</h3>
         <HierarchyNodeItem node={root} depth={0} />
       </div>
     </div>
@@ -663,9 +663,9 @@ function HierarchyTab({ data, isLoading, currency }: { data: HierarchyResponse |
 
 function RollupCard({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
-      <p className="mt-1 text-xl font-bold text-slate-950">{value}</p>
+    <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
+      <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">{label}</p>
+      <p className="mt-1 text-xl font-bold text-on-surface">{value}</p>
     </div>
   );
 }
@@ -673,8 +673,8 @@ function RollupCard({ label, value }: { label: string; value: ReactNode }) {
 function HierarchyNodeItem({ node, depth }: { node: HierarchyNode; depth: number }) {
   return (
     <div className="space-y-2">
-      <div className="rounded-lg border border-slate-200 bg-white p-3" style={{ marginLeft: depth * 18 }}>
-        <Link href={`/accounts/${node.id}`} className="text-sm font-bold text-slate-900 hover:underline">{node.name}</Link>
+      <div className="rounded-lg border border-outline-variant bg-surface p-3" style={{ marginLeft: depth * 18 }}>
+        <Link href={`/accounts/${node.id}`} className="text-sm font-bold text-on-surface hover:underline">{node.name}</Link>
       </div>
       {node.children?.map((child) => <HierarchyNodeItem key={child.id} node={child} depth={depth + 1} />)}
     </div>
@@ -695,9 +695,9 @@ function GovernanceTab({ account }: { account: Account }) {
   return (
     <div className="grid gap-3 lg:grid-cols-2">
       {rows.map(([label, value]) => (
-        <div key={label} className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
-          <p className="mt-1 text-sm font-semibold text-slate-800">{value}</p>
+        <div key={label} className="rounded-xl border border-outline-variant bg-surface p-4">
+          <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">{label}</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">{value}</p>
         </div>
       ))}
     </div>
@@ -724,8 +724,8 @@ function DocumentsTab({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold text-slate-950">Account documents</h3>
-          <p className="mt-1 text-xs text-slate-500">Contracts, tax records, commercial registration, shipping files, and account evidence.</p>
+          <h3 className="text-sm font-bold text-on-surface">Account documents</h3>
+          <p className="mt-1 text-xs text-on-surface-variant">Contracts, tax records, commercial registration, shipping files, and account evidence.</p>
         </div>
         {canUpdate && (
           <>
@@ -751,17 +751,17 @@ function DocumentsTab({
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">
           {rows.map((row) => (
-            <div key={String(row.id ?? row.fileName)} className="rounded-xl border border-slate-200 bg-white p-4">
+            <div key={String(row.id ?? row.fileName)} className="rounded-xl border border-outline-variant bg-surface p-4">
               <div className="flex items-start gap-3">
-                <div className="rounded-lg bg-indigo-50 p-2 text-indigo-700">
+                <div className="rounded-lg bg-primary-container p-2 text-primary">
                   <FileText className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-slate-950">{String(row.fileName ?? row.name ?? 'Document')}</p>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="truncate text-sm font-bold text-on-surface">{String(row.fileName ?? row.name ?? 'Document')}</p>
+                  <p className="mt-1 text-xs text-on-surface-variant">
                     {String(row.mimeType ?? row.type ?? 'file')} · {formatFileSize(row.fileSize ?? row.size)}
                   </p>
-                  <p className="mt-2 text-xs text-slate-400">Uploaded {formatDate(String(row.createdAt ?? row.updatedAt ?? new Date().toISOString()))}</p>
+                  <p className="mt-2 text-xs text-on-surface-variant">Uploaded {formatDate(String(row.createdAt ?? row.updatedAt ?? new Date().toISOString()))}</p>
                 </div>
               </div>
             </div>
@@ -778,17 +778,17 @@ function RecordsTab({ rows, isLoading, title, icon }: { rows: Record<string, unk
   return (
     <div className="space-y-3">
       {rows.map((row, index) => (
-        <div key={String(row.id ?? index)} className="rounded-xl border border-slate-200 bg-white p-4">
+        <div key={String(row.id ?? index)} className="rounded-xl border border-outline-variant bg-surface p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-bold text-slate-950">{String(row.description ?? row.type ?? row.eventType ?? row.fieldName ?? row.name ?? 'Record')}</p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="text-sm font-bold text-on-surface">{String(row.description ?? row.type ?? row.eventType ?? row.fieldName ?? row.name ?? 'Record')}</p>
+              <p className="mt-1 text-xs text-on-surface-variant">
                 {String(row.actorName ?? row.changedByName ?? row.status ?? row.score ?? 'System')} · {formatDate(String(row.createdAt ?? row.changedAt ?? row.updatedAt ?? new Date().toISOString()))}
               </p>
             </div>
             {row.score ? <Badge tone={Number(row.score) >= 70 ? 'amber' : 'blue'}>{String(row.score)}%</Badge> : null}
           </div>
-          <pre className="mt-3 max-h-40 overflow-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+          <pre className="mt-3 max-h-40 overflow-auto rounded-lg bg-surface-container-low p-3 text-xs text-on-surface-variant">
             {JSON.stringify(row.metadata ?? row.payload ?? row.duplicateSignals ?? row, null, 2)}
           </pre>
         </div>
@@ -810,7 +810,7 @@ function AccountEditPanel({
 }) {
   return (
     <form
-      className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-5"
+      className="rounded-xl border border-primary/30 bg-primary-container/40 p-5"
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
@@ -859,8 +859,8 @@ function AccountEditPanel({
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-bold text-slate-950">Edit account master data</h2>
-          <p className="mt-1 text-xs text-slate-500">Role-controlled changes are audited and feed duplicate checks, account health, quotes, and orders.</p>
+          <h2 className="text-sm font-bold text-on-surface">Edit account master data</h2>
+          <p className="mt-1 text-xs text-on-surface-variant">Role-controlled changes are audited and feed duplicate checks, account health, quotes, and orders.</p>
         </div>
         <div className="flex gap-2">
           <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
@@ -914,13 +914,13 @@ function AccountEditPanel({
 function EditField({ label, name, value, type = 'text', required = false }: { label: string; name: string; value: unknown; type?: string; required?: boolean }) {
   return (
     <label className="block">
-      <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</span>
+      <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">{label}</span>
       <input
         name={name}
         type={type}
         required={required}
         defaultValue={value === null || value === undefined ? '' : String(value)}
-        className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+        className="mt-1 h-10 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
       />
     </label>
   );
@@ -929,17 +929,17 @@ function EditField({ label, name, value, type = 'text', required = false }: { la
 function DetailMini({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
-      <p className="mt-1 min-w-0 break-words font-semibold text-slate-800">{value}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">{label}</p>
+      <p className="mt-1 min-w-0 break-words font-semibold text-on-surface">{value}</p>
     </div>
   );
 }
 
 function TagCloud({ values }: { values: string[] }) {
-  if (!values.length) return <p className="text-sm text-slate-500">No tags</p>;
+  if (!values.length) return <p className="text-sm text-on-surface-variant">No tags</p>;
   return (
     <div className="flex flex-wrap gap-2">
-      {values.map((value) => <span key={value} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{value}</span>)}
+      {values.map((value) => <span key={value} className="rounded-full bg-surface-container-high px-2.5 py-1 text-xs font-semibold text-on-surface-variant">{value}</span>)}
     </div>
   );
 }
@@ -947,7 +947,7 @@ function TagCloud({ values }: { values: string[] }) {
 function link(value: string | null | undefined) {
   if (!value) return 'Not set';
   return (
-    <a href={value} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-indigo-700 hover:underline">
+    <a href={value} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-primary hover:underline">
       <Globe2 className="h-3.5 w-3.5" />
       {value}
     </a>

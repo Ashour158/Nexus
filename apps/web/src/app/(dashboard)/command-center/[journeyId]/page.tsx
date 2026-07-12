@@ -134,14 +134,14 @@ export default function JourneyEditorPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-      <Link href="/command-center" className="mb-4 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900">
+      <Link href="/command-center" className="mb-4 inline-flex items-center gap-2 text-sm text-on-surface-variant hover:text-on-surface">
         <ArrowLeft className="h-4 w-4" /> Back to journeys
       </Link>
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="flex-1">
           <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className="max-w-md text-lg font-semibold" />
-          <p className="mt-1 text-xs capitalize text-slate-500">Entity: {draft.entityType} · Status: {draft.status}</p>
+          <p className="mt-1 text-xs capitalize text-on-surface-variant">Entity: {draft.entityType} · Status: {draft.status}</p>
         </div>
         <div className="flex items-center gap-2">
           {draft.status !== 'ACTIVE' && <Button variant="secondary" onClick={handleActivate}><Play className="h-4 w-4" /> Activate</Button>}
@@ -151,17 +151,17 @@ export default function JourneyEditorPage() {
       </div>
 
       {/* Entry trigger */}
-      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Entry trigger</h2>
-        <label className="mb-1 block text-sm font-medium text-slate-700">Event</label>
+      <section className="mb-6 rounded-xl border border-outline-variant bg-surface p-5">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-on-surface-variant">Entry trigger</h2>
+        <label className="mb-1 block text-sm font-medium text-on-surface">Event</label>
         <Input value={draft.entryTrigger.event ?? ''} onChange={(e) => setEntryEvent(e.target.value)} placeholder="deal.won" className="max-w-sm" />
-        <p className="mt-1 text-xs text-slate-400">Records matching this event enter the journey.</p>
+        <p className="mt-1 text-xs text-on-surface-variant">Records matching this event enter the journey.</p>
       </section>
 
       {/* Steps */}
       <section className="mb-6">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Steps ({draft.steps.length})</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-on-surface-variant">Steps ({draft.steps.length})</h2>
           <Button variant="secondary" size="sm" onClick={addStep}><Plus className="h-4 w-4" /> Add step</Button>
         </div>
         {draft.steps.length === 0 ? (
@@ -169,12 +169,12 @@ export default function JourneyEditorPage() {
         ) : (
           <ol className="space-y-3">
             {draft.steps.map((step, i) => (
-              <li key={step.id} className="rounded-xl border border-slate-200 bg-white p-4">
+              <li key={step.id} className="rounded-xl border border-outline-variant bg-surface p-4">
                 <div className="flex items-start gap-3">
                   <div className="flex flex-col items-center pt-1">
-                    <span className="mb-1 flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">{i + 1}</span>
-                    <button type="button" onClick={() => moveStep(i, -1)} disabled={i === 0} className="text-slate-400 hover:text-slate-700 disabled:opacity-30" aria-label="Move up"><ArrowUp className="h-3.5 w-3.5" /></button>
-                    <button type="button" onClick={() => moveStep(i, 1)} disabled={i === draft.steps.length - 1} className="text-slate-400 hover:text-slate-700 disabled:opacity-30" aria-label="Move down"><ArrowDown className="h-3.5 w-3.5" /></button>
+                    <span className="mb-1 flex h-6 w-6 items-center justify-center rounded-full bg-surface-container-high text-xs font-semibold text-on-surface-variant">{i + 1}</span>
+                    <button type="button" onClick={() => moveStep(i, -1)} disabled={i === 0} className="text-on-surface-variant hover:text-on-surface disabled:opacity-30" aria-label="Move up"><ArrowUp className="h-3.5 w-3.5" /></button>
+                    <button type="button" onClick={() => moveStep(i, 1)} disabled={i === draft.steps.length - 1} className="text-on-surface-variant hover:text-on-surface disabled:opacity-30" aria-label="Move down"><ArrowDown className="h-3.5 w-3.5" /></button>
                   </div>
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -183,8 +183,8 @@ export default function JourneyEditorPage() {
                           <option key={t} value={t}>{t}</option>
                         ))}
                       </Select>
-                      <span className="text-xs text-slate-400">{STEP_HINTS[step.type]}</span>
-                      <button type="button" onClick={() => removeStep(step.id)} className="ml-auto rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label="Remove step"><Trash2 className="h-4 w-4" /></button>
+                      <span className="text-xs text-on-surface-variant">{STEP_HINTS[step.type]}</span>
+                      <button type="button" onClick={() => removeStep(step.id)} className="ml-auto rounded p-1.5 text-on-surface-variant hover:bg-error-container hover:text-error" aria-label="Remove step"><Trash2 className="h-4 w-4" /></button>
                     </div>
                     <StepConfig step={step} onChange={(config) => updateStep(step.id, { config })} />
                   </div>
@@ -196,25 +196,25 @@ export default function JourneyEditorPage() {
       </section>
 
       {/* Enrollments */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Enrollments</h2>
+      <section className="rounded-xl border border-outline-variant bg-surface p-5">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-on-surface-variant">Enrollments</h2>
         <div className="mb-4 flex flex-wrap items-end gap-2">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">Enroll entity ID</label>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">Enroll entity ID</label>
             <Input value={entityId} onChange={(e) => setEntityId(e.target.value)} placeholder="contact_123" className="w-56" />
           </div>
           <Button variant="secondary" size="sm" onClick={handleEnroll} isLoading={enroll.isPending}>Enroll</Button>
         </div>
         {!enrollments || enrollments.length === 0 ? (
-          <p className="text-sm text-slate-400">No enrollments yet.</p>
+          <p className="text-sm text-on-surface-variant">No enrollments yet.</p>
         ) : (
-          <ul className="divide-y divide-slate-100 text-sm">
+          <ul className="divide-y divide-outline-variant text-sm">
             {enrollments.map((e) => (
               <li key={e.id} className="flex items-center justify-between py-2">
-                <span className="font-mono text-xs text-slate-700">{e.entityType}:{e.entityId}</span>
+                <span className="font-mono text-xs text-on-surface">{e.entityType}:{e.entityId}</span>
                 <span className={cn(
                   'rounded px-1.5 py-0.5 text-xs',
-                  e.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : e.status === 'EXITED' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
+                  e.status === 'ACTIVE' ? 'bg-success-container text-success' : e.status === 'EXITED' ? 'bg-warning-container text-warning' : 'bg-surface-container-high text-on-surface-variant'
                 )}>{e.status}</span>
               </li>
             ))}
@@ -233,7 +233,7 @@ function StepConfig({ step, onChange }: { step: JourneyStep; onChange: (config: 
     case 'WAIT':
       return (
         <div className="mt-3">
-          <label className="mb-1 block text-xs font-medium text-slate-500">Wait (hours)</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Wait (hours)</label>
           <Input type="number" value={String(step.config.durationHours ?? '')} onChange={(e) => set('durationHours', Number(e.target.value))} className="w-32" />
         </div>
       );
@@ -241,11 +241,11 @@ function StepConfig({ step, onChange }: { step: JourneyStep; onChange: (config: 
       return (
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">Template</label>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">Template</label>
             <Input value={String(step.config.template ?? '')} onChange={(e) => set('template', e.target.value)} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">Subject</label>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">Subject</label>
             <Input value={String(step.config.subject ?? '')} onChange={(e) => set('subject', e.target.value)} />
           </div>
         </div>
@@ -254,11 +254,11 @@ function StepConfig({ step, onChange }: { step: JourneyStep; onChange: (config: 
       return (
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">Field</label>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">Field</label>
             <Input value={String(step.config.field ?? '')} onChange={(e) => set('field', e.target.value)} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">Equals</label>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">Equals</label>
             <Input value={String(step.config.equals ?? '')} onChange={(e) => set('equals', e.target.value)} />
           </div>
         </div>
@@ -266,21 +266,21 @@ function StepConfig({ step, onChange }: { step: JourneyStep; onChange: (config: 
     case 'GOAL':
       return (
         <div className="mt-3">
-          <label className="mb-1 block text-xs font-medium text-slate-500">Goal name</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Goal name</label>
           <Input value={String(step.config.name ?? '')} onChange={(e) => set('name', e.target.value)} className="max-w-xs" />
         </div>
       );
     case 'ACTION':
       return (
         <div className="mt-3">
-          <label className="mb-1 block text-xs font-medium text-slate-500">Action key</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Action key</label>
           <Input value={String(step.config.action ?? '')} onChange={(e) => set('action', e.target.value)} placeholder="notify_owner" className="max-w-xs" />
         </div>
       );
     case 'BRANCH':
       return (
         <div className="mt-3">
-          <label className="mb-1 block text-xs font-medium text-slate-500">Branch labels (comma separated)</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Branch labels (comma separated)</label>
           <Input
             value={Array.isArray(step.config.labels) ? (step.config.labels as string[]).join(', ') : ''}
             onChange={(e) => set('labels', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}

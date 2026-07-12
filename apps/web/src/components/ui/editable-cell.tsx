@@ -83,7 +83,7 @@ export function EditableCell({
           )}
           style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface)', color: 'var(--text-primary)' }}
         />
-        {saving ? <Loader2 className="absolute end-1 h-3.5 w-3.5 animate-spin text-gray-400" /> : null}
+        {saving ? <Loader2 className="absolute end-1 h-3.5 w-3.5 animate-spin text-on-surface-variant" /> : null}
       </div>
     );
   }
@@ -91,7 +91,7 @@ export function EditableCell({
   return (
     <span
       onDoubleClick={startEdit}
-      className={cn('cursor-text rounded px-1 py-0.5 hover:bg-gray-50 dark:hover:bg-slate-800', className)}
+      className={cn('cursor-text rounded px-1 py-0.5 hover:bg-surface-container-low', className)}
       title="Double-click to edit"
     >
       {children}
@@ -187,7 +187,7 @@ export function EditableSelectCell<T extends string>({
   return (
     <span
       onDoubleClick={startEdit}
-      className={cn('cursor-text rounded px-1 py-0.5 hover:bg-gray-50 dark:hover:bg-slate-800', className)}
+      className={cn('cursor-text rounded px-1 py-0.5 hover:bg-surface-container-low', className)}
       title="Double-click to edit"
     >
       {children}

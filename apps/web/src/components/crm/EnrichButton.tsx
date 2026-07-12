@@ -30,12 +30,12 @@ export function EnrichButton({
       disabled={status === 'loading'}
       className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
         status === 'done'
-          ? 'bg-green-100 text-green-700'
+          ? 'bg-success-container text-success'
           : status === 'error'
-            ? 'bg-red-100 text-red-600'
+            ? 'bg-error-container text-error'
             : status === 'loading'
-              ? 'bg-gray-100 text-gray-400'
-              : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+              ? 'bg-surface-container-high text-on-surface-variant'
+              : 'bg-primary-container text-primary hover:bg-primary-container'
       }`}
     >
       {status === 'loading'

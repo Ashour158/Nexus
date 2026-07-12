@@ -102,36 +102,36 @@ export default function AccountDuplicatesPage() {
     <main className="space-y-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Duplicate Account Center</h1>
-          <p className="text-sm text-slate-500">Find and merge duplicate companies. Merges are admin/manager only.</p>
+          <h1 className="text-2xl font-bold text-on-surface">Duplicate Account Center</h1>
+          <p className="text-sm text-on-surface-variant">Find and merge duplicate companies. Merges are admin/manager only.</p>
         </div>
-        <a href="/accounts" className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+        <a href="/accounts" className="rounded-lg border border-outline-variant px-3 py-2 text-sm font-bold text-on-surface hover:bg-surface-container-low">
           Back to accounts
         </a>
       </div>
 
-      <section className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
+      <section className="flex flex-wrap items-center gap-3 rounded-xl border border-outline-variant bg-surface p-4">
         <button
           onClick={() => scan.mutate()}
           disabled={scan.isPending}
-          className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
+          className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
         >
           {scan.isPending ? 'Starting…' : 'Run duplicate scan'}
         </button>
         <button
           onClick={() => groupsQuery.refetch()}
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+          className="rounded-lg border border-outline-variant px-3 py-2 text-sm font-bold text-on-surface hover:bg-surface-container-low"
         >
           Refresh
         </button>
-        <p className="text-sm text-slate-600">{groups.length} potential duplicate group(s) found</p>
+        <p className="text-sm text-on-surface-variant">{groups.length} potential duplicate group(s) found</p>
       </section>
 
       <section className="space-y-3">
         {groupsQuery.isLoading ? (
-          <p className="text-sm text-slate-500">Loading duplicate groups…</p>
+          <p className="text-sm text-on-surface-variant">Loading duplicate groups…</p>
         ) : groups.length === 0 ? (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-on-surface-variant">
             No pending duplicate accounts. Run a scan, then refresh in a couple of minutes.
           </p>
         ) : (
@@ -139,18 +139,18 @@ export default function AccountDuplicatesPage() {
             const records = group.records.filter((r) => r.data);
             const master = masterByGroup[group.id] ?? records[0]?.recordId ?? '';
             return (
-              <article key={group.id} className="rounded-xl border border-slate-200 bg-white p-4">
+              <article key={group.id} className="rounded-xl border border-outline-variant bg-surface p-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <p className="font-semibold text-slate-900">Group {group.id.slice(0, 8)}</p>
+                  <p className="font-semibold text-on-surface">Group {group.id.slice(0, 8)}</p>
                   {typeof group.confidence === 'number' ? (
-                    <span className="text-sm text-slate-500">Confidence {group.confidence}%</span>
+                    <span className="text-sm text-on-surface-variant">Confidence {group.confidence}%</span>
                   ) : null}
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   {records.map((rec) => {
                     const a = rec.data as DedupAccount;
                     return (
-                      <div key={rec.recordId} className="rounded border border-slate-200 p-3 text-sm">
+                      <div key={rec.recordId} className="rounded border border-outline-variant p-3 text-sm">
                         <label className="inline-flex items-center gap-2">
                           <input
                             type="radio"
@@ -160,25 +160,25 @@ export default function AccountDuplicatesPage() {
                           />
                           Keep as master
                         </label>
-                        <p className="mt-1 font-medium text-slate-900">{a.name ?? '—'}</p>
-                        <p className="text-slate-600">{a.email ?? 'No email'}</p>
-                        <p className="text-slate-600">{a.phone ?? 'No phone'}</p>
-                        <p className="text-slate-600">{a.website ?? 'No website'}</p>
-                        <p className="text-slate-500">{[a.industry, a.city, a.country].filter(Boolean).join(' · ') || '—'}</p>
+                        <p className="mt-1 font-medium text-on-surface">{a.name ?? '—'}</p>
+                        <p className="text-on-surface-variant">{a.email ?? 'No email'}</p>
+                        <p className="text-on-surface-variant">{a.phone ?? 'No phone'}</p>
+                        <p className="text-on-surface-variant">{a.website ?? 'No website'}</p>
+                        <p className="text-on-surface-variant">{[a.industry, a.city, a.country].filter(Boolean).join(' · ') || '—'}</p>
                       </div>
                     );
                   })}
                 </div>
                 <div className="mt-3 flex gap-2">
                   <button
-                    className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
+                    className="rounded-lg bg-primary px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
                     onClick={() => master && merge.mutate({ groupId: group.id, masterId: master })}
                     disabled={merge.isPending || !master}
                   >
                     Merge into master
                   </button>
                   <button
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                    className="rounded-lg border border-outline-variant px-3 py-2 text-sm font-bold text-on-surface hover:bg-surface-container-low"
                     onClick={() => dismiss.mutate(group.id)}
                     disabled={dismiss.isPending}
                   >

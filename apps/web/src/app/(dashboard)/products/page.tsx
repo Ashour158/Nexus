@@ -223,7 +223,7 @@ export default function ProductsPage(): JSX.Element {
   return (
     <main className="space-y-4 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-slate-900">Catalog</h1>
+        <h1 className="text-2xl font-bold text-on-surface">Catalog</h1>
         <div className="flex items-center gap-2">
           {tab === 'products' ? <ExportButton module="products" /> : null}
           {tab === 'products' && canCreate ? (
@@ -239,7 +239,7 @@ export default function ProductsPage(): JSX.Element {
             key={key}
             onClick={() => setTab(key)}
             className={`rounded-lg px-3 py-1.5 text-sm ${
-              tab === key ? 'bg-indigo-600 text-white' : 'bg-gray-100'
+              tab === key ? 'bg-primary text-white' : 'bg-surface-container-high'
             }`}
           >
             {key === 'products' ? 'Products' : key === 'kits' ? 'Kits' : 'Vendors'}
@@ -248,15 +248,15 @@ export default function ProductsPage(): JSX.Element {
       </div>
 
       {tab === 'products' ? (
-        <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <section className="overflow-x-auto rounded-xl border border-outline-variant bg-surface">
           {productsQuery.isLoading ? (
             <div className="space-y-2 p-4">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-9 animate-pulse rounded bg-slate-100" />
+                <div key={i} className="h-9 animate-pulse rounded bg-surface-container-high" />
               ))}
             </div>
           ) : productsQuery.isError ? (
-            <div className="p-6 text-center text-sm text-red-600">
+            <div className="p-6 text-center text-sm text-error">
               Could not load products.{' '}
               <button className="underline" onClick={() => void productsQuery.refetch()}>
                 Retry
@@ -264,7 +264,7 @@ export default function ProductsPage(): JSX.Element {
             </div>
           ) : (
             <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-start text-xs uppercase tracking-wide text-slate-500">
+              <thead className="bg-surface-container-low text-start text-xs uppercase tracking-wide text-on-surface-variant">
                 <tr>
                   <th className="px-3 py-2 text-start">Name</th>
                   <th className="px-3 py-2 text-start">SKU</th>
@@ -275,12 +275,12 @@ export default function ProductsPage(): JSX.Element {
               </thead>
               <tbody>
                 {products.map((p) => (
-                  <tr key={p.id} className="border-t border-slate-100">
+                  <tr key={p.id} className="border-t border-outline-variant">
                     <td className="px-3 py-2">
                       <div>
-                        <span className="font-medium text-slate-900">{p.name}</span>
+                        <span className="font-medium text-on-surface">{p.name}</span>
                         {p.nameAr ? (
-                          <span className="mt-0.5 block text-xs text-slate-500" dir="rtl" lang="ar">
+                          <span className="mt-0.5 block text-xs text-on-surface-variant" dir="rtl" lang="ar">
                             {p.nameAr}
                           </span>
                         ) : null}
@@ -298,7 +298,7 @@ export default function ProductsPage(): JSX.Element {
                             <button
                               onClick={() => openEdit(p)}
                               aria-label={`Edit ${p.name}`}
-                              className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                              className="rounded p-1.5 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
                             >
                               <Pencil className="h-4 w-4" />
                             </button>
@@ -307,7 +307,7 @@ export default function ProductsPage(): JSX.Element {
                             <button
                               onClick={() => setDeleting(p)}
                               aria-label={`Delete ${p.name}`}
-                              className="rounded p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700"
+                              className="rounded p-1.5 text-error hover:bg-error-container hover:text-error"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -336,25 +336,25 @@ export default function ProductsPage(): JSX.Element {
       ) : null}
 
       {tab === 'kits' ? (
-        <section className="rounded-xl border border-slate-200 bg-white">
+        <section className="rounded-xl border border-outline-variant bg-surface">
           <ul>
             {kits.map((k) => (
               <li key={k.id} className="border-t px-4 py-3 first:border-t-0">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{k.name}</span>
-                  <span className="text-xs text-slate-500">{k.currency} {Number(k.listPrice ?? 0).toFixed(2)} · {(k.items as unknown[])?.length ?? 0} items</span>
+                  <span className="text-xs text-on-surface-variant">{k.currency} {Number(k.listPrice ?? 0).toFixed(2)} · {(k.items as unknown[])?.length ?? 0} items</span>
                 </div>
               </li>
             ))}
-            {kits.length === 0 ? <li className="px-4 py-6 text-center text-sm text-slate-500">No product kits found.</li> : null}
+            {kits.length === 0 ? <li className="px-4 py-6 text-center text-sm text-on-surface-variant">No product kits found.</li> : null}
           </ul>
         </section>
       ) : null}
 
       {tab === 'vendors' ? (
-        <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <section className="overflow-x-auto rounded-xl border border-outline-variant bg-surface">
           <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-start text-xs uppercase tracking-wide text-slate-500">
+            <thead className="bg-surface-container-low text-start text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
                 <th className="px-3 py-2">Vendor</th>
                 <th className="px-3 py-2">Code</th>
@@ -365,8 +365,8 @@ export default function ProductsPage(): JSX.Element {
             </thead>
             <tbody>
               {vendors.map((vendor) => (
-                <tr key={vendor.id} className="border-t border-slate-100">
-                  <td className="px-3 py-2 font-medium text-slate-900">{vendor.name}</td>
+                <tr key={vendor.id} className="border-t border-outline-variant">
+                  <td className="px-3 py-2 font-medium text-on-surface">{vendor.name}</td>
                   <td className="px-3 py-2">{vendor.code ?? '-'}</td>
                   <td className="px-3 py-2">{vendor.currency}</td>
                   <td className="px-3 py-2">{vendor.products?.length ?? 0}</td>
@@ -375,7 +375,7 @@ export default function ProductsPage(): JSX.Element {
               ))}
               {vendors.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-500">
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-on-surface-variant">
                     No vendors found.
                   </td>
                 </tr>
@@ -394,14 +394,14 @@ export default function ProductsPage(): JSX.Element {
         <div className="space-y-3">
           <FormRow label="Name" required>
             <input
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:border-primary"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             />
           </FormRow>
           <FormRow label="Name (Arabic)">
             <input
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:border-primary"
               dir="rtl"
               lang="ar"
               value={form.nameAr}
@@ -411,14 +411,14 @@ export default function ProductsPage(): JSX.Element {
           <div className="grid grid-cols-2 gap-3">
             <FormRow label="SKU" required>
               <input
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:border-primary"
                 value={form.sku}
                 onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
               />
             </FormRow>
             <FormRow label="Category">
               <input
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:border-primary"
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
               />
@@ -430,7 +430,7 @@ export default function ProductsPage(): JSX.Element {
                 type="number"
                 min={0}
                 step="0.01"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:border-primary"
                 value={form.listPrice}
                 onChange={(e) => setForm((f) => ({ ...f, listPrice: e.target.value }))}
               />
@@ -438,7 +438,7 @@ export default function ProductsPage(): JSX.Element {
             <FormRow label="Currency" required>
               <input
                 maxLength={3}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm uppercase outline-none focus:border-primary"
                 value={form.currency}
                 onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value.toUpperCase() }))}
               />
@@ -447,12 +447,12 @@ export default function ProductsPage(): JSX.Element {
           <FormRow label="Description">
             <textarea
               rows={3}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:border-primary"
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
             />
           </FormRow>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
+          <label className="flex items-center gap-2 text-sm text-on-surface">
             <input
               type="checkbox"
               checked={form.isActive}
@@ -462,7 +462,7 @@ export default function ProductsPage(): JSX.Element {
           </label>
 
           {formError ? (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
+            <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-error">{formError}</p>
           ) : null}
 
           <div className="flex justify-end gap-2 pt-2">
@@ -483,12 +483,12 @@ export default function ProductsPage(): JSX.Element {
         size="sm"
       >
         <div className="space-y-4">
-          <p className="text-sm text-slate-600">
-            Are you sure you want to delete <span className="font-medium text-slate-900">{deleting?.name}</span>?
+          <p className="text-sm text-on-surface-variant">
+            Are you sure you want to delete <span className="font-medium text-on-surface">{deleting?.name}</span>?
             This action cannot be undone.
           </p>
           {deleteMutation.isError ? (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-error">
               Could not delete this product.
             </p>
           ) : null}
@@ -521,9 +521,9 @@ function FormRow({
 }): JSX.Element {
   return (
     <label className="block space-y-1">
-      <span className="text-xs font-medium text-slate-600">
+      <span className="text-xs font-medium text-on-surface-variant">
         {label}
-        {required ? <span className="text-red-500"> *</span> : null}
+        {required ? <span className="text-error"> *</span> : null}
       </span>
       {children}
     </label>

@@ -13,7 +13,7 @@ import {
 } from '@/hooks/use-org';
 
 const inputClass =
-  'mt-1 w-full rounded border border-gray-700 bg-gray-950 px-2 py-2 text-sm text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-60';
+  'mt-1 w-full rounded border border-outline-variant bg-inverse-surface px-2 py-2 text-sm text-inverse-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60';
 
 /**
  * Org assignment (manager / department / level / job title) for a single user.
@@ -73,21 +73,21 @@ export function OrgAssignmentPanel({
   }
 
   return (
-    <section className="space-y-3 rounded-xl border border-gray-800 bg-gray-900 p-4">
+    <section className="space-y-3 rounded-xl border border-outline-variant bg-inverse-surface p-4">
       <h3 className="font-semibold">Organization</h3>
       {banner ? (
         <div
           className={`rounded border px-3 py-2 text-sm ${
             banner.kind === 'ok'
-              ? 'border-emerald-800 bg-emerald-950/40 text-emerald-300'
-              : 'border-red-800 bg-red-950/40 text-red-300'
+              ? 'border-success bg-success-container/40 text-success'
+              : 'border-error bg-error-container/40 text-error'
           }`}
         >
           {banner.text}
         </div>
       ) : null}
       <div className="grid gap-3 md:grid-cols-2">
-        <label className="text-sm text-gray-300">
+        <label className="text-sm text-outline">
           Manager
           <select
             className={inputClass}
@@ -103,7 +103,7 @@ export function OrgAssignmentPanel({
             ))}
           </select>
         </label>
-        <label className="text-sm text-gray-300">
+        <label className="text-sm text-outline">
           Department
           <select
             className={inputClass}
@@ -119,7 +119,7 @@ export function OrgAssignmentPanel({
             ))}
           </select>
         </label>
-        <label className="text-sm text-gray-300">
+        <label className="text-sm text-outline">
           Level
           <select
             className={inputClass}
@@ -135,7 +135,7 @@ export function OrgAssignmentPanel({
             ))}
           </select>
         </label>
-        <label className="text-sm text-gray-300">
+        <label className="text-sm text-outline">
           Job title
           <input
             className={inputClass}
@@ -148,12 +148,12 @@ export function OrgAssignmentPanel({
       </div>
       {canEdit ? (
         <div className="flex justify-end">
-          <Button onClick={save} isLoading={assign.isPending} className="bg-indigo-600 hover:bg-indigo-500">
+          <Button onClick={save} isLoading={assign.isPending} className="bg-primary hover:bg-primary">
             Save org assignment
           </Button>
         </div>
       ) : (
-        <p className="text-xs text-gray-500">Editing requires the users:update permission.</p>
+        <p className="text-xs text-on-surface-variant">Editing requires the users:update permission.</p>
       )}
     </section>
   );

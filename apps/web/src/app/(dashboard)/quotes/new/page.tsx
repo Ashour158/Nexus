@@ -255,13 +255,13 @@ export default function NewQuotePage(): JSX.Element {
   return (
     <main className="space-y-6 px-6 py-6">
       <header>
-        <h1 className="text-2xl font-bold text-slate-900">New quote</h1>
-        <p className="text-sm text-slate-600">
+        <h1 className="text-2xl font-bold text-on-surface">New quote</h1>
+        <p className="text-sm text-on-surface-variant">
           Four-step builder: customer, products, CPQ pricing, then review and create.
         </p>
       </header>
 
-      <ol className="flex flex-wrap gap-2 border-b border-slate-200 pb-4">
+      <ol className="flex flex-wrap gap-2 border-b border-outline-variant pb-4">
         {STEPS.map((s, i) => (
           <li key={s.id}>
             <button
@@ -270,14 +270,14 @@ export default function NewQuotePage(): JSX.Element {
               className={cn(
                 'flex items-center gap-2 rounded-lg border px-3 py-2 text-start text-sm transition',
                 step === i
-                  ? 'border-slate-900 bg-slate-900 text-white'
-                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                  ? 'border-outline bg-inverse-surface text-white'
+                  : 'border-outline-variant bg-surface text-on-surface hover:border-outline-variant'
               )}
             >
               <span
                 className={cn(
                   'flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold',
-                  step === i ? 'bg-white text-slate-900' : 'bg-slate-100 text-slate-600'
+                  step === i ? 'bg-surface text-on-surface' : 'bg-surface-container-high text-on-surface-variant'
                 )}
               >
                 {i + 1}
@@ -287,7 +287,7 @@ export default function NewQuotePage(): JSX.Element {
                 <span
                   className={cn(
                     'hidden text-xs sm:block',
-                    step === i ? 'text-slate-200' : 'text-slate-500'
+                    step === i ? 'text-outline' : 'text-on-surface-variant'
                   )}
                 >
                   {s.subtitle}
@@ -299,8 +299,8 @@ export default function NewQuotePage(): JSX.Element {
       </ol>
 
       {step === 0 ? (
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Deal</h2>
+        <section className="rounded-lg border border-outline-variant bg-surface p-4">
+          <h2 className="text-sm font-semibold text-on-surface">Deal</h2>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <FormField label="Search deals">
               {({ id }) => (
@@ -318,7 +318,7 @@ export default function NewQuotePage(): JSX.Element {
                   id={id}
                   value={selectedDealId}
                   onChange={(e) => setSelectedDealId(e.target.value)}
-                  className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
+                  className="h-9 rounded-md border border-outline-variant bg-surface px-3 text-sm"
                 >
                   <option value="">— Select deal —</option>
                   {(dealsQuery.data?.data ?? []).map((deal) => (
@@ -338,7 +338,7 @@ export default function NewQuotePage(): JSX.Element {
                     id={id}
                     value={selectedContactId}
                     onChange={(e) => setSelectedContactId(e.target.value)}
-                    className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
+                    className="h-9 rounded-md border border-outline-variant bg-surface px-3 text-sm"
                   >
                     <option value="">— No contact —</option>
                     {(contactsForAccountQuery.data?.data ?? []).map((c) => (
@@ -355,7 +355,7 @@ export default function NewQuotePage(): JSX.Element {
                     id={id}
                     value={selectedTemplateId}
                     onChange={(e) => setSelectedTemplateId(e.target.value)}
-                    className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
+                    className="h-9 rounded-md border border-outline-variant bg-surface px-3 text-sm"
                   >
                     <option value="">— No template —</option>
                     {(templatesQuery.data?.data ?? []).map((t) => (
@@ -382,8 +382,8 @@ export default function NewQuotePage(): JSX.Element {
       ) : null}
 
       {step === 1 ? (
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Line items</h2>
+        <section className="rounded-lg border border-outline-variant bg-surface p-4">
+          <h2 className="text-sm font-semibold text-on-surface">Line items</h2>
           <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center">
             <Input
               placeholder="Search product..."
@@ -398,16 +398,16 @@ export default function NewQuotePage(): JSX.Element {
                 key={p.id}
                 type="button"
                 onClick={() => addProduct(p)}
-                className="rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50"
+                className="rounded-md border border-outline-variant px-2 py-1 text-xs hover:bg-surface-container-low"
               >
                 {(uiArabic && p.nameAr ? p.nameAr : p.name)} (
                 {formatCurrency(p.listPrice, p.currency)})
               </button>
             ))}
           </div>
-          <div className="mt-4 overflow-x-auto rounded-md border border-slate-200">
+          <div className="mt-4 overflow-x-auto rounded-md border border-outline-variant">
             <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+              <thead className="bg-surface-container-low text-xs uppercase tracking-wide text-on-surface-variant">
                 <tr>
                   <th className="px-3 py-2 text-start">Product</th>
                   <th className="px-3 py-2 text-end">Qty</th>
@@ -420,7 +420,7 @@ export default function NewQuotePage(): JSX.Element {
               </thead>
               <tbody>
                 {lineItems.map((line) => (
-                  <tr key={line.productId} className="border-t border-slate-100">
+                  <tr key={line.productId} className="border-t border-outline-variant">
                     <td className="px-3 py-2">{line.productName}</td>
                     <td className="px-3 py-2 text-end">
                       <Input
@@ -442,7 +442,7 @@ export default function NewQuotePage(): JSX.Element {
                         className="ms-auto w-20 text-end"
                       />
                       {lineErrors[`${line.productId}-quantity`] ? (
-                        <p className="mt-1 text-xs text-red-500">{lineErrors[`${line.productId}-quantity`]}</p>
+                        <p className="mt-1 text-xs text-error">{lineErrors[`${line.productId}-quantity`]}</p>
                       ) : null}
                     </td>
                     <td className="px-3 py-2 text-end">
@@ -469,7 +469,7 @@ export default function NewQuotePage(): JSX.Element {
                         className="ms-auto w-28 text-end"
                       />
                       {lineErrors[`${line.productId}-unitPrice`] ? (
-                        <p className="mt-1 text-xs text-red-500">{lineErrors[`${line.productId}-unitPrice`]}</p>
+                        <p className="mt-1 text-xs text-error">{lineErrors[`${line.productId}-unitPrice`]}</p>
                       ) : null}
                     </td>
                     <td className="px-3 py-2 text-end">
@@ -503,7 +503,7 @@ export default function NewQuotePage(): JSX.Element {
                 ))}
                 {lineItems.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
+                    <td colSpan={7} className="px-3 py-8 text-center text-on-surface-variant">
                       Add products from the chips above.
                     </td>
                   </tr>
@@ -515,8 +515,8 @@ export default function NewQuotePage(): JSX.Element {
       ) : null}
 
       {step === 2 ? (
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">CPQ pricing</h2>
+        <section className="rounded-lg border border-outline-variant bg-surface p-4">
+          <h2 className="text-sm font-semibold text-on-surface">CPQ pricing</h2>
           <div className="mt-3 grid gap-3 md:grid-cols-3">
             <FormField label="Payment terms">
               {({ id }) => (
@@ -524,7 +524,7 @@ export default function NewQuotePage(): JSX.Element {
                   id={id}
                   value={paymentTerms}
                   onChange={(e) => setPaymentTerms(e.target.value)}
-                  className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
+                  className="h-9 rounded-md border border-outline-variant bg-surface px-3 text-sm"
                 >
                   <option value="NET_30">NET_30</option>
                   <option value="NET_60">NET_60</option>
@@ -560,7 +560,7 @@ export default function NewQuotePage(): JSX.Element {
             </div>
           </div>
           {appliedPromos.length > 0 ? (
-            <p className="mt-2 text-xs text-slate-600">
+            <p className="mt-2 text-xs text-on-surface-variant">
               Applied promos: {appliedPromos.join(', ')}
             </p>
           ) : null}
@@ -572,11 +572,11 @@ export default function NewQuotePage(): JSX.Element {
             >
               Run CPQ
             </Button>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-on-surface-variant">
               Computes waterfall, floor warnings, and approval flags.
             </span>
           </div>
-          <div className="mt-4 rounded-md border border-slate-200 p-3 text-sm">
+          <div className="mt-4 rounded-md border border-outline-variant p-3 text-sm">
             <p>
               Subtotal:{' '}
               {formatCurrency(pricingResult?.subtotal ?? subtotal, currency)}
@@ -586,13 +586,13 @@ export default function NewQuotePage(): JSX.Element {
               {formatCurrency(pricingResult?.discountTotal ?? 0, currency)}
             </p>
             <p>Tax: {formatCurrency(pricingResult?.taxTotal ?? 0, currency)}</p>
-            <p className="font-semibold text-slate-900">
+            <p className="font-semibold text-on-surface">
               Total:{' '}
               {formatCurrency(pricingResult?.total ?? subtotal, currency)}
             </p>
           </div>
           {pricingResult?.floorPriceWarnings?.length ? (
-            <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <div className="mt-3 rounded-md border border-warning/40 bg-warning-container p-3 text-sm text-on-warning-container">
               <p className="font-semibold">Floor price warnings</p>
               <ul className="mt-1 list-disc ps-5">
                 {pricingResult.floorPriceWarnings.map((w) => (
@@ -602,13 +602,13 @@ export default function NewQuotePage(): JSX.Element {
             </div>
           ) : null}
           {pricingResult?.approvalRequired ? (
-            <div className="mt-3 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+            <div className="mt-3 rounded-md border border-error/40 bg-error-container p-3 text-sm text-on-error-container">
               <p className="font-semibold">Approval required before this quote can be sent to the customer.</p>
               <div className="mt-3 grid gap-3 md:grid-cols-3">
                 <label className="text-xs font-semibold uppercase tracking-wide">
                   Discount reason
                   <select
-                    className="mt-1 h-9 w-full rounded-md border border-red-200 bg-white px-3 text-sm normal-case text-slate-700"
+                    className="mt-1 h-9 w-full rounded-md border border-error/30 bg-surface px-3 text-sm normal-case text-on-surface"
                     value={discountReasonCode}
                     onChange={(e) => setDiscountReasonCode(e.target.value)}
                   >
@@ -627,7 +627,7 @@ export default function NewQuotePage(): JSX.Element {
                 <label className="text-xs font-semibold uppercase tracking-wide">
                   Win probability if approved
                   <Input
-                    className="mt-1 bg-white"
+                    className="mt-1 bg-surface"
                     type="number"
                     min={0}
                     max={100}
@@ -638,7 +638,7 @@ export default function NewQuotePage(): JSX.Element {
                 <label className="text-xs font-semibold uppercase tracking-wide md:col-span-3">
                   Business reason
                   <Textarea
-                    className="mt-1 bg-white"
+                    className="mt-1 bg-surface"
                     rows={2}
                     value={discountReasonNotes}
                     onChange={(e) => setDiscountReasonNotes(e.target.value)}
@@ -653,8 +653,8 @@ export default function NewQuotePage(): JSX.Element {
 
       {step === 3 ? (
         <section className="space-y-4">
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-slate-900">Review</h2>
+          <div className="rounded-lg border border-outline-variant bg-surface p-4">
+            <h2 className="text-sm font-semibold text-on-surface">Review</h2>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <FormField label="Quote name">
                 {({ id }) => (
@@ -688,7 +688,7 @@ export default function NewQuotePage(): JSX.Element {
               )}
             </FormField>
           </div>
-          <div className="rounded-lg border border-slate-100 bg-slate-50 p-4 text-sm text-slate-700">
+          <div className="rounded-lg border border-outline-variant bg-surface-container-low p-4 text-sm text-on-surface">
             <p>
               <strong>Deal:</strong> {selectedDeal?.name ?? '—'}
             </p>
@@ -701,7 +701,7 @@ export default function NewQuotePage(): JSX.Element {
         </section>
       ) : null}
 
-      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant pt-4">
         <Button type="button" variant="secondary" onClick={back} disabled={step === 0}>
           Back
         </Button>

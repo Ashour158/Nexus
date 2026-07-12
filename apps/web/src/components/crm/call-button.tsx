@@ -58,7 +58,7 @@ export function CallButton({ defaultNumber, contactId, dealId, accountId, disabl
       <Modal open={open} onClose={() => setOpen(false)} title="Click to call" size="md">
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Number</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface">Number</label>
             <div className="flex gap-2">
               <Input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="+1 555 0100" type="tel" />
               <Button onClick={placeCall} isLoading={clickToCall.isPending}>
@@ -68,19 +68,19 @@ export function CallButton({ defaultNumber, contactId, dealId, accountId, disabl
           </div>
 
           <div>
-            <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
               <History className="h-3.5 w-3.5" /> Call history
             </h3>
             {isLoading ? (
-              <p className="text-sm text-slate-400">Loading…</p>
+              <p className="text-sm text-on-surface-variant">Loading…</p>
             ) : !calls || calls.length === 0 ? (
-              <p className="text-sm text-slate-400">No calls yet for this record.</p>
+              <p className="text-sm text-on-surface-variant">No calls yet for this record.</p>
             ) : (
-              <ul className="divide-y divide-slate-100 rounded-lg border border-slate-100">
+              <ul className="divide-y divide-outline-variant rounded-lg border border-outline-variant">
                 {calls.map((call) => (
                   <li key={call.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                    <span className="font-mono text-xs text-slate-700">{call.toNumber || '—'}</span>
-                    <span className="text-xs text-slate-500">
+                    <span className="font-mono text-xs text-on-surface">{call.toNumber || '—'}</span>
+                    <span className="text-xs text-on-surface-variant">
                       {call.status} · {new Date(call.startedAt).toLocaleString()}
                     </span>
                   </li>

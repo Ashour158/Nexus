@@ -117,7 +117,7 @@ export function ColumnChooser({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm transition hover:bg-gray-50 dark:hover:bg-slate-800"
+        className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm transition hover:bg-surface-container-low"
         style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
         aria-label="Choose columns"
         aria-expanded={open}
@@ -142,13 +142,13 @@ export function ColumnChooser({
                 return (
                   <label
                     key={col.key}
-                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-gray-50 dark:hover:bg-slate-800"
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-surface-container-low"
                   >
                     <input
                       type="checkbox"
                       checked={isVisible}
                       onChange={() => toggleKey(col.key)}
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"
                     />
                     <span className="flex-1" style={{ color: 'var(--text-primary)' }}>
                       {col.label}
@@ -162,7 +162,7 @@ export function ColumnChooser({
                             e.stopPropagation();
                             onMove(col.key, -1);
                           }}
-                          className="rounded p-0.5 text-gray-400 hover:bg-gray-100 disabled:opacity-30"
+                          className="rounded p-0.5 text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30"
                           title="Move up"
                         >
                           <GripVertical className="h-3 w-3 rotate-180" />
@@ -174,7 +174,7 @@ export function ColumnChooser({
                             e.stopPropagation();
                             onMove(col.key, 1);
                           }}
-                          className="rounded p-0.5 text-gray-400 hover:bg-gray-100 disabled:opacity-30"
+                          className="rounded p-0.5 text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30"
                           title="Move down"
                         >
                           <GripVertical className="h-3 w-3" />

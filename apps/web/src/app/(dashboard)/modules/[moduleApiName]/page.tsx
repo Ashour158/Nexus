@@ -119,10 +119,10 @@ export default function ModuleRecordsPage() {
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-on-surface">
             <span>{module.icon ?? '📦'}</span> {module.pluralLabel}
           </h1>
-          {module.description && <p className="mt-1 text-sm text-slate-500">{module.description}</p>}
+          {module.description && <p className="mt-1 text-sm text-on-surface-variant">{module.description}</p>}
         </div>
         <div className="flex items-center gap-2">
           <Link href={`/settings/modules/${module.id}`}>
@@ -134,7 +134,7 @@ export default function ModuleRecordsPage() {
 
       <div className="mb-4 flex items-center gap-2">
         <div className="relative max-w-xs flex-1">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
           <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search records…" className="pl-8" />
         </div>
       </div>
@@ -144,9 +144,9 @@ export default function ModuleRecordsPage() {
       ) : rows.length === 0 ? (
         <EmptyState icon="📄" title="No records" description="Create the first record for this module." cta={{ label: `New ${module.label.toLowerCase()}`, onClick: openCreate }} />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-outline-variant bg-surface-container-low text-left text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
                 {columns.map((f) => (
                   <th key={f.id} className="px-4 py-3">{f.label}</th>
@@ -154,20 +154,20 @@ export default function ModuleRecordsPage() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-outline-variant">
               {rows.map((record) => (
-                <tr key={record.id} className="hover:bg-slate-50">
+                <tr key={record.id} className="hover:bg-surface-container-low">
                   {columns.map((f) => (
-                    <td key={f.id} className="px-4 py-3 text-slate-700">
+                    <td key={f.id} className="px-4 py-3 text-on-surface">
                       {formatCell(record.values[f.apiName])}
                     </td>
                   ))}
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button type="button" onClick={() => openEdit(record)} className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Edit record">
+                      <button type="button" onClick={() => openEdit(record)} className="rounded p-1.5 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface" aria-label="Edit record">
                         <Pencil className="h-4 w-4" />
                       </button>
-                      <button type="button" onClick={() => handleDelete(record)} className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label="Delete record">
+                      <button type="button" onClick={() => handleDelete(record)} className="rounded p-1.5 text-on-surface-variant hover:bg-error-container hover:text-error" aria-label="Delete record">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
@@ -177,11 +177,11 @@ export default function ModuleRecordsPage() {
             </tbody>
           </table>
           {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-sm">
-              <span className="text-slate-500">{total} records</span>
+            <div className="flex items-center justify-between border-t border-outline-variant px-4 py-3 text-sm">
+              <span className="text-on-surface-variant">{total} records</span>
               <div className="flex items-center gap-2">
                 <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</Button>
-                <span className="text-slate-500">Page {page} / {totalPages}</span>
+                <span className="text-on-surface-variant">Page {page} / {totalPages}</span>
                 <Button variant="secondary" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</Button>
               </div>
             </div>

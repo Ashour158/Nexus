@@ -30,38 +30,38 @@ export function ImportProgress({ jobId, onComplete }: { jobId: string; onComplet
     return () => source.close();
   }, [jobId, onComplete]);
 
-  if (!progress) return <div className="h-8 animate-pulse rounded-lg bg-gray-100" />;
+  if (!progress) return <div className="h-8 animate-pulse rounded-lg bg-surface-container-high" />;
 
   const isComplete = progress.status === 'COMPLETED';
   const isFailed = progress.status === 'FAILED';
 
   return (
-    <div className={`rounded-xl border p-4 ${isComplete ? 'border-green-200 bg-green-50' : isFailed ? 'border-red-200 bg-red-50' : 'border-indigo-200 bg-indigo-50'}`}>
+    <div className={`rounded-xl border p-4 ${isComplete ? 'border-success/30 bg-success-container' : isFailed ? 'border-error/30 bg-error-container' : 'border-primary/40 bg-primary-container'}`}>
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-800">
+        <span className="text-sm font-medium text-on-surface">
           {isComplete ? '✅ Import complete' : isFailed ? '❌ Import failed' : `⏳ Importing… ${progress.progressPct}%`}
         </span>
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-on-surface-variant">
           {progress.processedRows}/{progress.totalRows} rows
         </span>
       </div>
       {!isComplete && !isFailed ? (
-        <div className="mb-2 h-2 overflow-hidden rounded-full bg-white">
-          <div className="h-full rounded-full bg-indigo-500 transition-all duration-300" style={{ width: `${progress.progressPct}%` }} />
+        <div className="mb-2 h-2 overflow-hidden rounded-full bg-surface">
+          <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${progress.progressPct}%` }} />
         </div>
       ) : null}
-      <div className="flex gap-4 text-xs text-gray-600">
-        <span className="text-green-600">✓ {progress.successRows} succeeded</span>
-        {progress.errorRows > 0 ? <span className="text-red-500">✗ {progress.errorRows} errors</span> : null}
+      <div className="flex gap-4 text-xs text-on-surface-variant">
+        <span className="text-success">✓ {progress.successRows} succeeded</span>
+        {progress.errorRows > 0 ? <span className="text-error">✗ {progress.errorRows} errors</span> : null}
       </div>
       {progress.errors && progress.errors.length > 0 ? (
         <details className="mt-2">
-          <summary className="cursor-pointer text-xs text-red-600">
+          <summary className="cursor-pointer text-xs text-error">
             Show errors ({progress.errors.length})
           </summary>
           <ul className="mt-1 max-h-24 space-y-0.5 overflow-y-auto">
             {progress.errors.slice(0, 20).map((err, i) => (
-              <li key={`${err}-${i}`} className="text-xs text-red-500">
+              <li key={`${err}-${i}`} className="text-xs text-error">
                 {err}
               </li>
             ))}

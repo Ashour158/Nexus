@@ -26,11 +26,11 @@ interface Invoice {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  DRAFT: 'bg-slate-100 text-slate-600',
-  SENT: 'bg-indigo-100 text-indigo-700',
-  PAID: 'bg-emerald-100 text-emerald-700',
-  VOID: 'bg-slate-100 text-slate-400 line-through',
-  OVERDUE: 'bg-red-100 text-red-700',
+  DRAFT: 'bg-surface-container-high text-on-surface-variant',
+  SENT: 'bg-primary-container text-primary',
+  PAID: 'bg-success-container text-success',
+  VOID: 'bg-surface-container-high text-on-surface-variant line-through',
+  OVERDUE: 'bg-error-container text-error',
 };
 
 export default function InvoicesPage(): JSX.Element {
@@ -84,8 +84,8 @@ export default function InvoicesPage(): JSX.Element {
     <main className="space-y-4 p-4">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Invoices</h1>
-          <p className="text-sm text-slate-500">{total} total invoices</p>
+          <h1 className="text-xl font-semibold text-on-surface">Invoices</h1>
+          <p className="text-sm text-on-surface-variant">{total} total invoices</p>
         </div>
         <div className="flex items-center gap-2">
           <ExportButton module="invoices" filters={{ status: statusFilter }} />
@@ -100,12 +100,12 @@ export default function InvoicesPage(): JSX.Element {
       {/* Summary metrics */}
       <section className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Outstanding', value: formatCurrency(totalOutstanding), color: 'text-orange-600' },
-          { label: 'Collected (this view)', value: formatCurrency(totalPaid), color: 'text-emerald-600' },
-          { label: 'Total invoices', value: String(total), color: 'text-slate-900' },
+          { label: 'Outstanding', value: formatCurrency(totalOutstanding), color: 'text-warning' },
+          { label: 'Collected (this view)', value: formatCurrency(totalPaid), color: 'text-success' },
+          { label: 'Total invoices', value: String(total), color: 'text-on-surface' },
         ].map((m) => (
-          <div key={m.label} className="rounded-lg border border-slate-200 bg-white p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">{m.label}</p>
+          <div key={m.label} className="rounded-lg border border-outline-variant bg-surface p-4">
+            <p className="text-xs uppercase tracking-wide text-on-surface-variant">{m.label}</p>
             <p className={`mt-1 text-2xl font-bold ${m.color}`}>{m.value}</p>
           </div>
         ))}
@@ -120,8 +120,8 @@ export default function InvoicesPage(): JSX.Element {
             onClick={() => setStatusFilter(s)}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               statusFilter === s
-                ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                ? 'bg-inverse-surface text-white'
+                : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'
             }`}
           >
             {s}
@@ -130,7 +130,7 @@ export default function InvoicesPage(): JSX.Element {
       </div>
 
       {/* Table */}
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <section className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
         {invoicesQuery.isLoading ? (
           <TableSkeleton rows={8} cols={7} />
         ) : invoices.length === 0 ? (
@@ -145,7 +145,7 @@ export default function InvoicesPage(): JSX.Element {
           />
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-start text-xs uppercase tracking-wide text-slate-500">
+            <thead className="bg-surface-container-low text-start text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
                 <th className="px-4 py-3">Invoice #</th>
                 <th className="px-4 py-3">Account</th>
@@ -156,13 +156,13 @@ export default function InvoicesPage(): JSX.Element {
                 <th className="px-4 py-3 text-end">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-outline-variant">
               {invoices.map((inv) => (
-                <tr key={inv.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 font-mono text-xs font-medium text-slate-900">
+                <tr key={inv.id} className="hover:bg-surface-container-low">
+                  <td className="px-4 py-3 font-mono text-xs font-medium text-on-surface">
                     {inv.invoiceNumber}
                   </td>
-                  <td className="px-4 py-3 font-mono text-[11px] text-slate-500">
+                  <td className="px-4 py-3 font-mono text-[11px] text-on-surface-variant">
                     {inv.accountId.slice(0, 10)}…
                   </td>
                   <td className="px-4 py-3">
@@ -170,13 +170,13 @@ export default function InvoicesPage(): JSX.Element {
                       {inv.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 font-semibold text-slate-900">
+                  <td className="px-4 py-3 font-semibold text-on-surface">
                     {formatCurrency(parseFloat(inv.total), inv.currency)}
                   </td>
-                  <td className={`px-4 py-3 text-sm ${inv.status === 'OVERDUE' ? 'font-semibold text-red-600' : 'text-slate-600'}`}>
+                  <td className={`px-4 py-3 text-sm ${inv.status === 'OVERDUE' ? 'font-semibold text-error' : 'text-on-surface-variant'}`}>
                     {inv.dueDate ? formatDate(inv.dueDate) : '—'}
                   </td>
-                  <td className="px-4 py-3 text-slate-500">{formatDate(inv.createdAt)}</td>
+                  <td className="px-4 py-3 text-on-surface-variant">{formatDate(inv.createdAt)}</td>
                   <td className="px-4 py-3 text-end">
                     <div className="inline-flex gap-1">
                       {inv.status === 'DRAFT' && (

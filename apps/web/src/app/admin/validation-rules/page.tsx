@@ -193,15 +193,15 @@ export default function AdminValidationRulesPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-gray-800 bg-gray-900 p-6 shadow-xl">
+      <section className="rounded-2xl border border-outline-variant bg-inverse-surface p-6 shadow-xl">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-indigo-300">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-primary">
               <LockKeyhole className="h-4 w-4" />
               Admin controlled policy
             </p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-white">System Field Validation Rules</h1>
-            <p className="mt-3 max-w-4xl text-sm leading-6 text-gray-300">
+            <p className="mt-3 max-w-4xl text-sm leading-6 text-outline">
               Choose which fields are optional or required across the CRM. These rules are global policy, owned by the
               admin panel, and are consumed by module forms, imports, and API validation paths as each service is
               hardened.
@@ -216,21 +216,21 @@ export default function AdminValidationRulesPage() {
           <button
             type="button"
             onClick={startCreate}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-500"
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white hover:bg-primary"
           >
             <Plus className="h-4 w-4" />
             New Policy
           </button>
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-on-surface-variant">
             Policies can be created from module field catalogs or custom field keys.
           </span>
         </div>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)_320px]">
-        <aside className="rounded-2xl border border-gray-800 bg-gray-900 p-4">
-          <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-200">
-            <Database className="h-4 w-4 text-indigo-300" />
+        <aside className="rounded-2xl border border-outline-variant bg-inverse-surface p-4">
+          <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-outline">
+            <Database className="h-4 w-4 text-primary" />
             CRM modules
           </div>
           <div className="space-y-2">
@@ -245,17 +245,17 @@ export default function AdminValidationRulesPage() {
                   onClick={() => setSelectedModule(module.id)}
                   className={`w-full rounded-xl border px-4 py-3 text-left transition ${
                     active
-                      ? 'border-indigo-500 bg-indigo-600 text-white'
-                      : 'border-gray-800 bg-gray-950 text-gray-300 hover:border-gray-700 hover:bg-gray-900'
+                      ? 'border-primary bg-primary text-white'
+                      : 'border-outline-variant bg-inverse-surface text-outline hover:border-outline-variant hover:bg-inverse-surface'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-semibold">{module.label}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${active ? 'bg-white/15' : 'bg-gray-800'}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${active ? 'bg-surface/15' : 'bg-surface-container-highest'}`}>
                       {moduleRequired}/{moduleRules.length}
                     </span>
                   </div>
-                  <p className={`mt-1 text-xs leading-5 ${active ? 'text-indigo-100' : 'text-gray-500'}`}>
+                  <p className={`mt-1 text-xs leading-5 ${active ? 'text-on-primary-container' : 'text-on-surface-variant'}`}>
                     {module.description}
                   </p>
                 </button>
@@ -264,64 +264,64 @@ export default function AdminValidationRulesPage() {
           </div>
         </aside>
 
-        <main className="overflow-hidden rounded-2xl border border-gray-800 bg-gray-900 shadow-xl">
-          <div className="border-b border-gray-800 px-6 py-5">
+        <main className="overflow-hidden rounded-2xl border border-outline-variant bg-inverse-surface shadow-xl">
+          <div className="border-b border-outline-variant px-6 py-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-300">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
                   {selectedDefinition.label}
                 </p>
                 <h2 className="mt-1 text-xl font-bold text-white">Required Field Policy</h2>
-                <p className="mt-1 text-sm text-gray-400">{selectedDefinition.description}</p>
-                <p className="mt-2 text-xs text-gray-500">
+                <p className="mt-1 text-sm text-on-surface-variant">{selectedDefinition.description}</p>
+                <p className="mt-2 text-xs text-on-surface-variant">
                   Reading {activeFields.length} fields across {fieldGroups.length} field groups for this module.
                 </p>
               </div>
-              <div className="rounded-lg border border-indigo-900/70 bg-blue-950/40 px-4 py-2 text-sm font-bold text-indigo-200">
+              <div className="rounded-lg border border-primary/70 bg-info-container/40 px-4 py-2 text-sm font-bold text-primary">
                 {requiredCount} active required fields
               </div>
             </div>
           </div>
 
           {loading ? (
-            <div className="p-8 text-sm text-gray-400">
+            <div className="p-8 text-sm text-on-surface-variant">
               <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
               Loading validation rules...
             </div>
           ) : activeRules.length === 0 ? (
-            <div className="p-8 text-sm text-gray-400">No validation rules configured for this module.</div>
+            <div className="p-8 text-sm text-on-surface-variant">No validation rules configured for this module.</div>
           ) : (
-            <div className="divide-y divide-gray-800">
+            <div className="divide-y divide-outline-variant">
               {activeRules.map((rule) => (
                 <div key={rule.id} className="grid gap-4 px-6 py-5 lg:grid-cols-[220px_minmax(0,1fr)_170px] lg:items-center">
                   <div>
                     <p className="font-semibold text-white">{rule.label}</p>
-                    <p className="text-xs uppercase tracking-[0.18em] text-gray-500">{rule.field}</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-on-surface-variant">{rule.field}</p>
                   </div>
                   <input
                     value={rule.message}
                     onChange={(event) => updateRule(rule, { message: event.target.value })}
-                    className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-sm text-gray-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    className="h-10 rounded-lg border border-outline-variant bg-inverse-surface px-3 text-sm text-inverse-on-surface outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                   <div className="flex items-center justify-between gap-3">
-                    <span className={`text-sm font-semibold ${rule.enabled ? 'text-indigo-200' : 'text-gray-400'}`}>
+                    <span className={`text-sm font-semibold ${rule.enabled ? 'text-primary' : 'text-on-surface-variant'}`}>
                       {rule.enabled ? 'Required' : 'Optional'}
                     </span>
                     <button
                       type="button"
                       onClick={() => updateRule(rule, { enabled: !rule.enabled })}
                       className={`relative h-7 w-12 rounded-full transition ${
-                        rule.enabled ? 'bg-indigo-600' : 'bg-gray-700'
+                        rule.enabled ? 'bg-primary' : 'bg-surface-container-high'
                       }`}
                       aria-label={`Toggle ${rule.label}`}
                     >
                       <span
-                        className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${
+                        className={`absolute top-1 h-5 w-5 rounded-full bg-surface shadow transition ${
                           rule.enabled ? 'left-6' : 'left-1'
                         }`}
                       />
                     </button>
-                    {savingId === rule.id ? <Loader2 className="h-4 w-4 animate-spin text-indigo-300" /> : null}
+                    {savingId === rule.id ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : null}
                   </div>
                 </div>
               ))}
@@ -330,20 +330,20 @@ export default function AdminValidationRulesPage() {
         </main>
 
         <aside className="space-y-4">
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-5">
+          <div className="rounded-2xl border border-outline-variant bg-inverse-surface p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold text-white">Module Fields</h2>
-                <p className="mt-1 text-xs text-gray-500">Field catalog read by policy builder.</p>
+                <p className="mt-1 text-xs text-on-surface-variant">Field catalog read by policy builder.</p>
               </div>
-              <span className="rounded-full bg-gray-800 px-2 py-0.5 text-xs font-bold text-gray-300">
+              <span className="rounded-full bg-surface-container-highest px-2 py-0.5 text-xs font-bold text-outline">
                 {activeFields.length}
               </span>
             </div>
             <div className="mt-4 max-h-72 space-y-4 overflow-y-auto pr-1">
               {fieldGroups.map(([group, groupFields]) => (
                 <div key={group}>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-300">{group}</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">{group}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {groupFields.map((field) => {
                       const exists = activeRules.some((rule) => rule.field === field.field);
@@ -351,7 +351,7 @@ export default function AdminValidationRulesPage() {
                         <span
                           key={field.field}
                           className={`rounded px-2 py-1 text-xs ${
-                            exists ? 'bg-blue-950 text-indigo-200' : 'bg-gray-800 text-gray-300'
+                            exists ? 'bg-info-container text-primary' : 'bg-surface-container-highest text-outline'
                           }`}
                         >
                           {field.label}
@@ -364,40 +364,40 @@ export default function AdminValidationRulesPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600 text-white">
+          <div className="rounded-2xl border border-outline-variant bg-inverse-surface p-5">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-white">
               <GitBranch className="h-5 w-5" />
             </div>
             <h2 className="mt-4 text-lg font-bold text-white">How the policy runs</h2>
-            <div className="mt-4 space-y-4 text-sm text-gray-300">
+            <div className="mt-4 space-y-4 text-sm text-outline">
               <PolicyLine text="Admin panel is the only UI for changing required-field policy." />
               <PolicyLine text="Rules are stored by module and field, so the same engine can govern all services." />
               <PolicyLine text="Contacts enforce this policy in the API before duplicate checks." />
               <PolicyLine text="Accounts, leads, deals, and quotes enforce the same policy in preview and service routes as they are created or updated." />
             </div>
-            <button className="mt-6 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 text-sm font-bold text-white">
+            <button className="mt-6 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-bold text-white">
               <Save className="h-4 w-4" />
               Auto-saved Policy
             </button>
           </div>
 
-          <div className="rounded-2xl border border-amber-900/60 bg-amber-950/30 p-5 text-sm text-amber-100">
+          <div className="rounded-2xl border border-warning/60 bg-warning-container/30 p-5 text-sm text-on-warning-container">
             <div className="flex items-center gap-2 font-bold">
               <AlertTriangle className="h-4 w-4" />
               Governance note
             </div>
-            <p className="mt-2 leading-6 text-amber-100/80">
+            <p className="mt-2 leading-6 text-on-warning-container/80">
               Making a field required affects manual creation, imports, and future integration syncs once that module is
               connected to the shared validation engine.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-5">
-            <div className="flex items-center gap-2 text-sm font-bold text-gray-200">
-              <SlidersHorizontal className="h-4 w-4 text-indigo-300" />
+          <div className="rounded-2xl border border-outline-variant bg-inverse-surface p-5">
+            <div className="flex items-center gap-2 text-sm font-bold text-outline">
+              <SlidersHorizontal className="h-4 w-4 text-primary" />
               Next hardening path
             </div>
-            <div className="mt-4 space-y-3 text-sm text-gray-400">
+            <div className="mt-4 space-y-3 text-sm text-on-surface-variant">
               <PolicyLine text="Extend import validators to show the same policy errors row by row." />
               <PolicyLine text="Add approval-gated policy changes for regulated modules." />
               <PolicyLine text="Expose custom fields as rule candidates in every module catalog." />
@@ -407,20 +407,20 @@ export default function AdminValidationRulesPage() {
       </section>
 
       {creating ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <form onSubmit={createPolicy} className="w-full max-w-2xl rounded-2xl border border-gray-800 bg-gray-900 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-800 px-6 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-on-surface/60 p-4">
+          <form onSubmit={createPolicy} className="w-full max-w-2xl rounded-2xl border border-outline-variant bg-inverse-surface shadow-2xl">
+            <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
               <div>
                 <h2 className="text-lg font-bold text-white">Create Validation Policy</h2>
-                <p className="text-sm text-gray-400">Choose a module-specific field and define how the system validates it.</p>
+                <p className="text-sm text-on-surface-variant">Choose a module-specific field and define how the system validates it.</p>
               </div>
-              <button type="button" onClick={() => setCreating(false)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-white">
+              <button type="button" onClick={() => setCreating(false)} className="rounded-lg p-2 text-on-surface-variant hover:bg-surface-container-highest hover:text-white">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="grid gap-4 p-6">
               <label className="grid gap-1 text-sm">
-                <span className="font-semibold text-gray-300">Module</span>
+                <span className="font-semibold text-outline">Module</span>
                 <select
                   value={draft.objectType}
                   onChange={(event) => {
@@ -438,7 +438,7 @@ export default function AdminValidationRulesPage() {
                       useCustomField: !firstField,
                     });
                   }}
-                  className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-indigo-500"
+                  className="h-10 rounded-lg border border-outline-variant bg-inverse-surface px-3 text-inverse-on-surface outline-none focus:border-primary"
                 >
                   {MODULES.map((module) => (
                     <option key={module.id} value={module.id}>{module.label}</option>
@@ -446,33 +446,33 @@ export default function AdminValidationRulesPage() {
                 </select>
               </label>
 
-              <label className="flex items-center justify-between rounded-lg border border-gray-800 bg-gray-950 px-4 py-3 text-sm">
-                <span className="font-semibold text-gray-300">Use custom field key</span>
+              <label className="flex items-center justify-between rounded-lg border border-outline-variant bg-inverse-surface px-4 py-3 text-sm">
+                <span className="font-semibold text-outline">Use custom field key</span>
                 <input
                   type="checkbox"
                   checked={draft.useCustomField}
                   onChange={(event) => setDraft((current) => ({ ...current, useCustomField: event.target.checked }))}
-                  className="rounded border-gray-600 bg-gray-900 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-outline bg-inverse-surface text-primary focus:ring-primary"
                 />
               </label>
 
               {draft.useCustomField ? (
                 <label className="grid gap-1 text-sm">
-                  <span className="font-semibold text-gray-300">Custom field key</span>
+                  <span className="font-semibold text-outline">Custom field key</span>
                   <input
                     value={draft.customField}
                     onChange={(event) => setDraft((current) => ({ ...current, customField: event.target.value, label: current.label || event.target.value }))}
                     placeholder="customFields.customerSegment"
-                    className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-indigo-500"
+                    className="h-10 rounded-lg border border-outline-variant bg-inverse-surface px-3 text-inverse-on-surface outline-none focus:border-primary"
                   />
                 </label>
               ) : (
                 <label className="grid gap-1 text-sm">
-                  <span className="font-semibold text-gray-300">Module field</span>
+                  <span className="font-semibold text-outline">Module field</span>
                   <select
                     value={draft.field}
                     onChange={(event) => updateDraftField(event.target.value)}
-                    className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-indigo-500"
+                    className="h-10 rounded-lg border border-outline-variant bg-inverse-surface px-3 text-inverse-on-surface outline-none focus:border-primary"
                   >
                     {fields
                       .filter((field) => field.objectType === draft.objectType)
@@ -487,19 +487,19 @@ export default function AdminValidationRulesPage() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="grid gap-1 text-sm">
-                  <span className="font-semibold text-gray-300">Policy label</span>
+                  <span className="font-semibold text-outline">Policy label</span>
                   <input
                     value={draft.label}
                     onChange={(event) => setDraft((current) => ({ ...current, label: event.target.value }))}
-                    className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-indigo-500"
+                    className="h-10 rounded-lg border border-outline-variant bg-inverse-surface px-3 text-inverse-on-surface outline-none focus:border-primary"
                   />
                 </label>
                 <label className="grid gap-1 text-sm">
-                  <span className="font-semibold text-gray-300">Initial status</span>
+                  <span className="font-semibold text-outline">Initial status</span>
                   <select
                     value={draft.enabled ? 'required' : 'optional'}
                     onChange={(event) => setDraft((current) => ({ ...current, enabled: event.target.value === 'required' }))}
-                    className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-indigo-500"
+                    className="h-10 rounded-lg border border-outline-variant bg-inverse-surface px-3 text-inverse-on-surface outline-none focus:border-primary"
                   >
                     <option value="required">Required</option>
                     <option value="optional">Optional</option>
@@ -508,19 +508,19 @@ export default function AdminValidationRulesPage() {
               </div>
 
               <label className="grid gap-1 text-sm">
-                <span className="font-semibold text-gray-300">Validation message</span>
+                <span className="font-semibold text-outline">Validation message</span>
                 <input
                   value={draft.message}
                   onChange={(event) => setDraft((current) => ({ ...current, message: event.target.value }))}
-                  className="h-10 rounded-lg border border-gray-700 bg-gray-950 px-3 text-gray-100 outline-none focus:border-indigo-500"
+                  className="h-10 rounded-lg border border-outline-variant bg-inverse-surface px-3 text-inverse-on-surface outline-none focus:border-primary"
                 />
               </label>
             </div>
-            <div className="flex justify-end gap-3 border-t border-gray-800 px-6 py-4">
-              <button type="button" onClick={() => setCreating(false)} className="rounded-lg border border-gray-700 px-4 py-2 text-sm font-bold text-gray-200 hover:bg-gray-800">
+            <div className="flex justify-end gap-3 border-t border-outline-variant px-6 py-4">
+              <button type="button" onClick={() => setCreating(false)} className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-bold text-outline hover:bg-surface-container-highest">
                 Cancel
               </button>
-              <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500">
+              <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary">
                 Create Policy
               </button>
             </div>
@@ -533,8 +533,8 @@ export default function AdminValidationRulesPage() {
 
 function AdminMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-950 px-4 py-3">
-      <p className="text-xs uppercase tracking-[0.18em] text-gray-500">{label}</p>
+    <div className="rounded-xl border border-outline-variant bg-inverse-surface px-4 py-3">
+      <p className="text-xs uppercase tracking-[0.18em] text-on-surface-variant">{label}</p>
       <p className="mt-1 text-2xl font-bold text-white">{value}</p>
     </div>
   );
@@ -543,7 +543,7 @@ function AdminMetric({ label, value }: { label: string; value: string }) {
 function PolicyLine({ text }: { text: string }) {
   return (
     <div className="flex gap-3">
-      <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-emerald-400" />
+      <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-success" />
       <p>{text}</p>
     </div>
   );

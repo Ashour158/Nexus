@@ -148,7 +148,7 @@ export default function DealsPage() {
               onClick={() => setView('pipeline')}
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
-                view === 'pipeline' ? 'bg-primary-light text-primary' : 'text-gray-500 hover:text-gray-700'
+                view === 'pipeline' ? 'bg-primary-light text-primary' : 'text-on-surface-variant hover:text-on-surface'
               )}
               aria-pressed={view === 'pipeline'}
             >
@@ -159,7 +159,7 @@ export default function DealsPage() {
               onClick={() => setView('list')}
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
-                view === 'list' ? 'bg-primary-light text-primary' : 'text-gray-500 hover:text-gray-700'
+                view === 'list' ? 'bg-primary-light text-primary' : 'text-on-surface-variant hover:text-on-surface'
               )}
               aria-pressed={view === 'list'}
             >
@@ -245,7 +245,7 @@ export default function DealsPage() {
                 header: 'Company',
                 cell: (row) => (
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gray-100 text-[10px] font-bold text-gray-500 dark:bg-slate-800 dark:text-slate-400">
+                    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-container-high text-[10px] font-bold text-on-surface-variant dark:bg-surface-container-high dark:text-on-surface-variant">
                       {(row as unknown as Record<string, string>)['accountName']?.[0] ?? 'C'}
                     </span>
                     <span style={{ color: 'var(--text-secondary)' }}>{(row as unknown as Record<string, string>)['accountName'] ?? '—'}</span>
@@ -359,7 +359,7 @@ export default function DealsPage() {
                       setSelectedIds(new Set());
                     }
                   }}
-                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-error hover:bg-error-container "
                 >
                   <Trash2 className="h-3.5 w-3.5" /> Delete
                 </button>
@@ -368,7 +368,7 @@ export default function DealsPage() {
                   onClick={() => {
                     setSelectedIds(new Set());
                   }}
-                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-800"
+                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-highest"
                 >
                   Clear
                 </button>
@@ -446,7 +446,7 @@ function FilterChip({
         'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition',
         active
           ? 'border-primary bg-primary-light text-primary'
-          : 'border-[var(--border-color)] text-gray-500 hover:text-gray-700'
+          : 'border-[var(--border-color)] text-on-surface-variant hover:text-on-surface'
       )}
     >
       {children}
@@ -458,7 +458,7 @@ function ErrorBanner({ message }: { message: string }) {
   return (
     <div
       role="alert"
-      className="rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
+      className="rounded-md border border-error/40 bg-error-container p-4 text-sm text-on-error-container "
     >
       {message}
     </div>

@@ -106,34 +106,34 @@ export default function ScoringRulesPage() {
     <div className="max-w-3xl p-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Lead Scoring Rules</h1>
-          <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Customize how NEXUS scores your leads</p>
+          <h1 className="text-xl font-bold text-on-surface ">Lead Scoring Rules</h1>
+          <p className="mt-0.5 text-sm text-on-surface-variant dark:text-on-surface-variant">Customize how NEXUS scores your leads</p>
         </div>
         <Button
           onClick={() => setShowForm(true)}
-          className="bg-indigo-600 hover:bg-indigo-700"
+          className="bg-primary hover:bg-primary"
         >
           + Add Rule
         </Button>
       </div>
 
       {error ? (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="mb-4 rounded-lg border border-warning/30 bg-warning-container px-4 py-3 text-sm text-on-warning-container">
           {error}
         </div>
       ) : null}
 
       {showForm ? (
-        <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-slate-700 dark:bg-slate-900">
+        <div className="mb-4 rounded-xl border border-outline-variant bg-surface-container-low p-4 dark:border-outline-variant dark:bg-surface">
           <div className="mb-3 grid grid-cols-3 gap-3">
             <input
               placeholder="Rule name"
-              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm dark:border-outline-variant dark:bg-surface "
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             />
             <select
-              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm dark:border-outline-variant dark:bg-surface "
               value={form.signal}
               onChange={(e) => setForm((f) => ({ ...f, signal: e.target.value }))}
             >
@@ -146,13 +146,13 @@ export default function ScoringRulesPage() {
             <input
               type="number"
               placeholder="Points"
-              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm dark:border-outline-variant dark:bg-surface "
               value={form.points}
               onChange={(e) => setForm((f) => ({ ...f, points: Number.parseInt(e.target.value, 10) || 0 }))}
             />
           </div>
           <div className="flex gap-2">
-            <Button onClick={handleCreate} className="bg-indigo-600 px-3 py-1.5 text-sm hover:bg-indigo-700">
+            <Button onClick={handleCreate} className="bg-primary px-3 py-1.5 text-sm hover:bg-primary">
               Save
             </Button>
             <Button
@@ -166,37 +166,37 @@ export default function ScoringRulesPage() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+      <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface dark:border-outline-variant dark:bg-surface">
         <table className="w-full text-sm">
-          <thead className="border-b border-gray-100 bg-gray-50 dark:border-slate-700 dark:bg-slate-950">
+          <thead className="border-b border-outline-variant bg-surface-container-low dark:border-outline-variant dark:bg-surface">
             <tr>
-              <th className="px-4 py-3 text-start font-medium text-gray-500 dark:text-slate-400">Rule</th>
-              <th className="px-4 py-3 text-start font-medium text-gray-500 dark:text-slate-400">Signal</th>
-              <th className="px-4 py-3 text-end font-medium text-gray-500 dark:text-slate-400">Points</th>
-              <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-slate-400">Active</th>
+              <th className="px-4 py-3 text-start font-medium text-on-surface-variant dark:text-on-surface-variant">Rule</th>
+              <th className="px-4 py-3 text-start font-medium text-on-surface-variant dark:text-on-surface-variant">Signal</th>
+              <th className="px-4 py-3 text-end font-medium text-on-surface-variant dark:text-on-surface-variant">Points</th>
+              <th className="px-4 py-3 text-center font-medium text-on-surface-variant dark:text-on-surface-variant">Active</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+          <tbody className="divide-y divide-outline-variant ">
             {rules.map((rule) => (
               <tr key={rule.id} className={!rule.isActive ? 'opacity-50' : undefined}>
-                <td className="px-4 py-3 font-medium text-gray-900 dark:text-slate-100">{rule.name}</td>
-                <td className="px-4 py-3 capitalize text-gray-600 dark:text-slate-300">{rule.signal.replace(/_/g, ' ')}</td>
-                <td className="px-4 py-3 text-end font-bold dark:text-slate-200">{rule.points}</td>
+                <td className="px-4 py-3 font-medium text-on-surface ">{rule.name}</td>
+                <td className="px-4 py-3 capitalize text-on-surface-variant dark:text-outline">{rule.signal.replace(/_/g, ' ')}</td>
+                <td className="px-4 py-3 text-end font-bold dark:text-outline">{rule.points}</td>
                 <td className="px-4 py-3 text-center">
                   <button
                     onClick={() => toggleActive(rule)}
-                    className={`h-5 w-9 rounded-full ${rule.isActive ? 'bg-indigo-500' : 'bg-gray-300'}`}
+                    className={`h-5 w-9 rounded-full ${rule.isActive ? 'bg-primary' : 'bg-surface-container-highest'}`}
                   >
                     <span
-                      className={`mx-0.5 block h-4 w-4 rounded-full bg-white shadow ${
+                      className={`mx-0.5 block h-4 w-4 rounded-full bg-surface shadow ${
                         rule.isActive ? 'translate-x-4' : ''
                       }`}
                     />
                   </button>
                 </td>
                 <td className="px-4 py-3 text-end">
-                  <button onClick={() => deleteRule(rule.id)} className="text-xs text-gray-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400">
+                  <button onClick={() => deleteRule(rule.id)} className="text-xs text-on-surface-variant hover:text-error dark:text-on-surface-variant dark:hover:text-error">
                     Remove
                   </button>
                 </td>
@@ -204,7 +204,7 @@ export default function ScoringRulesPage() {
             ))}
             {rules.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-500 dark:text-slate-400">
+                <td colSpan={5} className="px-4 py-8 text-center text-on-surface-variant dark:text-on-surface-variant">
                   No scoring rules configured yet.
                 </td>
               </tr>

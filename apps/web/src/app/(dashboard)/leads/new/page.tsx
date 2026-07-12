@@ -174,11 +174,11 @@ export default function NewLeadPage() {
         icon={Target}
         title="Create lead"
         description="Create a clean, coded lead record with ownership, source, consent, and qualification context ready for routing."
-        badges={<span className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">Shared CRM form pattern</span>}
+        badges={<span className="rounded-lg bg-surface-container-high px-3 py-2 text-xs font-semibold text-on-surface-variant">Shared CRM form pattern</span>}
         actions={
           <Link
             href="/leads"
-            className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+            className="inline-flex h-11 items-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 text-sm font-bold text-on-surface transition hover:bg-surface-container-low"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Leads
@@ -232,7 +232,7 @@ export default function NewLeadPage() {
               <SelectField label="Owner" required value={draft.ownerId} error={errors.ownerId} options={ownerOptions} onChange={(value) => update('ownerId', value)} />
               <TextField label="Score" type="number" value={draft.score} onChange={(value) => update('score', value)} />
               <TextField label="Tags" value={draft.tags} hint="Comma separated, for example enterprise, priority" onChange={(value) => update('tags', value)} />
-              <div className="grid gap-3 rounded-lg border border-slate-100 bg-slate-50 p-4">
+              <div className="grid gap-3 rounded-lg border border-outline-variant bg-surface-container-low p-4">
                 <CheckboxField label="GDPR consent captured" checked={draft.gdprConsent} onChange={(value) => update('gdprConsent', value)} />
                 <CheckboxField label="Do not contact" checked={draft.doNotContact} onChange={(value) => update('doNotContact', value)} />
               </div>
@@ -252,7 +252,7 @@ export default function NewLeadPage() {
           </CRMSidePanel>
 
           <CRMCard title="Shared design system" description="This page now uses the reusable CRM UI layer.">
-            <ul className="space-y-3 text-sm text-slate-600">
+            <ul className="space-y-3 text-sm text-on-surface-variant">
               <li>Cards: `CRMCard`, `CRMFormSection`</li>
               <li>Forms: field grids, consistent inputs, validation copy</li>
               <li>Dashboards: `CRMPageHeader`, metrics</li>
@@ -261,7 +261,7 @@ export default function NewLeadPage() {
             </ul>
           </CRMCard>
 
-          <div className="sticky bottom-4 rounded-xl border border-slate-100 bg-white p-4 shadow-lg">
+          <div className="sticky bottom-4 rounded-xl border border-outline-variant bg-surface p-4 shadow-lg">
             <button
               type="submit"
               disabled={createLead.isPending}
@@ -296,17 +296,17 @@ function TextField({
 }) {
   return (
     <label className="block">
-      <span className="text-sm font-bold text-slate-700">
-        {label} {required ? <span className="text-rose-500">*</span> : null}
+      <span className="text-sm font-bold text-on-surface">
+        {label} {required ? <span className="text-error">*</span> : null}
       </span>
       <input
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+        className="mt-2 h-11 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface outline-none transition focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
       />
-      {hint && !error ? <p className="mt-1 text-xs text-slate-500">{hint}</p> : null}
-      {error ? <p className="mt-1 text-xs font-semibold text-rose-600">{error}</p> : null}
+      {hint && !error ? <p className="mt-1 text-xs text-on-surface-variant">{hint}</p> : null}
+      {error ? <p className="mt-1 text-xs font-semibold text-error">{error}</p> : null}
     </label>
   );
 }
@@ -322,12 +322,12 @@ function TextareaField({
 }) {
   return (
     <label className="block">
-      <span className="text-sm font-bold text-slate-700">{label}</span>
+      <span className="text-sm font-bold text-on-surface">{label}</span>
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
         rows={4}
-        className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+        className="mt-2 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-3 text-sm text-on-surface outline-none transition focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
       />
     </label>
   );
@@ -350,13 +350,13 @@ function SelectField({
 }) {
   return (
     <label className="block">
-      <span className="text-sm font-bold text-slate-700">
-        {label} {required ? <span className="text-rose-500">*</span> : null}
+      <span className="text-sm font-bold text-on-surface">
+        {label} {required ? <span className="text-error">*</span> : null}
       </span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+        className="mt-2 h-11 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface outline-none transition focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -364,7 +364,7 @@ function SelectField({
           </option>
         ))}
       </select>
-      {error ? <p className="mt-1 text-xs font-semibold text-rose-600">{error}</p> : null}
+      {error ? <p className="mt-1 text-xs font-semibold text-error">{error}</p> : null}
     </label>
   );
 }
@@ -379,12 +379,12 @@ function CheckboxField({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+    <label className="flex items-center gap-3 text-sm font-semibold text-on-surface">
       <input
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="h-4 w-4 rounded border-slate-300 text-[#4f46e5] focus:ring-indigo-200"
+        className="h-4 w-4 rounded border-outline-variant text-[#4f46e5] focus:ring-primary/30"
       />
       {label}
     </label>
@@ -393,11 +393,11 @@ function CheckboxField({
 
 function CheckItem({ done, label }: { done: boolean; label: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-      <span className={done ? 'text-emerald-600' : 'text-slate-300'}>
+    <div className="flex items-center gap-3 rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2">
+      <span className={done ? 'text-success' : 'text-outline'}>
         <CheckCircle2 className="h-4 w-4" />
       </span>
-      <span className={done ? 'font-semibold text-slate-800' : 'text-slate-500'}>{label}</span>
+      <span className={done ? 'font-semibold text-on-surface' : 'text-on-surface-variant'}>{label}</span>
     </div>
   );
 }

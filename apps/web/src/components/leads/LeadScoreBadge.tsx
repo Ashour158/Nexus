@@ -12,9 +12,9 @@ interface LeadScoreData {
 }
 
 const tierConfig: Record<ScoreTier, { label: string; bg: string; text: string; dot: string }> = {
-  hot: { label: 'Hot', bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-500' },
-  warm: { label: 'Warm', bg: 'bg-amber-100', text: 'text-amber-700', dot: 'bg-amber-500' },
-  cold: { label: 'Cold', bg: 'bg-indigo-100', text: 'text-indigo-700', dot: 'bg-indigo-400' },
+  hot: { label: 'Hot', bg: 'bg-error-container', text: 'text-error', dot: 'bg-error' },
+  warm: { label: 'Warm', bg: 'bg-warning-container', text: 'text-warning', dot: 'bg-warning' },
+  cold: { label: 'Cold', bg: 'bg-primary-container', text: 'text-primary', dot: 'bg-primary' },
 };
 
 export function LeadScoreBadge({ leadId, showTooltip = true }: { leadId: string; showTooltip?: boolean }) {
@@ -46,25 +46,25 @@ export function LeadScoreBadge({ leadId, showTooltip = true }: { leadId: string;
       </span>
 
       {showTip && showTooltip && (
-        <div className="absolute bottom-full start-0 z-50 mb-2 w-56 rounded-lg bg-gray-900 p-3 text-xs text-white shadow-lg">
+        <div className="absolute bottom-full start-0 z-50 mb-2 w-56 rounded-lg bg-inverse-surface p-3 text-xs text-white shadow-lg">
           <p className="mb-2 font-semibold">Score breakdown</p>
           {Object.entries(scoreData.signals).map(([signal, pts]) => (
             <div key={signal} className="flex justify-between py-0.5">
-              <span className="capitalize text-gray-300">{signal.replace(/_/g, ' ')}</span>
-              <span className={pts >= 0 ? 'text-green-400' : 'text-red-400'}>
+              <span className="capitalize text-outline">{signal.replace(/_/g, ' ')}</span>
+              <span className={pts >= 0 ? 'text-success' : 'text-error'}>
                 {pts >= 0 ? '+' : ''}
                 {pts}
               </span>
             </div>
           ))}
-          <div className="mt-2 flex justify-between border-t border-gray-700 pt-2 font-semibold">
+          <div className="mt-2 flex justify-between border-t border-outline-variant pt-2 font-semibold">
             <span>Total</span>
             <span>{scoreData.score}</span>
           </div>
-          <p className="mt-1 text-[10px] text-gray-500">
+          <p className="mt-1 text-[10px] text-on-surface-variant">
             Updated {new Date(scoreData.scoredAt).toLocaleDateString()}
           </p>
-          <div className="absolute start-4 top-full border-4 border-transparent border-t-gray-900" />
+          <div className="absolute start-4 top-full border-4 border-transparent border-t-primary" />
         </div>
       )}
     </div>

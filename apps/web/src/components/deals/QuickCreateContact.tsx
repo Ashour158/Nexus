@@ -62,36 +62,36 @@ export function QuickCreateContact({ onCreated, onCancel }: Props) {
   return (
     <Modal open onClose={onCancel} title="Quick-create contact" size="md">
       <form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} className="space-y-3">
-        <div className="mb-1 flex items-center gap-2 text-sm text-indigo-700">
+        <div className="mb-1 flex items-center gap-2 text-sm text-primary">
           <UserPlus className="h-4 w-4" />
           Add a contact without leaving deal creation
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-medium text-gray-600">First name *</label>
-            <input required value={firstName} onChange={(e) => setFirstName(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
-            {fieldErrors.firstName ? <p className="mt-1 text-xs text-red-500">{fieldErrors.firstName}</p> : null}
+            <label className="text-xs font-medium text-on-surface-variant">First name *</label>
+            <input required value={firstName} onChange={(e) => setFirstName(e.target.value)} className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:border-primary" />
+            {fieldErrors.firstName ? <p className="mt-1 text-xs text-error">{fieldErrors.firstName}</p> : null}
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-600">Last name</label>
-            <input value={lastName} onChange={(e) => setLastName(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
+            <label className="text-xs font-medium text-on-surface-variant">Last name</label>
+            <input value={lastName} onChange={(e) => setLastName(e.target.value)} className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:border-primary" />
           </div>
         </div>
         <div>
-          <label className="text-xs font-medium text-gray-600">Email *</label>
-          <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
-            {fieldErrors.email ? <p className="mt-1 text-xs text-red-500">{fieldErrors.email}</p> : null}
+          <label className="text-xs font-medium text-on-surface-variant">Email *</label>
+          <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:border-primary" />
+            {fieldErrors.email ? <p className="mt-1 text-xs text-error">{fieldErrors.email}</p> : null}
         </div>
         <div>
-          <label className="text-xs font-medium text-gray-600">Company</label>
-          <input value={company} onChange={(e) => setCompany(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
+          <label className="text-xs font-medium text-on-surface-variant">Company</label>
+          <input value={company} onChange={(e) => setCompany(e.target.value)} className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:border-primary" />
         </div>
-        {error ? <p className="text-xs text-red-600">{error}</p> : null}
+        {error ? <p className="text-xs text-error">{error}</p> : null}
         <div className="flex gap-3 pt-1">
-          <button type="submit" disabled={create.isPending} className="flex-1 rounded-lg bg-indigo-600 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50">
+          <button type="submit" disabled={create.isPending} className="flex-1 rounded-lg bg-primary py-2 text-sm font-medium text-white transition hover:bg-primary disabled:opacity-50">
             {create.isPending ? 'Creating...' : 'Create & add to deal'}
           </button>
-          <button type="button" onClick={onCancel} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
+          <button type="button" onClick={onCancel} className="rounded-lg border border-outline-variant px-4 py-2 text-sm text-on-surface hover:bg-surface-container-low">Cancel</button>
         </div>
       </form>
     </Modal>

@@ -30,15 +30,15 @@ import {
 } from '@/hooks/use-automation-rules';
 
 const RUN_STATUS_STYLES: Record<string, string> = {
-  SUCCESS: 'bg-emerald-500/15 text-emerald-300',
-  PARTIAL: 'bg-amber-500/15 text-amber-300',
-  FAILED: 'bg-red-500/15 text-red-300',
-  RUNNING: 'bg-indigo-500/15 text-indigo-300',
-  SKIPPED: 'bg-gray-500/15 text-gray-300',
+  SUCCESS: 'bg-success/15 text-success',
+  PARTIAL: 'bg-warning/15 text-warning',
+  FAILED: 'bg-error/15 text-error',
+  RUNNING: 'bg-primary/15 text-primary',
+  SKIPPED: 'bg-outline/15 text-outline',
 };
 
 const inputClass =
-  'w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-indigo-500 focus:outline-none';
+  'w-full rounded-lg border border-outline-variant bg-inverse-surface px-3 py-2 text-sm text-inverse-on-surface placeholder-on-surface-variant/60 focus:border-primary focus:outline-none';
 
 interface DraftState {
   id?: string;
@@ -106,25 +106,25 @@ export default function AutomationRulesAdminPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-indigo-300">
+          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-primary">
             <Zap className="h-4 w-4" /> Automation
           </p>
           <h1 className="mt-1 text-2xl font-bold text-white">Automation Rules</h1>
-          <p className="mt-1 text-sm text-gray-400">
+          <p className="mt-1 text-sm text-on-surface-variant">
             Event-driven rules — when a record event fires, evaluate conditions and run actions.
           </p>
         </div>
         <button
           type="button"
           onClick={() => setDraft(emptyDraft(meta?.modules[0]?.module ?? ''))}
-          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary"
         >
           <Plus className="h-4 w-4" /> New rule
         </button>
       </header>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 rounded-2xl border border-gray-800 bg-gray-900 p-4">
+      <div className="flex flex-wrap gap-3 rounded-2xl border border-outline-variant bg-inverse-surface p-4">
         <select
           value={moduleFilter}
           onChange={(e) => {
@@ -165,30 +165,30 @@ export default function AutomationRulesAdminPage() {
       </div>
 
       {/* List */}
-      <div className="overflow-hidden rounded-2xl border border-gray-800 bg-gray-900">
+      <div className="overflow-hidden rounded-2xl border border-outline-variant bg-inverse-surface">
         {rulesQuery.isLoading || metaQuery.isLoading ? (
-          <div className="flex items-center justify-center gap-2 p-12 text-sm text-gray-400">
+          <div className="flex items-center justify-center gap-2 p-12 text-sm text-on-surface-variant">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading rules…
           </div>
         ) : rulesQuery.isError ? (
-          <div className="flex items-center justify-center gap-2 p-12 text-sm text-red-300">
+          <div className="flex items-center justify-center gap-2 p-12 text-sm text-error">
             <AlertTriangle className="h-4 w-4" /> Could not load automation rules.
           </div>
         ) : rules.length === 0 ? (
           <div className="p-12 text-center">
-            <Zap className="mx-auto h-8 w-8 text-gray-600" />
-            <p className="mt-3 text-sm text-gray-400">No automation rules yet.</p>
+            <Zap className="mx-auto h-8 w-8 text-on-surface-variant" />
+            <p className="mt-3 text-sm text-on-surface-variant">No automation rules yet.</p>
             <button
               type="button"
               onClick={() => setDraft(emptyDraft(meta?.modules[0]?.module ?? ''))}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary"
             >
               <Plus className="h-4 w-4" /> Create your first rule
             </button>
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-gray-950/50 text-left text-xs uppercase tracking-wide text-gray-500">
+            <thead className="bg-inverse-surface/50 text-left text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
                 <th className="px-4 py-3">Rule</th>
                 <th className="px-4 py-3">Module</th>
@@ -198,23 +198,23 @@ export default function AutomationRulesAdminPage() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-outline-variant">
               {rules.map((rule) => (
-                <tr key={rule.id} className="hover:bg-gray-950/40">
+                <tr key={rule.id} className="hover:bg-inverse-surface/40">
                   <td className="px-4 py-3">
                     <div className="font-medium text-white">{rule.name}</div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-on-surface-variant">
                       {rule.actions.length} action{rule.actions.length === 1 ? '' : 's'} ·{' '}
                       {rule.conditions.length} condition{rule.conditions.length === 1 ? '' : 's'}
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="rounded-full bg-gray-800 px-2 py-0.5 text-xs text-gray-300">
+                    <span className="rounded-full bg-surface-container-highest px-2 py-0.5 text-xs text-outline">
                       {rule.module}
                     </span>
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-gray-400">{rule.triggerEvent}</td>
-                  <td className="px-4 py-3 text-center text-gray-300">{rule.runCount}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-on-surface-variant">{rule.triggerEvent}</td>
+                  <td className="px-4 py-3 text-center text-outline">{rule.runCount}</td>
                   <td className="px-4 py-3 text-center">
                     <button
                       type="button"
@@ -222,11 +222,11 @@ export default function AutomationRulesAdminPage() {
                       disabled={toggle.isPending}
                       aria-pressed={rule.isActive}
                       className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${
-                        rule.isActive ? 'bg-emerald-500' : 'bg-gray-600'
+                        rule.isActive ? 'bg-success' : 'bg-inverse-surface'
                       }`}
                     >
                       <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                        className={`inline-block h-4 w-4 transform rounded-full bg-surface transition ${
                           rule.isActive ? 'translate-x-4' : 'translate-x-0.5'
                         }`}
                       />
@@ -237,7 +237,7 @@ export default function AutomationRulesAdminPage() {
                       <button
                         type="button"
                         onClick={() => setRunsFor(rule)}
-                        className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-800 hover:text-white"
+                        className="rounded-lg p-1.5 text-on-surface-variant transition hover:bg-surface-container-highest hover:text-white"
                         title="Run history"
                       >
                         <History className="h-4 w-4" />
@@ -256,7 +256,7 @@ export default function AutomationRulesAdminPage() {
                             isActive: rule.isActive,
                           })
                         }
-                        className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-800 hover:text-white"
+                        className="rounded-lg p-1.5 text-on-surface-variant transition hover:bg-surface-container-highest hover:text-white"
                         title="Edit"
                       >
                         <Pencil className="h-4 w-4" />
@@ -264,7 +264,7 @@ export default function AutomationRulesAdminPage() {
                       <button
                         type="button"
                         onClick={() => handleDelete(rule)}
-                        className="rounded-lg p-1.5 text-gray-400 transition hover:bg-red-500/10 hover:text-red-300"
+                        className="rounded-lg p-1.5 text-on-surface-variant transition hover:bg-error/10 hover:text-error"
                         title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -336,24 +336,24 @@ function RuleFormDrawer({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex justify-end bg-on-surface/50" onClick={onClose}>
       <form
         onSubmit={submit}
         onClick={(e) => e.stopPropagation()}
-        className="flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-gray-800 bg-gray-900 shadow-2xl"
+        className="flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-outline-variant bg-inverse-surface shadow-2xl"
       >
-        <div className="flex items-center justify-between border-b border-gray-800 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
           <h2 className="text-lg font-semibold text-white">
             {isEdit ? 'Edit rule' : 'New automation rule'}
           </h2>
-          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white">
+          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container-highest hover:text-white">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <div className="flex-1 space-y-5 px-6 py-5">
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-400">Name</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-on-surface-variant">Name</label>
             <input
               value={draft.name}
               onChange={(e) => set('name', e.target.value)}
@@ -364,7 +364,7 @@ function RuleFormDrawer({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-400">Description</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-on-surface-variant">Description</label>
             <textarea
               value={draft.description}
               onChange={(e) => set('description', e.target.value)}
@@ -375,7 +375,7 @@ function RuleFormDrawer({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-400">Module</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-on-surface-variant">Module</label>
               <select
                 value={draft.module}
                 onChange={(e) => setDraft({ ...draft, module: e.target.value, triggerEvent: '' })}
@@ -391,7 +391,7 @@ function RuleFormDrawer({
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-400">Trigger event</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-on-surface-variant">Trigger event</label>
               <select
                 value={draft.triggerEvent}
                 onChange={(e) => set('triggerEvent', e.target.value)}
@@ -412,21 +412,21 @@ function RuleFormDrawer({
           {/* Conditions */}
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <label className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                Conditions <span className="text-gray-600">(all must match)</span>
+              <label className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
+                Conditions <span className="text-on-surface-variant">(all must match)</span>
               </label>
               <button
                 type="button"
                 onClick={() =>
                   set('conditions', [...draft.conditions, { field: '', operator: 'eq', value: '' }])
                 }
-                className="inline-flex items-center gap-1 text-xs font-medium text-indigo-300 hover:text-indigo-200"
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary"
               >
                 <Plus className="h-3.5 w-3.5" /> Add condition
               </button>
             </div>
             {draft.conditions.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-gray-700 px-3 py-2 text-xs text-gray-500">
+              <p className="rounded-lg border border-dashed border-outline-variant px-3 py-2 text-xs text-on-surface-variant">
                 No conditions — the rule fires on every {draft.triggerEvent || 'trigger'} event.
               </p>
             ) : (
@@ -471,7 +471,7 @@ function RuleFormDrawer({
                     <button
                       type="button"
                       onClick={() => set('conditions', draft.conditions.filter((_, j) => j !== i))}
-                      className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-800 hover:text-red-300"
+                      className="rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container-highest hover:text-error"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -484,20 +484,20 @@ function RuleFormDrawer({
           {/* Actions */}
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <label className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                Actions <span className="text-gray-600">(at least one)</span>
+              <label className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
+                Actions <span className="text-on-surface-variant">(at least one)</span>
               </label>
               <button
                 type="button"
                 onClick={() => set('actions', [...draft.actions, { type: '', config: {} }])}
-                className="inline-flex items-center gap-1 text-xs font-medium text-indigo-300 hover:text-indigo-200"
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary"
               >
                 <Plus className="h-3.5 w-3.5" /> Add action
               </button>
             </div>
             <div className="space-y-3">
               {draft.actions.map((action, i) => (
-                <div key={i} className="rounded-lg border border-gray-700 bg-gray-950/50 p-3">
+                <div key={i} className="rounded-lg border border-outline-variant bg-inverse-surface/50 p-3">
                   <div className="flex items-center gap-2">
                     <select
                       value={action.type}
@@ -519,7 +519,7 @@ function RuleFormDrawer({
                       <button
                         type="button"
                         onClick={() => set('actions', draft.actions.filter((_, j) => j !== i))}
-                        className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-800 hover:text-red-300"
+                        className="rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container-highest hover:text-error"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -541,25 +541,25 @@ function RuleFormDrawer({
             </div>
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-gray-300">
+          <label className="flex items-center gap-2 text-sm text-outline">
             <input
               type="checkbox"
               checked={draft.isActive}
               onChange={(e) => set('isActive', e.target.checked)}
-              className="h-4 w-4 rounded border-gray-600 bg-gray-950"
+              className="h-4 w-4 rounded border-outline bg-inverse-surface"
             />
             Active — evaluate this rule on matching events
           </label>
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t border-gray-800 px-6 py-4">
-          <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-gray-300 hover:bg-gray-800">
+        <div className="flex items-center justify-end gap-3 border-t border-outline-variant px-6 py-4">
+          <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-outline hover:bg-surface-container-highest">
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary disabled:opacity-60"
           >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             {isEdit ? 'Save changes' : 'Create rule'}
@@ -577,46 +577,46 @@ function RunsDrawer({ rule, onClose }: { rule: AutomationRule; onClose: () => vo
   const runs = runsQuery.data ?? [];
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex justify-end bg-on-surface/50" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-gray-800 bg-gray-900 shadow-2xl"
+        className="flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-outline-variant bg-inverse-surface shadow-2xl"
       >
-        <div className="flex items-center justify-between border-b border-gray-800 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
-              <History className="h-4 w-4 text-indigo-300" /> Run history
+              <History className="h-4 w-4 text-primary" /> Run history
             </h2>
-            <p className="text-xs text-gray-500">{rule.name}</p>
+            <p className="text-xs text-on-surface-variant">{rule.name}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white">
+          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container-highest hover:text-white">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <div className="flex-1 px-6 py-5">
           {runsQuery.isLoading ? (
-            <div className="flex items-center justify-center gap-2 py-12 text-sm text-gray-400">
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-on-surface-variant">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading runs…
             </div>
           ) : runs.length === 0 ? (
             <div className="py-12 text-center">
-              <Activity className="mx-auto h-7 w-7 text-gray-600" />
-              <p className="mt-2 text-sm text-gray-400">No runs recorded yet.</p>
-              <p className="text-xs text-gray-600">Runs appear here once a matching event fires.</p>
+              <Activity className="mx-auto h-7 w-7 text-on-surface-variant" />
+              <p className="mt-2 text-sm text-on-surface-variant">No runs recorded yet.</p>
+              <p className="text-xs text-on-surface-variant">Runs appear here once a matching event fires.</p>
             </div>
           ) : (
             <ul className="space-y-2">
               {runs.map((run) => (
-                <li key={run.id} className="rounded-lg border border-gray-800 bg-gray-950/40 p-3">
+                <li key={run.id} className="rounded-lg border border-outline-variant bg-inverse-surface/40 p-3">
                   <div className="flex items-center justify-between">
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${RUN_STATUS_STYLES[run.status] ?? 'bg-gray-700 text-gray-300'}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${RUN_STATUS_STYLES[run.status] ?? 'bg-surface-container-high text-outline'}`}>
                       {run.status}
                     </span>
-                    <span className="text-xs text-gray-500">{formatDateTime(run.ranAt)}</span>
+                    <span className="text-xs text-on-surface-variant">{formatDateTime(run.ranAt)}</span>
                   </div>
-                  <p className="mt-1 font-mono text-[11px] text-gray-500">event {run.eventId.slice(0, 16)}…</p>
-                  {run.error && <p className="mt-1 text-xs text-red-300">{run.error}</p>}
+                  <p className="mt-1 font-mono text-[11px] text-on-surface-variant">event {run.eventId.slice(0, 16)}…</p>
+                  {run.error && <p className="mt-1 text-xs text-error">{run.error}</p>}
                 </li>
               ))}
             </ul>

@@ -30,9 +30,9 @@ interface AiPredictionPanelProps {
 }
 
 function confidenceMeta(confidence: number): { label: string; tone: string; dot: string } {
-  if (confidence >= 0.66) return { label: 'High confidence', tone: 'text-emerald-700', dot: 'bg-emerald-500' };
-  if (confidence >= 0.33) return { label: 'Moderate confidence', tone: 'text-amber-700', dot: 'bg-amber-500' };
-  return { label: 'Low confidence', tone: 'text-orange-700', dot: 'bg-orange-500' };
+  if (confidence >= 0.66) return { label: 'High confidence', tone: 'text-success', dot: 'bg-success' };
+  if (confidence >= 0.33) return { label: 'Moderate confidence', tone: 'text-warning', dot: 'bg-warning' };
+  return { label: 'Low confidence', tone: 'text-warning', dot: 'bg-warning' };
 }
 
 function clampPct(value: number): number {
@@ -54,12 +54,12 @@ export function AiPredictionPanel({
     return (
       <div
         className={cn(
-          'rounded-xl border border-slate-200 bg-white p-5',
+          'rounded-xl border border-outline-variant bg-surface p-5',
           className
         )}
       >
         <PanelHeader kind={kind} />
-        <p className="mt-3 text-sm text-slate-500">
+        <p className="mt-3 text-sm text-on-surface-variant">
           The AI {kind} is not available right now. It is generated from the
           model&apos;s learned factors and falls back to priors when data is thin.
         </p>
@@ -76,21 +76,21 @@ export function AiPredictionPanel({
   const actions = insights.nextBestActions ?? [];
 
   return (
-    <div className={cn('rounded-xl border border-slate-200 bg-white p-5', className)}>
+    <div className={cn('rounded-xl border border-outline-variant bg-surface p-5', className)}>
       <PanelHeader kind={kind} />
 
       {/* Win-probability gauge + AI score */}
       <div className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-2">
         <div className="flex items-end gap-2">
-          <span className="text-4xl font-bold text-slate-900">{probPct}%</span>
-          <span className="pb-1 text-sm text-slate-400">probability</span>
+          <span className="text-4xl font-bold text-on-surface">{probPct}%</span>
+          <span className="pb-1 text-sm text-on-surface-variant">probability</span>
         </div>
         <div className="flex items-end gap-2">
-          <span className="text-2xl font-semibold text-slate-700">{aiScore}</span>
-          <span className="pb-0.5 text-xs text-slate-400">AI score / 100</span>
+          <span className="text-2xl font-semibold text-on-surface">{aiScore}</span>
+          <span className="pb-0.5 text-xs text-on-surface-variant">AI score / 100</span>
         </div>
       </div>
-      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100">
+      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-surface-container-high">
         <div
           className="h-full rounded-full bg-gradient-to-r from-brand-500 to-brand-700"
           style={{ width: `${probPct}%` }}
@@ -104,19 +104,19 @@ export function AiPredictionPanel({
           {conf.label} ({confPct}%)
         </span>
         {insights.lowData && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+          <span className="inline-flex items-center gap-1 rounded-full bg-warning-container px-2 py-0.5 text-[11px] font-semibold text-on-warning-container">
             Low data — using priors
           </span>
         )}
         {insights.modelVersion && (
-          <span className="text-[11px] text-slate-400">
+          <span className="text-[11px] text-on-surface-variant">
             model {insights.modelVersion}
             {typeof insights.sampleSize === 'number' ? ` · n=${insights.sampleSize}` : ''}
           </span>
         )}
       </div>
       {insights.lowData && (
-        <p className="mt-2 text-xs text-amber-700">
+        <p className="mt-2 text-xs text-warning">
           There isn&apos;t enough history yet to train a confident model, so this
           estimate leans on baseline priors. Treat it as directional.
         </p>
@@ -124,11 +124,11 @@ export function AiPredictionPanel({
 
       {/* "Why" factor list */}
       <div className="mt-5">
-        <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
           Why — top factors
         </h4>
         {factors.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm text-on-surface-variant">
             No individual factors stood out — the estimate reflects the overall baseline.
           </p>
         ) : (
@@ -138,12 +138,12 @@ export function AiPredictionPanel({
               return (
                 <li
                   key={`${factor.label}-${i}`}
-                  className="flex items-start gap-3 rounded-lg bg-slate-50 px-3 py-2"
+                  className="flex items-start gap-3 rounded-lg bg-surface-container-low px-3 py-2"
                 >
                   <span
                     className={cn(
                       'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold',
-                      up ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                      up ? 'bg-success-container text-success' : 'bg-error-container text-error'
                     )}
                     aria-hidden
                   >
@@ -151,11 +151,11 @@ export function AiPredictionPanel({
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-slate-800">{factor.label}</span>
+                      <span className="text-sm font-medium text-on-surface">{factor.label}</span>
                       <span
                         className={cn(
                           'shrink-0 text-sm font-semibold tabular-nums',
-                          up ? 'text-emerald-700' : 'text-red-700'
+                          up ? 'text-success' : 'text-error'
                         )}
                       >
                         {up ? '+' : '−'}
@@ -163,7 +163,7 @@ export function AiPredictionPanel({
                       </span>
                     </div>
                     {factor.explanation && (
-                      <p className="mt-0.5 text-xs text-slate-500">{factor.explanation}</p>
+                      <p className="mt-0.5 text-xs text-on-surface-variant">{factor.explanation}</p>
                     )}
                   </div>
                 </li>
@@ -176,14 +176,14 @@ export function AiPredictionPanel({
       {/* Next-best-actions checklist */}
       {actions.length > 0 && (
         <div className="mt-5">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
             Next best actions
           </h4>
           <ul className="mt-2 space-y-1.5">
             {actions.map((action, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+              <li key={i} className="flex items-start gap-2 text-sm text-on-surface">
                 <span
-                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-slate-300 text-[10px] text-slate-400"
+                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-outline-variant text-[10px] text-on-surface-variant"
                   aria-hidden
                 >
                   ☐
@@ -201,7 +201,7 @@ export function AiPredictionPanel({
 function PanelHeader({ kind }: { kind: string }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+      <h3 className="text-sm font-semibold uppercase tracking-wider text-on-surface-variant">
         AI {kind} — explainable
       </h3>
       <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700">

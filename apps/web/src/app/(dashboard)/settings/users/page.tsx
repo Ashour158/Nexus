@@ -40,15 +40,15 @@ export default function SettingsUsersPage(): JSX.Element {
     <main className="space-y-4 px-6 py-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">User Management</h1>
-          <p className="text-sm text-slate-600">Invite users, manage role and account status.</p>
+          <h1 className="text-2xl font-bold text-on-surface">User Management</h1>
+          <p className="text-sm text-on-surface-variant">Invite users, manage role and account status.</p>
         </div>
         <Button type="button" onClick={() => setInviteOpen(true)}>
           + Invite User
         </Button>
       </header>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="rounded-lg border border-outline-variant bg-surface p-4">
         <div className="max-w-md">
           <Input
             placeholder="Search users by name or email..."
@@ -58,14 +58,14 @@ export default function SettingsUsersPage(): JSX.Element {
         </div>
       </section>
 
-      <section className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <section className="overflow-x-auto rounded-lg border border-outline-variant bg-surface">
         {usersQuery.isLoading ? (
           <div className="p-4">
             <Skeleton className="h-56 rounded-md" />
           </div>
         ) : (
           <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+            <thead className="bg-surface-container-low text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
                 <th className="px-3 py-2 text-start">Avatar</th>
                 <th className="px-3 py-2 text-start">Name</th>
@@ -78,13 +78,13 @@ export default function SettingsUsersPage(): JSX.Element {
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="border-t border-slate-100">
+                <tr key={u.id} className="border-t border-outline-variant">
                   <td className="px-3 py-2">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-inverse-surface text-xs font-semibold text-white">
                       {(u.firstName?.[0] ?? 'U').toUpperCase()}
                     </span>
                   </td>
-                  <td className="px-3 py-2 font-medium text-slate-900">
+                  <td className="px-3 py-2 font-medium text-on-surface">
                     {u.firstName} {u.lastName}
                   </td>
                   <td className="px-3 py-2">{u.email}</td>
@@ -92,7 +92,7 @@ export default function SettingsUsersPage(): JSX.Element {
                     <select
                       value={u.roles?.[0]?.id ?? ''}
                       onChange={(e) => assignRoles.mutate({ id: u.id, roleIds: [e.target.value] })}
-                      className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs"
+                      className="h-8 rounded-md border border-outline-variant bg-surface px-2 text-xs"
                     >
                       <option value="">No role</option>
                       {roles.map((r) => (
@@ -105,7 +105,7 @@ export default function SettingsUsersPage(): JSX.Element {
                   <td className="px-3 py-2">
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        u.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
+                        u.isActive ? 'bg-success-container text-on-success-container' : 'bg-surface-container-high text-on-surface'
                       }`}
                     >
                       {u.isActive ? 'active' : 'inactive'}
@@ -137,7 +137,7 @@ export default function SettingsUsersPage(): JSX.Element {
               ))}
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
+                  <td colSpan={7} className="px-3 py-8 text-center text-on-surface-variant">
                     No users found.
                   </td>
                 </tr>
@@ -148,9 +148,9 @@ export default function SettingsUsersPage(): JSX.Element {
       </section>
 
       {inviteOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-xl">
-            <h2 className="text-lg font-semibold text-slate-900">Invite User</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-surface p-4 shadow-xl">
+            <h2 className="text-lg font-semibold text-on-surface">Invite User</h2>
             <div className="mt-3 space-y-3">
               <Input placeholder="First name" value={inviteFirst} onChange={(e) => setInviteFirst(e.target.value)} />
               <Input placeholder="Last name" value={inviteLast} onChange={(e) => setInviteLast(e.target.value)} />
@@ -158,7 +158,7 @@ export default function SettingsUsersPage(): JSX.Element {
               <select
                 value={inviteRoleId}
                 onChange={(e) => setInviteRoleId(e.target.value)}
-                className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm"
+                className="h-9 w-full rounded-md border border-outline-variant bg-surface px-3 text-sm"
               >
                 <option value="">Select role</option>
                 {roles.map((r) => (

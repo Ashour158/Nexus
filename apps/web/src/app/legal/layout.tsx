@@ -3,13 +3,13 @@ import type { ReactNode } from 'react';
 
 export default function LegalLayout({ children }: { children: ReactNode }): JSX.Element {
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="min-h-screen bg-surface-container-low text-on-surface">
+      <header className="border-b border-outline-variant bg-surface">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
-          <Link href="/" className="text-lg font-bold text-slate-900">Nexus CRM</Link>
+          <Link href="/" className="text-lg font-bold text-on-surface">Nexus CRM</Link>
           <nav className="flex gap-4 text-sm">
-            <Link href="/legal/privacy" className="text-slate-600 hover:text-slate-900">Privacy</Link>
-            <Link href="/legal/terms" className="text-slate-600 hover:text-slate-900">Terms</Link>
+            <Link href="/legal/privacy" className="text-on-surface-variant hover:text-on-surface">Privacy</Link>
+            <Link href="/legal/terms" className="text-on-surface-variant hover:text-on-surface">Terms</Link>
           </nav>
         </div>
       </header>

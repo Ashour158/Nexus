@@ -67,19 +67,19 @@ export function BulkActionBar({ entityType, selectedIds, onClear, queryKey, owne
   if (count === 0) return null;
 
   return (
-    <div className="fixed bottom-6 start-1/2 z-40 flex min-w-[400px] -translate-x-1/2 items-center gap-4 rounded-2xl bg-gray-900 px-5 py-3 text-white shadow-2xl">
+    <div className="fixed bottom-6 start-1/2 z-40 flex min-w-[400px] -translate-x-1/2 items-center gap-4 rounded-2xl bg-inverse-surface px-5 py-3 text-white shadow-2xl">
       <div className="flex items-center gap-2">
-        <span className="rounded-full bg-indigo-500 px-2 py-0.5 text-xs font-bold text-white">{count}</span>
-        <span className="text-sm text-gray-300">selected</span>
-        <button onClick={onClear} className="ms-1 text-gray-500 hover:text-gray-300"><X className="h-3.5 w-3.5" /></button>
+        <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-white">{count}</span>
+        <span className="text-sm text-outline">selected</span>
+        <button onClick={onClear} className="ms-1 text-on-surface-variant hover:text-outline"><X className="h-3.5 w-3.5" /></button>
       </div>
-      <div className="h-6 w-px bg-gray-700" />
+      <div className="h-6 w-px bg-surface-container-high" />
       <div className="relative">
-        <button onClick={() => { setShowTagInput((s) => !s); setShowReassign(false); }} className="flex items-center gap-1.5 text-sm text-gray-300 hover:text-white"><Tag className="h-4 w-4" /> Tag</button>
-        {showTagInput && <div className="absolute bottom-full mb-2 start-0 min-w-[220px] rounded-xl bg-white p-3 shadow-xl"><input autoFocus value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && tagInput.trim() && bulkTag.mutate(tagInput.split(',').map((t) => t.trim()).filter(Boolean))} placeholder="Enter tags" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900" /></div>}
+        <button onClick={() => { setShowTagInput((s) => !s); setShowReassign(false); }} className="flex items-center gap-1.5 text-sm text-outline hover:text-white"><Tag className="h-4 w-4" /> Tag</button>
+        {showTagInput && <div className="absolute bottom-full mb-2 start-0 min-w-[220px] rounded-xl bg-surface p-3 shadow-xl"><input autoFocus value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && tagInput.trim() && bulkTag.mutate(tagInput.split(',').map((t) => t.trim()).filter(Boolean))} placeholder="Enter tags" className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm text-on-surface" /></div>}
       </div>
-      <div className="relative"><button onClick={() => { setShowReassign((s) => !s); setShowTagInput(false); }} className="flex items-center gap-1.5 text-sm text-gray-300 hover:text-white"><UserCheck className="h-4 w-4" /> Reassign <ChevronDown className="h-3.5 w-3.5" /></button>{showReassign && <div className="absolute bottom-full mb-2 start-0 min-w-[240px] rounded-xl bg-white p-3 shadow-xl">{ownerOptions.length > 0 ? <select value={reassignTo} onChange={(e) => setReassignTo(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"><option value="">Select owner…</option>{ownerOptions.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select> : <input value={reassignTo} onChange={(e) => setReassignTo(e.target.value)} placeholder="User ID or email" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900" />}<button onClick={() => { if (reassignTo) { bulkUpdate.mutate({ ownerId: reassignTo }); setShowReassign(false); setReassignTo(''); } }} className="mt-2 w-full rounded-lg bg-indigo-600 py-1.5 text-sm text-white">Apply</button></div>}</div>
-      <button onClick={async () => { if (await confirm(`Remove ${count} ${entityType}(s)? This can be undone by an admin.`, 'Remove Records')) bulkDelete.mutate(); }} className="flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300"><Trash2 className="h-4 w-4" /> Remove</button>
+      <div className="relative"><button onClick={() => { setShowReassign((s) => !s); setShowTagInput(false); }} className="flex items-center gap-1.5 text-sm text-outline hover:text-white"><UserCheck className="h-4 w-4" /> Reassign <ChevronDown className="h-3.5 w-3.5" /></button>{showReassign && <div className="absolute bottom-full mb-2 start-0 min-w-[240px] rounded-xl bg-surface p-3 shadow-xl">{ownerOptions.length > 0 ? <select value={reassignTo} onChange={(e) => setReassignTo(e.target.value)} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm text-on-surface"><option value="">Select owner…</option>{ownerOptions.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select> : <input value={reassignTo} onChange={(e) => setReassignTo(e.target.value)} placeholder="User ID or email" className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm text-on-surface" />}<button onClick={() => { if (reassignTo) { bulkUpdate.mutate({ ownerId: reassignTo }); setShowReassign(false); setReassignTo(''); } }} className="mt-2 w-full rounded-lg bg-primary py-1.5 text-sm text-white">Apply</button></div>}</div>
+      <button onClick={async () => { if (await confirm(`Remove ${count} ${entityType}(s)? This can be undone by an admin.`, 'Remove Records')) bulkDelete.mutate(); }} className="flex items-center gap-1.5 text-sm text-error hover:text-error"><Trash2 className="h-4 w-4" /> Remove</button>
       {ConfirmDialog}
     </div>
   );

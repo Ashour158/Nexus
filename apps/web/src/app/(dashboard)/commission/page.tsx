@@ -24,9 +24,9 @@ import {
 type Tab = 'plans' | 'statements';
 
 const STATUS_STYLES: Record<CommissionStatementStatus, string> = {
-  PENDING: 'bg-amber-100 text-amber-800',
-  APPROVED: 'bg-indigo-100 text-indigo-800',
-  PAID: 'bg-emerald-100 text-emerald-800',
+  PENDING: 'bg-warning-container text-on-warning-container',
+  APPROVED: 'bg-primary-container text-on-primary-container',
+  PAID: 'bg-success-container text-on-success-container',
 };
 
 export default function CommissionPage() {
@@ -43,12 +43,12 @@ export default function CommissionPage() {
     <div className="p-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Commission</h1>
-          <p className="mt-0.5 text-sm text-gray-500">Commission plans, rules, and rep statements</p>
+          <h1 className="text-2xl font-bold text-on-surface">Commission</h1>
+          <p className="mt-0.5 text-sm text-on-surface-variant">Commission plans, rules, and rep statements</p>
         </div>
       </div>
 
-      <div className="mb-6 flex gap-2 border-b border-gray-200">
+      <div className="mb-6 flex gap-2 border-b border-outline-variant">
         <TabButton active={tab === 'statements'} onClick={() => setTab('statements')}>
           Statements
         </TabButton>
@@ -73,7 +73,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
       type="button"
       onClick={onClick}
       className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
-        active ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'
+        active ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'
       }`}
     >
       {children}
@@ -107,8 +107,8 @@ function PlansView() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-gray-200 bg-white p-4">
-        <h2 className="mb-3 font-semibold text-gray-800">New commission plan</h2>
+      <section className="rounded-xl border border-outline-variant bg-surface p-4">
+        <h2 className="mb-3 font-semibold text-on-surface">New commission plan</h2>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
           <Input placeholder="Plan name" value={name} onChange={(e) => setName(e.target.value)} />
           <Input
@@ -132,31 +132,31 @@ function PlansView() {
       {isLoading ? (
         <div className="animate-pulse space-y-3">
           {[1, 2].map((i) => (
-            <div key={i} className="h-28 rounded-xl bg-gray-100" />
+            <div key={i} className="h-28 rounded-xl bg-surface-container-high" />
           ))}
         </div>
       ) : !plans || plans.length === 0 ? (
-        <div className="rounded-xl bg-gray-50 py-2">
+        <div className="rounded-xl bg-surface-container-low py-2">
           <EmptyState icon="📐" title="No commission plans" description="Create a plan above to start computing commissions" />
         </div>
       ) : (
         <div className="space-y-4">
           {plans.map((plan) => (
-            <div key={plan.id} className="rounded-xl border border-gray-200 bg-white p-4">
+            <div key={plan.id} className="rounded-xl border border-outline-variant bg-surface p-4">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-gray-900">{plan.name}</h3>
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">{plan.basis}</span>
+                    <h3 className="font-semibold text-on-surface">{plan.name}</h3>
+                    <span className="rounded bg-surface-container-high px-2 py-0.5 text-xs font-medium text-on-surface">{plan.basis}</span>
                     <span
                       className={`rounded px-2 py-0.5 text-xs font-medium ${
-                        plan.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
+                        plan.isActive ? 'bg-success-container text-on-success-container' : 'bg-surface-container-high text-on-surface-variant'
                       }`}
                     >
                       {plan.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </div>
-                  {plan.description ? <p className="mt-0.5 text-xs text-gray-500">{plan.description}</p> : null}
+                  {plan.description ? <p className="mt-0.5 text-xs text-on-surface-variant">{plan.description}</p> : null}
                 </div>
                 <Button
                   variant="ghost"
@@ -191,15 +191,15 @@ function RulesEditor({ planId, rules }: { planId: string; rules: import('@/hooks
   };
 
   return (
-    <div className="mt-3 border-t border-gray-100 pt-3">
-      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Rules</h4>
+    <div className="mt-3 border-t border-outline-variant pt-3">
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Rules</h4>
       {rules.length === 0 ? (
-        <p className="mb-2 text-xs text-gray-400">No rules yet — add one below.</p>
+        <p className="mb-2 text-xs text-on-surface-variant">No rules yet — add one below.</p>
       ) : (
         <div className="mb-3 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs text-gray-500">
+              <tr className="text-left text-xs text-on-surface-variant">
                 <th className="py-1 pr-3">Rate %</th>
                 <th className="py-1 pr-3">Role</th>
                 <th className="py-1 pr-3">Owner</th>
@@ -212,18 +212,18 @@ function RulesEditor({ planId, rules }: { planId: string; rules: import('@/hooks
             </thead>
             <tbody>
               {rules.map((r) => (
-                <tr key={r.id} className="border-t border-gray-100">
+                <tr key={r.id} className="border-t border-outline-variant">
                   <td className="py-1 pr-3 font-medium">{r.ratePercent}%</td>
-                  <td className="py-1 pr-3 text-gray-600">{r.appliesToRole ?? '—'}</td>
-                  <td className="py-1 pr-3 text-gray-600">{r.ownerId ?? '—'}</td>
-                  <td className="py-1 pr-3 text-gray-600">{r.productId ?? '—'}</td>
-                  <td className="py-1 pr-3 text-gray-600">{r.tierMinAmount ?? '—'}</td>
-                  <td className="py-1 pr-3 text-gray-600">{r.tierMaxAmount ?? '—'}</td>
-                  <td className="py-1 pr-3 text-gray-600">{r.priority}</td>
+                  <td className="py-1 pr-3 text-on-surface-variant">{r.appliesToRole ?? '—'}</td>
+                  <td className="py-1 pr-3 text-on-surface-variant">{r.ownerId ?? '—'}</td>
+                  <td className="py-1 pr-3 text-on-surface-variant">{r.productId ?? '—'}</td>
+                  <td className="py-1 pr-3 text-on-surface-variant">{r.tierMinAmount ?? '—'}</td>
+                  <td className="py-1 pr-3 text-on-surface-variant">{r.tierMaxAmount ?? '—'}</td>
+                  <td className="py-1 pr-3 text-on-surface-variant">{r.priority}</td>
                   <td className="py-1 text-right">
                     <button
                       type="button"
-                      className="text-xs text-red-600 hover:underline"
+                      className="text-xs text-error hover:underline"
                       onClick={() => deleteRule.mutate(r.id)}
                     >
                       remove
@@ -328,11 +328,11 @@ function StatementsView({
       {isLoading ? (
         <div className="animate-pulse space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-12 rounded-lg bg-gray-100" />
+            <div key={i} className="h-12 rounded-lg bg-surface-container-high" />
           ))}
         </div>
       ) : !statements || statements.length === 0 ? (
-        <div className="rounded-xl bg-gray-50 py-2">
+        <div className="rounded-xl bg-surface-container-low py-2">
           <EmptyState
             icon="💵"
             title="No commission statements"
@@ -340,10 +340,10 @@ function StatementsView({
           />
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <div className="overflow-x-auto rounded-xl border border-outline-variant bg-surface">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 text-left text-xs text-gray-500">
+              <tr className="border-b border-outline-variant text-left text-xs text-on-surface-variant">
                 <th className="px-4 py-2">Period</th>
                 {isAdmin ? <th className="px-4 py-2">Owner</th> : null}
                 <th className="px-4 py-2">Deal</th>
@@ -356,13 +356,13 @@ function StatementsView({
             </thead>
             <tbody>
               {statements.map((s) => (
-                <tr key={s.id} className="border-b border-gray-50 last:border-0">
-                  <td className="px-4 py-2 text-gray-700">{s.periodMonth}</td>
-                  {isAdmin ? <td className="px-4 py-2 text-gray-500">{s.ownerId}</td> : null}
-                  <td className="px-4 py-2 text-gray-500">{s.dealId}</td>
-                  <td className="px-4 py-2 text-gray-700">{formatCurrency(s.baseAmount, s.currency)}</td>
-                  <td className="px-4 py-2 text-gray-700">{s.ratePercent}%</td>
-                  <td className="px-4 py-2 font-medium text-gray-900">
+                <tr key={s.id} className="border-b border-outline-variant last:border-0">
+                  <td className="px-4 py-2 text-on-surface">{s.periodMonth}</td>
+                  {isAdmin ? <td className="px-4 py-2 text-on-surface-variant">{s.ownerId}</td> : null}
+                  <td className="px-4 py-2 text-on-surface-variant">{s.dealId}</td>
+                  <td className="px-4 py-2 text-on-surface">{formatCurrency(s.baseAmount, s.currency)}</td>
+                  <td className="px-4 py-2 text-on-surface">{s.ratePercent}%</td>
+                  <td className="px-4 py-2 font-medium text-on-surface">
                     {formatCurrency(s.commissionAmount, s.currency)}
                   </td>
                   <td className="px-4 py-2">
@@ -370,7 +370,7 @@ function StatementsView({
                       {s.status}
                     </span>
                     {s.approvedAt ? (
-                      <span className="ml-1 text-[10px] text-gray-400">{formatDate(s.approvedAt)}</span>
+                      <span className="ml-1 text-[10px] text-on-surface-variant">{formatDate(s.approvedAt)}</span>
                     ) : null}
                   </td>
                   <td className="px-4 py-2 text-right">
@@ -384,7 +384,7 @@ function StatementsView({
                         Mark paid
                       </Button>
                     ) : null}
-                    {s.status === 'PAID' ? <span className="text-xs text-gray-400">—</span> : null}
+                    {s.status === 'PAID' ? <span className="text-xs text-on-surface-variant">—</span> : null}
                   </td>
                 </tr>
               ))}

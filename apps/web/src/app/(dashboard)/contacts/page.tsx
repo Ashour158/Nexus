@@ -430,11 +430,11 @@ export default function ContactsPage(): ReactElement {
             <div className="relative z-10 flex h-64 items-end justify-between gap-4 px-4">
               {[
                 { label: 'Jan', value: 44, tone: 'bg-primary-container' },
-                { label: 'Feb', value: 58, tone: 'bg-indigo-200' },
-                { label: 'Mar', value: 72, tone: 'bg-indigo-300' },
+                { label: 'Feb', value: 58, tone: 'bg-primary-container' },
+                { label: 'Mar', value: 72, tone: 'bg-primary-container' },
                 { label: 'Apr', value: 88, tone: 'bg-[#4f46e5]' },
-                { label: 'May', value: 69, tone: 'bg-indigo-300' },
-                { label: 'Jun', value: 80, tone: 'bg-indigo-400' },
+                { label: 'May', value: 69, tone: 'bg-primary-container' },
+                { label: 'Jun', value: 80, tone: 'bg-primary' },
               ].map((bar) => (
                 <div key={bar.label} className="group flex flex-1 flex-col items-center gap-2">
                   <div
@@ -459,7 +459,7 @@ export default function ContactsPage(): ReactElement {
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-surface-container-high">
                   <div
-                    className={cn('h-full', ['bg-primary', 'bg-indigo-400', 'bg-indigo-300', 'bg-primary-container'][index % 4])}
+                    className={cn('h-full', ['bg-primary', 'bg-primary', 'bg-primary-container', 'bg-primary-container'][index % 4])}
                     style={{ width: `${row.pct}%` }}
                   />
                 </div>
@@ -489,7 +489,7 @@ export default function ContactsPage(): ReactElement {
                     setPage(1);
                     setSearch(event.target.value);
                   }}
-                  className="h-10 w-64 rounded-lg border-0 bg-surface-container-high pl-10 pr-4 text-sm focus:ring-2 focus:ring-indigo-500"
+                  className="h-10 w-64 rounded-lg border-0 bg-surface-container-high pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary"
                   placeholder="Search contacts..."
                 />
               </div>
@@ -500,7 +500,7 @@ export default function ContactsPage(): ReactElement {
                   setPage(1);
                   setOwnerId(event.target.value);
                 }}
-                className="h-10 rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-indigo-500"
+                className="h-10 rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary"
               >
                 <option value="">All owners</option>
                 {users.map((user) => (
@@ -511,7 +511,7 @@ export default function ContactsPage(): ReactElement {
                 value={sortBy}
                 aria-label="Sort contacts"
                 onChange={(event) => setSortBy(event.target.value as ContactListFilters['sortBy'])}
-                className="h-10 rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-indigo-500"
+                className="h-10 rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary"
               >
                 <option value="createdAt">Newest</option>
                 <option value="firstName">First name</option>
@@ -921,7 +921,7 @@ function ContactFormPanel({
           </button>
         </div>
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
-          <div className="rounded-lg border border-indigo-100 bg-primary-container px-4 py-3 text-xs leading-5 text-primary">
+          <div className="rounded-lg border border-primary/30 bg-primary-container px-4 py-3 text-xs leading-5 text-primary">
             Account linking is enforced through the low-code validation policy. Admins can change required fields under
             Settings / Validation Rules.
           </div>
@@ -943,7 +943,7 @@ function ContactFormPanel({
               required={requiredFields.has('ownerId')}
               value={draft.ownerId}
               onChange={(event) => onDraftChange({ ...draft, ownerId: event.target.value })}
-              className="mt-1 h-10 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-indigo-500"
+              className="mt-1 h-10 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary"
             >
               <option value="">Select owner</option>
               {users.map((user) => (
@@ -1034,8 +1034,8 @@ function Field({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
-          'mt-1 h-10 w-full rounded-lg border text-sm focus:border-primary focus:ring-indigo-500',
-          error ? 'border-red-400' : 'border-outline-variant'
+          'mt-1 h-10 w-full rounded-lg border text-sm focus:border-primary focus:ring-primary',
+          error ? 'border-error' : 'border-outline-variant'
         )}
       />
       {error ? <p className="mt-1 text-xs text-error">{error}</p> : null}
@@ -1069,8 +1069,8 @@ function SelectField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
-          'mt-1 h-10 w-full rounded-lg border text-sm focus:border-primary focus:ring-indigo-500',
-          error ? 'border-red-400' : 'border-outline-variant'
+          'mt-1 h-10 w-full rounded-lg border text-sm focus:border-primary focus:ring-primary',
+          error ? 'border-error' : 'border-outline-variant'
         )}
       >
         <option value="">Select {label.toLowerCase()}</option>
@@ -1167,7 +1167,7 @@ function CheckboxField({
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="rounded border-outline-variant text-primary focus:ring-indigo-500"
+        className="rounded border-outline-variant text-primary focus:ring-primary"
       />
     </label>
   );

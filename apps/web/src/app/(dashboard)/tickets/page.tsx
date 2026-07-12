@@ -154,7 +154,7 @@ export default function TicketsPage() {
         {ticketsQuery.isError ? (
           <div
             role="alert"
-            className="rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
+            className="rounded-md border border-error/40 bg-error-container p-4 text-sm text-on-error-container "
           >
             Failed to load tickets. Try refreshing.
           </div>

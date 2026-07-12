@@ -54,7 +54,7 @@ export default function NotesPage() {
   if (!canRead) {
     return (
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
+        <div className="rounded-lg border border-warning/30 bg-warning-container p-6 text-sm text-on-warning-container">
           You do not have permission to view notes.
         </div>
       </div>
@@ -129,7 +129,7 @@ export default function NotesPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-slate-900">Notes</h1>
+        <h1 className="text-2xl font-bold text-on-surface">Notes</h1>
         <Button onClick={startCreate}>New Note</Button>
       </div>
 
@@ -141,7 +141,7 @@ export default function NotesPage() {
             onClick={() => { setTab(t.id); setPage(1); }}
             className={cn(
               'rounded-lg px-3 py-1.5 text-sm font-medium transition',
-              tab === t.id ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              tab === t.id ? 'bg-inverse-surface text-white' : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'
             )}
           >
             {t.label}
@@ -155,33 +155,33 @@ export default function NotesPage() {
           value={dealId}
           onChange={(e) => { setDealId(e.target.value); setPage(1); }}
           placeholder="Deal ID"
-          className="h-9 w-40 rounded-md border border-slate-200 px-3 text-sm"
+          className="h-9 w-40 rounded-md border border-outline-variant px-3 text-sm"
         />
         <input
           type="text"
           value={contactId}
           onChange={(e) => { setContactId(e.target.value); setPage(1); }}
           placeholder="Contact ID"
-          className="h-9 w-40 rounded-md border border-slate-200 px-3 text-sm"
+          className="h-9 w-40 rounded-md border border-outline-variant px-3 text-sm"
         />
         <input
           type="text"
           value={leadId}
           onChange={(e) => { setLeadId(e.target.value); setPage(1); }}
           placeholder="Lead ID"
-          className="h-9 w-40 rounded-md border border-slate-200 px-3 text-sm"
+          className="h-9 w-40 rounded-md border border-outline-variant px-3 text-sm"
         />
         <input
           type="text"
           value={accountId}
           onChange={(e) => { setAccountId(e.target.value); setPage(1); }}
           placeholder="Account ID"
-          className="h-9 w-40 rounded-md border border-slate-200 px-3 text-sm"
+          className="h-9 w-40 rounded-md border border-outline-variant px-3 text-sm"
         />
         <select
           value={authorId}
           onChange={(e) => { setAuthorId(e.target.value); setPage(1); }}
-          className="h-9 rounded-md border border-slate-200 px-2 text-sm"
+          className="h-9 rounded-md border border-outline-variant px-2 text-sm"
         >
           <option value="">All authors</option>
           {owners.map((u) => (
@@ -192,7 +192,7 @@ export default function NotesPage() {
         </select>
       </div>
 
-      <form onSubmit={onSubmit} className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+      <form onSubmit={onSubmit} className="mb-6 rounded-xl border border-outline-variant bg-surface p-4">
         <Textarea
           value={draftContent}
           onChange={(e) => setDraftContent(e.target.value)}
@@ -200,12 +200,12 @@ export default function NotesPage() {
           className="mb-3"
         />
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-slate-600">
+          <label className="flex items-center gap-2 text-sm text-on-surface-variant">
             <input
               type="checkbox"
               checked={draftPinned}
               onChange={(e) => setDraftPinned(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300"
+              className="h-4 w-4 rounded border-outline-variant"
             />
             Pinned
           </label>
@@ -214,28 +214,28 @@ export default function NotesPage() {
             value={draftDealId}
             onChange={(e) => setDraftDealId(e.target.value)}
             placeholder="Deal ID"
-            className="h-8 w-32 rounded-md border border-slate-200 px-2 text-xs"
+            className="h-8 w-32 rounded-md border border-outline-variant px-2 text-xs"
           />
           <input
             type="text"
             value={draftContactId}
             onChange={(e) => setDraftContactId(e.target.value)}
             placeholder="Contact ID"
-            className="h-8 w-32 rounded-md border border-slate-200 px-2 text-xs"
+            className="h-8 w-32 rounded-md border border-outline-variant px-2 text-xs"
           />
           <input
             type="text"
             value={draftLeadId}
             onChange={(e) => setDraftLeadId(e.target.value)}
             placeholder="Lead ID"
-            className="h-8 w-32 rounded-md border border-slate-200 px-2 text-xs"
+            className="h-8 w-32 rounded-md border border-outline-variant px-2 text-xs"
           />
           <input
             type="text"
             value={draftAccountId}
             onChange={(e) => setDraftAccountId(e.target.value)}
             placeholder="Account ID"
-            className="h-8 w-32 rounded-md border border-slate-200 px-2 text-xs"
+            className="h-8 w-32 rounded-md border border-outline-variant px-2 text-xs"
           />
           <div className="ms-auto flex gap-2">
             {editing && (
@@ -261,12 +261,12 @@ export default function NotesPage() {
       ) : (
         <div className="space-y-3">
           {notes.map((note) => (
-            <div key={note.id} className="rounded-xl border border-slate-200 bg-white p-4">
+            <div key={note.id} className="rounded-xl border border-outline-variant bg-surface p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
-                  <p className="whitespace-pre-wrap text-sm text-slate-700">{note.content}</p>
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-400">
-                    {note.isPinned && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-700">📌 Pinned</span>}
+                  <p className="whitespace-pre-wrap text-sm text-on-surface">{note.content}</p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-on-surface-variant">
+                    {note.isPinned && <span className="rounded bg-warning-container px-1.5 py-0.5 text-warning">📌 Pinned</span>}
                     {note.dealId && (
                       <span>
                         Deal: <Link href={`/deals/${note.dealId}`} className="text-brand-700 hover:underline">{note.dealId.slice(0, 8)}</Link>
@@ -294,7 +294,7 @@ export default function NotesPage() {
                   <button
                     type="button"
                     onClick={() => startEdit(note)}
-                    className="rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50"
+                    className="rounded-md border border-outline-variant px-2 py-1 text-xs hover:bg-surface-container-low"
                   >
                     Edit
                   </button>
@@ -303,7 +303,7 @@ export default function NotesPage() {
                     onClick={async () => {
                       if (await confirm('Delete this note?', 'Delete Note')) deleteNote.mutate(note.id);
                     }}
-                    className="rounded-md border border-slate-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                    className="rounded-md border border-outline-variant px-2 py-1 text-xs text-error hover:bg-error-container"
                   >
                     Delete
                   </button>
@@ -316,14 +316,14 @@ export default function NotesPage() {
 
       {ConfirmDialog}
       {notesQuery.data && (
-        <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
+        <div className="mt-4 flex items-center justify-between text-xs text-on-surface-variant">
           <span>
             Page {notesQuery.data.page} of {notesQuery.data.totalPages} · {notesQuery.data.total} total
           </span>
           <div className="flex gap-1">
             <button
               type="button"
-              className="rounded border border-slate-200 px-2 py-1 disabled:opacity-50"
+              className="rounded border border-outline-variant px-2 py-1 disabled:opacity-50"
               disabled={!notesQuery.data.hasPrevPage}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
             >
@@ -331,7 +331,7 @@ export default function NotesPage() {
             </button>
             <button
               type="button"
-              className="rounded border border-slate-200 px-2 py-1 disabled:opacity-50"
+              className="rounded border border-outline-variant px-2 py-1 disabled:opacity-50"
               disabled={!notesQuery.data.hasNextPage}
               onClick={() => setPage((p) => p + 1)}
             >

@@ -61,9 +61,9 @@ export default function PerformanceDashboardPage() {
     return (
       <main className="space-y-6">
         <header className="space-y-3">
-          <h1 className="text-2xl font-bold text-slate-900">Sales Performance</h1>
+          <h1 className="text-2xl font-bold text-on-surface">Sales Performance</h1>
         </header>
-        <div className="py-12 text-center text-slate-500">Loading reports...</div>
+        <div className="py-12 text-center text-on-surface-variant">Loading reports...</div>
       </main>
     );
   }
@@ -72,7 +72,7 @@ export default function PerformanceDashboardPage() {
     return (
       <main className="space-y-6">
         <header className="space-y-3">
-          <h1 className="text-2xl font-bold text-slate-900">Sales Performance</h1>
+          <h1 className="text-2xl font-bold text-on-surface">Sales Performance</h1>
         </header>
         <EmptyState
           icon={<BarChart3 className="h-5 w-5" />}
@@ -86,13 +86,13 @@ export default function PerformanceDashboardPage() {
   return (
     <main className="space-y-6">
       <header className="space-y-3">
-        <h1 className="text-2xl font-bold text-slate-900">Sales Performance</h1>
+        <h1 className="text-2xl font-bold text-on-surface">Sales Performance</h1>
         <div className="grid gap-2 md:grid-cols-4">
           <DateRangePicker />
           <select
             value={team}
             onChange={(e) => setTeam(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+            className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm"
           >
             <option value="all">All teams</option>
             <option value="enterprise">Enterprise</option>
@@ -101,7 +101,7 @@ export default function PerformanceDashboardPage() {
           <select
             value={rep}
             onChange={(e) => setRep(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+            className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm"
           >
             <option value="all">All reps</option>
             {reps.map((r: any) => (
@@ -111,7 +111,7 @@ export default function PerformanceDashboardPage() {
           <select
             value={product}
             onChange={(e) => setProduct(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+            className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm"
           >
             <option value="all">All products</option>
             <option value="core">Core</option>
@@ -122,19 +122,19 @@ export default function PerformanceDashboardPage() {
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {reps.map((row: any) => (
-          <div key={row.id} className="rounded-xl border border-slate-200 bg-white p-4">
+          <div key={row.id} className="rounded-xl border border-outline-variant bg-surface p-4">
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-highest text-sm font-semibold">
                 {row.name.split(' ').map((p: string) => p[0]).join('')}
               </span>
               <div>
-                <p className="font-semibold text-slate-900">{row.name}</p>
-                <p className="text-xs text-slate-500">{row.won} deals won</p>
+                <p className="font-semibold text-on-surface">{row.name}</p>
+                <p className="text-xs text-on-surface-variant">{row.won} deals won</p>
               </div>
             </div>
-            <div className="mt-3 h-2 rounded-full bg-slate-100">
+            <div className="mt-3 h-2 rounded-full bg-surface-container-high">
               <div
-                className="h-full rounded-full bg-indigo-600"
+                className="h-full rounded-full bg-primary"
                 style={{ width: `${Math.min(100, (row.revenue / row.quota) * 100)}%` }}
               />
             </div>
@@ -156,23 +156,23 @@ export default function PerformanceDashboardPage() {
         ))}
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Activity breakdown</h2>
+      <section className="rounded-xl border border-outline-variant bg-surface p-4">
+        <h2 className="mb-3 text-sm font-semibold text-on-surface">Activity breakdown</h2>
         <div className="h-72">
           <ActivityBreakdownChart data={activity} />
         </div>
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Revenue vs Quota</h2>
+      <section className="rounded-xl border border-outline-variant bg-surface p-4">
+        <h2 className="mb-3 text-sm font-semibold text-on-surface">Revenue vs Quota</h2>
         <div className="h-72">
           <RevenueQuotaChart data={cumulative} />
         </div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">Win/Loss analysis</h2>
+        <div className="rounded-xl border border-outline-variant bg-surface p-4">
+          <h2 className="mb-3 text-sm font-semibold text-on-surface">Win/Loss analysis</h2>
           <div className="h-56">
             <WinLossPieChart data={wonLost} />
           </div>
@@ -180,7 +180,7 @@ export default function PerformanceDashboardPage() {
             <LostReasonsChart data={lostReasons} />
           </div>
           <div className="mt-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
               Top competitors in lost deals
             </h3>
             <ul className="mt-2 space-y-1 text-sm">
@@ -193,12 +193,12 @@ export default function PerformanceDashboardPage() {
             </ul>
           </div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">Response time analysis</h2>
+        <div className="rounded-xl border border-outline-variant bg-surface p-4">
+          <h2 className="mb-3 text-sm font-semibold text-on-surface">Response time analysis</h2>
           <div className="h-72">
             <ResponseTimeChart data={reps} />
           </div>
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs text-on-surface-variant">
             SLA target: 4 hours. Reps above threshold should receive coaching support.
           </p>
           {reps.length === 0 ? (

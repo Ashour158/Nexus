@@ -23,15 +23,15 @@ interface HealthResponse {
 const REFRESH_MS = 30_000;
 
 const DOT_STYLES: Record<Status, string> = {
-  healthy: 'bg-emerald-500',
-  degraded: 'bg-amber-500',
-  down: 'bg-red-500',
+  healthy: 'bg-success',
+  degraded: 'bg-warning',
+  down: 'bg-error',
 };
 
 const BADGE_STYLES: Record<Status, string> = {
-  healthy: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
-  degraded: 'bg-amber-50 text-amber-700 ring-amber-600/20',
-  down: 'bg-red-50 text-red-700 ring-red-600/20',
+  healthy: 'bg-success-container text-success ring-success/20',
+  degraded: 'bg-warning-container text-warning ring-warning/20',
+  down: 'bg-error-container text-error ring-error/20',
 };
 
 const STATUS_LABEL: Record<Status, string> = {
@@ -97,12 +97,12 @@ export default function SystemStatusPage(): JSX.Element {
   return (
     <main className="space-y-5 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-slate-900">System Status</h1>
-        <div className="flex items-center gap-3 text-xs text-slate-500">
+        <h1 className="text-2xl font-bold text-on-surface">System Status</h1>
+        <div className="flex items-center gap-3 text-xs text-on-surface-variant">
           {refreshedAt ? <span>Last checked {refreshedAt}</span> : null}
           <button
             onClick={() => void load()}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border border-outline-variant px-3 py-1.5 text-xs text-on-surface hover:bg-surface-container-low"
           >
             Refresh
           </button>
@@ -113,14 +113,14 @@ export default function SystemStatusPage(): JSX.Element {
         <div
           className={`flex items-center gap-3 rounded-xl border p-4 ${
             allHealthy
-              ? 'border-emerald-200 bg-emerald-50'
+              ? 'border-success/30 bg-success-container'
               : overall === 'down'
-                ? 'border-red-200 bg-red-50'
-                : 'border-amber-200 bg-amber-50'
+                ? 'border-error/30 bg-error-container'
+                : 'border-warning/30 bg-warning-container'
           }`}
         >
           <span className={`h-3 w-3 rounded-full ${DOT_STYLES[overall]}`} />
-          <p className="text-sm font-medium text-slate-800">
+          <p className="text-sm font-medium text-on-surface">
             {allHealthy
               ? 'All systems operational'
               : overall === 'down'
@@ -140,7 +140,7 @@ export default function SystemStatusPage(): JSX.Element {
       ) : null}
 
       {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-xl border border-error/30 bg-error-container p-4 text-sm text-error">
           {error}
         </div>
       ) : null}
@@ -148,7 +148,7 @@ export default function SystemStatusPage(): JSX.Element {
       {loading && !data ? (
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-100" />
+            <div key={i} className="h-20 animate-pulse rounded-xl bg-surface-container-high" />
           ))}
         </section>
       ) : (
@@ -156,10 +156,10 @@ export default function SystemStatusPage(): JSX.Element {
           {services.map((s) => (
             <div
               key={s.service}
-              className="rounded-xl border border-slate-200 bg-white p-3 text-sm"
+              className="rounded-xl border border-outline-variant bg-surface p-3 text-sm"
             >
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 font-semibold capitalize text-slate-900">
+                <span className="flex items-center gap-2 font-semibold capitalize text-on-surface">
                   <span className={`h-2.5 w-2.5 rounded-full ${DOT_STYLES[s.status]}`} />
                   {s.service}
                 </span>
@@ -169,25 +169,25 @@ export default function SystemStatusPage(): JSX.Element {
                   {STATUS_LABEL[s.status]}
                 </span>
               </div>
-              <p className="mt-2 text-slate-500">
+              <p className="mt-2 text-on-surface-variant">
                 {s.latencyMs != null ? `${s.latencyMs} ms` : '—'}
                 {s.httpStatus != null ? ` · HTTP ${s.httpStatus}` : ''}
               </p>
               {s.detail && s.status !== 'healthy' ? (
-                <p className="mt-1 text-xs text-slate-400">{s.detail}</p>
+                <p className="mt-1 text-xs text-on-surface-variant">{s.detail}</p>
               ) : null}
             </div>
           ))}
           {services.length === 0 && !error ? (
-            <p className="col-span-full text-sm text-slate-500">No services reported.</p>
+            <p className="col-span-full text-sm text-on-surface-variant">No services reported.</p>
           ) : null}
         </section>
       )}
 
       {data ? (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-on-surface-variant">
           Polled server-side from each service&apos;s{' '}
-          <code className="text-slate-500">/health</code> endpoint at{' '}
+          <code className="text-on-surface-variant">/health</code> endpoint at{' '}
           {new Date(data.checkedAt).toLocaleTimeString()}. Auto-refreshes every 30s.
         </p>
       ) : null}
@@ -205,14 +205,14 @@ function SummaryCard({
   tone: 'neutral' | 'green' | 'amber' | 'red';
 }): JSX.Element {
   const toneStyles: Record<typeof tone, string> = {
-    neutral: 'text-slate-900',
-    green: 'text-emerald-600',
-    amber: 'text-amber-600',
-    red: 'text-red-600',
+    neutral: 'text-on-surface',
+    green: 'text-success',
+    amber: 'text-warning',
+    red: 'text-error',
   };
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <p className="text-xs uppercase tracking-wider text-slate-500">{label}</p>
+    <div className="rounded-xl border border-outline-variant bg-surface p-4">
+      <p className="text-xs uppercase tracking-wider text-on-surface-variant">{label}</p>
       <p className={`mt-1 text-2xl font-bold ${toneStyles[tone]}`}>{value}</p>
     </div>
   );

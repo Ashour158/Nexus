@@ -82,8 +82,8 @@ export default function AdminUserDetailPage({ params }: { params: { id: string }
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">User #{params.id}</h2>
-      {banner ? <div className="rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-300">{banner}</div> : null}
-      <section className="rounded-xl border border-gray-800 bg-gray-900 p-4">
+      {banner ? <div className="rounded border border-outline-variant bg-inverse-surface px-3 py-2 text-sm text-outline">{banner}</div> : null}
+      <section className="rounded-xl border border-outline-variant bg-inverse-surface p-4">
         <h3 className="mb-3 font-semibold">Profile</h3>
         <div className="grid gap-2 md:grid-cols-2">
           <div>Name: {data?.name ?? '?'}</div>
@@ -92,16 +92,16 @@ export default function AdminUserDetailPage({ params }: { params: { id: string }
           <div>Joined: {data?.joined ? new Date(data.joined).toLocaleDateString() : '?'}</div>
         </div>
       </section>
-      <section className="space-y-3 rounded-xl border border-gray-800 bg-gray-900 p-4">
+      <section className="space-y-3 rounded-xl border border-outline-variant bg-inverse-surface p-4">
         <h3 className="font-semibold">Access controls</h3>
         <div className="grid gap-3 md:grid-cols-2">
-          <label className="text-sm">Role<select value={role} onChange={(e) => setRole(e.target.value)} className="mt-1 w-full rounded border border-gray-700 bg-gray-950 px-2 py-2"><option>admin</option><option>manager</option><option>ae</option><option>sdr</option></select></label>
-          <label className="text-sm">Tenant<select value={tenant} onChange={(e) => setTenant(e.target.value)} className="mt-1 w-full rounded border border-gray-700 bg-gray-950 px-2 py-2"><option>Tenant 1</option><option>Tenant 2</option></select></label>
+          <label className="text-sm">Role<select value={role} onChange={(e) => setRole(e.target.value)} className="mt-1 w-full rounded border border-outline-variant bg-inverse-surface px-2 py-2"><option>admin</option><option>manager</option><option>ae</option><option>sdr</option></select></label>
+          <label className="text-sm">Tenant<select value={tenant} onChange={(e) => setTenant(e.target.value)} className="mt-1 w-full rounded border border-outline-variant bg-inverse-surface px-2 py-2"><option>Tenant 1</option><option>Tenant 2</option></select></label>
         </div>
         <div className="space-y-2">
           {RESOURCES.map((r) => (
-            <div key={r} className="flex items-center justify-between rounded border border-gray-800 p-2 text-sm">
-              <span className="uppercase text-gray-300">{r}</span>
+            <div key={r} className="flex items-center justify-between rounded border border-outline-variant p-2 text-sm">
+              <span className="uppercase text-outline">{r}</span>
               <div className="flex gap-3">
                 {(['read', 'write', 'delete'] as const).map((p) => (
                   <label key={p} className="inline-flex items-center gap-1">
@@ -119,26 +119,26 @@ export default function AdminUserDetailPage({ params }: { params: { id: string }
         </div>
       </section>
       <OrgAssignmentPanel userId={params.id} />
-      <section className="rounded-xl border border-gray-800 bg-gray-900 p-4">
+      <section className="rounded-xl border border-outline-variant bg-inverse-surface p-4">
         <h3 className="mb-2 font-semibold">Login history</h3>
-        <ul className="space-y-1 text-sm text-gray-300">{history.map((h) => <li key={h.id}>{new Date(h.at).toLocaleString()} - {h.action}</li>)}</ul>
+        <ul className="space-y-1 text-sm text-outline">{history.map((h) => <li key={h.id}>{new Date(h.at).toLocaleString()} - {h.action}</li>)}</ul>
       </section>
-      <section className="rounded-xl border border-gray-800 bg-gray-900 p-4">
+      <section className="rounded-xl border border-outline-variant bg-inverse-surface p-4">
         <h3 className="mb-2 font-semibold">Active sessions</h3>
-        <ul className="space-y-2 text-sm">{sessions.map((s) => <li key={s.id} className="flex items-center justify-between rounded border border-gray-800 p-2"><span>{s.device} - {s.ip}</span><button className="rounded border border-red-700 px-2 py-1 text-xs text-red-300">Revoke</button></li>)}</ul>
+        <ul className="space-y-2 text-sm">{sessions.map((s) => <li key={s.id} className="flex items-center justify-between rounded border border-outline-variant p-2"><span>{s.device} - {s.ip}</span><button className="rounded border border-error px-2 py-1 text-xs text-error">Revoke</button></li>)}</ul>
       </section>
-      <section className="rounded-xl border border-red-900 bg-red-950/30 p-4">
-        <h3 className="font-semibold text-red-300">Danger zone</h3>
+      <section className="rounded-xl border border-error bg-error-container/30 p-4">
+        <h3 className="font-semibold text-error">Danger zone</h3>
         <div className="mt-2 flex gap-2">
-          <button onClick={() => void updateCurrent({ status: 'Suspended' }, 'Account suspended')} className="rounded border border-red-700 px-3 py-1.5 text-sm text-red-300">Suspend account</button>
-          <button onClick={() => void deleteCurrent()} className="rounded border border-red-700 px-3 py-1.5 text-sm text-red-300">Delete account</button>
+          <button onClick={() => void updateCurrent({ status: 'Suspended' }, 'Account suspended')} className="rounded border border-error px-3 py-1.5 text-sm text-error">Suspend account</button>
+          <button onClick={() => void deleteCurrent()} className="rounded border border-error px-3 py-1.5 text-sm text-error">Delete account</button>
         </div>
       </section>
       {ConfirmDialog}
       <div className="flex justify-end">
         <button
           onClick={() => void updateCurrent({ role, tenant, permissions }, 'User permissions saved')}
-          className="rounded bg-indigo-600 px-3 py-2 text-sm"
+          className="rounded bg-primary px-3 py-2 text-sm"
         >
           Save changes
         </button>

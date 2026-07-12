@@ -108,14 +108,14 @@ export function SavedViewsSidebar({
   }
 
   return (
-    <aside className="w-full rounded-lg border border-slate-200 bg-white p-3 lg:w-64">
+    <aside className="w-full rounded-lg border border-outline-variant bg-surface p-3 lg:w-64">
       <button className="w-full text-left text-sm font-semibold" onClick={() => setOpen((s) => !s)}>
         Saved Views
       </button>
       {open ? (
         <div className="mt-2 space-y-2">
           <button
-            className="w-full rounded border border-slate-200 px-2 py-1 text-left text-sm"
+            className="w-full rounded border border-outline-variant px-2 py-1 text-left text-sm"
             onClick={() => onViewSelect({ filters: {} })}
           >
             All {module}
@@ -123,7 +123,7 @@ export function SavedViewsSidebar({
           {(views.data ?? []).map((v) => (
             <div key={v.id} className="flex items-center gap-1">
               <button
-                className="flex-1 rounded border border-slate-200 px-2 py-1 text-left text-sm"
+                className="flex-1 rounded border border-outline-variant px-2 py-1 text-left text-sm"
                 onClick={() =>
                   onViewSelect({
                     filters: v.filters,
@@ -137,7 +137,7 @@ export function SavedViewsSidebar({
               </button>
               <button
                 onClick={() => void deleteView(v.id)}
-                className="rounded p-1 text-slate-400 hover:text-red-600"
+                className="rounded p-1 text-on-surface-variant hover:text-error"
                 title="Delete view"
               >
                 <X className="h-3 w-3" />
@@ -145,13 +145,13 @@ export function SavedViewsSidebar({
             </div>
           ))}
           <input
-            className="h-8 w-full rounded border border-slate-200 px-2 text-sm"
+            className="h-8 w-full rounded border border-outline-variant px-2 text-sm"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="View name"
           />
           <button
-            className="w-full rounded bg-slate-900 px-2 py-1 text-sm text-white"
+            className="w-full rounded bg-primary px-2 py-1 text-sm text-on-primary"
             onClick={() => void saveCurrentView()}
           >
             Save current view

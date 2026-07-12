@@ -100,7 +100,7 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
         type="button"
         aria-label="Close help"
         onClick={onClose}
-        className="absolute inset-0 bg-black/40"
+        className="absolute inset-0 bg-on-surface/40"
       />
       <div
         ref={panelRef}

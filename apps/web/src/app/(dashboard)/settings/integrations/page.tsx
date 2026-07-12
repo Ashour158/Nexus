@@ -139,7 +139,7 @@ function ConnectorCard({
                 <Button
                   size="sm"
                   variant="secondary"
-                  className="border-red-300 text-red-700 hover:bg-red-50"
+                  className="border-error/40 text-error hover:bg-error-container"
                   isLoading={disconnect.isPending}
                   onClick={() =>
                     disconnect.mutate(

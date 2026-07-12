@@ -109,21 +109,21 @@ export default function QuotesPage(): JSX.Element {
     <main className="space-y-4 px-6 py-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Quotes</h1>
-          <p className="text-sm text-slate-600">Finance quote lifecycle and actions.</p>
+          <h1 className="text-2xl font-bold text-on-surface">Quotes</h1>
+          <p className="text-sm text-on-surface-variant">Finance quote lifecycle and actions.</p>
         </div>
-        <div className="inline-flex overflow-hidden rounded-md border border-slate-300">
+        <div className="inline-flex overflow-hidden rounded-md border border-outline-variant">
           <button
             type="button"
             onClick={() => { setView('active'); setPage(1); }}
-            className={`px-3 py-1.5 text-sm font-medium ${view === 'active' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+            className={`px-3 py-1.5 text-sm font-medium ${view === 'active' ? 'bg-inverse-surface text-white' : 'bg-surface text-on-surface-variant hover:bg-surface-container-low'}`}
           >
             Active
           </button>
           <button
             type="button"
             onClick={() => { setView('archived'); setPage(1); }}
-            className={`px-3 py-1.5 text-sm font-medium ${view === 'archived' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+            className={`px-3 py-1.5 text-sm font-medium ${view === 'archived' ? 'bg-inverse-surface text-white' : 'bg-surface text-on-surface-variant hover:bg-surface-container-low'}`}
           >
             Archived
           </button>
@@ -151,9 +151,9 @@ export default function QuotesPage(): JSX.Element {
         )}
       </header>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="rounded-lg border border-outline-variant bg-surface p-4">
         <div className="grid gap-3 md:grid-cols-4">
-          <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+          <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
             <span>Status</span>
             <select
               value={status}
@@ -161,7 +161,7 @@ export default function QuotesPage(): JSX.Element {
                 setStatus(e.target.value as Quote['status'] | '');
                 setPage(1);
               }}
-              className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm normal-case text-slate-700"
+              className="h-9 w-full rounded-md border border-outline-variant bg-surface px-3 text-sm normal-case text-on-surface"
             >
               <option value="">All</option>
               {statusOptions.map((s) => (
@@ -172,31 +172,31 @@ export default function QuotesPage(): JSX.Element {
             </select>
           </label>
 
-          <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+          <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
             <span>Owner ID</span>
             <Input value={ownerId} onChange={(e) => setOwnerId(e.target.value)} placeholder="cuid..." />
           </label>
 
-          <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+          <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
             <span>Date from</span>
             <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
           </label>
 
-          <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+          <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
             <span>Date to</span>
             <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </label>
         </div>
       </section>
 
-      <section className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <section className="overflow-x-auto rounded-lg border border-outline-variant bg-surface">
         {query.isLoading ? (
           <TableSkeleton rows={8} cols={10} />
         ) : query.isError ? (
-          <div className="p-4 text-sm text-red-600">Failed to load quotes.</div>
+          <div className="p-4 text-sm text-error">Failed to load quotes.</div>
         ) : (
           <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+            <thead className="bg-surface-container-low text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
                 <th className="px-3 py-2 text-start">Quote #</th>
                 <th className="px-3 py-2 text-start">Account</th>
@@ -212,7 +212,7 @@ export default function QuotesPage(): JSX.Element {
             </thead>
             <tbody>
               {rows.map((q) => (
-                <tr key={q.id} className="border-t border-slate-100">
+                <tr key={q.id} className="border-t border-outline-variant">
                   <td className="px-3 py-2 font-medium">
                     <Link href={`/quotes/${q.id}`} className="text-brand-700 hover:underline">
                       {q.quoteNumber || q.id.slice(0, 8)}
@@ -230,7 +230,7 @@ export default function QuotesPage(): JSX.Element {
                       <Link href={`/contacts/${(q as { contactId?: string }).contactId}`} className="text-brand-700 hover:underline">
                         {contactName.get((q as { contactId: string }).contactId) ?? short((q as { contactId: string }).contactId)}
                       </Link>
-                    ) : <span className="text-slate-400">—</span>}
+                    ) : <span className="text-on-surface-variant">—</span>}
                   </td>
                   <td className="px-3 py-2">
                     <StatusPill status={q.status} />
@@ -279,7 +279,7 @@ export default function QuotesPage(): JSX.Element {
               ))}
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-3 py-10 text-center text-sm text-slate-500">
+                  <td colSpan={10} className="px-3 py-10 text-center text-sm text-on-surface-variant">
                     No quotes found for current filters.
                   </td>
                 </tr>
@@ -291,14 +291,14 @@ export default function QuotesPage(): JSX.Element {
 
       {PromptDialog}
       <footer className="flex items-center justify-between text-sm">
-        <p className="text-slate-500">
+        <p className="text-on-surface-variant">
           {rows.length} shown / {total} total
         </p>
         <div className="flex items-center gap-2">
           <Button type="button" variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
             Previous
           </Button>
-          <span className="text-slate-600">
+          <span className="text-on-surface-variant">
             Page {page} / {totalPages}
           </span>
           <Button
@@ -319,12 +319,12 @@ function ApprovalCell({ quote }: { quote: Quote }) {
   const q = quote as { requiredApprovalLevel?: number; approvalLevel?: number; approvalRequired?: boolean };
   const req = q.requiredApprovalLevel ?? 0;
   const cur = q.approvalLevel ?? 0;
-  if (!req && !q.approvalRequired) return <span className="text-xs text-slate-400">—</span>;
+  if (!req && !q.approvalRequired) return <span className="text-xs text-on-surface-variant">—</span>;
   if (req && cur >= req) {
-    return <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Approved</span>;
+    return <span className="rounded-full bg-success-container px-2 py-0.5 text-xs font-semibold text-on-success-container">Approved</span>;
   }
   return (
-    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+    <span className="rounded-full bg-warning-container px-2 py-0.5 text-xs font-semibold text-on-warning-container">
       {req ? `L${cur}/${req} pending` : 'Pending'}
     </span>
   );
@@ -332,16 +332,16 @@ function ApprovalCell({ quote }: { quote: Quote }) {
 
 function StatusPill({ status }: { status: Quote['status'] }) {
   const cls: Record<Quote['status'], string> = {
-    DRAFT: 'bg-slate-100 text-slate-700',
-    SENT: 'bg-indigo-100 text-indigo-800',
-    ACCEPTED: 'bg-emerald-100 text-emerald-800',
-    REJECTED: 'bg-red-100 text-red-800',
-    EXPIRED: 'bg-amber-100 text-amber-800',
-    VOID: 'bg-slate-200 text-slate-700',
-    PENDING_APPROVAL: 'bg-amber-100 text-amber-800',
-    APPROVED: 'bg-emerald-100 text-emerald-800',
-    VIEWED: 'bg-sky-100 text-sky-800',
-    CONVERTED: 'bg-indigo-100 text-indigo-800',
+    DRAFT: 'bg-surface-container-high text-on-surface',
+    SENT: 'bg-primary-container text-on-primary-container',
+    ACCEPTED: 'bg-success-container text-on-success-container',
+    REJECTED: 'bg-error-container text-on-error-container',
+    EXPIRED: 'bg-warning-container text-on-warning-container',
+    VOID: 'bg-surface-container-highest text-on-surface',
+    PENDING_APPROVAL: 'bg-warning-container text-on-warning-container',
+    APPROVED: 'bg-success-container text-on-success-container',
+    VIEWED: 'bg-info-container text-on-info-container',
+    CONVERTED: 'bg-primary-container text-on-primary-container',
   };
   return (
     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${cls[status]}`}>

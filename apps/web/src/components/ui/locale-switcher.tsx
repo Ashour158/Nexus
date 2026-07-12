@@ -26,8 +26,8 @@ export function LocaleSwitcher({ currentLocale }: { currentLocale: string }) {
           disabled={isPending || currentLocale === locale.code}
           className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
             currentLocale === locale.code
-              ? 'bg-indigo-100 text-indigo-700'
-              : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+              ? 'bg-primary-container text-on-primary-container'
+              : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface'
           }`}
           title={locale.label}
         >

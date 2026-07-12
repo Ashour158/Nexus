@@ -55,7 +55,7 @@ import {
 type Tab = 'overview' | 'members' | 'metrics';
 
 const inputClass =
-  'h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100';
+  'h-11 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface outline-none focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30';
 
 export default function CampaignDetailPage() {
   const params = useParams<{ id: string }>();
@@ -89,13 +89,13 @@ export default function CampaignDetailPage() {
               <button
                 type="button"
                 onClick={() => void refetch()}
-                className="inline-flex h-10 items-center rounded-lg border border-rose-200 bg-white px-4 text-sm font-bold text-rose-700 hover:bg-rose-50"
+                className="inline-flex h-10 items-center rounded-lg border border-error/30 bg-surface px-4 text-sm font-bold text-error hover:bg-error-container"
               >
                 Retry
               </button>
               <Link
                 href="/campaigns"
-                className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                className="inline-flex h-10 items-center rounded-lg border border-outline-variant bg-surface px-4 text-sm font-bold text-on-surface-variant hover:bg-surface-container-low"
               >
                 Back to campaigns
               </Link>
@@ -124,7 +124,7 @@ export default function CampaignDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             <CRMStatusBadge tone={typeTone(campaign.type)}>{campaign.type}</CRMStatusBadge>
             <CRMStatusBadge tone={statusTone(campaign.status)}>{campaign.status}</CRMStatusBadge>
-            <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+            <span className="rounded-lg bg-surface-container-high px-3 py-1 text-xs font-semibold text-on-surface-variant">
               {campaign.memberCount ?? 0} members
             </span>
           </div>
@@ -133,7 +133,7 @@ export default function CampaignDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/campaigns"
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 text-sm font-bold text-on-surface-variant hover:bg-surface-container-low"
             >
               <ArrowLeft className="h-4 w-4" />
               Back
@@ -144,7 +144,7 @@ export default function CampaignDetailPage() {
                 type="button"
                 disabled={changeStatus.isPending}
                 onClick={() => changeStatus.mutate({ id, status: to as CampaignStatus })}
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 text-sm font-bold text-on-surface hover:bg-surface-container-low disabled:opacity-50"
               >
                 {to}
               </button>
@@ -172,7 +172,7 @@ export default function CampaignDetailPage() {
                 });
                 if (ok) remove.mutate(id, { onSuccess: () => router.push('/campaigns') });
               }}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-rose-200 bg-white px-4 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-error/30 bg-surface px-4 text-sm font-bold text-error hover:bg-error-container disabled:opacity-50"
             >
               <Trash2 className="h-4 w-4" />
               Delete
@@ -232,9 +232,9 @@ function OverviewTab({
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
       <CRMCard title="Content preview">
         {campaign.contentHtml ? (
-          <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
+          <div className="rounded-lg border border-outline-variant bg-surface-container-low p-4">
             <div
-              className="prose prose-sm max-w-none text-slate-800"
+              className="prose prose-sm max-w-none text-on-surface"
               // Tenant-authored content is sanitized to strip scripts/handlers.
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(campaign.contentHtml) }}
             />
@@ -249,13 +249,13 @@ function OverviewTab({
       </CRMCard>
 
       <CRMCard title="Details">
-        <dl className="divide-y divide-slate-100">
+        <dl className="divide-y divide-outline-variant">
           {rows.map((r) => (
             <div key={r.label} className="flex items-start justify-between gap-4 py-2.5">
-              <dt className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              <dt className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                 {r.label}
               </dt>
-              <dd className="max-w-[60%] break-words text-right text-sm text-slate-700">
+              <dd className="max-w-[60%] break-words text-right text-sm text-on-surface">
                 {r.value}
               </dd>
             </div>
@@ -333,7 +333,7 @@ function MembersTab({ campaignId }: { campaignId: string }) {
                 <button
                   type="button"
                   onClick={() => void refetch()}
-                  className="inline-flex h-10 items-center rounded-lg border border-rose-200 bg-white px-4 text-sm font-bold text-rose-700 hover:bg-rose-50"
+                  className="inline-flex h-10 items-center rounded-lg border border-error/30 bg-surface px-4 text-sm font-bold text-error hover:bg-error-container"
                 >
                   Retry
                 </button>
@@ -343,7 +343,7 @@ function MembersTab({ campaignId }: { campaignId: string }) {
         ) : (
           <CRMTableShell className="rounded-none border-0 shadow-none">
             <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500">
+              <thead className="bg-surface-container-low text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                 <tr>
                   <th className="px-5 py-3">Email</th>
                   <th className="px-5 py-3">Entity</th>
@@ -351,10 +351,10 @@ function MembersTab({ campaignId }: { campaignId: string }) {
                   <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-outline-variant">
                 {rows.map((m) => (
-                  <tr key={m.id} className="hover:bg-slate-50">
-                    <td className="px-5 py-3 font-medium text-slate-900">{m.email}</td>
+                  <tr key={m.id} className="hover:bg-surface-container-low">
+                    <td className="px-5 py-3 font-medium text-on-surface">{m.email}</td>
                     <td className="px-5 py-3">
                       <CRMStatusBadge tone={m.entityType === 'LEAD' ? 'amber' : 'blue'}>
                         {m.entityType}
@@ -372,7 +372,7 @@ function MembersTab({ campaignId }: { campaignId: string }) {
                         onClick={() =>
                           removeMember.mutate({ id: campaignId, memberId: m.id })
                         }
-                        className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded-lg border border-error/30 bg-surface px-3 py-1.5 text-xs font-bold text-error hover:bg-error-container disabled:opacity-50"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         Remove
@@ -448,13 +448,13 @@ function MembersTab({ campaignId }: { campaignId: string }) {
               onChange={(e) => setBulkText(e.target.value)}
               rows={5}
               placeholder="a@x.com, b@y.com&#10;c@z.com"
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+              className="w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
             />
             <button
               type="button"
               disabled={add.isPending || !bulkText.trim()}
               onClick={handleBulkImport}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 text-sm font-bold text-on-surface hover:bg-surface-container-low disabled:opacity-50"
             >
               <Upload className="h-4 w-4" />
               Import members
@@ -497,7 +497,7 @@ function MetricsTab({ campaignId }: { campaignId: string }) {
           <button
             type="button"
             onClick={() => void refetch()}
-            className="inline-flex h-10 items-center rounded-lg border border-rose-200 bg-white px-4 text-sm font-bold text-rose-700 hover:bg-rose-50"
+            className="inline-flex h-10 items-center rounded-lg border border-error/30 bg-surface px-4 text-sm font-bold text-error hover:bg-error-container"
           >
             Retry
           </button>
@@ -564,13 +564,13 @@ function MetricsTab({ campaignId }: { campaignId: string }) {
                 <div className="w-32 shrink-0">
                   <CRMStatusBadge tone={memberStatusTone(f.status)}>{f.status}</CRMStatusBadge>
                 </div>
-                <div className="h-6 flex-1 overflow-hidden rounded-lg bg-slate-100">
+                <div className="h-6 flex-1 overflow-hidden rounded-lg bg-surface-container-high">
                   <div
                     className="h-full rounded-lg bg-[#4f46e5]"
                     style={{ width: `${(f.count / max) * 100}%` }}
                   />
                 </div>
-                <span className="w-12 shrink-0 text-right text-sm font-bold text-slate-700">
+                <span className="w-12 shrink-0 text-right text-sm font-bold text-on-surface">
                   {f.count}
                 </span>
               </div>

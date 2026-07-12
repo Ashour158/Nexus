@@ -26,12 +26,12 @@ interface Execution {
 }
 
 function statusClass(status: Execution['status']): string {
-  if (status === 'RUNNING') return 'bg-indigo-100 text-indigo-700';
-  if (status === 'COMPLETED') return 'bg-emerald-100 text-emerald-700';
-  if (status === 'FAILED') return 'bg-red-100 text-red-700';
-  if (status === 'PAUSED') return 'bg-amber-100 text-amber-700';
-  if (status === 'CANCELLED') return 'bg-slate-200 text-slate-700';
-  return 'bg-slate-100 text-slate-700';
+  if (status === 'RUNNING') return 'bg-primary-container text-primary';
+  if (status === 'COMPLETED') return 'bg-success-container text-success';
+  if (status === 'FAILED') return 'bg-error-container text-error';
+  if (status === 'PAUSED') return 'bg-warning-container text-warning';
+  if (status === 'CANCELLED') return 'bg-surface-container-highest text-on-surface';
+  return 'bg-surface-container-high text-on-surface';
 }
 
 interface Paginated<T> {
@@ -103,33 +103,33 @@ export default function WorkflowsPage(): JSX.Element {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Workflows</h1>
-          <p className="text-sm text-slate-500">Automation workflows and recent execution history.</p>
+          <p className="text-sm text-on-surface-variant">Automation workflows and recent execution history.</p>
         </div>
         <Button onClick={() => router.push('/workflows/new')}>+ New Workflow</Button>
       </header>
-      <div className="inline-flex rounded-md border border-slate-200 bg-white p-0.5">
-        <button type="button" onClick={() => setTab('workflows')} className={`rounded px-3 py-1 text-sm ${tab === 'workflows' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>Workflows</button>
-        <button type="button" onClick={() => setTab('executions')} className={`rounded px-3 py-1 text-sm ${tab === 'executions' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>Executions</button>
+      <div className="inline-flex rounded-md border border-outline-variant bg-surface p-0.5">
+        <button type="button" onClick={() => setTab('workflows')} className={`rounded px-3 py-1 text-sm ${tab === 'workflows' ? 'bg-inverse-surface text-white' : 'text-on-surface-variant hover:bg-surface-container-high'}`}>Workflows</button>
+        <button type="button" onClick={() => setTab('executions')} className={`rounded px-3 py-1 text-sm ${tab === 'executions' ? 'bg-inverse-surface text-white' : 'text-on-surface-variant hover:bg-surface-container-high'}`}>Executions</button>
       </div>
 
       {tab === 'workflows' ? (
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <section className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
           {workflowsQuery.isLoading ? (
             <div className="space-y-2 p-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10" />)}</div>
           ) : workflows.length === 0 ? (
-            <p className="p-8 text-center text-sm text-slate-500">No workflows configured.</p>
+            <p className="p-8 text-center text-sm text-on-surface-variant">No workflows configured.</p>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-start text-xs uppercase text-slate-500">
+              <thead className="bg-surface-container-low text-start text-xs uppercase text-on-surface-variant">
                 <tr><th className="px-3 py-2">Name</th><th>Trigger</th><th>Status</th><th>Created</th><th className="text-end pe-3">Actions</th></tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-outline-variant">
                 {workflows.map((workflow) => (
                   <tr key={workflow.id}>
                     <td className="px-3 py-2 font-medium">{workflow.name}</td>
                     <td>{workflow.trigger}</td>
                     <td>
-                      <span className={`rounded-full px-2 py-0.5 text-xs ${workflow.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-xs ${workflow.isActive ? 'bg-success-container text-success' : 'bg-surface-container-high text-on-surface'}`}>
                         {workflow.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
@@ -166,17 +166,17 @@ export default function WorkflowsPage(): JSX.Element {
           )}
         </section>
       ) : (
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <section className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
           {executionsQuery.isLoading ? (
             <div className="space-y-2 p-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10" />)}</div>
           ) : executions.length === 0 ? (
-            <p className="p-8 text-center text-sm text-slate-500">No executions yet.</p>
+            <p className="p-8 text-center text-sm text-on-surface-variant">No executions yet.</p>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-start text-xs uppercase text-slate-500">
+              <thead className="bg-surface-container-low text-start text-xs uppercase text-on-surface-variant">
                 <tr><th className="px-3 py-2">Workflow</th><th>Status</th><th>Started At</th><th>Duration</th></tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-outline-variant">
                 {executions.map((execution) => {
                   const durationMs = execution.completedAt
                     ? new Date(execution.completedAt).getTime() - new Date(execution.startedAt).getTime()

@@ -25,20 +25,20 @@ interface TimelineMeta {
 }
 
 const CHANNEL_META: Record<string, TimelineMeta> = {
-  CALL: { icon: <Phone className="h-4 w-4 text-emerald-600" />, label: 'Call' },
-  EMAIL: { icon: <Mail className="h-4 w-4 text-indigo-600" />, label: 'Email' },
-  CHAT: { icon: <MessageSquare className="h-4 w-4 text-indigo-600" />, label: 'Chat' },
-  WHATSAPP: { icon: <MessageCircle className="h-4 w-4 text-green-600" />, label: 'WhatsApp' },
-  WHATS_APP: { icon: <MessageCircle className="h-4 w-4 text-green-600" />, label: 'WhatsApp' },
-  MEETING: { icon: <Calendar className="h-4 w-4 text-purple-600" />, label: 'Meeting' },
-  NOTE: { icon: <FileText className="h-4 w-4 text-slate-500" />, label: 'Note' },
-  TASK: { icon: <MessageSquare className="h-4 w-4 text-orange-600" />, label: 'Task' },
-  STAGE_CHANGE: { icon: <GitCommitVertical className="h-4 w-4 text-amber-600" />, label: 'Stage change' },
-  STATUS_CHANGE: { icon: <GitCommitVertical className="h-4 w-4 text-amber-600" />, label: 'Status change' },
-  CREATED: { icon: <Sparkles className="h-4 w-4 text-emerald-600" />, label: 'Created' },
+  CALL: { icon: <Phone className="h-4 w-4 text-success" />, label: 'Call' },
+  EMAIL: { icon: <Mail className="h-4 w-4 text-primary" />, label: 'Email' },
+  CHAT: { icon: <MessageSquare className="h-4 w-4 text-primary" />, label: 'Chat' },
+  WHATSAPP: { icon: <MessageCircle className="h-4 w-4 text-success" />, label: 'WhatsApp' },
+  WHATS_APP: { icon: <MessageCircle className="h-4 w-4 text-success" />, label: 'WhatsApp' },
+  MEETING: { icon: <Calendar className="h-4 w-4 text-tertiary" />, label: 'Meeting' },
+  NOTE: { icon: <FileText className="h-4 w-4 text-on-surface-variant" />, label: 'Note' },
+  TASK: { icon: <MessageSquare className="h-4 w-4 text-warning" />, label: 'Task' },
+  STAGE_CHANGE: { icon: <GitCommitVertical className="h-4 w-4 text-warning" />, label: 'Stage change' },
+  STATUS_CHANGE: { icon: <GitCommitVertical className="h-4 w-4 text-warning" />, label: 'Status change' },
+  CREATED: { icon: <Sparkles className="h-4 w-4 text-success" />, label: 'Created' },
 };
 
-const DEFAULT_META: TimelineMeta = { icon: <ActivityIcon className="h-4 w-4 text-slate-400" />, label: 'Activity' };
+const DEFAULT_META: TimelineMeta = { icon: <ActivityIcon className="h-4 w-4 text-on-surface-variant" />, label: 'Activity' };
 
 function pickKey(row: Record<string, unknown>): string {
   const metadata = (row.metadata ?? {}) as Record<string, unknown>;

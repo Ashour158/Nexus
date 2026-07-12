@@ -642,8 +642,8 @@ export function DealMeddicicForm({
                   className={cn(
                     'h-7 w-7 rounded-full text-sm font-semibold',
                     n <= state.champion.strength
-                      ? 'bg-amber-400 text-amber-950'
-                      : 'bg-slate-100 text-slate-400'
+                      ? 'bg-warning text-on-warning-container'
+                      : 'bg-surface-container-high text-on-surface-variant'
                   )}
                   aria-label={`Strength ${n}`}
                 >
@@ -741,29 +741,29 @@ export function DealMeddicicForm({
         </FormField>
       </Section>
 
-      <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-1 py-3">
+      <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-outline-variant bg-surface px-1 py-3">
         <div className="flex items-center gap-3">
           <div
             className={cn(
               'inline-flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold',
               totalScore >= 70
-                ? 'bg-emerald-100 text-emerald-800'
+                ? 'bg-success-container text-on-success-container'
                 : totalScore >= 40
-                  ? 'bg-amber-100 text-amber-800'
-                  : 'bg-red-100 text-red-800'
+                  ? 'bg-warning-container text-on-warning-container'
+                  : 'bg-error-container text-on-error-container'
             )}
           >
             {totalScore}
           </div>
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <div className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
               MEDDIC Score
             </div>
-            <div className="text-sm text-slate-700">Live preview</div>
+            <div className="text-sm text-on-surface">Live preview</div>
           </div>
         </div>
         {serverError ? (
-          <p role="alert" className="text-xs font-medium text-red-600">
+          <p role="alert" className="text-xs font-medium text-error">
             {serverError}
           </p>
         ) : null}
@@ -797,11 +797,11 @@ function Section({
   children,
 }: SectionProps) {
   return (
-    <div className="rounded-md border border-slate-200">
+    <div className="rounded-md border border-outline-variant">
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-start hover:bg-slate-50"
+        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-start hover:bg-surface-container-low"
         aria-expanded={open}
       >
         <div className="flex items-center gap-2">
@@ -811,12 +811,12 @@ function Section({
             <ChevronRightIcon size={14} />
           )}
           <div>
-            <div className="text-sm font-semibold text-slate-900">{label}</div>
-            <div className="text-xs text-slate-500">{description}</div>
+            <div className="text-sm font-semibold text-on-surface">{label}</div>
+            <div className="text-xs text-on-surface-variant">{description}</div>
           </div>
         </div>
         {typeof score === 'number' ? (
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+          <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-xs font-semibold text-on-surface">
             {score}/100
           </span>
         ) : binaryIdentified !== undefined ? (
@@ -824,8 +824,8 @@ function Section({
             className={cn(
               'rounded-full px-2 py-0.5 text-xs font-semibold',
               binaryIdentified
-                ? 'bg-emerald-100 text-emerald-800'
-                : 'bg-slate-100 text-slate-600'
+                ? 'bg-success-container text-on-success-container'
+                : 'bg-surface-container-high text-on-surface-variant'
             )}
           >
             {binaryIdentified ? 'Identified' : 'Unknown'}
@@ -854,7 +854,7 @@ function ScoreSlider({
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full accent-brand-600"
       />
-      <span className="w-10 text-end text-sm font-semibold tabular-nums text-slate-700">
+      <span className="w-10 text-end text-sm font-semibold tabular-nums text-on-surface">
         {value}
       </span>
     </div>

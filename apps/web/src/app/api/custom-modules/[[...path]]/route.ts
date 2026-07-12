@@ -73,12 +73,12 @@ async function handleMock(
   // /custom-modules/:id
   if (rest.length === 0) {
     if (method === 'GET') {
-      const module = getModule(moduleId);
-      return module ? ok(module) : notFound('Module not found');
+      const mod = getModule(moduleId);
+      return mod ? ok(mod) : notFound('Module not found');
     }
     if (method === 'PATCH') {
-      const module = updateModule(moduleId, await body(req));
-      return module ? ok(module) : notFound('Module not found');
+      const mod = updateModule(moduleId, await body(req));
+      return mod ? ok(mod) : notFound('Module not found');
     }
     if (method === 'DELETE') {
       return deleteModule(moduleId) ? ok({ deleted: true }) : notFound('Module not found');

@@ -30,8 +30,8 @@ export default function ModuleRecordsPage() {
   const apiName = params.moduleApiName;
 
   const { data: modules, isLoading: modulesLoading } = useCustomModules();
-  const module = useMemo(() => modules?.find((m) => m.apiName === apiName), [modules, apiName]);
-  const moduleId = module?.id;
+  const mod = useMemo(() => modules?.find((m) => m.apiName === apiName), [modules, apiName]);
+  const moduleId = mod?.id;
 
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -103,7 +103,7 @@ export default function ModuleRecordsPage() {
     );
   }
 
-  if (!module) {
+  if (!mod) {
     return (
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <EmptyState icon="🔍" title="Module not found" description={`No module with API name "${apiName}".`} cta={{ label: 'Module Builder', href: '/settings/modules' }} />
@@ -120,15 +120,15 @@ export default function ModuleRecordsPage() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-on-surface">
-            <span>{module.icon ?? '📦'}</span> {module.pluralLabel}
+            <span>{mod.icon ?? '📦'}</span> {mod.pluralLabel}
           </h1>
-          {module.description && <p className="mt-1 text-sm text-on-surface-variant">{module.description}</p>}
+          {mod.description && <p className="mt-1 text-sm text-on-surface-variant">{mod.description}</p>}
         </div>
         <div className="flex items-center gap-2">
-          <Link href={`/settings/modules/${module.id}`}>
+          <Link href={`/settings/modules/${mod.id}`}>
             <Button variant="secondary"><Settings2 className="h-4 w-4" /> Configure</Button>
           </Link>
-          <Button onClick={openCreate}><Plus className="h-4 w-4" /> New {module.label.toLowerCase()}</Button>
+          <Button onClick={openCreate}><Plus className="h-4 w-4" /> New {mod.label.toLowerCase()}</Button>
         </div>
       </div>
 
@@ -142,7 +142,7 @@ export default function ModuleRecordsPage() {
       {recordsLoading ? (
         <TableSkeleton rows={5} cols={Math.max(2, columns.length)} />
       ) : rows.length === 0 ? (
-        <EmptyState icon="📄" title="No records" description="Create the first record for this module." cta={{ label: `New ${module.label.toLowerCase()}`, onClick: openCreate }} />
+        <EmptyState icon="📄" title="No records" description="Create the first record for this module." cta={{ label: `New ${mod.label.toLowerCase()}`, onClick: openCreate }} />
       ) : (
         <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
           <table className="w-full text-sm">
@@ -189,7 +189,7 @@ export default function ModuleRecordsPage() {
         </div>
       )}
 
-      <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editing ? `Edit ${module.label.toLowerCase()}` : `New ${module.label.toLowerCase()}`} size="xl">
+      <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editing ? `Edit ${mod.label.toLowerCase()}` : `New ${mod.label.toLowerCase()}`} size="xl">
         <DynamicRecordForm
           fields={fields ?? []}
           layout={layout}

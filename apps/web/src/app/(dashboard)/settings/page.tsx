@@ -805,7 +805,7 @@ function ApiKeysTab() {
           <DialogHeader>
             <DialogTitle>API key created</DialogTitle>
             <DialogDescription>
-              Copy this key now — it won't be shown again.
+              Copy this key now — it won&apos;t be shown again.
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">

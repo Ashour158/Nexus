@@ -56,18 +56,18 @@ async function violationsOf(ui: React.ReactElement, impacts: string[]) {
 // MSW handler (below) returns empty payloads so pages render their loading/empty
 // state deterministically without live data.
 const ROUTES: Array<[name: string, ui: React.ReactElement]> = [
-  ['Dashboard', <DashboardPage />],
-  ['Reports', <ReportsPage />],
-  ['Leads', <LeadsPage />],
-  ['Deals', <DealsPage />],
-  ['Accounts', <AccountsPage />],
-  ['Contacts', <ContactsPage />],
-  ['Tasks', <TasksPage />],
-  ['Activities', <ActivitiesPage />],
-  ['Tickets', <TicketsPage />],
-  ['Campaigns', <CampaignsPage />],
-  ['Knowledge', <KnowledgePage />],
-  ["What's new", <WhatsNewPage />],
+  ['Dashboard', <DashboardPage key="dashboard" />],
+  ['Reports', <ReportsPage key="reports" />],
+  ['Leads', <LeadsPage key="leads" />],
+  ['Deals', <DealsPage key="deals" />],
+  ['Accounts', <AccountsPage key="accounts" />],
+  ['Contacts', <ContactsPage key="contacts" />],
+  ['Tasks', <TasksPage key="tasks" />],
+  ['Activities', <ActivitiesPage key="activities" />],
+  ['Tickets', <TicketsPage key="tickets" />],
+  ['Campaigns', <CampaignsPage key="campaigns" />],
+  ['Knowledge', <KnowledgePage key="knowledge" />],
+  ["What's new", <WhatsNewPage key="whats-new" />],
 ];
 
 describe('Accessibility — axe-core across top routes', () => {

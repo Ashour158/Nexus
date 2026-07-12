@@ -49,7 +49,7 @@ export function TestAssignmentPanel() {
     <div className="rounded-xl border border-outline-variant bg-surface p-5">
       <h3 className="font-semibold text-on-surface">Test Assignment (dry-run)</h3>
       <p className="mb-4 mt-1 text-sm text-on-surface-variant">
-        Enter a sample record's attributes and see which territory + owner it would route to.
+        Enter a sample record&apos;s attributes and see which territory + owner it would route to.
       </p>
 
       <div className="space-y-2">

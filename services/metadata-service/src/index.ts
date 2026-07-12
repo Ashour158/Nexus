@@ -9,6 +9,7 @@ import { registerTagsRoutes } from './routes/tags.routes.js';
 import { registerValidationRulesRoutes } from './routes/validation-rules.routes.js';
 import { registerCodingRoutes } from './routes/coding.routes.js';
 import { registerCustomModulesRoutes } from './routes/custom-modules.routes.js';
+import { registerGlobalSetsRoutes } from './routes/global-sets.routes.js';
 import { registerFeatureFlagsRoutes } from './routes/feature-flags.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 // REMOVED: Self-consuming sync consumer (anti-pattern). A service must not consume
@@ -56,5 +57,6 @@ await startService(app, port, async () => {
   await registerValidationRulesRoutes(app, prisma);
   await registerCodingRoutes(app, prisma);
   await registerCustomModulesRoutes(app, prisma);
+  await registerGlobalSetsRoutes(app, prisma);
   await registerFeatureFlagsRoutes(app, prisma);
 });

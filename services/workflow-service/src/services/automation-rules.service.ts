@@ -11,6 +11,13 @@ import {
   type AutomationAction,
 } from '../engine/automation-actions.js';
 import { ActionHttpError } from '../engine/nodes/action.node.js';
+import {
+  enqueueDelayedActions,
+  scheduleDateTriggers,
+  matchesFieldUpdate,
+  DELAY_UNITS,
+  DATE_DIRECTIONS,
+} from './scheduled-actions.service.js';
 
 // ─── Loop-guard + rate-cap tunables (AU-5) ──────────────────────────────────
 
@@ -288,15 +295,201 @@ export function buildMetaCatalog() {
   };
 }
 
+// ─── Builder meta (Zoho-style visual rule builder) ──────────────────────────
+
+/** Trigger classifications the rule builder can author. */
+export const TRIGGER_TYPES = [
+  {
+    value: 'record_action',
+    label: 'Record action',
+    description: 'Fire when the trigger event occurs (create / update / stage change / …).',
+  },
+  {
+    value: 'field_update',
+    label: 'Field update',
+    description: 'Fire only when a specific field changes to / from a value.',
+    config: { fieldUpdate: { field: 'string', from: 'any?', to: 'any?' } },
+  },
+  {
+    value: 'date_time',
+    label: 'Date / time',
+    description: 'Fire relative to a date field on the record, e.g. 3 days before Deal.expectedCloseDate.',
+    config: { dateTriggers: [{ dateField: 'string', offset: 'number', unit: 'minutes|hours|days', direction: 'before|after' }] },
+  },
+  {
+    value: 'scheduled',
+    label: 'Scheduled / delayed',
+    description: 'Fire follow-up actions a fixed delay after the trigger event.',
+  },
+] as const;
+
+/**
+ * Field catalog per module for the builder's condition / field-update / date
+ * pickers. Curated from the domain-event payload shapes each service publishes.
+ * `type` drives the operator set and value editor the builder renders.
+ */
+export const MODULE_FIELDS: Record<string, Array<{ name: string; type: string; label: string }>> = {
+  lead: [
+    { name: 'id', type: 'string', label: 'Lead ID' },
+    { name: 'status', type: 'string', label: 'Status' },
+    { name: 'source', type: 'string', label: 'Source' },
+    { name: 'score', type: 'number', label: 'Score' },
+    { name: 'ownerId', type: 'string', label: 'Owner' },
+    { name: 'email', type: 'string', label: 'Email' },
+    { name: 'company', type: 'string', label: 'Company' },
+    { name: 'createdAt', type: 'date', label: 'Created at' },
+  ],
+  contact: [
+    { name: 'id', type: 'string', label: 'Contact ID' },
+    { name: 'email', type: 'string', label: 'Email' },
+    { name: 'ownerId', type: 'string', label: 'Owner' },
+    { name: 'accountId', type: 'string', label: 'Account' },
+    { name: 'lifecycleStage', type: 'string', label: 'Lifecycle stage' },
+  ],
+  account: [
+    { name: 'id', type: 'string', label: 'Account ID' },
+    { name: 'name', type: 'string', label: 'Name' },
+    { name: 'ownerId', type: 'string', label: 'Owner' },
+    { name: 'industry', type: 'string', label: 'Industry' },
+    { name: 'annualRevenue', type: 'number', label: 'Annual revenue' },
+    { name: 'tier', type: 'string', label: 'Tier' },
+  ],
+  deal: [
+    { name: 'id', type: 'string', label: 'Deal ID' },
+    { name: 'name', type: 'string', label: 'Name' },
+    { name: 'amount', type: 'number', label: 'Amount' },
+    { name: 'stage', type: 'string', label: 'Stage' },
+    { name: 'stageId', type: 'string', label: 'Stage ID' },
+    { name: 'probability', type: 'number', label: 'Probability' },
+    { name: 'ownerId', type: 'string', label: 'Owner' },
+    { name: 'expectedCloseDate', type: 'date', label: 'Expected close date' },
+    { name: 'closedAt', type: 'date', label: 'Closed at' },
+  ],
+  activity: [
+    { name: 'id', type: 'string', label: 'Activity ID' },
+    { name: 'type', type: 'string', label: 'Type' },
+    { name: 'dueDate', type: 'date', label: 'Due date' },
+    { name: 'ownerId', type: 'string', label: 'Owner' },
+    { name: 'status', type: 'string', label: 'Status' },
+  ],
+  quote: [
+    { name: 'id', type: 'string', label: 'Quote ID' },
+    { name: 'total', type: 'number', label: 'Total' },
+    { name: 'status', type: 'string', label: 'Status' },
+    { name: 'ownerId', type: 'string', label: 'Owner' },
+    { name: 'expiresAt', type: 'date', label: 'Expires at' },
+    { name: 'validUntil', type: 'date', label: 'Valid until' },
+  ],
+  rfq: [
+    { name: 'id', type: 'string', label: 'RFQ ID' },
+    { name: 'status', type: 'string', label: 'Status' },
+    { name: 'ownerId', type: 'string', label: 'Owner' },
+    { name: 'dueDate', type: 'date', label: 'Due date' },
+  ],
+  invoice: [
+    { name: 'id', type: 'string', label: 'Invoice ID' },
+    { name: 'amount', type: 'number', label: 'Amount' },
+    { name: 'status', type: 'string', label: 'Status' },
+    { name: 'dueDate', type: 'date', label: 'Due date' },
+  ],
+  payment: [
+    { name: 'id', type: 'string', label: 'Payment ID' },
+    { name: 'amount', type: 'number', label: 'Amount' },
+    { name: 'invoiceId', type: 'string', label: 'Invoice' },
+  ],
+  contract: [
+    { name: 'id', type: 'string', label: 'Contract ID' },
+    { name: 'status', type: 'string', label: 'Status' },
+    { name: 'endDate', type: 'date', label: 'End date' },
+    { name: 'renewalDate', type: 'date', label: 'Renewal date' },
+  ],
+  subscription: [
+    { name: 'id', type: 'string', label: 'Subscription ID' },
+    { name: 'status', type: 'string', label: 'Status' },
+    { name: 'mrr', type: 'number', label: 'MRR' },
+    { name: 'renewalDate', type: 'date', label: 'Renewal date' },
+  ],
+  commission: [
+    { name: 'id', type: 'string', label: 'Commission ID' },
+    { name: 'amount', type: 'number', label: 'Amount' },
+    { name: 'status', type: 'string', label: 'Status' },
+    { name: 'ownerId', type: 'string', label: 'Owner' },
+  ],
+  ticket: [
+    { name: 'id', type: 'string', label: 'Ticket ID' },
+    { name: 'status', type: 'string', label: 'Status' },
+    { name: 'priority', type: 'string', label: 'Priority' },
+    { name: 'ownerId', type: 'string', label: 'Owner / assignee' },
+    { name: 'slaDueAt', type: 'date', label: 'SLA due at' },
+  ],
+  campaign: [
+    { name: 'id', type: 'string', label: 'Campaign ID' },
+    { name: 'status', type: 'string', label: 'Status' },
+    { name: 'type', type: 'string', label: 'Type' },
+    { name: 'startDate', type: 'date', label: 'Start date' },
+    { name: 'endDate', type: 'date', label: 'End date' },
+  ],
+  approval: [
+    { name: 'id', type: 'string', label: 'Approval ID' },
+    { name: 'status', type: 'string', label: 'Status' },
+    { name: 'requesterId', type: 'string', label: 'Requester' },
+  ],
+  sla: [
+    { name: 'id', type: 'string', label: 'SLA ID' },
+    { name: 'entityId', type: 'string', label: 'Entity ID' },
+    { name: 'entityType', type: 'string', label: 'Entity type' },
+  ],
+};
+
+/**
+ * Everything a visual (Zoho-style) rule builder needs to render: modules with
+ * their trigger events + field lists, the trigger TYPES, the operator set, and the
+ * action types — plus the delay units / date directions the scheduled + date-time
+ * builders offer.
+ */
+export function buildBuilderMeta() {
+  return {
+    modules: Object.entries(AUTOMATION_MODULES).map(([module, triggerEvents]) => ({
+      module,
+      triggerEvents,
+      fields: MODULE_FIELDS[module] ?? [{ name: 'id', type: 'string', label: 'ID' }],
+    })),
+    triggerTypes: TRIGGER_TYPES,
+    operators: SUPPORTED_OPERATORS,
+    actionTypes: SUPPORTED_ACTION_TYPES,
+    delayUnits: DELAY_UNITS,
+    dateDirections: DATE_DIRECTIONS,
+  };
+}
+
 // ─── CRUD + execution service ───────────────────────────────────────────────
+
+/** A time-delayed action authored on a rule: fire `delay` after the trigger. */
+export interface ScheduledActionInput {
+  delay: { value: number; unit: 'minutes' | 'hours' | 'days' };
+  action: AutomationAction;
+}
+
+/** A date-relative trigger authored on a rule (fire vs a record date field). */
+export interface DateTriggerInput {
+  dateField: string;
+  offset: number;
+  unit?: 'minutes' | 'hours' | 'days';
+  direction?: 'before' | 'after';
+  isActive?: boolean;
+}
 
 export interface AutomationRuleInput {
   name: string;
   description?: string;
   module: string;
   triggerEvent: string;
+  triggerType?: 'record_action' | 'field_update' | 'date_time' | 'scheduled';
+  triggerConfig?: Record<string, unknown>;
   conditions?: RuleCondition[];
   actions?: AutomationAction[];
+  scheduledActions?: ScheduledActionInput[];
+  dateTriggers?: DateTriggerInput[];
   isActive?: boolean;
 }
 
@@ -306,8 +499,11 @@ function ruleSnapshot(rule: {
   description: string | null;
   module: string;
   triggerEvent: string;
+  triggerType?: string;
+  triggerConfig?: unknown;
   conditions: unknown;
   actions: unknown;
+  scheduledActions?: unknown;
   isActive: boolean;
 }) {
   return {
@@ -315,8 +511,11 @@ function ruleSnapshot(rule: {
     description: rule.description ?? null,
     module: rule.module,
     triggerEvent: rule.triggerEvent,
+    triggerType: rule.triggerType ?? 'record_action',
+    triggerConfig: rule.triggerConfig ?? {},
     conditions: rule.conditions,
     actions: rule.actions,
+    scheduledActions: rule.scheduledActions ?? [],
     isActive: rule.isActive,
   };
 }
@@ -373,14 +572,17 @@ export function createAutomationRulesService(
     },
 
     async get(tenantId: string, id: string) {
-      const row = await prisma.automationRule.findFirst({ where: { id, tenantId } });
+      const row = await prisma.automationRule.findFirst({
+        where: { id, tenantId },
+        include: { dateTriggers: { orderBy: { createdAt: 'asc' } } },
+      });
       if (!row) throw new NotFoundError('Automation rule not found');
       return row;
     },
 
     async create(tenantId: string, createdBy: string, data: AutomationRuleInput) {
       // Rule + its first version (v1) written atomically so history always exists.
-      return prisma.$transaction(async (tx: any) => {
+      const created = await prisma.$transaction(async (tx: any) => {
         const rule = await tx.automationRule.create({
           data: {
             tenantId,
@@ -389,14 +591,32 @@ export function createAutomationRulesService(
             description: data.description,
             module: data.module,
             triggerEvent: data.triggerEvent,
+            triggerType: data.triggerType ?? 'record_action',
+            triggerConfig: (data.triggerConfig ?? {}) as object,
             conditions: (data.conditions ?? []) as object,
             actions: (data.actions ?? []) as object,
+            scheduledActions: (data.scheduledActions ?? []) as object,
             isActive: data.isActive ?? true,
           },
         });
+        if (data.dateTriggers && data.dateTriggers.length > 0) {
+          await tx.dateBasedTrigger.createMany({
+            data: data.dateTriggers.map((t) => ({
+              tenantId,
+              ruleId: rule.id,
+              module: data.module,
+              dateField: t.dateField,
+              offset: Math.max(0, Math.floor(t.offset ?? 0)),
+              unit: t.unit ?? 'days',
+              direction: t.direction ?? 'before',
+              isActive: t.isActive ?? true,
+            })),
+          });
+        }
         await writeVersion(tx, rule, createdBy, 'create');
         return rule;
       });
+      return this.get(tenantId, created.id);
     },
 
     async update(
@@ -408,7 +628,7 @@ export function createAutomationRulesService(
       await this.get(tenantId, id);
       // Update the rule and snapshot the resulting state (AU-3 versioning) so the
       // pre-edit state remains recoverable via rollback.
-      return prisma.$transaction(async (tx: any) => {
+      const updated = await prisma.$transaction(async (tx: any) => {
         const rule = await tx.automationRule.update({
           where: { id },
           data: {
@@ -416,14 +636,37 @@ export function createAutomationRulesService(
             ...(data.description !== undefined ? { description: data.description } : {}),
             ...(data.module !== undefined ? { module: data.module } : {}),
             ...(data.triggerEvent !== undefined ? { triggerEvent: data.triggerEvent } : {}),
+            ...(data.triggerType !== undefined ? { triggerType: data.triggerType } : {}),
+            ...(data.triggerConfig !== undefined ? { triggerConfig: data.triggerConfig as object } : {}),
             ...(data.conditions !== undefined ? { conditions: data.conditions as object } : {}),
             ...(data.actions !== undefined ? { actions: data.actions as object } : {}),
+            ...(data.scheduledActions !== undefined ? { scheduledActions: data.scheduledActions as object } : {}),
             ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
           },
         });
+        // Date triggers are authored as part of the rule: replace the whole set
+        // when supplied so the visual builder can add/remove anchors idempotently.
+        if (data.dateTriggers !== undefined) {
+          await tx.dateBasedTrigger.deleteMany({ where: { ruleId: id } });
+          if (data.dateTriggers.length > 0) {
+            await tx.dateBasedTrigger.createMany({
+              data: data.dateTriggers.map((t) => ({
+                tenantId,
+                ruleId: id,
+                module: data.module ?? rule.module,
+                dateField: t.dateField,
+                offset: Math.max(0, Math.floor(t.offset ?? 0)),
+                unit: t.unit ?? 'days',
+                direction: t.direction ?? 'before',
+                isActive: t.isActive ?? true,
+              })),
+            });
+          }
+        }
         await writeVersion(tx, rule, actor, 'update');
         return rule;
       });
+      return this.get(tenantId, updated.id);
     },
 
     /** List a rule's version history (newest first). */
@@ -470,8 +713,11 @@ export function createAutomationRulesService(
             description: snap.description,
             module: snap.module,
             triggerEvent: snap.triggerEvent,
+            triggerType: snap.triggerType ?? 'record_action',
+            triggerConfig: (snap.triggerConfig ?? {}) as object,
             conditions: snap.conditions as object,
             actions: snap.actions as object,
+            scheduledActions: (snap.scheduledActions ?? []) as object,
             isActive: snap.isActive,
           },
         });
@@ -602,6 +848,7 @@ export function createAutomationRulesService(
           triggerEvent: input.triggerEvent,
           isActive: true,
         },
+        include: { dateTriggers: { where: { isActive: true } } },
       });
       if (rules.length === 0) return; // no rule matched — fine, drop
 
@@ -629,7 +876,33 @@ export function createAutomationRulesService(
 
       for (const rule of rules) {
         try {
-          if (!evaluateConditions(rule.conditions, input.payload)) continue;
+          const conditionsMatch = evaluateConditions(rule.conditions, input.payload);
+
+          // WF-DEPTH date_time triggers: never fire instantly. (Re)schedule the
+          // rule's actions relative to the record's date field — or withdraw a
+          // pending scheduled row when the record no longer matches / the date was
+          // cleared. Then move on (nothing runs synchronously for this rule).
+          if (rule.triggerType === 'date_time') {
+            await scheduleDateTriggers(prisma, {
+              tenantId: input.tenantId,
+              module: input.module,
+              eventId: input.eventId,
+              rule: rule as never,
+              payload: input.payload,
+              conditionsMatch,
+            }).catch((err) =>
+              console.error(`[automation] scheduleDateTriggers failed for rule ${rule.id}:`, err)
+            );
+            continue;
+          }
+
+          if (!conditionsMatch) continue;
+
+          // WF-DEPTH field_update triggers: additionally require the configured
+          // field to have changed to/from the target value on this event.
+          if (rule.triggerType === 'field_update' && !matchesFieldUpdate(rule.triggerConfig, input.payload)) {
+            continue;
+          }
 
           // AU-5 per-tenant rate cap. Over budget ⇒ skip (recorded), never DLQ.
           if (!tryAcquireTenantBudget(input.tenantId)) {
@@ -684,6 +957,19 @@ export function createAutomationRulesService(
           if (outcome.hadTransientFailure) {
             transientFailures.push(rule.id);
           }
+
+          // WF-DEPTH: queue the rule's time-delayed follow-up actions (fire N
+          // minutes/hours/days later). Best-effort — a scheduling failure never
+          // fails the instant run or DLQs the event.
+          await enqueueDelayedActions(prisma, {
+            tenantId: input.tenantId,
+            module: input.module,
+            eventId: input.eventId,
+            rule: rule as never,
+            payload: input.payload,
+          }).catch((err) =>
+            console.error(`[automation] enqueueDelayedActions failed for rule ${rule.id}:`, err)
+          );
         } catch (err) {
           // An unexpected error (e.g. DB fault) around a single rule is transient
           // — record it so the whole event is retained for replay.

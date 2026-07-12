@@ -14,8 +14,15 @@ model CustomFieldDefinition {
   entityType String
   name       String
   apiKey     String
+  // text|textarea|number|currency|percent|boolean|date|datetime|email|phone|url|
+  // picklist|multipicklist|lookup|multilookup|subform|rollup|user
   fieldType  String
   options    Json     @default("[]")
+  // Advanced type-specific config (lookup/rollup/subform/dependent picklist).
+  config     Json?
+  // Optional reference to a shared GlobalPicklistSet (picklist-family fields).
+  globalSetId String?
+  globalSet  GlobalPicklistSet? @relation(fields: [globalSetId], references: [id])
   required   Boolean  @default(false)
   showOnCard Boolean  @default(false)
   position   Int      @default(0)
@@ -25,6 +32,26 @@ model CustomFieldDefinition {
 
   @@unique([tenantId, entityType, apiKey])
   @@index([tenantId, entityType])
+  @@index([globalSetId])
+  @@unique([id, tenantId])
+}
+
+// Tenant-level named set of picklist options, reusable across many fields.
+// A picklist/multipicklist CustomFieldDefinition may reference one via
+// `globalSetId`; its option list is resolved from `options` here at read time.
+model GlobalPicklistSet {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  options   Json     @default("[]")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fields    CustomFieldDefinition[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
   @@unique([id, tenantId])
 }
 

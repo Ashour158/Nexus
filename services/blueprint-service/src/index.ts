@@ -19,8 +19,11 @@ import { registerBlueprintInternalRoutes } from './routes/internal.routes.js';
 import { registerPlaybooksRoutes } from './routes/playbooks.routes.js';
 import { registerTemplatesRoutes } from './routes/templates.routes.js';
 import { registerValidationRoutes } from './routes/validation.routes.js';
+import { registerTransitionsRoutes } from './routes/transitions.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 import { startDealStageConsumer } from './consumers/deal-stage.consumer.js';
+import { createTransitionsService } from './services/transitions.service.js';
+import { startSlaPoller } from './workers/sla-poller.js';
 
 startTracing({ serviceName: 'blueprint-service' });
 const rawPrisma = new PrismaClient({
@@ -78,6 +81,18 @@ try {
   app.log.warn({ err }, 'Deal stage consumer failed to start; continuing without stage-entry actions');
 }
 
+// SLA breach poller: scans BlueprintRecordState across all tenants for elapsed
+// SLA clocks, emits `blueprint.sla.breached`, and runs each transition's
+// escalation config. Uses the RAW prisma client (global sweep, no request tenant
+// context) and is fully guarded so it never affects HTTP serving.
+let slaPoller: ReturnType<typeof startSlaPoller> | null = null;
+try {
+  slaPoller = startSlaPoller(rawPrisma, producer, app.log);
+  app.log.info('Blueprint SLA poller started');
+} catch (err) {
+  app.log.warn({ err }, 'Blueprint SLA poller failed to start; continuing without SLA escalation');
+}
+
 app.addHook('onClose', async () => {
   try {
     await producer.disconnect();
@@ -89,12 +104,18 @@ app.addHook('onClose', async () => {
   } catch {
     /* ignore */
   }
+  try {
+    slaPoller?.stop();
+  } catch {
+    /* ignore */
+  }
   await rawPrisma.$disconnect();
 });
 
 const playbooks = createPlaybooksService(prisma, producer);
 const templates = createTemplatesService(prisma);
 const validation = createValidationService(prisma);
+const transitions = createTransitionsService(prisma, producer, app.log);
 
 await registerGraphQL(app, prisma);
 
@@ -103,4 +124,5 @@ await startService(app, port, async (a) => {
   await registerPlaybooksRoutes(a, playbooks);
   await registerTemplatesRoutes(a, templates);
   await registerValidationRoutes(a, validation);
+  await registerTransitionsRoutes(a, transitions);
 });

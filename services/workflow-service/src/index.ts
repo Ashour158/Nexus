@@ -25,6 +25,7 @@ import { startSlaScanner } from './services/sla-scanner.js';
 import { startScheduleTrigger } from './services/schedule-trigger.js';
 import { startJourneyEnrollmentConsumer } from './consumers/journey-enrollment.consumer.js';
 import { startJourneyScheduler } from './services/journey-engine.js';
+import { startScheduledActionPoller } from './services/scheduled-actions.service.js';
 import { createExecutionsService } from './services/executions.service.js';
 import { registerGraphQL } from './graphql/index.js';
 
@@ -170,6 +171,13 @@ startScheduleTrigger(prisma, producer, app.log);
 // CommandCenter — advance due journey enrollments (resumeAt <= now) on a timer.
 // Tick interval configurable via JOURNEY_SCHEDULE_TICK_MS (default 30 s).
 startJourneyScheduler(prisma, producer, app.log);
+
+// WF-DEPTH — execute due time-delayed / date-relative automation actions
+// (ScheduledAutomationAction rows). Re-checks each rule's criteria at fire time
+// and runs the action(s) through the shared engine node handlers. Uses the same
+// producer so NOTIFY/EMAIL actions can publish. Tick interval configurable via
+// SCHEDULED_ACTION_TICK_MS (default 30 s).
+startScheduledActionPoller(prisma, producer, app.log);
 
 await registerGraphQL(app, prisma);
 

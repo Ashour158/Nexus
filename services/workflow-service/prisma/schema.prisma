@@ -264,10 +264,26 @@ model AutomationRule {
   description  String?
   module       String              // lead | contact | account | deal | quote | ticket | campaign | invoice | ...
   triggerEvent String              // e.g. 'deal.created', 'deal.stage_changed', 'ticket.sla.breached'
+  // Trigger classification (Zoho Workflow-Rule parity, WF-DEPTH):
+  //   record_action → fire on the domain event (default, existing behaviour)
+  //   field_update  → fire only when triggerConfig.fieldUpdate matched (a field
+  //                   changed to/from a value on an update event)
+  //   date_time     → do NOT fire instantly; (re)schedule the rule's actions
+  //                   relative to a date field on the record (see dateTriggers)
+  //   scheduled     → authored as a delayed-action-first rule (still gated by the
+  //                   trigger event; scheduledActions carry the delayed work)
+  triggerType  String              @default("record_action")
+  // Extra trigger config keyed by triggerType, e.g.
+  //   field_update → { fieldUpdate: { field, from?, to? } }
+  triggerConfig Json               @default("{}")
   // [{ field, operator, value }] — AND-combined, evaluated against the event payload
   conditions   Json                @default("[]")
   // [{ type, config }] — type ∈ engine action types (SEND_NOTIFICATION/CREATE_TASK/…)
   actions      Json                @default("[]")
+  // Time-delayed actions (WF-DEPTH): [{ delay: { value, unit }, action: { type, config } }]
+  // Each fires `delay` after the trigger via a ScheduledAutomationAction, re-checked
+  // against the rule criteria at fire time.
+  scheduledActions Json            @default("[]")
   isActive     Boolean             @default(true)
   runCount     Int                 @default(0)
   lastRunAt    DateTime?
@@ -276,10 +292,77 @@ model AutomationRule {
   updatedAt    DateTime            @updatedAt
   runs         AutomationRuleRun[]
   versions     AutomationRuleVersion[]
+  scheduled    ScheduledAutomationAction[]
+  dateTriggers DateBasedTrigger[]
 
   @@index([tenantId, module, triggerEvent])
   @@index([tenantId, isActive])
   @@unique([id, tenantId])
+}
+
+// A single time-delayed / date-relative action queued for future execution
+// (WF-DEPTH). Produced by an automation rule's `scheduledActions` (delay after a
+// trigger) or by a `DateBasedTrigger` (relative to a record date field). A poller
+// (`startScheduledActionPoller`) picks up rows whose `runAt` is due, RE-CHECKS the
+// owning rule's criteria against the captured payload snapshot, and — if still
+// matching — executes the action through the SAME engine node handlers as an
+// instant action. If the rule is gone/inactive or no longer matches, the row is
+// CANCELLED instead of fired.
+model ScheduledAutomationAction {
+  id        String         @id @default(cuid())
+  tenantId  String
+  ruleId    String
+  rule      AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  // The CRM record this action targets (resolved from the trigger payload).
+  entityId  String
+  module    String
+  // Source domain-event id that scheduled this action (traceability).
+  eventId   String
+  // 'delay' (rule.scheduledActions) | 'date' (DateBasedTrigger).
+  origin    String         @default("delay")
+  // Stable idempotency key so the same (event,action) is never double-queued and a
+  // date trigger re-schedules (updates runAt) rather than duplicating on re-fire.
+  dedupeKey String         @unique
+  // When the action becomes due.
+  runAt     DateTime
+  // { type, config } — one automation action (same shape as rule.actions[i]).
+  action    Json
+  // Snapshot of the trigger payload — used both to re-check the rule criteria at
+  // fire time and as the execution context payload.
+  payload   Json           @default("{}")
+  status    String         @default("PENDING") // PENDING | FIRING | DONE | CANCELLED | FAILED
+  error     String?
+  firedAt   DateTime?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([status, runAt])
+  @@index([tenantId, ruleId])
+  @@index([tenantId, module, entityId])
+}
+
+// Date/time trigger definition (WF-DEPTH): "fire N units before/after a date
+// field on the record", e.g. "3 days before Deal.expectedCloseDate". When a
+// record event for `module` carries `dateField`, the automation service computes
+// the fire time and (re)schedules the owning rule's actions as
+// ScheduledAutomationAction rows. Stored as child rows of a rule so the visual
+// builder can author several date anchors per rule.
+model DateBasedTrigger {
+  id        String         @id @default(cuid())
+  tenantId  String
+  ruleId    String
+  rule      AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  module    String
+  dateField String         // payload field holding the anchor date (e.g. 'expectedCloseDate')
+  offset    Int            @default(0)      // magnitude, in `unit`s
+  unit      String         @default("days") // minutes | hours | days
+  direction String         @default("before") // before | after
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([tenantId, ruleId])
+  @@index([tenantId, module, isActive])
 }
 
 // Immutable snapshot of a rule's authored state (conditions + actions + meta),

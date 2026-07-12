@@ -29,6 +29,8 @@ import { registerInternalAutomationRoutes } from './internal-automation.routes.j
 import { registerWinLossRoutes } from './win-loss.routes.js';
 import { registerFieldHistoryRoutes } from './field-history.routes.js';
 import { registerValidationRulesRoutes } from './validation-rules.routes.js';
+import { registerFieldPermissionsRoutes } from './field-permissions.routes.js';
+import { registerReviewRoutes } from './review.routes.js';
 import { registerConsentRoutes } from './consent.routes.js';
 import { registerCompaniesRoutes } from './companies.routes.js';
 import { registerMeetingsRoutes } from './meetings.routes.js';
@@ -75,6 +77,8 @@ export async function registerAllRoutes(
   await registerWinLossRoutes(app, prisma);
   await registerFieldHistoryRoutes(app, prisma);
   await registerValidationRulesRoutes(app, prisma);
+  await registerFieldPermissionsRoutes(app, prisma);
+  await registerReviewRoutes(app, prisma, producer);
   await registerConsentRoutes(app, prisma);
   await registerCompaniesRoutes(app, prisma);
   await registerMeetingsRoutes(app, prisma, producer);

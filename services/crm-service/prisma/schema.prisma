@@ -705,18 +705,25 @@ model WinLossReason {
   @@index([tenantId, type])
 }
 
+// Field-Level Security — per-ROLE per-FIELD read/edit control, layered on top of
+// the existing own/team/all ownership scoping. Each row grants (or denies) a
+// single role's ability to read/edit a single field of a module. Enforcement is
+// DEFAULT-ALLOW: a field with no matching row for the caller's roles is fully
+// visible/editable, so tenants that never configure FLS see no behavior change.
 model FieldPermission {
-  id           String    @id @default(cuid())
-  tenantId     String
-  objectType   String
-  fieldName    String
-  allowedRoles Json
-  deletedAt    DateTime?
-  createdAt    DateTime  @default(now())
+  id         String    @id @default(cuid())
+  tenantId   String
+  module     String
+  field      String
+  roleName   String
+  canRead    Boolean   @default(true)
+  canEdit    Boolean   @default(true)
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
 
-  @@unique([tenantId, objectType, fieldName])
+  @@unique([tenantId, module, field, roleName])
   @@unique([id, tenantId])
-  @@index([tenantId, objectType])
+  @@index([tenantId, module])
 }
 
 model ValidationRule {
@@ -733,6 +740,46 @@ model ValidationRule {
 
   @@unique([id, tenantId])
   @@index([tenantId, objectType])
+}
+
+// Review Process (maker-checker). When a ReviewProcessConfig is active for a
+// module, edits to the configured fields are held as a PendingChange in PENDING
+// state until a reviewer approves (applies it to the real record) or rejects it.
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model PendingChange {
+  id              String       @id @default(cuid())
+  tenantId        String
+  module          String
+  recordId        String
+  submittedById   String
+  changes         Json
+  status          ReviewStatus @default(PENDING)
+  reviewerComment String?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  createdAt       DateTime     @default(now())
+
+  @@unique([id, tenantId])
+  @@index([tenantId, module, status])
+  @@index([tenantId, recordId])
+}
+
+model ReviewProcessConfig {
+  id        String   @id @default(cuid())
+  tenantId  String
+  module    String
+  fields    String[]
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, module])
+  @@unique([id, tenantId])
+  @@index([tenantId, module])
 }
 
 model Activity {

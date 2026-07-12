@@ -7,10 +7,13 @@ import {
   AUTOMATION_MODULES,
   SUPPORTED_OPERATORS,
   buildMetaCatalog,
+  buildBuilderMeta,
   createAutomationRulesService,
   type AutomationRuleInput,
 } from '../services/automation-rules.service.js';
 import { SUPPORTED_ACTION_TYPES } from '../engine/automation-actions.js';
+
+const DelayUnitEnum = z.enum(['minutes', 'hours', 'days']);
 
 const IdParamSchema = z.object({ id: z.string().cuid() });
 
@@ -25,13 +28,32 @@ const ActionSchema = z.object({
   config: z.record(z.unknown()).default({}),
 });
 
+const ScheduledActionSchema = z.object({
+  delay: z.object({ value: z.number().min(0), unit: DelayUnitEnum }),
+  action: ActionSchema,
+});
+
+const DateTriggerSchema = z.object({
+  dateField: z.string().min(1).max(100),
+  offset: z.number().int().min(0).default(0),
+  unit: DelayUnitEnum.default('days'),
+  direction: z.enum(['before', 'after']).default('before'),
+  isActive: z.boolean().default(true),
+});
+
 const RuleShape = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(1000).optional(),
   module: z.string().min(1).max(50),
   triggerEvent: z.string().min(1).max(100),
+  triggerType: z.enum(['record_action', 'field_update', 'date_time', 'scheduled']).default('record_action'),
+  triggerConfig: z.record(z.unknown()).default({}),
   conditions: z.array(ConditionSchema).default([]),
-  actions: z.array(ActionSchema).min(1),
+  // date_time rules drive their behaviour off dateTriggers, not instant actions,
+  // so `actions` is only required to be non-empty for the firing trigger types.
+  actions: z.array(ActionSchema).default([]),
+  scheduledActions: z.array(ScheduledActionSchema).default([]),
+  dateTriggers: z.array(DateTriggerSchema).default([]),
   isActive: z.boolean().default(true),
 });
 
@@ -41,9 +63,39 @@ const RuleShape = z.object({
  * resolve the pair without loading the existing rule.
  */
 function refineTriggerForModule(
-  val: { module?: string; triggerEvent?: string },
+  val: {
+    module?: string;
+    triggerEvent?: string;
+    triggerType?: string;
+    actions?: unknown[];
+    scheduledActions?: unknown[];
+    dateTriggers?: unknown[];
+  },
   ctx: z.RefinementCtx
 ): void {
+  // A rule must actually do something: at least one instant action, one delayed
+  // action, or (for date_time) a date trigger. Only enforced when the relevant
+  // arrays are present (so partial PATCH bodies aren't rejected spuriously).
+  if (val.actions !== undefined && val.scheduledActions !== undefined) {
+    const hasInstant = (val.actions?.length ?? 0) > 0;
+    const hasDelayed = (val.scheduledActions?.length ?? 0) > 0;
+    const hasDate = (val.dateTriggers?.length ?? 0) > 0;
+    if (!hasInstant && !hasDelayed && !hasDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['actions'],
+        message: 'A rule must define at least one action, scheduledAction, or dateTrigger',
+      });
+    }
+    if (val.triggerType === 'date_time' && !hasDate && !hasInstant) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['dateTriggers'],
+        message: 'A date_time rule needs at least one dateTrigger (and actions to fire)',
+      });
+    }
+  }
+
   if (val.module === undefined || val.triggerEvent === undefined) return;
   const allowed = AUTOMATION_MODULES[val.module];
   if (!allowed) {
@@ -104,6 +156,17 @@ export async function registerAutomationRulesRoutes(
         { preHandler: requirePermission(PERMISSIONS.WORKFLOWS.READ) },
         async (_request, reply) => {
           return reply.send({ success: true, data: buildMetaCatalog() });
+        }
+      );
+
+      // WF-DEPTH: everything a Zoho-style visual rule builder needs — modules with
+      // trigger events + field lists, trigger TYPES (record_action / field_update /
+      // date_time / scheduled), operators, action types, delay units, directions.
+      r.get(
+        '/automation-rules/builder-meta',
+        { preHandler: requirePermission(PERMISSIONS.WORKFLOWS.READ) },
+        async (_request, reply) => {
+          return reply.send({ success: true, data: buildBuilderMeta() });
         }
       );
 

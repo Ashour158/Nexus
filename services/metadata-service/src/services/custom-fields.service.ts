@@ -1,10 +1,12 @@
 import { ConflictError, NotFoundError, ValidationError } from '@nexus/service-utils';
-import type { CreateCustomFieldInput, UpdateCustomFieldInput } from '@nexus/validation';
+import type { CreateCustomFieldInput, RollupRecomputeInput, UpdateCustomFieldInput } from '@nexus/validation';
 import { Prisma } from '../../../../node_modules/.prisma/metadata-client/index.js';
 import type { CustomFieldDefinition } from '../../../../node_modules/.prisma/metadata-client/index.js';
 import type { MetadataPrisma } from '../prisma.js';
 import { checkFieldDefinition } from './field-integrity.js';
 import { filterDependentOptions, type DependentOptionsResult } from './dependent-picklist.js';
+import { readGlobalSetId, readRollupConfig } from './field-config.js';
+import { computeRollup, computeRollupFromValues, type RollupResult } from './rollup.js';
 
 /** Prisma unique-constraint violation code. */
 const P2002 = 'P2002';
@@ -34,6 +36,9 @@ export function createCustomFieldsService(prisma: MetadataPrisma) {
       if (issues.length > 0) {
         throw new ValidationError('Invalid custom field definition', { issues });
       }
+      // A globalSetId may arrive top-level or nested in config; mirror it to the
+      // indexed column so the FK relation + fast lookups both work.
+      const globalSetId = readGlobalSetId(data.config, data.globalSetId ?? null);
       try {
         return await prisma.customFieldDefinition.create({
           data: {
@@ -43,6 +48,8 @@ export function createCustomFieldsService(prisma: MetadataPrisma) {
             apiKey: data.apiKey,
             fieldType: data.fieldType,
             options: data.options as Prisma.InputJsonValue,
+            config: (data.config ?? undefined) as Prisma.InputJsonValue | undefined,
+            globalSetId,
             required: data.required ?? false,
             showOnCard: data.showOnCard ?? false,
             position: data.position ?? 0,
@@ -69,6 +76,17 @@ export function createCustomFieldsService(prisma: MetadataPrisma) {
       if (data.apiKey !== undefined) update.apiKey = data.apiKey;
       if (data.fieldType !== undefined) update.fieldType = data.fieldType;
       if (data.options !== undefined) update.options = data.options as Prisma.InputJsonValue;
+      if (data.config !== undefined) update.config = (data.config ?? Prisma.DbNull) as Prisma.InputJsonValue;
+      // Keep the indexed globalSetId column in sync with an explicit top-level
+      // value or a config.globalSetId when either is supplied on this patch.
+      if (data.globalSetId !== undefined || data.config !== undefined) {
+        const nextGlobalSetId = readGlobalSetId(data.config, data.globalSetId ?? null);
+        if (data.globalSetId !== undefined || nextGlobalSetId !== null) {
+          update.globalSet = nextGlobalSetId
+            ? { connect: { id: nextGlobalSetId } }
+            : { disconnect: true };
+        }
+      }
       if (data.required !== undefined) update.required = data.required;
       if (data.showOnCard !== undefined) update.showOnCard = data.showOnCard;
       if (data.position !== undefined) update.position = data.position;
@@ -100,7 +118,37 @@ export function createCustomFieldsService(prisma: MetadataPrisma) {
       controllingValue: string | null | undefined
     ): Promise<DependentOptionsResult> {
       const field = await loadOrThrow(tenantId, id);
-      return filterDependentOptions(field.options, controllingValue);
+      // Options come from a referenced GlobalPicklistSet when the field points to
+      // one; otherwise from the field's own inline options. Either source may
+      // carry `controllingValues` for cascading (dependent) behaviour.
+      const globalSetId = readGlobalSetId(field.config, field.globalSetId);
+      let source: unknown = field.options;
+      if (globalSetId) {
+        const set = await prisma.globalPicklistSet.findFirst({ where: { id: globalSetId, tenantId } });
+        if (set) source = set.options;
+      }
+      return filterDependentOptions(source, controllingValue);
+    },
+
+    /**
+     * ROLLUP_SUMMARY recompute helper. Loads the field's rollup config and
+     * aggregates over the supplied child rows (or pre-extracted numeric values).
+     * The event-driven trigger lives in crm-service; this endpoint lets that
+     * consumer (or an admin preview) derive the stored value from the config.
+     */
+    async recomputeRollup(tenantId: string, id: string, input: RollupRecomputeInput): Promise<RollupResult> {
+      const field = await loadOrThrow(tenantId, id);
+      if (String(field.fieldType).toLowerCase() !== 'rollup') {
+        throw new ValidationError('Field is not a rollup field', { fieldType: field.fieldType });
+      }
+      const config = readRollupConfig(field.config);
+      if (!config) {
+        throw new ValidationError('Rollup field is missing a valid config.rollup definition', {});
+      }
+      if (Array.isArray(input.values)) {
+        return computeRollupFromValues(config, input.values);
+      }
+      return computeRollup(config, input.rows ?? []);
     },
   };
 }

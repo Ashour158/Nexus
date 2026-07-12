@@ -22,6 +22,7 @@ import { getFieldHistory } from '../lib/field-history.js';
 import { uploadToStorage } from '../lib/storage.js';
 import { createCustomerRecordsUseCase } from '../use-cases/customer-records.use-case.js';
 import { buildReadAccessContext } from '../lib/access-context.js';
+import { interceptForReview } from '../lib/review-process.js';
 import { withIdempotency } from '../lib/idempotency.js';
 import type { EngineContext } from '@nexus/domain-core';
 
@@ -452,6 +453,18 @@ export async function registerContactsRoutes(
             throw new ValidationError('Invalid body', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
+          // Maker-checker: if a review process gates any edited field, divert the
+          // whole change into a PendingChange and return 202 instead of writing.
+          const review = await interceptForReview(prisma, {
+            tenantId: jwt.tenantId,
+            module: 'contact',
+            recordId: id,
+            changes: parsed.data as Record<string, unknown>,
+            submittedById: jwt.sub,
+          });
+          if (review) {
+            return reply.code(202).send({ success: true, pendingChangeId: review.pendingChangeId, requiresReview: true });
+          }
           const contact = await customerRecords.update(engineContextFromJwt(request.id, jwt), {
             entityType: 'contact',
             id,

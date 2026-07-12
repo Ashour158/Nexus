@@ -1112,6 +1112,70 @@ export type UpdateTagInput = z.infer<typeof UpdateTagSchema>;
 
 // ─── CRM / Custom Field ─ Section 33 ────────────────────────────────────────
 
+// ─── Advanced custom-field configs (Zoho-parity engine) ──────────────────────
+// Type-specific configuration carried in `CustomFieldDefinition.config` (JSON).
+// Each sub-schema is optional at the object level; field-integrity.ts enforces
+// which keys are required for a given fieldType. Kept permissive (passthrough)
+// so the low-code UI can round-trip forward-compatible extra keys.
+
+/** Aggregation function for ROLLUP_SUMMARY fields. */
+export const RollupFunctionSchema = z.enum(['COUNT', 'SUM', 'MIN', 'MAX', 'AVG']);
+export type RollupFunction = z.infer<typeof RollupFunctionSchema>;
+
+/** Rollup-summary config: aggregate a child/related set into this field. */
+export const RollupConfigSchema = z.object({
+  function: RollupFunctionSchema,
+  // Related module/entity whose records are aggregated (apiName).
+  childModule: z.string().min(1).max(120),
+  // Field on the child record to aggregate. Required for SUM/MIN/MAX/AVG.
+  childField: z.string().max(120).optional(),
+  // Lookup field on the child that links back to the parent record.
+  linkField: z.string().min(1).max(120),
+  // Optional simple equality filter applied to child rows before aggregating.
+  filter: z.record(z.unknown()).optional(),
+});
+export type RollupConfigInput = z.infer<typeof RollupConfigSchema>;
+
+/** One field definition inside a SUBFORM (repeating line-item grid). */
+export const SubformFieldSchema = z.object({
+  apiName: z.string().min(1).max(120),
+  label: z.string().min(1).max(120),
+  type: z.string().min(1).max(40),
+  required: z.boolean().optional(),
+  options: z.array(z.unknown()).optional(),
+  defaultValue: z.unknown().optional(),
+});
+export type SubformFieldInput = z.infer<typeof SubformFieldSchema>;
+
+/** Subform config: embedded repeating child-record grid. */
+export const SubformConfigSchema = z.object({
+  fields: z.array(SubformFieldSchema).min(1),
+  minRows: z.number().int().min(0).optional(),
+  maxRows: z.number().int().min(1).optional(),
+});
+export type SubformConfigInput = z.infer<typeof SubformConfigSchema>;
+
+/** Type-specific config for an advanced custom field. Passthrough-tolerant. */
+export const CustomFieldConfigSchema = z
+  .object({
+    // LOOKUP / MULTI_LOOKUP
+    lookupModule: z.string().min(1).max(120).optional(),
+    displayField: z.string().max(120).optional(),
+    // MULTI_LOOKUP
+    junctionModule: z.string().max(120).optional(),
+    maxSelections: z.number().int().min(1).optional(),
+    // SUBFORM
+    subform: SubformConfigSchema.optional(),
+    // ROLLUP_SUMMARY
+    rollup: RollupConfigSchema.optional(),
+    // DEPENDENT_PICKLIST (controlling/parent field apiKey)
+    controllingField: z.string().max(120).optional(),
+    // GLOBAL SET reference (shared picklist)
+    globalSetId: z.string().min(1).optional(),
+  })
+  .passthrough();
+export type CustomFieldConfigInput = z.infer<typeof CustomFieldConfigSchema>;
+
 export const CreateCustomFieldSchema = z.object({
   tenantId: z.string().min(1).optional(),
   entityType: z.string().min(1).max(40),
@@ -1122,12 +1186,45 @@ export const CreateCustomFieldSchema = z.object({
   required: z.boolean().default(false),
   showOnCard: z.boolean().default(false),
   position: z.number().int().min(0).default(0),
+  // Advanced field-type configuration (lookup/rollup/subform/dependent/etc.).
+  config: CustomFieldConfigSchema.optional(),
+  // Shortcut reference to a shared GlobalPicklistSet (also mirrored in config).
+  globalSetId: z.string().min(1).nullish(),
 });
 
 export const UpdateCustomFieldSchema = CreateCustomFieldSchema.partial().omit({ tenantId: true, entityType: true });
 
 export type CreateCustomFieldInput = z.infer<typeof CreateCustomFieldSchema>;
 export type UpdateCustomFieldInput = z.infer<typeof UpdateCustomFieldSchema>;
+
+/** Body for POST /custom-fields/:id/rollup/recompute — supply the child rows
+ *  (or pre-extracted numeric values) the aggregate is computed from. */
+export const RollupRecomputeSchema = z.object({
+  rows: z.array(z.record(z.unknown())).optional(),
+  values: z.array(z.number()).optional(),
+});
+export type RollupRecomputeInput = z.infer<typeof RollupRecomputeSchema>;
+
+// ─── Global picklist sets (tenant-level shared option lists) ──────────────────
+export const GlobalPicklistOptionSchema = z.union([
+  z.string().min(1),
+  z
+    .object({
+      value: z.string().min(1),
+      label: z.string().optional(),
+    })
+    .passthrough(),
+]);
+
+export const CreateGlobalPicklistSetSchema = z.object({
+  name: z.string().min(1).max(120),
+  options: z.array(GlobalPicklistOptionSchema).default([]),
+  isActive: z.boolean().optional(),
+});
+export const UpdateGlobalPicklistSetSchema = CreateGlobalPicklistSetSchema.partial();
+
+export type CreateGlobalPicklistSetInput = z.infer<typeof CreateGlobalPicklistSetSchema>;
+export type UpdateGlobalPicklistSetInput = z.infer<typeof UpdateGlobalPicklistSetSchema>;
 
 // ─── Reusable Address — Section 33 ───────────────────────────────────────────
 

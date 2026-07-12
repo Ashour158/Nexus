@@ -155,6 +155,23 @@ export function globalErrorHandler(
     return;
   }
 
+  // Framework/plugin errors that already carry a 4xx status (most importantly
+  // @fastify/rate-limit's 429) must NOT be flattened to 500 — otherwise a throttle
+  // reads as a server fault: clients can't back off, on-call pages, and the error
+  // budget burns. Return the real status with a stable code so backoff works.
+  const sc = (error as { statusCode?: number }).statusCode;
+  if (typeof sc === 'number' && sc >= 400 && sc < 500) {
+    reply.code(sc).send({
+      success: false,
+      error: {
+        code: (error as { code?: string }).code ?? (sc === 429 ? 'RATE_LIMITED' : 'REQUEST_REJECTED'),
+        message: error.message || 'Request rejected',
+        requestId: request.id,
+      },
+    });
+    return;
+  }
+
   reply.code(500).send({
     success: false,
     error: {

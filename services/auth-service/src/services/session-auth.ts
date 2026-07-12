@@ -25,6 +25,8 @@ export interface LoginResult {
   refreshToken: string;
   expiresIn: string;
   mfaRequired: false;
+  /** True when the account was invited and hasn't reset its temp password yet. */
+  mustChangePassword?: boolean;
 }
 
 export interface MfaChallengeResult {
@@ -129,7 +131,7 @@ export async function loginWithPassword(
 async function finalizeSession(
   keyStore: JwksKeyStore,
   prisma: AuthPrisma,
-  user: { id: string; tenantId: string; email: string },
+  user: { id: string; tenantId: string; email: string; mustChangePassword?: boolean },
   meta: { userAgent?: string; ip?: string }
 ): Promise<AuthResult> {
   const mfaRequired = await isMfaEnabled(prisma, user.id);
@@ -191,7 +193,13 @@ async function finalizeSession(
     expiresIn: accessExpiresIn(),
   });
 
-  return { accessToken, refreshToken, expiresIn: accessExpiresIn(), mfaRequired: false };
+  return {
+    accessToken,
+    refreshToken,
+    expiresIn: accessExpiresIn(),
+    mfaRequired: false,
+    ...(user.mustChangePassword ? { mustChangePassword: true } : {}),
+  };
 }
 
 export async function refreshTokens(

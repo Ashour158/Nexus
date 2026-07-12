@@ -7,7 +7,7 @@ import {
   RefreshTokenBodySchema,
   ResetPasswordSchema,
 } from '@nexus/validation';
-import { hashPassword, validatePasswordStrength } from '@nexus/security';
+import { hashPassword, validatePasswordStrength, verifyPassword } from '@nexus/security';
 import type { AuthPrisma } from '../prisma.js';
 import { loginWithKeycloak, loginWithPassword, refreshTokens, revokeSession } from '../services/session-auth.js';
 import { z } from 'zod';
@@ -277,6 +277,62 @@ export async function registerAuthRoutes(
           success: true,
           data: { message: 'Password reset successfully. Please log in with your new password.' },
         });
+      });
+
+      /**
+       * Authenticated self-service password change. This is the second half of the
+       * invite flow: an invited user logs in with their temp password (login returns
+       * `mustChangePassword: true`), then calls this with the current + new password.
+       * Not in `isPublicRoute`, so the global JWT preHandler has already verified the
+       * bearer token and populated `request.user`.
+       */
+      r.post('/auth/change-password', async (request, reply) => {
+        const jwt = request.user as JwtPayload;
+        const parsed = z
+          .object({ currentPassword: z.string().min(1), newPassword: z.string().min(1) })
+          .safeParse(request.body);
+        if (!parsed.success) {
+          throw new ValidationError('Invalid body', parsed.error.flatten());
+        }
+        const { currentPassword, newPassword } = parsed.data;
+
+        const user = await prisma.user.findFirst({
+          where: { id: jwt.sub, tenantId: jwt.tenantId },
+        });
+        if (!user || !user.passwordHash) {
+          throw new ValidationError('Password change unavailable for this account', {});
+        }
+        const ok = await verifyPassword(currentPassword, user.passwordHash);
+        if (!ok) {
+          return reply.code(401).send({
+            success: false,
+            error: { code: 'INVALID_CREDENTIALS', message: 'Current password is incorrect', requestId: request.id },
+          });
+        }
+        if (currentPassword === newPassword) {
+          throw new ValidationError('New password must differ from the current password', {});
+        }
+        const strength = validatePasswordStrength(newPassword);
+        if (!strength.valid) {
+          throw new ValidationError('Password too weak', { fieldErrors: { newPassword: strength.errors } });
+        }
+
+        const passwordHash = await hashPassword(newPassword);
+        await prisma.user.update({
+          where: { id_tenantId: { id: user.id, tenantId: user.tenantId } },
+          data: { passwordHash, mustChangePassword: false },
+        });
+        await prisma.auditLog.create({
+          data: {
+            tenantId: user.tenantId,
+            userId: user.id,
+            action: 'PASSWORD_CHANGE',
+            resource: 'user',
+            resourceId: user.id,
+            newValue: { changedAt: new Date().toISOString() },
+          },
+        });
+        return reply.send({ success: true, data: { message: 'Password changed. Please use your new password from now on.' } });
       });
     },
     { prefix: '/api/v1' }

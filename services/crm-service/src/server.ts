@@ -1,5 +1,4 @@
 import { createService, globalErrorHandler, registerHealthRoutes, requireEnv, optionalEnv, checkDatabase } from '@nexus/service-utils';
-import rateLimit from '@fastify/rate-limit';
 import { PrismaClient } from '../../../node_modules/.prisma/crm-client/index.js';
 import { buildDatabaseUrl } from '@nexus/service-utils/db';
 import { createCrmPrisma } from './prisma.js';
@@ -36,16 +35,9 @@ export async function buildServer(): Promise<{ app: FastifyInstance; prismaHealt
 
   registerHealthRoutes(app, 'crm-service', [() => checkDatabase(prismaHealth)]);
   app.setErrorHandler(globalErrorHandler);
-  await app.register(rateLimit, {
-    global: true,
-    max: 300,
-    timeWindow: '1 minute',
-    errorResponseBuilder: (_req, context) => ({
-      success: false,
-      error: 'RATE_LIMIT_EXCEEDED',
-      message: `Too many requests. Retry after ${context.after}.`,
-    }),
-  });
+  // Rate limiting is provided once by createService() (shared, JWT-keyed per
+  // tenant+user). A second IP-keyed limiter here double-throttled and collapsed
+  // all proxied users into one bucket — removed in favour of the shared one.
 
   try {
     await producer.connect();

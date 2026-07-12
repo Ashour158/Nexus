@@ -251,20 +251,23 @@ export async function createService(config: ServiceConfig): Promise<FastifyInsta
         return path.startsWith('/health') || path.startsWith('/metrics') || path.startsWith('/ready');
       },
       keyGenerator: (req: any) => {
-        const tenantId = req.headers['x-tenant-id'] as string | undefined;
-        // Extract user sub from JWT payload (no signature verification needed for bucketing)
-        let userId: string | undefined;
+        // Bucket per authenticated (tenant, user) so one busy tenant can't starve
+        // the rest. BOTH ids come from the JWT payload — NOT the `x-tenant-id`
+        // header. The header is absent on any direct API client and (critically)
+        // the web BFF proxies every user through one server IP, so a header-gated
+        // key collapses the whole deployment into a single IP bucket. The JWT is
+        // present on every authenticated request and already carries tenantId+sub.
         const auth = req.headers.authorization as string | undefined;
         if (auth?.startsWith('Bearer ')) {
           try {
             const payload = JSON.parse(Buffer.from(auth.split('.')[1], 'base64url').toString());
-            userId = payload.sub;
-          } catch { /* ignore malformed JWT */ }
+            if (payload.tenantId && payload.sub) return `${payload.tenantId}:${payload.sub}`;
+            if (payload.sub) return `u:${payload.sub}`;
+          } catch { /* ignore malformed JWT — fall through to IP */ }
         }
-        // Per-tenant per-user bucket when identifiable; fallback to IP
-        if (tenantId && userId) return `${tenantId}:${userId}`;
-        if (tenantId) return `${tenantId}:${req.ip}`;
-        return req.ip;
+        // Unauthenticated (login, refresh, public scheduling) → per-IP.
+        const headerTenant = req.headers['x-tenant-id'] as string | undefined;
+        return headerTenant ? `${headerTenant}:${req.ip}` : req.ip;
       },
       errorResponseBuilder: (_req: any, context: any) => ({
         success: false,

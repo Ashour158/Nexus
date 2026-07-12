@@ -84,6 +84,9 @@ const nextConfig = {
       { source: '/bff/integration/:path*', destination: 'http://integration-service:3012/api/v1/:path*' },
       { source: '/bff/tickets/:path*', destination: 'http://ticket-service:3029/api/v1/:path*' },
       { source: '/bff/campaign/:path*', destination: 'http://campaign-service:3025/api/v1/:path*' },
+      // Setup pages (Territories) + (Scheduled Jobs / Mapping Templates) call these.
+      { source: '/bff/territory/:path*', destination: 'http://territory-service:3019/api/v1/:path*' },
+      { source: '/bff/data/:path*', destination: 'http://data-service:3015/api/v1/:path*' },
     ];
   },
   async headers() {

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import { SETUP_CATEGORIES } from '@/config/setup-registry';
+import { SetupChecklist } from '@/components/settings/setup-checklist';
 
 export default function SetupLandingPage() {
   return (
@@ -13,6 +14,8 @@ export default function SetupLandingPage() {
           Every configuration and administration surface for Nexus, organized in one place.
         </p>
       </header>
+
+      <SetupChecklist />
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {SETUP_CATEGORIES.map((category) => {

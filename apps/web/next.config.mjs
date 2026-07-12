@@ -37,10 +37,13 @@ const nextConfig = {
   // redirected; they remain where they are and are surfaced via the Admin hub.
   async redirects() {
     return [
-      // Roles existed at both /roles and /admin/roles — canonicalize on the admin tree.
-      { source: '/roles', destination: '/admin/roles', permanent: false },
-      // Validation Rules existed at both /settings/validation-rules and /admin/validation-rules.
-      { source: '/settings/validation-rules', destination: '/admin/validation-rules', permanent: false },
+      // Roles canonicalized under the unified Setup tree at /settings/roles
+      // (/admin/roles now redirects there too).
+      { source: '/roles', destination: '/settings/roles', permanent: false },
+      // NOTE: the old '/settings/validation-rules -> /admin/validation-rules' redirect
+      // was REMOVED — after the Setup consolidation /settings/validation-rules is the
+      // canonical real page and /admin/validation-rules redirects TO it, so the old
+      // rule created an infinite redirect loop.
       // Commissions existed twice: the finance-backed /commissions and the wired
       // incentive-backed /commission (plans + per-rep statements). Canonicalize on
       // /commission and retire the /commissions twin.
@@ -62,6 +65,9 @@ const nextConfig = {
       { source: '/bff/auth/:path*', destination: 'http://auth-service:3000/api/v1/:path*' },
       { source: '/bff/crm/:path*', destination: 'http://crm-service:3001/api/v1/:path*' },
       { source: '/bff/finance/:path*', destination: 'http://finance-service:3002/api/v1/:path*' },
+      // Setup pages (Global Picklist Sets, Page Layouts, Blueprint Transitions) call these.
+      { source: '/bff/metadata/:path*', destination: 'http://metadata-service:3004/api/v1/:path*' },
+      { source: '/bff/blueprint/:path*', destination: 'http://blueprint-service:3013/api/v1/:path*' },
       // Approval requests live on approval-service, not workflow-service. The
       // approvals UI calls them via the workflow BFF (apiClients.workflow), so
       // route just the /approval/* subpath to approval-service. Must precede the

@@ -246,10 +246,10 @@ export function Topbar(): ReactElement {
               onClick={() => setMenuOpen(false)}
               className="flex items-center gap-2 px-3 py-2 text-sm text-on-surface hover:bg-surface-container-high"
               role="menuitem"
-              aria-label="Settings"
-              title="Settings"
+              aria-label="Setup"
+              title="Setup"
             >
-              <SettingsIcon size={14} /> Settings
+              <SettingsIcon size={14} /> Setup
             </Link>
             <Link
               href="/whats-new"

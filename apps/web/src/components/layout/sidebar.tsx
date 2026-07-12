@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Database,
   Plus,
+  Settings,
   ShieldCheck,
   Users,
   X,
@@ -56,12 +57,12 @@ const NAV_GROUPS: NavGroup[] = [
       })),
   })),
   {
-    label: 'Admin',
+    label: 'Workspace',
     icon: ShieldCheck,
     items: [
       { href: '/org-chart', label: 'Org Chart', icon: Users },
       { href: '/system-map', label: 'System Map', icon: Database },
-      { href: '/admin', label: 'Admin Panel', icon: ShieldCheck, adminOnly: true },
+      { href: '/settings', label: 'Setup', icon: Settings },
     ],
   },
 ].filter((group) => group.items.length > 0);
@@ -227,15 +228,13 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps): ReactEleme
               </p>
             </div>
           </div>
-          {roles.includes('admin') ? (
-            <Link
-              href="/admin"
-              className="mt-3 flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold text-primary hover:bg-primary-container hover:text-on-primary-container"
-            >
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Admin Panel
-            </Link>
-          ) : null}
+          <Link
+            href="/settings"
+            className="mt-3 flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold text-primary hover:bg-primary-container hover:text-on-primary-container"
+          >
+            <Settings className="h-3.5 w-3.5" />
+            Setup
+          </Link>
         </div>
       </aside>
     </>

@@ -534,7 +534,8 @@ export default function ContactsPage(): ReactElement {
               <p className="mt-1 text-sm text-on-surface-variant">Adjust the filters or create a new contact.</p>
             </div>
           ) : (
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px]">
               <thead className="border-b border-outline-variant bg-surface-container-low">
                 <tr>
                   <th className="px-6 py-3 text-left w-8">
@@ -619,6 +620,7 @@ export default function ContactsPage(): ReactElement {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
 
           {contactsQuery.data ? (

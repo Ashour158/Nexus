@@ -26,6 +26,7 @@ import {
   Languages,
   Layers,
   LayoutGrid,
+  LayoutTemplate,
   List,
   Lock,
   Mail,
@@ -173,6 +174,7 @@ export const SETUP_CATEGORIES: SetupCategory[] = [
     icon: Webhook,
     description: 'Integrations, mail accounts, API keys, and AI models.',
     items: [
+      { id: 'templates', label: 'Templates', href: '/settings/templates', icon: LayoutTemplate, description: 'WYSIWYG email, SMS, and document templates with merge fields and live preview.', isNew: true },
       { id: 'integrations', label: 'Integrations', href: '/settings/integrations', icon: Plug, description: 'Mail, calendar, maps, Slack, Teams, ZATCA, and ERP integrations.' },
       { id: 'outbound-webhooks', label: 'Outbound Webhooks', href: '/settings/outbound-webhooks', icon: Webhook, description: 'Push CRM events to external endpoints and inspect deliveries.', isNew: true },
       { id: 'mail-accounts', label: 'Email & Mail Accounts', href: '/settings/mail-accounts', icon: Mail, description: 'Shared/team mailboxes and outbound sending domains.' },

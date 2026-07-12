@@ -319,8 +319,8 @@ export default function AccountsPage(): ReactElement {
           />
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto rounded-lg border border-outline-variant bg-surface">
+          <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-surface-container-low text-start text-xs uppercase tracking-wider text-on-surface-variant">
               <tr>
                 <th className="px-4 py-2 w-8">

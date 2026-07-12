@@ -1,9 +1,11 @@
 import type { NexusProducer } from '@nexus/kafka';
 import type { DataPrisma } from '../prisma.js';
 import { parseCsv } from '../lib/csv.js';
-import { getModuleConfig, validateRow } from '../lib/import-modules.js';
+import { applyTransform, getModuleConfig, validateRow } from '../lib/import-modules.js';
 
 type FieldMap = Record<string, string>;
+/** Optional per-target-field transforms, e.g. `{ email: 'lowercase' }`. */
+type TransformMap = Record<string, string>;
 
 interface RowError {
   row: number;
@@ -44,7 +46,7 @@ export function createImportService(prisma: DataPrisma, producer?: NexusProducer
      * it never fails the whole job. Any unexpected error marks the job FAILED
      * but is caught so the request/service never crashes.
      */
-    async processJob(jobId: string, csvBuffer: Buffer) {
+    async processJob(jobId: string, csvBuffer: Buffer, transforms?: TransformMap) {
       try {
         const job = await prisma.importJob.findUnique({ where: { id: jobId } });
         if (!job) return null;
@@ -99,6 +101,16 @@ export function createImportService(prisma: DataPrisma, producer?: NexusProducer
                   }
                 } else {
                   Object.assign(mapped, row);
+                }
+
+                // Apply optional per-field transforms (from a mapping template)
+                // before validation/coercion runs.
+                if (transforms) {
+                  for (const [targetKey, transform] of Object.entries(transforms)) {
+                    if (targetKey in mapped) {
+                      mapped[targetKey] = applyTransform(mapped[targetKey], transform);
+                    }
+                  }
                 }
 
                 const result = validateRow(config, mapped);

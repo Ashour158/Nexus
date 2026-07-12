@@ -81,6 +81,32 @@ export function getModuleConfig(module: string): ModuleConfig {
 }
 
 /**
+ * Apply an optional per-field transform to a raw string value before validation.
+ * Mapping templates may attach a `transform` to each column. Unknown transforms
+ * are a no-op so a template can never hard-fail an import.
+ */
+export function applyTransform(value: string, transform?: string): string {
+  if (!transform) return value;
+  switch (transform.toLowerCase()) {
+    case 'trim':
+      return value.trim();
+    case 'lowercase':
+    case 'lower':
+      return value.toLowerCase();
+    case 'uppercase':
+    case 'upper':
+      return value.toUpperCase();
+    case 'titlecase':
+      return value.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+    case 'digits':
+      // Strip everything but digits — handy for phone columns.
+      return value.replace(/\D+/g, '');
+    default:
+      return value;
+  }
+}
+
+/**
  * Coerce + validate a single mapped row against a module's field rules.
  *
  * @returns `{ ok: true, value }` with type-coerced fields, or

@@ -4,6 +4,10 @@ import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
 import type { NexusProducer } from '@nexus/kafka';
 import type { DataPrisma } from '../prisma.js';
 import { createImportService } from '../services/import.service.js';
+import {
+  createMappingTemplateService,
+  resolveMappings,
+} from '../services/mapping-template.service.js';
 
 const ModuleParams = z.object({ module: z.string().min(1) });
 const JobParams = z.object({ id: z.string().cuid() });
@@ -13,10 +17,14 @@ const QuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
+// An import supplies EITHER an explicit `fieldMap` OR a saved `templateId`
+// (which drives the column→field mapping + transforms). `fieldMap` is optional
+// so a template-only request is valid.
 const CreateBody = z.object({
   fileName: z.string().min(1),
   csvBase64: z.string().min(1),
-  fieldMap: z.record(z.string()),
+  fieldMap: z.record(z.string()).optional(),
+  templateId: z.string().cuid().optional(),
 });
 
 export async function registerImportRoutes(
@@ -25,21 +33,35 @@ export async function registerImportRoutes(
   producer: NexusProducer
 ) {
   const service = createImportService(prisma, producer);
+  const templates = createMappingTemplateService(prisma);
 
   app.post('/api/v1/import/:module', { preHandler: requirePermission(PERMISSIONS.DATA.IMPORT) }, async (request, reply) => {
     const { module } = ModuleParams.parse(request.params);
     const body = CreateBody.parse(request.body);
     const user = (request as any).user as { tenantId: string; sub?: string; userId?: string };
     const createdBy = user.userId ?? user.sub ?? 'system';
-    const job = await service.createJob(
-      user.tenantId,
-      module,
-      body.fileName,
-      createdBy,
-      body.fieldMap
-    );
+
+    // Resolve the effective mapping: a saved template (if referenced) drives the
+    // column→field map + transforms; an explicit fieldMap overrides/supplements
+    // it; otherwise fall back to identity mapping.
+    let fieldMap: Record<string, string> = body.fieldMap ?? {};
+    let transforms: Record<string, string> | undefined;
+    if (body.templateId) {
+      const tpl = await templates.get(user.tenantId, body.templateId);
+      if (!tpl) {
+        return reply.code(404).send({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Mapping template not found', requestId: request.id },
+        });
+      }
+      const resolved = resolveMappings(tpl.mappings);
+      fieldMap = { ...resolved.fieldMap, ...(body.fieldMap ?? {}) };
+      transforms = resolved.transforms;
+    }
+
+    const job = await service.createJob(user.tenantId, module, body.fileName, createdBy, fieldMap);
     const buffer = Buffer.from(body.csvBase64, 'base64');
-    void service.processJob(job.id, buffer);
+    void service.processJob(job.id, buffer, transforms);
     return reply.code(202).send({ success: true, data: job });
   });
 

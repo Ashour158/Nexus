@@ -97,6 +97,75 @@ enum ImportStatus {
   FAILED
 }
 
+/// Reusable column→field mapping for CSV imports. An import job can reference a
+/// template by id instead of re-specifying the full field map every time.
+/// `mappings` is an ordered array of `{ sourceColumn, targetField, transform? }`.
+model ImportMappingTemplate {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  module    String
+  mappings  Json     @default("[]")
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, module, name])
+  @@index([tenantId, module])
+  @@unique([id, tenantId])
+}
+
+enum DataJobKind {
+  IMPORT
+  EXPORT
+}
+
+/// A recurring import or export driven by a cron expression. The background
+/// poller (jobs/data-job.poller.ts) finds rows whose `nextRunAt <= now`, runs
+/// them, records a DataJobRun, and advances `nextRunAt` from `cron`.
+/// `config` shape:
+///   IMPORT → { source: { csvBase64? | url? }, mappingTemplateId?, fieldMap? }
+///   EXPORT → { destination?: { type: 'file'|'inline', path? }, filter?, format: 'csv'|'json' }
+model ScheduledDataJob {
+  id         String       @id @default(cuid())
+  tenantId   String
+  name       String
+  kind       DataJobKind
+  module     String
+  config     Json         @default("{}")
+  cron       String
+  nextRunAt  DateTime
+  lastRunAt  DateTime?
+  lastStatus String?
+  isActive   Boolean      @default(true)
+  createdBy  String
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  runs       DataJobRun[]
+
+  @@index([isActive, nextRunAt])
+  @@index([tenantId, kind])
+  @@unique([id, tenantId])
+}
+
+/// One execution-history row per run of a ScheduledDataJob.
+model DataJobRun {
+  id             String           @id @default(cuid())
+  tenantId       String
+  jobId          String
+  job            ScheduledDataJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  kind           DataJobKind
+  status         String           @default("RUNNING")
+  rowCount       Int              @default(0)
+  outputLocation String?
+  error          String?
+  startedAt      DateTime         @default(now())
+  finishedAt     DateTime?
+
+  @@index([tenantId, jobId])
+  @@index([jobId, startedAt])
+}
+
 model OutboxMessage {
   id             String   @id @default(cuid())
   topic          String

@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import type { DataPrisma as PrismaClient } from '../prisma.js';
 import DataLoader from 'dataloader';
 
 export interface GraphQLContext {

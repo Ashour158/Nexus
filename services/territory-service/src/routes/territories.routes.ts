@@ -13,7 +13,31 @@ const TerritoryBody = z.object({
   teamId: z.string().optional(),
   priority: z.number().int().default(0),
   isDefault: z.boolean().default(false),
+  parentId: z.string().cuid().nullable().optional(),
   rules: z.array(z.object({ field: z.string(), operator: z.string(), value: z.string() })).default([]),
+});
+const MemberBody = z.object({
+  userId: z.string().min(1),
+  role: z.enum(['manager', 'member']).default('member'),
+});
+const MemberRoleBody = z.object({ role: z.enum(['manager', 'member']) });
+const AssignBody = z.object({
+  module: z.enum(['lead', 'deal', 'account']),
+  recordData: z.record(z.unknown()),
+});
+const SummaryQuery = z.object({
+  amounts: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (!s) return undefined;
+      try {
+        const parsed = JSON.parse(s);
+        return parsed && typeof parsed === 'object' ? (parsed as Record<string, number>) : undefined;
+      } catch {
+        return undefined;
+      }
+    }),
 });
 const Paging = z.object({
   leadId: z.string().optional(),
@@ -29,6 +53,21 @@ const AssignmentRuleBody = z.object({
   priority: z.number().int().default(0),
   isActive: z.boolean().default(true),
 });
+
+/** Map parent-validation errors thrown by the service to HTTP responses. */
+function mapParentError(
+  err: unknown,
+  requestId: string
+): { code: number; body: unknown } | null {
+  const msg = (err as Error)?.message;
+  if (msg === 'PARENT_NOT_FOUND') {
+    return { code: 400, body: { success: false, error: { code: 'PARENT_NOT_FOUND', message: 'Parent territory not found', requestId } } };
+  }
+  if (msg === 'PARENT_CYCLE') {
+    return { code: 400, body: { success: false, error: { code: 'PARENT_CYCLE', message: 'Parent would create a cycle', requestId } } };
+  }
+  return null;
+}
 
 export async function registerTerritoriesRoutes(
   app: FastifyInstance,
@@ -50,9 +89,30 @@ export async function registerTerritoriesRoutes(
   app.post('/api/v1/territories', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const body = TerritoryBody.parse(request.body);
-    const data = await territories.createTerritory(tenantId, body);
-    await cache.del(`territories:${tenantId}`);
-    return reply.code(201).send({ success: true, data });
+    try {
+      const data = await territories.createTerritory(tenantId, body);
+      await cache.del(`territories:${tenantId}`);
+      return reply.code(201).send({ success: true, data });
+    } catch (err) {
+      const mapped = mapParentError(err, request.id);
+      if (mapped) return reply.code(mapped.code).send(mapped.body);
+      throw err;
+    }
+  });
+
+  // Nested hierarchy (roll-up tree). Static path — Fastify's radix router
+  // prioritises it over the parametric `/territories/:id`.
+  app.get('/api/v1/territories/tree', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
+    const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+    return reply.send({ success: true, data: await territories.getTree(tenantId) });
+  });
+
+  // Resolve the territory a record routes to (module + recordData → territoryId).
+  app.post('/api/v1/territories/assign', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
+    const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+    const body = AssignBody.parse(request.body);
+    const data = await territories.resolveTerritory(tenantId, body.module, body.recordData);
+    return reply.send({ success: true, data });
   });
 
   app.get('/api/v1/territories/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
@@ -72,11 +132,17 @@ export async function registerTerritoriesRoutes(
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const { id } = Id.parse(request.params);
     const body = TerritoryBody.partial().parse(request.body);
-    const data = await territories.updateTerritory(tenantId, id, body);
-    if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found', requestId: request.id } });
-    await cache.del(`territory:${tenantId}:${id}`);
-    await cache.del(`territories:${tenantId}`);
-    return reply.send({ success: true, data });
+    try {
+      const data = await territories.updateTerritory(tenantId, id, body);
+      if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found', requestId: request.id } });
+      await cache.del(`territory:${tenantId}:${id}`);
+      await cache.del(`territories:${tenantId}`);
+      return reply.send({ success: true, data });
+    } catch (err) {
+      const mapped = mapParentError(err, request.id);
+      if (mapped) return reply.code(mapped.code).send(mapped.body);
+      throw err;
+    }
   });
 
   app.delete('/api/v1/territories/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
@@ -128,6 +194,40 @@ export async function registerTerritoriesRoutes(
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const { id } = Id.parse(request.params);
     const data = await territories.getMembers(tenantId, id);
+    if (data === null) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Territory not found', requestId: request.id } });
+    return reply.send({ success: true, data });
+  });
+
+  app.post('/api/v1/territories/:id/members', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+    const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+    const { id } = Id.parse(request.params);
+    const body = MemberBody.parse(request.body);
+    const data = await territories.addMember(tenantId, id, body);
+    if (data === null) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Territory not found', requestId: request.id } });
+    return reply.code(201).send({ success: true, data });
+  });
+
+  app.patch('/api/v1/territories/:id/members/:memberId', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+    const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+    const { id, memberId } = z.object({ id: z.string().cuid(), memberId: z.string().cuid() }).parse(request.params);
+    const body = MemberRoleBody.parse(request.body);
+    const data = await territories.updateMember(tenantId, id, memberId, body);
+    if (data === null) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Member not found', requestId: request.id } });
+    return reply.send({ success: true, data });
+  });
+
+  app.delete('/api/v1/territories/:id/members/:memberId', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+    const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+    const { id, memberId } = z.object({ id: z.string().cuid(), memberId: z.string().cuid() }).parse(request.params);
+    return reply.send({ success: true, data: await territories.removeMember(tenantId, id, memberId) });
+  });
+
+  // Territory-scoped roll-up over the territory + its descendants.
+  app.get('/api/v1/territories/:id/summary', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
+    const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
+    const { id } = Id.parse(request.params);
+    const { amounts } = SummaryQuery.parse(request.query);
+    const data = await territories.getSummary(tenantId, id, amounts);
     if (data === null) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Territory not found', requestId: request.id } });
     return reply.send({ success: true, data });
   });

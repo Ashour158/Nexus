@@ -20,13 +20,39 @@ model Territory {
   isActive    Boolean          @default(true)
   isDefault   Boolean          @default(false)
   currency    String?
+  // Self-referential hierarchy (Territory Management, Zoho parity). A territory
+  // may nest under a parent, forming a tree used for roll-up + inheritance.
+  parentId    String?
+  parent      Territory?       @relation("TerritoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Territory[]      @relation("TerritoryHierarchy")
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   rules       TerritoryRule[]
   assignmentRules AssignmentRule[]
+  members     TerritoryMember[]
   routingLogs LeadRoutingLog[]
 
   @@index([tenantId])
+  @@index([tenantId, parentId])
+  @@unique([id, tenantId])
+}
+
+// Territory membership (Zoho parity): who belongs to a territory and in what
+// capacity. Distinct from Territory.ownerIds (the round-robin assignment pool)
+// — a member records org-structure participation (a manager oversees, members
+// work the territory) and drives the members surface + roll-up participation.
+model TerritoryMember {
+  id          String    @id @default(cuid())
+  tenantId    String
+  territoryId String
+  territory   Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  userId      String
+  role        String    @default("member") // 'manager' | 'member'
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([tenantId, territoryId, userId])
+  @@index([tenantId, territoryId])
   @@unique([id, tenantId])
 }
 
@@ -42,7 +68,7 @@ model AssignmentRule {
   territoryId String
   territory   Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
   name        String
-  entityType  String    @default("lead") // 'lead' | 'deal' | 'any'
+  entityType  String    @default("lead") // module: 'lead' | 'deal' | 'account' | 'any'
   criteria    Json      @default("{}")
   ownerId     String?
   queue       String? // round-robin queue key; owners resolved from territory.ownerIds

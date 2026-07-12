@@ -60,6 +60,7 @@ export function FilterBar({
           </span>
           <select
             value={f.value}
+            aria-label={f.label}
             onChange={(e) => f.onChange(e.target.value)}
             className="h-9 rounded-lg border bg-transparent px-2.5 text-sm outline-none focus:border-primary"
             style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
@@ -77,7 +78,7 @@ export function FilterBar({
         <button
           type="button"
           onClick={onRefresh}
-          className="ms-auto inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition hover:bg-gray-50 dark:hover:bg-slate-800"
+          className="ms-auto inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition hover:bg-surface-container-low dark:hover:bg-surface-container-highest"
           style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
           aria-label="Refresh"
         >

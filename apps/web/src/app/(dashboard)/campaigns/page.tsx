@@ -99,7 +99,7 @@ export default function CampaignsPage() {
             <button
               type="button"
               onClick={() => void refetch()}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 text-sm font-bold text-on-surface-variant hover:bg-surface-container-low"
             >
               <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
               Refresh
@@ -118,18 +118,19 @@ export default function CampaignsPage() {
       <CRMToolbar>
         <div className="grid w-full gap-3 lg:grid-cols-[1.4fr_180px_180px_1fr]">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
             <input
               value={search}
               onChange={(e) => resetPage(setSearch)(e.target.value)}
               placeholder="Search name or subject"
-              className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+              className="h-11 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-9 pr-3 text-sm text-on-surface outline-none focus:border-indigo-400 focus:bg-surface focus:ring-2 focus:ring-indigo-100"
             />
           </div>
           <select
             value={type}
+            aria-label="Filter by campaign type"
             onChange={(e) => resetPage(setType)(e.target.value as CampaignType | '')}
-            className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            className="h-11 rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
           >
             <option value="">All types</option>
             {CAMPAIGN_TYPES.map((t) => (
@@ -140,8 +141,9 @@ export default function CampaignsPage() {
           </select>
           <select
             value={status}
+            aria-label="Filter by campaign status"
             onChange={(e) => resetPage(setStatus)(e.target.value as CampaignStatus | '')}
-            className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            className="h-11 rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
           >
             <option value="">All statuses</option>
             {CAMPAIGN_STATUSES.map((s) => (
@@ -154,7 +156,7 @@ export default function CampaignsPage() {
             value={ownerId}
             onChange={(e) => resetPage(setOwnerId)(e.target.value)}
             placeholder="Filter by owner id"
-            className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+            className="h-11 rounded-lg border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface outline-none focus:border-indigo-400 focus:bg-surface focus:ring-2 focus:ring-indigo-100"
           />
         </div>
       </CRMToolbar>
@@ -167,7 +169,7 @@ export default function CampaignsPage() {
             <button
               type="button"
               onClick={() => void refetch()}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-rose-200 bg-white px-4 text-sm font-bold text-rose-700 hover:bg-rose-50"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-error/30 bg-surface px-4 text-sm font-bold text-error hover:bg-error-container"
             >
               <RefreshCw className="h-4 w-4" />
               Retry
@@ -178,7 +180,7 @@ export default function CampaignsPage() {
         <CRMCard title="Campaign registry" padded={false}>
           <CRMTableShell className="rounded-none border-0 shadow-none">
             <table className="w-full min-w-[820px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500">
+              <thead className="bg-surface-container-low text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                 <tr>
                   <th className="px-5 py-3">Name</th>
                   <th className="px-5 py-3">Type</th>
@@ -187,18 +189,18 @@ export default function CampaignsPage() {
                   <th className="px-5 py-3">Scheduled</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-outline-variant">
                 {rows.map((row) => (
-                  <tr key={row.id} className="hover:bg-slate-50">
+                  <tr key={row.id} className="hover:bg-surface-container-low">
                     <td className="px-5 py-4">
                       <Link
                         href={`/campaigns/${row.id}`}
-                        className="font-bold text-slate-950 hover:text-[#4f46e5]"
+                        className="font-bold text-on-surface hover:text-[#4f46e5]"
                       >
                         {row.name}
                       </Link>
                       {row.subject ? (
-                        <p className="mt-1 truncate text-xs text-slate-500">{row.subject}</p>
+                        <p className="mt-1 truncate text-xs text-on-surface-variant">{row.subject}</p>
                       ) : null}
                     </td>
                     <td className="px-5 py-4">
@@ -207,8 +209,8 @@ export default function CampaignsPage() {
                     <td className="px-5 py-4">
                       <CRMStatusBadge tone={statusTone(row.status)}>{row.status}</CRMStatusBadge>
                     </td>
-                    <td className="px-5 py-4 text-slate-600">{row.memberCount ?? 0}</td>
-                    <td className="px-5 py-4 text-slate-600">
+                    <td className="px-5 py-4 text-on-surface-variant">{row.memberCount ?? 0}</td>
+                    <td className="px-5 py-4 text-on-surface-variant">
                       {row.scheduledAt
                         ? new Date(row.scheduledAt).toLocaleString()
                         : '—'}
@@ -245,13 +247,13 @@ export default function CampaignsPage() {
 
       {(page > 1 || hasNext) && rows.length > 0 ? (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-slate-500">Page {page}</p>
+          <p className="text-sm text-on-surface-variant">Page {page}</p>
           <div className="inline-flex gap-2">
             <button
               type="button"
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="inline-flex h-10 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              className="inline-flex h-10 items-center gap-1 rounded-lg border border-outline-variant bg-surface px-3 text-sm font-bold text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50"
             >
               <ChevronLeft className="h-4 w-4" />
               Prev
@@ -260,7 +262,7 @@ export default function CampaignsPage() {
               type="button"
               disabled={!hasNext}
               onClick={() => setPage((p) => p + 1)}
-              className="inline-flex h-10 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              className="inline-flex h-10 items-center gap-1 rounded-lg border border-outline-variant bg-surface px-3 text-sm font-bold text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50"
             >
               Next
               <ChevronRight className="h-4 w-4" />

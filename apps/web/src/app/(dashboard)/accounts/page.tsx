@@ -8,7 +8,7 @@ import type { Account } from '@nexus/shared-types';
 import { cn } from '@/lib/cn';
 import { formatCurrency, formatDate } from '@/lib/format';
 
-const AccountMapView = dynamic(() => import('./map-view'), { ssr: false, loading: () => <div className="p-10 text-center text-sm text-slate-500">Loading map…</div> });
+const AccountMapView = dynamic(() => import('./map-view'), { ssr: false, loading: () => <div className="p-10 text-center text-sm text-on-surface-variant">Loading map…</div> });
 import { useAuthStore } from '@/stores/auth.store';
 import { ExportButton } from '@/components/export/ExportButton';
 import {
@@ -45,13 +45,13 @@ const TIERS: Array<Account['tier']> = ['SMB', 'MID_MARKET', 'ENTERPRISE', 'STRAT
 function tierColor(tier: Account['tier']): string {
   switch (tier) {
     case 'STRATEGIC':
-      return 'bg-violet-100 text-violet-700';
+      return 'bg-tertiary-container text-tertiary';
     case 'ENTERPRISE':
-      return 'bg-indigo-100 text-indigo-700';
+      return 'bg-primary-container text-primary';
     case 'MID_MARKET':
-      return 'bg-emerald-100 text-emerald-700';
+      return 'bg-success-container text-success';
     default:
-      return 'bg-slate-100 text-slate-700';
+      return 'bg-surface-container-high text-on-surface';
   }
 }
 
@@ -130,7 +130,7 @@ export default function AccountsPage(): ReactElement {
 
   if (!isHydrated) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <div className="rounded-lg border border-outline-variant bg-surface p-4">
         <TableSkeleton rows={6} cols={7} />
       </div>
     );
@@ -138,7 +138,7 @@ export default function AccountsPage(): ReactElement {
 
   if (!canRead) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
+      <div className="rounded-lg border border-warning/30 bg-warning-container p-6 text-sm text-on-warning-container">
         You do not have permission to view accounts.
       </div>
     );
@@ -146,18 +146,18 @@ export default function AccountsPage(): ReactElement {
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-lg border border-[#dbe7f3] bg-white shadow-sm">
+      <section className="overflow-hidden rounded-lg border border-[#dbe7f3] bg-surface shadow-sm">
         <div className="h-1.5 bg-gradient-to-r from-indigo-600 via-emerald-500 to-amber-400" />
         <div className="p-4 sm:p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm shadow-indigo-200">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-sm shadow-indigo-200">
                 <Building2 className="h-5 w-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase text-indigo-700">Customer foundation</p>
-                <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">Accounts command center</h1>
-                <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+                <p className="text-xs font-semibold uppercase text-primary">Customer foundation</p>
+                <h1 className="mt-1 text-2xl font-bold tracking-tight text-on-surface">Accounts command center</h1>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
                   Govern companies, billing and shipping profiles, account health, ownership, contacts, territories, and customer hierarchy from one operating view.
                 </p>
               </div>
@@ -177,7 +177,7 @@ export default function AccountsPage(): ReactElement {
         />
         <Link
           href="/accounts/duplicates"
-          className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-xs font-bold text-slate-600 hover:bg-slate-50"
+          className="inline-flex h-9 items-center gap-2 rounded-md border border-outline-variant px-3 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low"
         >
           Duplicates
         </Link>
@@ -187,15 +187,15 @@ export default function AccountsPage(): ReactElement {
           onChange={accountCols.setVisibleKeys}
           onReset={accountCols.reset}
         />
-        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+        <div className="inline-flex rounded-lg border border-outline-variant bg-surface-container-low p-1">
           <button
             type="button"
             onClick={() => setViewMode('list')}
             className={cn(
               'inline-flex h-9 items-center gap-2 rounded-md px-3 text-xs font-bold transition',
               viewMode === 'list'
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-slate-600 hover:bg-white'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-on-surface-variant hover:bg-surface'
             )}
           >
             <List className="h-3.5 w-3.5" />
@@ -207,8 +207,8 @@ export default function AccountsPage(): ReactElement {
             className={cn(
               'inline-flex h-9 items-center gap-2 rounded-md px-3 text-xs font-bold transition',
               viewMode === 'map'
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-slate-600 hover:bg-white'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-on-surface-variant hover:bg-surface'
             )}
           >
             <MapIcon className="h-3.5 w-3.5" />
@@ -227,10 +227,10 @@ export default function AccountsPage(): ReactElement {
         </div>
       </section>
 
-      <section className="rounded-lg border border-[#e7edf3] bg-white p-4 shadow-sm">
+      <section className="rounded-lg border border-[#e7edf3] bg-surface p-4 shadow-sm">
         <div className="grid gap-3 lg:grid-cols-[minmax(260px,1.5fr)_repeat(3,minmax(160px,1fr))]">
         <label className="relative block">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
         <input
           type="search"
           value={search}
@@ -239,16 +239,17 @@ export default function AccountsPage(): ReactElement {
             setSearch(e.target.value);
           }}
           placeholder="Search account name…"
-          className="h-11 w-full rounded-lg border border-slate-200 bg-slate-100 pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+          className="h-11 w-full rounded-lg border border-outline-variant bg-surface-container-high pl-10 pr-3 text-sm text-on-surface outline-none transition focus:border-primary/40 focus:bg-surface focus:ring-2 focus:ring-indigo-100"
         />
         </label>
         <select
           value={industry}
+          aria-label="Filter by industry"
           onChange={(e) => {
             setPage(1);
             setIndustry(e.target.value);
           }}
-          className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+          className="h-11 rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary/40 focus:ring-2 focus:ring-indigo-100"
         >
           <option value="">All industries</option>
           {industries.map((i) => (
@@ -259,11 +260,12 @@ export default function AccountsPage(): ReactElement {
         </select>
         <select
           value={tier}
+          aria-label="Filter by tier"
           onChange={(e) => {
             setPage(1);
             setTier(e.target.value as AccountListFilters['tier'] | '');
           }}
-          className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+          className="h-11 rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary/40 focus:ring-2 focus:ring-indigo-100"
         >
           <option value="">All tiers</option>
           {TIERS.map((t) => (
@@ -274,11 +276,12 @@ export default function AccountsPage(): ReactElement {
         </select>
         <select
           value={ownerId}
+          aria-label="Filter by owner"
           onChange={(e) => {
             setPage(1);
             setOwnerId(e.target.value);
           }}
-          className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+          className="h-11 rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary/40 focus:ring-2 focus:ring-indigo-100"
         >
           <option value="">All owners</option>
           {(users.data?.data ?? []).map((u) => (
@@ -291,15 +294,15 @@ export default function AccountsPage(): ReactElement {
       </section>
 
       {isLoading ? (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <div className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
           <TableSkeleton rows={8} cols={7} />
         </div>
       ) : isError ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+        <div className="rounded-lg border border-error/30 bg-error-container p-6 text-sm text-error">
           Failed to load: {error instanceof Error ? error.message : 'Unknown error'}
         </div>
       ) : accounts.length === 0 ? (
-        <div className="rounded-lg border border-slate-200 bg-white">
+        <div className="rounded-lg border border-outline-variant bg-surface">
           <EmptyState
             icon="🏢"
             title="No accounts yet"
@@ -308,7 +311,7 @@ export default function AccountsPage(): ReactElement {
           />
         </div>
       ) : viewMode === 'map' ? (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
           <AccountMapView
             accounts={accounts as AccountWithGeo[]}
             mapAccount={mapAccount}
@@ -316,15 +319,15 @@ export default function AccountsPage(): ReactElement {
           />
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-start text-xs uppercase tracking-wider text-slate-500">
+            <thead className="bg-surface-container-low text-start text-xs uppercase tracking-wider text-on-surface-variant">
               <tr>
                 <th className="px-4 py-2 w-8">
                   <input
                     type="checkbox"
                     aria-label="Select all"
-                    className="rounded border-slate-300"
+                    className="rounded border-outline-variant"
                     checked={accounts.length > 0 && selectedIds.length === accounts.length}
                     ref={(el) => {
                       if (el) el.indeterminate = selectedIds.length > 0 && selectedIds.length < accounts.length;
@@ -343,7 +346,7 @@ export default function AccountsPage(): ReactElement {
                 {accountCols.visibleKeys.includes('created') ? <th className="px-4 py-2">Created</th> : null}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-outline-variant">
               {accounts.map((a) => (
                 <tr
                   key={a.id}
@@ -351,13 +354,13 @@ export default function AccountsPage(): ReactElement {
                     setActive(a);
                     setTab('info');
                   }}
-                  className="cursor-pointer hover:bg-slate-50"
+                  className="cursor-pointer hover:bg-surface-container-low"
                 >
                   <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       aria-label={`Select ${a.name}`}
-                      className="rounded border-slate-300"
+                      className="rounded border-outline-variant"
                       checked={selectedIds.includes(a.id)}
                       onChange={(e) =>
                         setSelectedIds((prev) =>
@@ -367,7 +370,7 @@ export default function AccountsPage(): ReactElement {
                     />
                   </td>
                   {accountCols.visibleKeys.includes('name') ? (
-                    <td className="px-4 py-2 font-medium text-slate-900">
+                    <td className="px-4 py-2 font-medium text-on-surface">
                       <EditableCell value={a.name} onSave={(v) => updateAccount.mutate({ id: a.id, data: { name: v } })} disabled={!canUpdate}>
                         <Link
                           href={`/accounts/${a.id}`}
@@ -380,14 +383,14 @@ export default function AccountsPage(): ReactElement {
                     </td>
                   ) : null}
                   {accountCols.visibleKeys.includes('industry') ? (
-                    <td className="px-4 py-2 text-slate-600">
+                    <td className="px-4 py-2 text-on-surface-variant">
                       <EditableCell value={a.industry ?? ''} onSave={(v) => updateAccount.mutate({ id: a.id, data: { industry: v || undefined } })} disabled={!canUpdate}>
                         {a.industry ?? '—'}
                       </EditableCell>
                     </td>
                   ) : null}
                   {accountCols.visibleKeys.includes('arr') ? (
-                    <td className="px-4 py-2 text-slate-600">
+                    <td className="px-4 py-2 text-on-surface-variant">
                       <EditableCell
                         value={a.annualRevenue ? String(a.annualRevenue) : ''}
                         onSave={(v) => {
@@ -425,7 +428,7 @@ export default function AccountsPage(): ReactElement {
                     </td>
                   ) : null}
                   {accountCols.visibleKeys.includes('owner') ? (
-                    <td className="px-4 py-2 text-slate-600">
+                    <td className="px-4 py-2 text-on-surface-variant">
                       <EditableSelectCell
                         value={a.ownerId}
                         options={(users.data?.data ?? []).map((u) => ({ label: `${u.firstName} ${u.lastName}`, value: u.id }))}
@@ -449,14 +452,14 @@ export default function AccountsPage(): ReactElement {
                         onSave={(v) => updateAccount.mutate({ id: a.id, data: { status: v } })}
                         disabled={!canUpdate}
                       >
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
+                        <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] text-on-surface">
                           {a.status}
                         </span>
                       </EditableSelectCell>
                     </td>
                   ) : null}
                   {accountCols.visibleKeys.includes('created') ? (
-                    <td className="px-4 py-2 text-slate-500">
+                    <td className="px-4 py-2 text-on-surface-variant">
                       {formatDate(a.createdAt)}
                     </td>
                   ) : null}
@@ -466,14 +469,14 @@ export default function AccountsPage(): ReactElement {
           </table>
 
           {data ? (
-            <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
+            <div className="flex items-center justify-between border-t border-outline-variant px-4 py-2 text-xs text-on-surface-variant">
               <span>
                 Page {data.page} of {data.totalPages} · {data.total} total
               </span>
               <div className="flex gap-1">
                 <button
                   type="button"
-                  className="rounded border border-slate-200 px-2 py-1 disabled:opacity-50"
+                  className="rounded border border-outline-variant px-2 py-1 disabled:opacity-50"
                   disabled={!data.hasPrevPage}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                 >
@@ -481,7 +484,7 @@ export default function AccountsPage(): ReactElement {
                 </button>
                 <button
                   type="button"
-                  className="rounded border border-slate-200 px-2 py-1 disabled:opacity-50"
+                  className="rounded border border-outline-variant px-2 py-1 disabled:opacity-50"
                   disabled={!data.hasNextPage}
                   onClick={() => setPage((p) => p + 1)}
                 >
@@ -498,29 +501,29 @@ export default function AccountsPage(): ReactElement {
           <button
             type="button"
             aria-label="Close"
-            className="flex-1 bg-slate-900/50"
+            className="flex-1 bg-inverse-surface/50"
             onClick={() => setActive(null)}
           />
-          <aside className="flex w-full max-w-lg flex-col bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <aside className="flex w-full max-w-lg flex-col bg-surface shadow-xl">
+            <div className="flex items-center justify-between border-b border-outline-variant px-4 py-3">
               <div className="min-w-0">
-                <h2 className="truncate text-lg font-semibold text-slate-900">
+                <h2 className="truncate text-lg font-semibold text-on-surface">
                   {active.name}
                 </h2>
-                <p className="truncate text-xs text-slate-500">
+                <p className="truncate text-xs text-on-surface-variant">
                   {active.industry ?? 'No industry'} · {active.tier}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setActive(null)}
-                className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
+                className="rounded-md p-1.5 text-on-surface-variant hover:bg-surface-container-high"
               >
                 <XIcon size={16} />
               </button>
             </div>
 
-            <div className="flex gap-1 border-b border-slate-200 px-2">
+            <div className="flex gap-1 border-b border-outline-variant px-2">
               {(['info', 'contacts', 'deals', 'timeline'] as DetailTab[]).map(
                 (t) => (
                   <button
@@ -530,8 +533,8 @@ export default function AccountsPage(): ReactElement {
                     className={cn(
                       '-mb-px border-b-2 px-3 py-2 text-sm capitalize',
                       tab === t
-                        ? 'border-slate-900 font-semibold text-slate-900'
-                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                        ? 'border-outline font-semibold text-on-surface'
+                        : 'border-transparent text-on-surface-variant hover:text-on-surface'
                     )}
                   >
                     {t}
@@ -576,7 +579,7 @@ export default function AccountsPage(): ReactElement {
                   <InfoRow label="Updated" value={formatDate(active.updatedAt)} />
                 </div>
               ) : (
-                <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-xs text-slate-500">
+                <div className="rounded-md border border-dashed border-outline-variant bg-surface-container-low p-6 text-center text-xs text-on-surface-variant">
                   The <span className="font-medium">{tab}</span> tab pulls from
                   <code className="mx-1">
                     GET /accounts/{active.id}/{tab === 'timeline' ? 'timeline' : tab}
@@ -610,8 +613,8 @@ function InfoRow({
 }): ReactElement {
   return (
     <div className="flex items-start gap-2 py-1">
-      <div className="w-28 shrink-0 rounded bg-slate-50 p-1 text-xs text-slate-500">{label}</div>
-      <div className="flex-1 text-sm text-slate-800">{value}</div>
+      <div className="w-28 shrink-0 rounded bg-surface-container-low p-1 text-xs text-on-surface-variant">{label}</div>
+      <div className="flex-1 text-sm text-on-surface">{value}</div>
     </div>
   );
 }
@@ -632,19 +635,19 @@ function StatCard({
   const tones = {
     blue: {
       bar: 'from-indigo-500 to-cyan-400',
-      badge: 'border-indigo-100 bg-indigo-50 text-indigo-700',
+      badge: 'border-indigo-100 bg-primary-container text-primary',
     },
     emerald: {
       bar: 'from-emerald-500 to-teal-400',
-      badge: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+      badge: 'border-emerald-100 bg-success-container text-success',
     },
     amber: {
       bar: 'from-amber-500 to-orange-400',
-      badge: 'border-amber-100 bg-amber-50 text-amber-700',
+      badge: 'border-amber-100 bg-warning-container text-warning',
     },
     violet: {
       bar: 'from-violet-500 to-indigo-400',
-      badge: 'border-violet-100 bg-violet-50 text-violet-700',
+      badge: 'border-violet-100 bg-tertiary-container text-tertiary',
     },
   }[tone];
 
@@ -653,11 +656,11 @@ function StatCard({
       <div className={cn('h-1.5 bg-gradient-to-r', tones.bar)} />
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
-          <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
+          <p className="text-xs font-semibold uppercase text-on-surface-variant">{label}</p>
           <span className={cn('rounded-lg border p-2', tones.badge)}>{icon}</span>
         </div>
-        <p className="mt-3 text-2xl font-bold text-slate-950">{value}</p>
-        <p className="mt-1 text-sm text-slate-500">{note}</p>
+        <p className="mt-3 text-2xl font-bold text-on-surface">{value}</p>
+        <p className="mt-1 text-sm text-on-surface-variant">{note}</p>
       </div>
     </div>
   );

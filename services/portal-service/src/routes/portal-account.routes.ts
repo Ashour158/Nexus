@@ -1,33 +1,18 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
-import { verifyPortalSession, type PortalSession } from '../lib/portal-auth.js';
+import { requirePortalSession } from '../lib/portal-session-guard.js';
 import type { createPortalAccountService } from '../services/portal-account.service.js';
 
 /**
  * B9 logged-in portal-user surface. Two route groups:
  *
- *  - Public (`/portal/...`, JWT-bypassed via publicPrefixes): login + the
- *    account-scoped read/accept surfaces, guarded by a portal SESSION bearer
- *    token (verified here, distinct from the end-user JWT).
+ *  - Public (`/portal/...`, JWT-bypassed via publicPrefixes): login, invite
+ *    accept, and the account-scoped read/accept surfaces, guarded by a portal
+ *    SESSION bearer token (verified here, distinct from the end-user JWT).
  *  - Admin (`/api/v1/portal/users`, end-user JWT + SETTINGS perm): provision /
- *    list / deactivate portal users.
+ *    invite / list / disable portal users.
  */
-function readPortalSession(request: FastifyRequest): PortalSession | null {
-  const auth = request.headers['authorization'];
-  if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) return null;
-  return verifyPortalSession(auth.slice('Bearer '.length).trim());
-}
-
-function requirePortalSession(request: FastifyRequest, reply: FastifyReply): PortalSession | null {
-  const session = readPortalSession(request);
-  if (!session) {
-    reply.code(401).send({ success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid or expired portal session', requestId: request.id } });
-    return null;
-  }
-  return session;
-}
-
 export async function registerPortalAccountRoutes(
   app: FastifyInstance,
   account: ReturnType<typeof createPortalAccountService>
@@ -40,6 +25,20 @@ export async function registerPortalAccountRoutes(
       return reply.code(401).send({ success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password', requestId: request.id } });
     }
     return reply.send({ success: true, data: result });
+  });
+
+  // Invite acceptance is performed by the (as-yet unauthenticated) external
+  // invitee, so it lives on the PUBLIC `/portal/` prefix and is gated by the
+  // single-use invite token itself rather than a session/JWT. It marks the user
+  // ACTIVE; setting an actual credential remains a documented out-of-scope hook.
+  app.post('/portal/invite/accept', async (request, reply) => {
+    const body = z.object({ inviteToken: z.string().min(1) }).parse(request.body);
+    const result = await account.acceptInvite(body.inviteToken);
+    if (!result.ok) {
+      const status = result.code === 'NOT_FOUND' ? 404 : 409;
+      return reply.code(status).send({ success: false, error: { code: result.code, message: result.message, requestId: request.id } });
+    }
+    return reply.send({ success: true, data: result.data });
   });
 
   app.get('/portal/me', async (request, reply) => {
@@ -93,12 +92,31 @@ export async function registerPortalAccountRoutes(
     const body = z
       .object({
         accountId: z.string().min(1),
+        contactId: z.string().nullable().optional(),
         email: z.string().email(),
         name: z.string().nullable().optional(),
+        portalRole: z.enum(['customer', 'partner']).optional(),
         password: z.string().min(8),
       })
       .parse(request.body);
     return reply.code(201).send({ success: true, data: await account.createUser(tenantId, body) });
+  });
+
+  // Invite an external portal user (INVITED status + single-use invite token,
+  // no password). Returns the raw inviteToken exactly once (email delivery is a
+  // documented out-of-scope hook).
+  app.post('/api/v1/portal/users/invite', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+    const user = (request as unknown as { user: { tenantId: string; sub: string } }).user;
+    const body = z
+      .object({
+        accountId: z.string().min(1),
+        contactId: z.string().nullable().optional(),
+        email: z.string().email(),
+        name: z.string().nullable().optional(),
+        portalRole: z.enum(['customer', 'partner']).default('customer'),
+      })
+      .parse(request.body);
+    return reply.code(201).send({ success: true, data: await account.inviteUser(user.tenantId, user.sub, body) });
   });
 
   app.get('/api/v1/portal/users', { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) }, async (request, reply) => {
@@ -107,9 +125,13 @@ export async function registerPortalAccountRoutes(
     return reply.send({ success: true, data: await account.listUsers(tenantId, query.accountId) });
   });
 
-  app.delete('/api/v1/portal/users/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, async (request, reply) => {
+  // Disable a portal user (status=DISABLED, blocks login). DELETE kept for
+  // backwards-compat; POST /:id/disable is the explicit verb.
+  const disableHandler = async (request: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply) => {
     const tenantId = (request as unknown as { user: { tenantId: string } }).user.tenantId;
     const { id } = z.object({ id: z.string().cuid() }).parse(request.params);
-    return reply.send({ success: true, data: await account.deactivateUser(tenantId, id) });
-  });
+    return reply.send({ success: true, data: await account.disableUser(tenantId, id) });
+  };
+  app.delete('/api/v1/portal/users/:id', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, disableHandler);
+  app.post('/api/v1/portal/users/:id/disable', { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) }, disableHandler);
 }

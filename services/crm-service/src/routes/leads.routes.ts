@@ -24,6 +24,7 @@ import { getFieldHistory } from '../lib/field-history.js';
 import { uploadToStorage } from '../lib/storage.js';
 import { createSalesRecordsUseCase } from '../use-cases/sales-records.use-case.js';
 import { buildReadAccessContext } from '../lib/access-context.js';
+import { resolveAssignee } from '../lib/assignment.js';
 import { withIdempotency } from '../lib/idempotency.js';
 import type { EngineContext } from '@nexus/domain-core';
 
@@ -157,13 +158,22 @@ export async function registerLeadsRoutes(
           }
           const jwt = request.user as JwtPayload;
           const force = (request.query as Record<string, string>)?.force === 'true';
+          // Assignment Rules (opt-in): when the caller did NOT explicitly supply
+          // an ownerId and an active rule assigns one, auto-assign. An explicitly
+          // supplied ownerId is never overridden.
+          const createData = parsed.data as Record<string, unknown>;
+          const explicitOwner = Boolean((request.body as Record<string, unknown> | undefined)?.ownerId);
+          if (!explicitOwner) {
+            const assignee = await resolveAssignee(prisma, jwt.tenantId, 'lead', createData);
+            if (assignee) createData.ownerId = assignee;
+          }
           try {
             // ConflictError (duplicate) propagates OUT of withIdempotency and is
             // handled below — it is never persisted, so a later retry re-runs.
             const { statusCode, body } = await withIdempotency(prisma, request, jwt.tenantId, async () => {
               const lead = await salesRecords.create(engineContextFromJwt(request.id, jwt), {
                 entityType: 'lead',
-                data: parsed.data as Record<string, unknown>,
+                data: createData,
                 force,
               });
               return { statusCode: 201, body: { success: true, data: lead } };

@@ -782,6 +782,102 @@ model ReviewProcessConfig {
   @@index([tenantId, module])
 }
 
+// ─── Data Governance: record-level access control (Zoho "Data Sharing") ───────
+// All models below are ADDITIVE and OPT-IN. Enforcement (lib/sharing.ts,
+// lib/record-lock.ts) is skipped entirely for a (tenant, module) that has no
+// OrgWideDefault and no SharingRule, so unconfigured tenants keep today's
+// behavior (fail-open / permissive).
+
+// Org-Wide Default sharing per module. Absence of a row ⇒ PUBLIC_READ_WRITE
+// (fail-open). accessLevel ∈ {PRIVATE, PUBLIC_READ, PUBLIC_READ_WRITE};
+// module ∈ {account, contact, deal, lead}.
+model OrgWideDefault {
+  id                   String   @id @default(cuid())
+  tenantId             String
+  module               String
+  accessLevel          String
+  grantHierarchyAccess Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([tenantId, module])
+  @@unique([id, tenantId])
+  @@index([tenantId, module])
+}
+
+// A rule that GRANTS access (READ | READ_WRITE) on records owned by `source`
+// to members of `target`. sourceType/targetType ∈ {ROLE, GROUP, TERRITORY,
+// OWNER, USER}. Rules only add access on top of the OrgWideDefault.
+model SharingRule {
+  id          String   @id @default(cuid())
+  tenantId    String
+  module      String
+  name        String
+  sourceType  String
+  sourceValue String
+  targetType  String
+  targetValue String
+  accessLevel String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@unique([id, tenantId])
+  @@index([tenantId, module, isActive])
+}
+
+// Zoho "manual sharing" — an explicit per-record grant to a user or role.
+// granteeType ∈ {USER, ROLE}; accessLevel ∈ {READ, READ_WRITE}.
+model ManualShare {
+  id          String   @id @default(cuid())
+  tenantId    String
+  module      String
+  recordId    String
+  granteeType String
+  granteeId   String
+  accessLevel String
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  @@unique([id, tenantId])
+  @@index([tenantId, module, recordId])
+}
+
+// Record locking (Zoho "record locking" / lock-on-approval). An active lock is
+// one with unlockedAt = null; there is at most one active lock per record
+// (enforced in application logic). Only ADMIN or the locker may unlock.
+model RecordLock {
+  id         String    @id @default(cuid())
+  tenantId   String
+  module     String
+  recordId   String
+  reason     String?
+  lockedBy   String
+  lockedAt   DateTime  @default(now())
+  unlockedAt DateTime?
+
+  @@unique([id, tenantId])
+  @@index([tenantId, module, recordId, unlockedAt])
+}
+
+// Assignment Rules (Zoho "Assignment Rules"). strategy ∈ {ROUND_ROBIN,
+// LOAD_BALANCED, CRITERIA}; module ∈ {lead, deal, account, contact}. `cursor`
+// persists round-robin position across invocations.
+model AssignmentRule {
+  id           String   @id @default(cuid())
+  tenantId     String
+  module       String
+  name         String
+  strategy     String
+  criteria     Json?
+  assigneePool String[]
+  isActive     Boolean  @default(true)
+  cursor       Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@unique([id, tenantId])
+  @@index([tenantId, module, isActive])
+}
+
 model Activity {
   id           String           @id @default(cuid())
   tenantId     String

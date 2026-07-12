@@ -28,6 +28,9 @@ import { uploadToStorage } from '../lib/storage.js';
 import { createSalesRecordsUseCase } from '../use-cases/sales-records.use-case.js';
 import { buildReadAccessContext } from '../lib/access-context.js';
 import { interceptForReview } from '../lib/review-process.js';
+import { guardRecordWrite } from '../lib/record-write-guard.js';
+import { canAccessRecord, filterReadableRecords, isSharingConfigured } from '../lib/sharing.js';
+import { resolveAssignee } from '../lib/assignment.js';
 import { withIdempotency } from '../lib/idempotency.js';
 import type { EngineContext } from '@nexus/domain-core';
 
@@ -165,7 +168,15 @@ export async function registerDealsRoutes(
             sortBy: q.sortBy as import('../services/deals.service.js').DealListPagination['sortBy'],
             sortDir: q.sortDir,
           }, access);
-          return reply.send({ success: true, data: result });
+          // Record-level sharing (opt-in): drop rows the caller cannot read.
+          const filtered = await filterReadableRecords(
+            prisma,
+            jwt.tenantId,
+            jwt,
+            'deal',
+            result.data as unknown as Record<string, unknown>[]
+          );
+          return reply.send({ success: true, data: { ...result, data: filtered } });
         }
       );
 
@@ -179,10 +190,19 @@ export async function registerDealsRoutes(
             throw new ValidationError('Invalid body', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
+          // Assignment Rules (opt-in): when the caller did NOT explicitly supply
+          // an ownerId and an active rule assigns one, auto-assign. An explicitly
+          // supplied ownerId is never overridden.
+          const createData = parsed.data as Record<string, unknown>;
+          const explicitOwner = Boolean((request.body as Record<string, unknown> | undefined)?.ownerId);
+          if (!explicitOwner) {
+            const assignee = await resolveAssignee(prisma, jwt.tenantId, 'deal', createData);
+            if (assignee) createData.ownerId = assignee;
+          }
           const { statusCode, body } = await withIdempotency(prisma, request, jwt.tenantId, async () => {
             const deal = await salesRecords.create(engineContextFromJwt(request.id, jwt), {
               entityType: 'deal',
-              data: parsed.data as Record<string, unknown>,
+              data: createData,
             });
             return { statusCode: 201, body: { success: true, data: deal } };
           });
@@ -565,6 +585,13 @@ export async function registerDealsRoutes(
           const jwt = request.user as JwtPayload;
           const access = await buildReadAccessContext(jwt, 'deal', request.headers.authorization);
           const deal = await deals.getDealById(jwt.tenantId, id, access);
+          // Record-level sharing (opt-in): deny read if not accessible.
+          if (deal && (await isSharingConfigured(prisma, jwt.tenantId, 'deal'))) {
+            const allowed = await canAccessRecord(prisma, jwt.tenantId, jwt, 'deal', deal as unknown as Record<string, unknown>, 'read');
+            if (!allowed) {
+              return reply.code(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'You do not have read access to this record', requestId: request.id } });
+            }
+          }
           return reply.send({ success: true, data: deal });
         }
       );
@@ -580,6 +607,11 @@ export async function registerDealsRoutes(
             throw new ValidationError('Invalid body', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
+          // Data-governance guard (opt-in): record lock (423) → sharing write (403).
+          const guard = await guardRecordWrite(prisma, jwt, 'deal', id);
+          if (!guard.ok) {
+            return reply.code(guard.status).send({ success: false, error: { code: guard.code, message: guard.message, requestId: request.id } });
+          }
           // Maker-checker: if a review process gates any edited field, divert the
           // whole change into a PendingChange and return 202 instead of writing.
           const review = await interceptForReview(prisma, {

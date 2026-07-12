@@ -40,6 +40,9 @@ import { registerQuotasRoutes } from './quotas.routes.js';
 import { registerFollowersRoutes } from './followers.routes.js';
 import { registerSavedViewsRoutes } from './saved-views.routes.js';
 import { registerDataQualityRoutes } from './data-quality.routes.js';
+import { registerSharingRoutes } from './sharing.routes.js';
+import { registerRecordLocksRoutes } from './record-locks.routes.js';
+import { registerAssignmentRulesRoutes } from './assignment-rules.routes.js';
 
 /**
  * Registers every CRM HTTP route under `/api/v1` — Section 34.2 + 34.3.
@@ -88,4 +91,7 @@ export async function registerAllRoutes(
   await registerFollowersRoutes(app, prisma);
   await registerSavedViewsRoutes(app, prisma);
   await registerDataQualityRoutes(app, prisma);
+  await registerSharingRoutes(app, prisma);
+  await registerRecordLocksRoutes(app, prisma);
+  await registerAssignmentRulesRoutes(app, prisma, producer);
 }

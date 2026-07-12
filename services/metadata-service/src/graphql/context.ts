@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../../../../node_modules/.prisma/metadata-client/index.js';
 import DataLoader from 'dataloader';
 import { verifyBearerToken } from '@nexus/service-utils';
 

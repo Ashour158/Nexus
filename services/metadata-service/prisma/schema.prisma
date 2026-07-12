@@ -318,6 +318,73 @@ model FeatureFlag {
   @@unique([id, tenantId])
 }
 
+// ─── Page Layouts + Layout Rules (Zoho-parity dynamic layouts) ───────────────
+// Additive, tenant-scoped. Admins define per-module page layouts (ordered
+// sections → fields/columns), assign them to profiles (role names), and attach
+// conditional Layout Rules that show/hide/require fields & sections based on the
+// live record's field values. Unconfigured module => today's behavior (the UI
+// falls back to its static layout when /layouts/resolve returns nothing).
+
+model PageLayout {
+  id               String   @id @default(cuid())
+  tenantId         String
+  module           String
+  name             String
+  isDefault        Boolean  @default(false)
+  // Role names this layout is assigned to. Empty => not profile-restricted.
+  assignedProfiles String[] @default([])
+  // Ordered sections: [{ id?, title, columns, fields: [fieldApiName], ... }]
+  sections         Json     @default("[]")
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  rules            LayoutRule[]
+
+  @@index([tenantId, module])
+  @@unique([id, tenantId])
+}
+
+model LayoutRule {
+  id           String   @id @default(cuid())
+  tenantId     String
+  layoutId     String
+  layout       PageLayout @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+  name         String
+  triggerField String
+  // eq|ne|in|gt|lt|is_empty|is_not_empty
+  operator     String
+  triggerValue Json?
+  // Ordered list of { type: SHOW_FIELD|HIDE_FIELD|SHOW_SECTION|HIDE_SECTION|
+  //                        REQUIRE_FIELD|SET_READONLY, target }
+  actions      Json     @default("[]")
+  position     Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([tenantId, layoutId])
+  @@unique([id, tenantId])
+}
+
+model RelatedListConfig {
+  id                String   @id @default(cuid())
+  tenantId          String
+  module            String
+  name              String
+  relatedModule     String
+  displayFields     String[] @default([])
+  sortBy            String?
+  visibleToProfiles String[] @default([])
+  sortOrder         Int      @default(0)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([tenantId, module])
+  @@unique([id, tenantId])
+}
+
 model CodingAllocationLog {
   id               String   @id @default(cuid())
   tenantId         String

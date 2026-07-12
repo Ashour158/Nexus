@@ -26,6 +26,8 @@ import { startScheduleTrigger } from './services/schedule-trigger.js';
 import { startJourneyEnrollmentConsumer } from './consumers/journey-enrollment.consumer.js';
 import { startJourneyScheduler } from './services/journey-engine.js';
 import { startScheduledActionPoller } from './services/scheduled-actions.service.js';
+import { startEscalationPoller } from './services/escalation.js';
+import { startRecordScoringConsumer } from './consumers/record-scoring.consumer.js';
 import { createExecutionsService } from './services/executions.service.js';
 import { registerGraphQL } from './graphql/index.js';
 
@@ -95,6 +97,7 @@ let gdprConsumer: Awaited<ReturnType<typeof startGdprConsumer>> | null = null;
 let journeyEnrollmentConsumer: Awaited<ReturnType<typeof startJourneyEnrollmentConsumer>> | null = null;
 let automationConsumer: Awaited<ReturnType<typeof startAutomationConsumer>> | null = null;
 let automationDlqReplayConsumer: Awaited<ReturnType<typeof startAutomationDlqReplayConsumer>> | null = null;
+let recordScoringConsumer: Awaited<ReturnType<typeof startRecordScoringConsumer>> | null = null;
 try {
   await producer.connect();
   await startTriggerConsumer(prisma, producer);
@@ -116,6 +119,12 @@ try {
   branchConsumer = await startBranchConsumer(prisma, producer);
   approvalConsumer = await startApprovalConsumer(prisma, producer, app.log);
   gdprConsumer = await startGdprConsumer(prisma);
+  // WF-DEPTH scoring + threshold-alert consumer — fail-open, never blocks the rest.
+  try {
+    recordScoringConsumer = await startRecordScoringConsumer(prisma, producer, app.log);
+  } catch (err) {
+    app.log.warn({ err }, 'Record-scoring consumer failed to start');
+  }
   // CommandCenter auto-enrollment — fail-open, never blocks the other consumers.
   try {
     journeyEnrollmentConsumer = await startJourneyEnrollmentConsumer(prisma, producer, app.log);
@@ -134,6 +143,7 @@ app.addHook('onClose', async () => {
   try { await journeyEnrollmentConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Journey enrollment consumer disconnect failed'); }
   try { await automationConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Automation-rules consumer disconnect failed'); }
   try { await automationDlqReplayConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Automation DLQ replay consumer disconnect failed'); }
+  try { await recordScoringConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Record-scoring consumer disconnect failed'); }
   try { await producer.disconnect(); } catch (err) { app.log.warn({ err }, 'Producer disconnect failed'); }
 });
 
@@ -178,6 +188,11 @@ startJourneyScheduler(prisma, producer, app.log);
 // producer so NOTIFY/EMAIL actions can publish. Tick interval configurable via
 // SCHEDULED_ACTION_TICK_MS (default 30 s).
 startScheduledActionPoller(prisma, producer, app.log);
+
+// WF-DEPTH — Escalation Rules: walk ACTIVE EscalationInstances up their tier
+// ladder, firing each tier's action at its due time. Tick interval configurable
+// via ESCALATION_TICK_MS (default 60 s).
+startEscalationPoller(prisma, producer, app.log);
 
 await registerGraphQL(app, prisma);
 

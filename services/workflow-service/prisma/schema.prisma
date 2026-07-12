@@ -463,3 +463,141 @@ model SlaBreach {
   @@index([slaId, entityId])
   @@unique([id, tenantId])
 }
+
+// ─── Escalation Rules (Zoho "Escalation Rules" — time-based, tiered) ─────────
+//
+// A tiered, time-based escalation ladder for a module. When a record needs
+// watching (e.g. an unanswered case / an unattended high-value deal), an
+// EscalationInstance is opened; a poller walks it up the `tiers` ladder, firing
+// each tier's action at its `afterMinutes` mark (measured from `startedAt`).
+// Resolving the instance (record replied / closed) stops the ladder.
+model EscalationRule {
+  id                String               @id @default(cuid())
+  tenantId          String
+  module            String               // deal | lead | ticket | activity | ...
+  name              String
+  // Optional [{ field, operator, value }] filter — advisory metadata used when an
+  // instance is opened (the caller/consumer decides eligibility). AND-combined.
+  criteria          Json?
+  // Ordered ladder: [{ afterMinutes, action: NOTIFY|REASSIGN|SET_FIELD|CREATE_TASK,
+  //                    target, params }]. `afterMinutes` is measured from startedAt.
+  tiers             Json                 @default("[]")
+  // When true, tier fire times are shifted into the next business-hours window.
+  businessHoursOnly Boolean              @default(false)
+  isActive          Boolean              @default(true)
+  createdBy         String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  instances         EscalationInstance[]
+
+  @@index([tenantId, module, isActive])
+  @@unique([id, tenantId])
+}
+
+// A single record's progress up an EscalationRule ladder. `nextFireAt` is the due
+// time of `currentTier`; the poller fires it, advances the tier, and marks
+// COMPLETED after the last tier. RESOLVED = stopped early (record replied/closed).
+model EscalationInstance {
+  id          String         @id @default(cuid())
+  tenantId    String
+  ruleId      String
+  rule        EscalationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  module      String
+  recordId    String
+  // Snapshot of the record used to resolve action targets/fields at fire time.
+  recordData  Json           @default("{}")
+  startedAt   DateTime       @default(now())
+  currentTier Int            @default(0)
+  nextFireAt  DateTime
+  resolvedAt  DateTime?
+  status      String         @default("ACTIVE") // ACTIVE | RESOLVED | COMPLETED
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([status, nextFireAt])
+  @@index([tenantId, module, recordId])
+  @@index([tenantId, ruleId])
+  @@unique([id, tenantId])
+}
+
+// ─── Scoring Rules Engine (configurable record scoring) ─────────────────────
+//
+// Admin-configured scoring for leads/deals/contacts/accounts. Each rule carries
+// conditions with positive/negative points; the engine sums the points of matched
+// conditions into a RecordScore. Recomputed on demand or automatically when a
+// relevant record event arrives.
+model ScoringRule {
+  id         String   @id @default(cuid())
+  tenantId   String
+  module     String   // lead | deal | contact | account
+  name       String
+  // [{ field, operator, value, points }] — each matched condition adds `points`
+  // (may be negative). Uses the same operator set as automation-rule conditions.
+  conditions Json     @default("[]")
+  isActive   Boolean  @default(true)
+  createdBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([tenantId, module, isActive])
+  @@unique([id, tenantId])
+}
+
+// Materialised score for a single record (one row per tenant+module+record).
+model RecordScore {
+  id        String   @id @default(cuid())
+  tenantId  String
+  module    String
+  recordId  String
+  score     Int      @default(0)
+  // [{ ruleId, ruleName, field, operator, value, points }] — the matched
+  // conditions that contributed to `score`.
+  breakdown Json     @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, module, recordId])
+  @@index([tenantId, module])
+}
+
+// ─── Threshold / Big-Deal Alerts ────────────────────────────────────────────
+//
+// Fire a notification to roles/users when a record field crosses a threshold
+// (e.g. Deal.amount >= 100000). Evaluated on record events; deduped so it fires
+// once per crossing (see ThresholdAlertState) rather than on every subsequent
+// event while the record remains over the line.
+model ThresholdAlert {
+  id          String               @id @default(cuid())
+  tenantId    String
+  module      String
+  name        String
+  field       String
+  operator    String               // eq | neq | gt | gte | lt | lte | contains | ...
+  value       Json
+  notifyRoles String[]             @default([])
+  notifyUsers String[]             @default([])
+  isActive    Boolean              @default(true)
+  createdBy   String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  states      ThresholdAlertState[]
+
+  @@index([tenantId, module, isActive])
+  @@unique([id, tenantId])
+}
+
+// Last-known crossing state per (alert, record) — the fired-marker that makes a
+// threshold alert fire once per crossing (edge-triggered), not on every event.
+model ThresholdAlertState {
+  id         String         @id @default(cuid())
+  tenantId   String
+  alertId    String
+  alert      ThresholdAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  recordId   String
+  crossed    Boolean        @default(false)
+  lastFiredAt DateTime?
+  updatedAt  DateTime       @updatedAt
+
+  @@unique([alertId, recordId])
+  @@index([tenantId, alertId])
+}

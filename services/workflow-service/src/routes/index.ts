@@ -7,6 +7,9 @@ import { registerJourneysRoutes } from './journeys.routes.js';
 import { registerCommandJourneysRoutes } from './command-journeys.routes.js';
 import { registerSlaRoutes } from './sla.routes.js';
 import { registerAutomationRulesRoutes } from './automation-rules.routes.js';
+import { registerEscalationRulesRoutes } from './escalation-rules.routes.js';
+import { registerScoringRulesRoutes } from './scoring-rules.routes.js';
+import { registerThresholdAlertsRoutes } from './threshold-alerts.routes.js';
 
 export async function registerRoutes(
   app: FastifyInstance,
@@ -19,4 +22,7 @@ export async function registerRoutes(
   await registerCommandJourneysRoutes(app, prisma, producer);
   await registerSlaRoutes(app, prisma);
   await registerAutomationRulesRoutes(app, prisma);
+  await registerEscalationRulesRoutes(app, prisma);
+  await registerScoringRulesRoutes(app, prisma);
+  await registerThresholdAlertsRoutes(app, prisma);
 }

@@ -2,7 +2,11 @@ import { BusinessRuleError, NotFoundError } from '@nexus/service-utils';
 import type { EmailTemplate, SmsTemplate } from '../../../../node_modules/.prisma/comm-client/index.js';
 import type { CommPrisma } from '../prisma.js';
 
-const VAR_RE = /\{\{(\w+)\}\}/g;
+// Tokens allow dotted paths (`{{deal.name}}`, `{{user.email}}`) as well as the
+// legacy single-word form (`{{firstName}}`). `[\w.]+` matches both, so existing
+// email templates keep rendering unchanged while the Template Designer's
+// merge-field catalog (dotted tokens) is supported too.
+const VAR_RE = /\{\{([\w.]+)\}\}/g;
 
 export function extractVariableNames(...sources: string[]): string[] {
   const names = new Set<string>();
@@ -15,6 +19,33 @@ export function extractVariableNames(...sources: string[]): string[] {
   }
   return [...names];
 }
+
+/**
+ * Single-pass token substitution shared by every renderer in this service.
+ *
+ * It is deliberately NOT recursive: replacement values are substituted once and
+ * never re-scanned, so a value that itself contains `{{...}}` cannot trigger
+ * further expansion (no template-injection amplification, no unbounded
+ * recursion). Reuse this — do not hand-roll a second substitution loop.
+ */
+function applyTokens(
+  source: string,
+  variables: Record<string, string>,
+  fill: string | undefined
+): string {
+  return source.replace(/\{\{([\w.]+)\}\}/g, (_, key: string) => {
+    const v = variables[key];
+    if (v !== undefined) return v;
+    return fill ?? '';
+  });
+}
+
+/**
+ * The `type` discriminator for a designer-managed template row. Stored in
+ * `EmailTemplate.type` (default `EMAIL`).
+ */
+export const TEMPLATE_TYPES = ['EMAIL', 'SMS', 'DOCUMENT'] as const;
+export type TemplateType = (typeof TEMPLATE_TYPES)[number];
 
 export function createTemplatesService(prisma: CommPrisma) {
   async function loadEmailOrThrow(tenantId: string, id: string): Promise<EmailTemplate> {
@@ -113,16 +144,29 @@ export function createTemplatesService(prisma: CommPrisma) {
       if (missing.length) {
         throw new BusinessRuleError(`Missing template variables: ${missing.join(', ')}`);
       }
-      const apply = (s: string) =>
-        s.replace(/\{\{(\w+)\}\}/g, (_, key: string) => {
-          const v = variables[key];
-          if (v !== undefined) return v;
-          return fill ?? '';
-        });
       return {
-        subject: apply(template.subject),
-        htmlBody: apply(template.htmlBody),
-        textBody: apply(template.textBody),
+        subject: applyTokens(template.subject, variables, fill),
+        htmlBody: applyTokens(template.htmlBody, variables, fill),
+        textBody: applyTokens(template.textBody, variables, fill),
+      };
+    },
+
+    /**
+     * Render an arbitrary (unsaved) subject/body pair through the shared engine.
+     * Powers the Template Designer's live preview: content need not be persisted
+     * first. Missing tokens are always filled (never throws on missing vars) so a
+     * half-written template still previews cleanly. Uses {@link applyTokens} —
+     * the same single-pass, non-recursive substitution as `renderTemplate`.
+     */
+    renderContent(
+      content: { subject?: string; body: string },
+      variables: Record<string, string>,
+      options?: { fillMissingWith?: string }
+    ): { subject: string; html: string } {
+      const fill = options?.fillMissingWith ?? '';
+      return {
+        subject: applyTokens(content.subject ?? '', variables, fill),
+        html: applyTokens(content.body, variables, fill),
       };
     },
 
@@ -183,7 +227,100 @@ export function createTemplatesService(prisma: CommPrisma) {
       if (missing.length) {
         throw new BusinessRuleError(`Missing template variables: ${missing.join(', ')}`);
       }
-      return template.body.replace(/\{\{(\w+)\}\}/g, (_, key: string) => variables[key] ?? '');
+      return applyTokens(template.body, variables, undefined);
+    },
+
+    // ── Unified Template Designer CRUD (EMAIL | SMS | DOCUMENT) ───────────────
+    // These operate on the EmailTemplate model as the general template store,
+    // discriminated by `type`. Legacy /templates/email and /templates/sms
+    // endpoints remain for backward compat; the designer uses these.
+
+    async createTemplate(
+      tenantId: string,
+      data: {
+        name: string;
+        type?: TemplateType;
+        module?: string | null;
+        subject?: string;
+        body: string;
+        textBody?: string;
+        category?: string;
+        isActive?: boolean;
+      }
+    ): Promise<EmailTemplate> {
+      const subject = data.subject ?? '';
+      const htmlBody = data.body;
+      const textBody = data.textBody ?? '';
+      const variables = extractVariableNames(subject, htmlBody, textBody);
+      return prisma.emailTemplate.create({
+        data: {
+          tenantId,
+          name: data.name,
+          type: data.type ?? 'EMAIL',
+          module: data.module ?? null,
+          subject,
+          htmlBody,
+          textBody,
+          variables,
+          category: data.category ?? 'GENERAL',
+          ...(typeof data.isActive === 'boolean' ? { isActive: data.isActive } : {}),
+        },
+      });
+    },
+
+    async updateTemplate(
+      tenantId: string,
+      id: string,
+      data: Partial<{
+        name: string;
+        type: TemplateType;
+        module: string | null;
+        subject: string;
+        body: string;
+        textBody: string;
+        category: string;
+        isActive: boolean;
+      }>
+    ): Promise<EmailTemplate> {
+      const cur = await loadEmailOrThrow(tenantId, id);
+      const subject = data.subject ?? cur.subject;
+      const htmlBody = data.body ?? cur.htmlBody;
+      const textBody = data.textBody ?? cur.textBody;
+      const variables = extractVariableNames(subject, htmlBody, textBody);
+      const { body: _body, ...rest } = data;
+      return prisma.emailTemplate.update({
+        where: { id },
+        data: {
+          ...rest,
+          ...(data.body !== undefined ? { htmlBody } : {}),
+          variables,
+        },
+      });
+    },
+
+    async deleteTemplate(tenantId: string, id: string): Promise<void> {
+      await loadEmailOrThrow(tenantId, id);
+      await prisma.emailTemplate.delete({ where: { id } });
+    },
+
+    async getTemplateById(tenantId: string, id: string): Promise<EmailTemplate> {
+      return loadEmailOrThrow(tenantId, id);
+    },
+
+    async listTemplates(
+      tenantId: string,
+      filters: { type?: TemplateType; module?: string; category?: string; isActive?: boolean }
+    ): Promise<EmailTemplate[]> {
+      return prisma.emailTemplate.findMany({
+        where: {
+          tenantId,
+          ...(filters.type ? { type: filters.type } : {}),
+          ...(filters.module ? { module: filters.module } : {}),
+          ...(filters.category ? { category: filters.category } : {}),
+          ...(typeof filters.isActive === 'boolean' ? { isActive: filters.isActive } : {}),
+        },
+        orderBy: { updatedAt: 'desc' },
+      });
     },
   };
 }

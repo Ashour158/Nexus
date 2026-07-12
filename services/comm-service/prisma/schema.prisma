@@ -8,13 +8,23 @@ datasource db {
   url      = env("COMM_DATABASE_URL")
 }
 
+/// Unified template store for the WYSIWYG Template Designer. Despite the
+/// legacy name, a row can represent an EMAIL, SMS, or DOCUMENT template via the
+/// `type` discriminator. Existing email rows keep `type = "EMAIL"` (the
+/// default) and are unaffected. `subject`/`textBody` carry `@default("")` so
+/// DOCUMENT/SMS rows that only need an HTML `htmlBody` can be created without
+/// them; pre-existing rows already hold their own values.
 model EmailTemplate {
   id        String   @id @default(cuid())
   tenantId  String
   name      String
-  subject   String
+  /// EMAIL | SMS | DOCUMENT
+  type      String   @default("EMAIL")
+  /// Target CRM module for merge fields: lead | contact | account | deal | quote
+  module    String?
+  subject   String   @default("")
   htmlBody  String   @db.Text
-  textBody  String   @db.Text
+  textBody  String   @default("") @db.Text
   variables String[]
   category  String   @default("GENERAL")
   isActive  Boolean  @default(true)
@@ -22,6 +32,7 @@ model EmailTemplate {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId])
+  @@index([tenantId, type])
   @@unique([id, tenantId])
 }
 

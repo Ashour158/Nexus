@@ -97,6 +97,16 @@ export async function startTriggerConsumer(
   consumer.on('quote.sent', onEvent);
   consumer.on('quote.accepted', onEvent);
   consumer.on('quote.rejected', onEvent);
+  consumer.on('contact.created', onEvent);
+  consumer.on('contact.updated', onEvent);
+  consumer.on('contact.archived', onEvent);
+  consumer.on('contact.merged', onEvent);
+  consumer.on('contact.restored', onEvent);
+  consumer.on('account.created', onEvent);
+  consumer.on('account.updated', onEvent);
+  consumer.on('account.archived', onEvent);
+  consumer.on('account.merged', onEvent);
+  consumer.on('account.restored', onEvent);
   consumer.on('approval.request.approved', onEvent);
   consumer.on('approval.request.rejected', onEvent);
 

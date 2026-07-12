@@ -1074,7 +1074,12 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
     if (command.entity === 'quote' && command.action === 'SEND_TO_CUSTOMER') {
       const quote = await prisma.quote.findFirst({ where: { id: command.entityId, tenantId: command.tenantId } });
       if (!quote) throw new NotFoundError('Quote', command.entityId);
-      if (!['APPROVED'].includes(quote.status)) {
+      // Sendable when APPROVED, or when it's a plain DRAFT that never required
+      // approval. Previously a no-approval-needed quote was stuck in DRAFT forever
+      // (submit-for-approval no-ops with no matrix rule, and send demanded APPROVED)
+      // — deadlocking quote-to-cash for the common case.
+      const sendableDraft = quote.status === 'DRAFT' && !quote.approvalRequired;
+      if (quote.status !== 'APPROVED' && !sendableDraft) {
         throw new BusinessRuleError(`Quote cannot be sent before approval (current: ${quote.status})`);
       }
       if (quote.expiresAt && quote.expiresAt.getTime() <= ctxDate(command).getTime()) {

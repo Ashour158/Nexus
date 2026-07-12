@@ -1,11 +1,25 @@
 import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
+
+// Flags for the system Chromium the image ships (Alpine `chromium`, at
+// CHROMIUM_PATH=/usr/bin/chromium-browser). The previous config used
+// @sparticuz/chromium's AWS-Lambda-tuned args against that Alpine binary, which
+// crashed the browser on launch (`TargetCloseError: Target closed`). These are the
+// standard containerized-Chromium flags: no sandbox (we run unprivileged), and no
+// reliance on /dev/shm (tiny in containers) so the tab process doesn't get killed.
+const CHROMIUM_ARGS = [
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-dev-shm-usage',
+  '--disable-gpu',
+  '--no-zygote',
+  '--font-render-hinting=none',
+];
 
 export async function generatePDF(html: string): Promise<Buffer> {
   const browser = await puppeteer.launch({
-    args: chromium.args,
+    args: CHROMIUM_ARGS,
     defaultViewport: null,
-    executablePath: process.env.CHROMIUM_PATH || (await chromium.executablePath()),
+    executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium-browser',
     headless: true,
   });
 

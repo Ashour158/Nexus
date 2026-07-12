@@ -7,7 +7,13 @@ import { OutboxPublisher } from '@nexus/outbox';
 import { TOPICS } from '@nexus/kafka';
 import { invalidateListCache, cachedEntityForModel } from './lib/read-cache.js';
 
-const skipTenantModels = new Set<string>();
+// DealRoom is exempt from tenant auto-scoping: the PUBLIC customer link
+// (`GET /deal-rooms/:slug/public`, no JWT) looks a room up by its globally-unique
+// random slug BEFORE any tenant is known, which otherwise throws TenantContextError
+// under fail-closed enforcement. Safe because every AUTHENTICATED deal-room query
+// already filters by an explicit `tenantId: jwt.tenantId`, and the slug is
+// unguessable — so this is never the sole isolation boundary.
+const skipTenantModels = new Set<string>(['DealRoom']);
 
 const softDeleteModels = new Set([
   'Lead', 'Contact', 'Deal', 'Account', 'Activity', 'Note', 'Quote',

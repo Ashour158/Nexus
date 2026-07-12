@@ -39,7 +39,14 @@ export function createAuthPrisma() {
   const encryptionKey = process.env.ENCRYPTION_MASTER_KEY;
   if (encryptionKey && encryptionKey.length >= 32) {
     withFieldEncryption(base as any, encryptionKey, [
-      { model: 'User', fields: ['email', 'phone', 'firstName', 'lastName'] },
+      // NOTE: `email` is intentionally NOT encrypted. Local login looks users up by
+      // plaintext email (`findFirst({ where: { email } })`) and there is no
+      // `emailHash` blind index on User — so an encrypted email is unfindable and
+      // the account can never log in locally (it only surfaced once invited users
+      // got a local password instead of Keycloak SSO). Proper fix = add an
+      // `emailHash` blind index and look up by it; until then email stays plaintext
+      // to match every existing loginnable user.
+      { model: 'User', fields: ['phone', 'firstName', 'lastName'] },
       { model: 'UserProfile', fields: ['personalEmail', 'emergencyPhone', 'address', 'dateOfBirth'] },
       { model: 'SsoConfiguration', fields: ['certificate'] },
       { model: 'MfaConfiguration', fields: ['secret'] },

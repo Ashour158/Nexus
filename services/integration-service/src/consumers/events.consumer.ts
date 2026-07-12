@@ -56,15 +56,35 @@ function registerCrmFanOut(
     await geocoding.geocodeAccount(event.tenantId, payload.id, address);
   };
 
-  consumer.on('lead.created', forward);
-  consumer.on('deal.created', forward);
-  consumer.on('deal.stage_changed', forward);
-  consumer.on('deal.won', forward);
-  consumer.on('deal.lost', forward);
-  consumer.on('contact.created', forward);
+  // Generic outbound fan-out: every domain event listed here is forwarded to
+  // `enqueueFromDomainEvent`, which filters by each subscription's `events[]`.
+  // NexusConsumer dispatches by exact `event.type`, so the set must be explicit.
+  // The four events with a CRM side-effect (activity calendar-sync, account
+  // geocode) are registered separately below and forward internally — they are
+  // intentionally EXCLUDED here to avoid double-enqueue.
+  const FORWARD_EVENT_TYPES = [
+    // leads
+    'lead.created', 'lead.updated', 'lead.deleted', 'lead.qualified',
+    'lead.converted', 'lead.assigned',
+    // deals
+    'deal.created', 'deal.updated', 'deal.deleted', 'deal.stage_changed',
+    'deal.won', 'deal.lost', 'deal.reopened',
+    // contacts
+    'contact.created', 'contact.updated', 'contact.deleted',
+    // accounts (account.created/updated handled by geocodeAccount below)
+    'account.deleted',
+    // activities (activity.created/updated handled by syncActivity below)
+    'activity.completed', 'activity.deleted',
+    // quotes (finance)
+    'quote.created', 'quote.updated', 'quote.created_from_rfq',
+    'quote.revision_created', 'quote.submitted_for_approval', 'quote.approved',
+    'quote.rejected', 'quote.sent', 'quote.signature_requested', 'quote.signed',
+    'quote.accepted', 'quote.expired', 'quote.voided', 'quote.converted_to_order',
+  ];
+  for (const type of FORWARD_EVENT_TYPES) consumer.on(type, forward);
+
   consumer.on('activity.created', syncActivity);
   consumer.on('activity.updated', syncActivity);
-  consumer.on('activity.completed', forward);
   consumer.on('account.created', geocodeAccount);
   consumer.on('account.updated', geocodeAccount);
 }
@@ -82,6 +102,7 @@ export async function startIntegrationEventsConsumer(
     TOPICS.LEADS,
     TOPICS.ACTIVITIES,
     TOPICS.ACCOUNTS,
+    TOPICS.QUOTES,
   ]);
   await consumer.start();
   return consumer;

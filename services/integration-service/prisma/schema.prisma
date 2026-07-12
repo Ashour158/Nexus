@@ -123,6 +123,7 @@ enum DeliveryStatus {
   DELIVERED
   FAILED
   RETRYING
+  DEAD
 }
 
 enum SyncStatus {

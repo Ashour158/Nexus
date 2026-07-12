@@ -41,6 +41,99 @@ function emailSimilarity(a: string | null | undefined, b: string | null | undefi
   return maxLen === 0 ? 0 : 1 - levenshtein(la, lb) / maxLen;
 }
 
+/**
+ * Deterministic normalized similarity in [0,1] for the rule-driven detector.
+ * 1 = identical after normalization; otherwise a Levenshtein ratio
+ * (1 - distance/maxLen) over the lowercased/stripped strings. No dependency,
+ * fully deterministic — reuses the same {@link normalize}/{@link levenshtein}
+ * primitives the pairwise scorers use.
+ */
+export function similarityRatio(a: string | null | undefined, b: string | null | undefined): number {
+  const na = normalize(a);
+  const nb = normalize(b);
+  if (!na && !nb) return 1;
+  if (!na || !nb) return 0;
+  if (na === nb) return 1;
+  const maxLen = Math.max(na.length, nb.length);
+  return maxLen === 0 ? 1 : 1 - levenshtein(na, nb) / maxLen;
+}
+
+/** Canonical module identifiers used across the unified dedup surface. */
+export type DedupModule = 'lead' | 'contact' | 'account' | 'deal';
+export const DEDUP_MODULES: readonly DedupModule[] = ['lead', 'contact', 'account', 'deal'];
+
+/**
+ * The Prisma model + the concrete columns each module exposes to a
+ * {@link DuplicateRule}. `matchFields` on a rule must be a subset of `fields`
+ * (unknown fields are ignored). `where` scopes the detector's candidate pull to
+ * live rows for the module (soft-delete is additionally applied by the client
+ * extension).
+ */
+const MODULE_CONFIG: Record<DedupModule, { model: string; fields: string[]; where: Record<string, unknown> }> = {
+  lead: {
+    model: 'lead',
+    fields: ['firstName', 'lastName', 'email', 'phone', 'company', 'website', 'jobTitle', 'city', 'country'],
+    where: {},
+  },
+  contact: {
+    model: 'contact',
+    fields: ['firstName', 'lastName', 'email', 'phone', 'mobile', 'jobTitle', 'department', 'accountId', 'city', 'country'],
+    where: { isActive: true },
+  },
+  account: {
+    model: 'account',
+    fields: ['name', 'email', 'phone', 'website', 'industry', 'city', 'country'],
+    where: { status: 'ACTIVE' },
+  },
+  deal: {
+    model: 'deal',
+    fields: ['name', 'amount', 'accountId', 'currency', 'stageId'],
+    where: {},
+  },
+};
+
+/** System columns a merge's field-resolution may never overwrite. */
+const PROTECTED_MERGE_FIELDS = new Set(['id', 'tenantId', 'createdAt', 'updatedAt', 'deletedAt', 'version']);
+
+/**
+ * Does a configured {@link DuplicateRule} consider records `a` and `b` a match?
+ * EXACT  → every matchField is present on both and normalized-equal.
+ * FUZZY  → every matchField is present on both and the AVERAGE per-field
+ *          similarity ≥ threshold% (threshold defaults to 80). Returns the
+ *          representative score for surfacing/ordering, or null when no match.
+ */
+export function ruleMatch(
+  rule: { matchFields: string[]; matchType: string; threshold?: number | null },
+  a: Record<string, unknown>,
+  b: Record<string, unknown>
+): { score: number } | null {
+  const fields = (rule.matchFields ?? []).filter((f) => typeof f === 'string' && f.length > 0);
+  if (fields.length === 0) return null;
+
+  const isFuzzy = (rule.matchType ?? 'EXACT').toUpperCase() === 'FUZZY';
+  const cutoff = Math.max(0, Math.min(1, (rule.threshold ?? 80) / 100));
+
+  let scoreSum = 0;
+  for (const field of fields) {
+    const va = a[field];
+    const vb = b[field];
+    const sa = va == null ? '' : String(va);
+    const sb = vb == null ? '' : String(vb);
+    // Both must carry a value on the field, else two empty/null records would
+    // trivially "match" (e.g. two contacts with no phone).
+    if (!normalize(sa) || !normalize(sb)) return null;
+    if (isFuzzy) {
+      scoreSum += similarityRatio(sa, sb);
+    } else {
+      if (normalize(sa) !== normalize(sb)) return null;
+      scoreSum += 1;
+    }
+  }
+  const avg = scoreSum / fields.length;
+  if (isFuzzy && avg < cutoff) return null;
+  return { score: avg };
+}
+
 export function scoreContactPair(
   a: { firstName: string; lastName: string; email?: string | null; phone?: string | null; company?: string | null },
   b: { firstName: string; lastName: string; email?: string | null; phone?: string | null; company?: string | null }
@@ -315,25 +408,34 @@ export function createDedupService(prisma: CrmPrisma, producer?: NexusProducer) 
     return { deals: { groups: dealCount } };
   }
 
-  async function mergeContacts(
+  /**
+   * Id-list contact merge core (shared by the group-merge wrapper and the
+   * unified `/contact/merge` route). Validates tenant ownership of the master +
+   * every loser, applies the resolved field overrides, re-parents children
+   * collision-safely, soft-deletes the losers, and (when `groupId` is given)
+   * resolves the originating DuplicateGroup — all in one transaction.
+   */
+  async function mergeContactsByIds(
     tenantId: string,
-    groupId: string,
     masterId: string,
-    fieldSelections: Record<string, { sourceId: string; value?: unknown }>,
-    userId: string
+    mergeIds: string[],
+    mergedData: Record<string, unknown>,
+    userId: string,
+    groupId?: string
   ) {
-    const mergedData: Record<string, unknown> = {};
-    for (const [field, selection] of Object.entries(fieldSelections)) mergedData[field] = selection.value;
+    const requested = [...new Set(mergeIds)].filter((id) => id && id !== masterId);
+    if (requested.length === 0) throw new Error('No contacts to merge');
 
-    const group = await p.duplicateGroup.findUnique({ where: { id: groupId }, include: { records: true } });
-    if (!group || group.tenantId !== tenantId) throw new Error('Group not found');
-
-    const duplicateIds = group.records.map((r: { recordId: string }) => r.recordId).filter((id: string) => id !== masterId);
+    const involved = await p.contact.findMany({ where: { tenantId, id: { in: [masterId, ...requested] } }, select: { id: true } });
+    const involvedIds = new Set(involved.map((c: { id: string }) => c.id));
+    if (!involvedIds.has(masterId)) throw new Error('Master contact not found');
+    const duplicateIds = requested.filter((id) => involvedIds.has(id));
+    if (duplicateIds.length === 0) throw new Error('No valid contacts to merge');
 
     // Atomic merge (DI-09): all reparenting + soft-delete happen in one transaction,
     // so a mid-way failure leaves the graph untouched rather than half-merged.
     await p.$transaction(async (tx: CrmPrisma) => {
-      await tx.contact.update({ where: { id: masterId }, data: mergedData });
+      if (Object.keys(mergedData).length > 0) await tx.contact.update({ where: { id: masterId }, data: mergedData });
 
       // Reparent the duplicate's child records to the master (DI-08). Optional-FK
       // relations with no (dealId, contactId) uniqueness can be bulk-updated safely.
@@ -341,6 +443,11 @@ export function createDedupService(prisma: CrmPrisma, producer?: NexusProducer) 
       await tx.note.updateMany({ where: { contactId: { in: duplicateIds } }, data: { contactId: masterId } });
       await tx.quoteProjection.updateMany({ where: { tenantId, contactId: { in: duplicateIds } }, data: { contactId: masterId } });
       await tx.emailThread.updateMany({ where: { contactId: { in: duplicateIds } }, data: { contactId: masterId } });
+      // Polymorphic activity/note rows (entityType/entityId) that point at a contact.
+      await tx.activity.updateMany({ where: { tenantId, entityType: { in: ['contact', 'CONTACT'] }, entityId: { in: duplicateIds } }, data: { entityId: masterId } });
+      await tx.note.updateMany({ where: { tenantId, entityType: { in: ['contact', 'CONTACT'] }, entityId: { in: duplicateIds } }, data: { entityId: masterId } });
+      // Attachments keyed by (module, recordId).
+      await tx.attachment.updateMany({ where: { tenantId, module: 'contact', recordId: { in: duplicateIds } }, data: { recordId: masterId } });
 
       // Deal links carry a @@unique([dealId, contactId]) — moving a duplicate's link
       // to a deal the master already sits on would violate it, so drop the redundant
@@ -367,10 +474,12 @@ export function createDedupService(prisma: CrmPrisma, producer?: NexusProducer) 
       // Consistent soft-delete: mark duplicates inactive AND stamp deletedAt so they
       // drop out of every list that filters on either flag.
       await tx.contact.updateMany({ where: { id: { in: duplicateIds } }, data: { isActive: false, deletedAt: new Date() } });
-      await tx.duplicateGroup.update({
-        where: { id: groupId },
-        data: { status: 'merged', masterRecordId: masterId, resolvedAt: new Date(), resolvedBy: userId },
-      });
+      if (groupId) {
+        await tx.duplicateGroup.update({
+          where: { id: groupId },
+          data: { status: 'merged', masterRecordId: masterId, resolvedAt: new Date(), resolvedBy: userId },
+        });
+      }
     });
 
     // Nervous system: announce each collapsed duplicate so downstream consumers reconcile.
@@ -389,15 +498,9 @@ export function createDedupService(prisma: CrmPrisma, producer?: NexusProducer) 
     return { merged: duplicateIds.length, masterId };
   }
 
-  /**
-   * Account merge — parity with contact merge (DI-08/09). Atomic $transaction:
-   * reparent child relations to the master, collision-safe, then soft-delete the
-   * duplicates (deletedAt). Emits `account.merged` per collapsed duplicate.
-   *
-   * NOTE: the CrmPrisma replica-wrapper requires the interactive-tx callback to be
-   * typed `async (tx: CrmPrisma) => …` (see mergeContacts) so `tx.*` models resolve.
-   */
-  async function mergeAccounts(
+  /** Group-based contact merge (`/dedup/groups/:id/merge`): resolves the group's
+   * losers + `{sourceId,value}` overrides, then delegates to the id-list core. */
+  async function mergeContacts(
     tenantId: string,
     groupId: string,
     masterId: string,
@@ -409,13 +512,37 @@ export function createDedupService(prisma: CrmPrisma, producer?: NexusProducer) 
 
     const group = await p.duplicateGroup.findUnique({ where: { id: groupId }, include: { records: true } });
     if (!group || group.tenantId !== tenantId) throw new Error('Group not found');
+    const mergeIds = group.records.map((r: { recordId: string }) => r.recordId).filter((id: string) => id !== masterId);
+    return mergeContactsByIds(tenantId, masterId, mergeIds, mergedData, userId, groupId);
+  }
 
-    const duplicateIds = group.records
-      .map((r: { recordId: string }) => r.recordId)
-      .filter((id: string) => id !== masterId);
+  /**
+   * Account merge — parity with contact merge (DI-08/09). Atomic $transaction:
+   * reparent child relations to the master, collision-safe, then soft-delete the
+   * duplicates (deletedAt). Emits `account.merged` per collapsed duplicate.
+   *
+   * NOTE: the CrmPrisma replica-wrapper requires the interactive-tx callback to be
+   * typed `async (tx: CrmPrisma) => …` (see mergeContacts) so `tx.*` models resolve.
+   */
+  async function mergeAccountsByIds(
+    tenantId: string,
+    masterId: string,
+    mergeIds: string[],
+    mergedData: Record<string, unknown>,
+    userId: string,
+    groupId?: string
+  ) {
+    const requested = [...new Set(mergeIds)].filter((id) => id && id !== masterId);
+    if (requested.length === 0) throw new Error('No accounts to merge');
+
+    const involved = await p.account.findMany({ where: { tenantId, id: { in: [masterId, ...requested] } }, select: { id: true } });
+    const involvedIds = new Set(involved.map((a: { id: string }) => a.id));
+    if (!involvedIds.has(masterId)) throw new Error('Master account not found');
+    const duplicateIds = requested.filter((id) => involvedIds.has(id));
+    if (duplicateIds.length === 0) throw new Error('No valid accounts to merge');
 
     await p.$transaction(async (tx: CrmPrisma) => {
-      await tx.account.update({ where: { id: masterId }, data: mergedData });
+      if (Object.keys(mergedData).length > 0) await tx.account.update({ where: { id: masterId }, data: mergedData });
 
       // Reparent optional/plain-FK children — no per-account uniqueness on these,
       // so bulk updateMany is collision-safe.
@@ -425,6 +552,10 @@ export function createDedupService(prisma: CrmPrisma, producer?: NexusProducer) 
       await tx.note.updateMany({ where: { tenantId, accountId: { in: duplicateIds } }, data: { accountId: masterId } });
       await tx.emailThread.updateMany({ where: { tenantId, accountId: { in: duplicateIds } }, data: { accountId: masterId } });
       await tx.quoteProjection.updateMany({ where: { tenantId, accountId: { in: duplicateIds } }, data: { accountId: masterId } });
+      // Polymorphic activity/note rows + attachments keyed by account.
+      await tx.activity.updateMany({ where: { tenantId, entityType: { in: ['account', 'ACCOUNT'] }, entityId: { in: duplicateIds } }, data: { entityId: masterId } });
+      await tx.note.updateMany({ where: { tenantId, entityType: { in: ['account', 'ACCOUNT'] }, entityId: { in: duplicateIds } }, data: { entityId: masterId } });
+      await tx.attachment.updateMany({ where: { tenantId, module: 'account', recordId: { in: duplicateIds } }, data: { recordId: masterId } });
 
       // Re-parent the hierarchy: children of a duplicate now hang off the master,
       // and avoid self-parenting the master.
@@ -455,10 +586,12 @@ export function createDedupService(prisma: CrmPrisma, producer?: NexusProducer) 
 
       // Soft-delete duplicates (deletedAt) so they drop out of every list.
       await tx.account.updateMany({ where: { id: { in: duplicateIds } }, data: { deletedAt: new Date() } });
-      await tx.duplicateGroup.update({
-        where: { id: groupId },
-        data: { status: 'merged', masterRecordId: masterId, resolvedAt: new Date(), resolvedBy: userId },
-      });
+      if (groupId) {
+        await tx.duplicateGroup.update({
+          where: { id: groupId },
+          data: { status: 'merged', masterRecordId: masterId, resolvedAt: new Date(), resolvedBy: userId },
+        });
+      }
     });
 
     // Nervous system: announce each collapsed duplicate.
@@ -475,6 +608,24 @@ export function createDedupService(prisma: CrmPrisma, producer?: NexusProducer) 
     }
 
     return { merged: duplicateIds.length, masterId };
+  }
+
+  /** Group-based account merge (`/dedup/groups/:id/merge`): resolves the group's
+   * losers + `{sourceId,value}` overrides, then delegates to the id-list core. */
+  async function mergeAccounts(
+    tenantId: string,
+    groupId: string,
+    masterId: string,
+    fieldSelections: Record<string, { sourceId: string; value?: unknown }>,
+    userId: string
+  ) {
+    const mergedData: Record<string, unknown> = {};
+    for (const [field, selection] of Object.entries(fieldSelections)) mergedData[field] = selection.value;
+
+    const group = await p.duplicateGroup.findUnique({ where: { id: groupId }, include: { records: true } });
+    if (!group || group.tenantId !== tenantId) throw new Error('Group not found');
+    const mergeIds = group.records.map((r: { recordId: string }) => r.recordId).filter((id: string) => id !== masterId);
+    return mergeAccountsByIds(tenantId, masterId, mergeIds, mergedData, userId, groupId);
   }
 
   /**
@@ -724,15 +875,339 @@ export function createDedupService(prisma: CrmPrisma, producer?: NexusProducer) 
     return { merged: result.merged, masterId };
   }
 
+  /**
+   * Id-list LEAD merge — new reparent coverage (leads previously had NO merge
+   * path at all, only create-time duplicate detection). Mirrors the contact/
+   * account cores: tenant-scoped, transactional, collision-safe, soft-deletes
+   * the losers, writes merge-audit rows, and emits lead events.
+   *
+   * Reparents: activities + notes (typed `leadId` FK and the polymorphic
+   * entityType/entityId pair), attachments keyed by (module='lead', recordId),
+   * LeadRoutingEvent rows, and the @unique(leadId) LeadScore (collision-safe).
+   */
+  async function mergeLeadsByIds(
+    tenantId: string,
+    masterId: string,
+    mergeIds: string[],
+    mergedData: Record<string, unknown>,
+    userId: string,
+    groupId?: string
+  ) {
+    const requested = [...new Set(mergeIds)].filter((id) => id && id !== masterId);
+    if (requested.length === 0) throw new Error('No leads to merge');
+
+    const involved = await p.lead.findMany({ where: { tenantId, id: { in: [masterId, ...requested] } }, select: { id: true } });
+    const involvedIds = new Set(involved.map((l: { id: string }) => l.id));
+    if (!involvedIds.has(masterId)) throw new Error('Master lead not found');
+    const duplicateIds = requested.filter((id) => involvedIds.has(id));
+    if (duplicateIds.length === 0) throw new Error('No valid leads to merge');
+
+    await p.$transaction(async (tx: CrmPrisma) => {
+      if (Object.keys(mergedData).length > 0) await tx.lead.update({ where: { id: masterId }, data: mergedData });
+
+      // Constraint-free children: bulk reparent (collision-safe).
+      await tx.activity.updateMany({ where: { tenantId, leadId: { in: duplicateIds } }, data: { leadId: masterId } });
+      await tx.note.updateMany({ where: { tenantId, leadId: { in: duplicateIds } }, data: { leadId: masterId } });
+      await tx.activity.updateMany({ where: { tenantId, entityType: { in: ['lead', 'LEAD'] }, entityId: { in: duplicateIds } }, data: { entityId: masterId } });
+      await tx.note.updateMany({ where: { tenantId, entityType: { in: ['lead', 'LEAD'] }, entityId: { in: duplicateIds } }, data: { entityId: masterId } });
+      await tx.attachment.updateMany({ where: { tenantId, module: 'lead', recordId: { in: duplicateIds } }, data: { recordId: masterId } });
+      await tx.leadRoutingEvent.updateMany({ where: { tenantId, leadId: { in: duplicateIds } }, data: { leadId: masterId } });
+
+      // LeadScore @unique(leadId): keep the master's (or adopt a duplicate's when
+      // the master has none) and drop the rest — collision-safe.
+      const scoreModel = tx.leadScore as unknown as {
+        findMany: (a: unknown) => Promise<Array<{ id: string; leadId: string }>>;
+        update: (a: unknown) => Promise<unknown>;
+        delete: (a: unknown) => Promise<unknown>;
+      };
+      const masterScore = await scoreModel.findMany({ where: { leadId: masterId } });
+      const dupScores = await scoreModel.findMany({ where: { leadId: { in: duplicateIds } } });
+      let masterHasScore = masterScore.length > 0;
+      for (const row of dupScores) {
+        if (masterHasScore) {
+          await scoreModel.delete({ where: { id: row.id } });
+        } else {
+          await scoreModel.update({ where: { id: row.id }, data: { leadId: masterId } });
+          masterHasScore = true;
+        }
+      }
+
+      // Soft-delete the losers so they drop out of every list.
+      await tx.lead.updateMany({ where: { tenantId, id: { in: duplicateIds } }, data: { deletedAt: new Date() } });
+
+      // Merge-audit rows via the field-change log (parity with deal merge).
+      await tx.fieldChangeLog.create({
+        data: { tenantId, objectType: 'lead', objectId: masterId, fieldName: 'mergedFrom', oldValue: null, newValue: JSON.stringify(duplicateIds), changedBy: userId },
+      });
+      for (const dupId of duplicateIds) {
+        await tx.fieldChangeLog.create({
+          data: { tenantId, objectType: 'lead', objectId: dupId, fieldName: 'mergedInto', oldValue: null, newValue: masterId, changedBy: userId },
+        });
+      }
+
+      if (groupId) {
+        await tx.duplicateGroup.update({
+          where: { id: groupId },
+          data: { status: 'merged', masterRecordId: masterId, resolvedAt: new Date(), resolvedBy: userId },
+        });
+      }
+    });
+
+    if (producer) {
+      const master = await p.lead.findFirst({ where: { id: masterId, tenantId } });
+      await producer
+        .publish(TOPICS.LEADS, {
+          type: 'lead.updated',
+          tenantId,
+          payload: master
+            ? { id: master.id, leadId: master.id, ownerId: master.ownerId, status: master.status, changedFields: ['merge'] }
+            : { id: masterId, leadId: masterId },
+        })
+        .catch(() => undefined);
+      for (const dupId of duplicateIds) {
+        await producer
+          .publish(TOPICS.LEADS, { type: 'lead.archived', tenantId, payload: { leadId: dupId, mergedIntoId: masterId, reason: 'merged' } })
+          .catch(() => undefined);
+      }
+    }
+
+    return { merged: duplicateIds.length, masterId };
+  }
+
+  /**
+   * Resolve a unified merge's `fieldResolution` map ({ field: winnerId }) into a
+   * concrete `{ field: value }` override object, reading each winner's value from
+   * the involved records. System columns are never overwritable.
+   */
+  function resolveWinners(
+    records: Array<Record<string, unknown> & { id: string }>,
+    fieldResolution: Record<string, string> | undefined
+  ): Record<string, unknown> {
+    const byId = new Map(records.map((r) => [r.id, r]));
+    const data: Record<string, unknown> = {};
+    for (const [field, winnerId] of Object.entries(fieldResolution ?? {})) {
+      if (PROTECTED_MERGE_FIELDS.has(field)) continue;
+      const winner = byId.get(winnerId);
+      if (winner && Object.prototype.hasOwnProperty.call(winner, field)) data[field] = winner[field];
+    }
+    return data;
+  }
+
+  function moduleSelect(module: DedupModule): Record<string, boolean> {
+    const select: Record<string, boolean> = { id: true, tenantId: true };
+    for (const f of MODULE_CONFIG[module].fields) select[f] = true;
+    return select;
+  }
+
+  /**
+   * Rule-driven duplicate detector. Loads the module's active {@link DuplicateRule}s
+   * and its live records, then unions any two records a rule considers a match
+   * (bounded pairwise window to keep CPU predictable). Returns the resulting
+   * clusters (2+ ids) and, unless `persist` is false, replaces the module's OPEN
+   * {@link DuplicateCandidate} rows with the fresh findings.
+   */
+  async function scanByRules(tenantId: string, module: DedupModule, persist = true, limit = 2000) {
+    const cfg = MODULE_CONFIG[module];
+    const rules = await p.duplicateRule.findMany({ where: { tenantId, module, isActive: true } }) as Array<{
+      id: string; matchFields: string[]; matchType: string; threshold: number | null;
+    }>;
+    if (rules.length === 0) {
+      if (persist) await p.duplicateCandidate.deleteMany({ where: { tenantId, module, status: 'OPEN' } });
+      return { module, clusters: [] as Array<{ recordIds: string[]; score: number; ruleId: string | null }>, ruleCount: 0 };
+    }
+
+    const records = await p[cfg.model].findMany({
+      where: { tenantId, ...cfg.where },
+      select: moduleSelect(module),
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    }) as Array<Record<string, unknown> & { id: string }>;
+
+    // Union-find over record ids.
+    const parent = new Map<string, string>();
+    for (const r of records) parent.set(r.id, r.id);
+    const find = (x: string): string => {
+      let root = x;
+      while (parent.get(root) !== root) root = parent.get(root) as string;
+      let cur = x;
+      while (parent.get(cur) !== root) {
+        const next = parent.get(cur) as string;
+        parent.set(cur, root);
+        cur = next;
+      }
+      return root;
+    };
+    const unite = (a: string, b: string) => {
+      const ra = find(a);
+      const rb = find(b);
+      if (ra !== rb) parent.set(ra, rb);
+    };
+
+    // Best {score, ruleId} per matched unordered pair, for candidate metadata.
+    const pairMeta: Array<{ a: string; b: string; score: number; ruleId: string }> = [];
+    for (const rule of rules) {
+      for (let i = 0; i < records.length; i += 1) {
+        for (let j = i + 1; j < Math.min(records.length, i + 201); j += 1) {
+          const m = ruleMatch(rule, records[i], records[j]);
+          if (m) {
+            unite(records[i].id, records[j].id);
+            pairMeta.push({ a: records[i].id, b: records[j].id, score: m.score, ruleId: rule.id });
+          }
+        }
+      }
+    }
+
+    // Assemble clusters from the union-find roots.
+    const byRoot = new Map<string, string[]>();
+    for (const r of records) {
+      const root = find(r.id);
+      const bucket = byRoot.get(root) ?? [];
+      bucket.push(r.id);
+      byRoot.set(root, bucket);
+    }
+    const clusters: Array<{ recordIds: string[]; score: number; ruleId: string | null }> = [];
+    for (const ids of byRoot.values()) {
+      if (ids.length < 2) continue;
+      const idSet = new Set(ids);
+      let best = 0;
+      let bestRule: string | null = null;
+      for (const pm of pairMeta) {
+        if (idSet.has(pm.a) && idSet.has(pm.b) && pm.score >= best) {
+          best = pm.score;
+          bestRule = pm.ruleId;
+        }
+      }
+      clusters.push({ recordIds: ids, score: best, ruleId: bestRule });
+    }
+
+    if (persist) {
+      await p.duplicateCandidate.deleteMany({ where: { tenantId, module, status: 'OPEN' } });
+      if (clusters.length > 0) {
+        await p.duplicateCandidate.createMany({
+          data: clusters.map((c) => ({ tenantId, module, recordIds: c.recordIds, ruleId: c.ruleId, score: c.score, status: 'OPEN' })),
+        });
+      }
+    }
+
+    return { module, clusters, ruleCount: rules.length };
+  }
+
+  /**
+   * Create-time duplicate warn: returns the records that a module's active rules
+   * consider a potential match for `recordData` (best score per record). Does not
+   * persist — callers use it to warn before inserting a new record.
+   */
+  async function checkRecord(
+    tenantId: string,
+    module: DedupModule,
+    recordData: Record<string, unknown>,
+    limit = 2000
+  ) {
+    const cfg = MODULE_CONFIG[module];
+    const rules = await p.duplicateRule.findMany({ where: { tenantId, module, isActive: true } }) as Array<{
+      id: string; name: string; matchFields: string[]; matchType: string; threshold: number | null;
+    }>;
+    if (rules.length === 0) return [] as Array<{ recordId: string; score: number; ruleId: string; ruleName: string }>;
+
+    const excludeId = typeof recordData.id === 'string' ? recordData.id : undefined;
+    const records = await p[cfg.model].findMany({
+      where: { tenantId, ...cfg.where, ...(excludeId ? { id: { not: excludeId } } : {}) },
+      select: moduleSelect(module),
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    }) as Array<Record<string, unknown> & { id: string }>;
+
+    const best = new Map<string, { recordId: string; score: number; ruleId: string; ruleName: string }>();
+    for (const rec of records) {
+      for (const rule of rules) {
+        const m = ruleMatch(rule, recordData, rec);
+        if (m) {
+          const prev = best.get(rec.id);
+          if (!prev || m.score > prev.score) {
+            best.set(rec.id, { recordId: rec.id, score: m.score, ruleId: rule.id, ruleName: rule.name });
+          }
+        }
+      }
+    }
+    return [...best.values()].sort((x, y) => y.score - x.score);
+  }
+
+  /**
+   * Unified merge dispatcher for the `POST /api/v1/:module/merge` route. Resolves
+   * the `{ field: winnerId }` field-resolution against the involved records, then
+   * delegates to the correct per-module id-list core (leads/contacts/accounts via
+   * their *ByIds cores, deals via {@link mergeDeals}). Finally marks any OPEN
+   * DuplicateCandidate cluster that referenced the collapsed ids as MERGED.
+   */
+  async function mergeByModule(
+    tenantId: string,
+    module: DedupModule,
+    masterId: string,
+    mergeIds: string[],
+    fieldResolution: Record<string, string> | undefined,
+    userId: string
+  ) {
+    const cfg = MODULE_CONFIG[module];
+    const requested = [...new Set(mergeIds)].filter((id) => id && id !== masterId);
+    if (requested.length === 0) throw new Error(`No ${module}s to merge`);
+
+    const records = await p[cfg.model].findMany({
+      where: { tenantId, id: { in: [masterId, ...requested] } },
+      select: moduleSelect(module),
+    }) as Array<Record<string, unknown> & { id: string }>;
+    const mergedData = resolveWinners(records, fieldResolution);
+
+    let result: { merged: number; masterId: string };
+    switch (module) {
+      case 'lead':
+        result = await mergeLeadsByIds(tenantId, masterId, requested, mergedData, userId);
+        break;
+      case 'contact':
+        result = await mergeContactsByIds(tenantId, masterId, requested, mergedData, userId);
+        break;
+      case 'account':
+        result = await mergeAccountsByIds(tenantId, masterId, requested, mergedData, userId);
+        break;
+      case 'deal': {
+        const fieldResolutions = Object.fromEntries(
+          Object.entries(mergedData).map(([f, v]) => [f, { value: v }])
+        ) as Record<string, { value?: unknown }>;
+        const r = await mergeDeals(tenantId, masterId, requested, fieldResolutions, userId);
+        result = { merged: r.merged, masterId };
+        break;
+      }
+      default:
+        throw new Error(`Unsupported module: ${module as string}`);
+    }
+
+    // Resolve any OPEN duplicate candidates that referenced the collapsed ids.
+    try {
+      await p.duplicateCandidate.updateMany({
+        where: { tenantId, module, status: 'OPEN', recordIds: { hasSome: [masterId, ...requested] } },
+        data: { status: 'MERGED' },
+      });
+    } catch {
+      /* candidate resolution is best-effort — the merge itself already committed */
+    }
+
+    return { ...result, module };
+  }
+
   return {
     runFullScan,
     runDealScan,
     scanContacts,
     scanAccounts,
     scanDeals,
+    scanByRules,
+    checkRecord,
     mergeContacts,
+    mergeContactsByIds,
     mergeAccounts,
+    mergeAccountsByIds,
+    mergeLeadsByIds,
     mergeDeals,
     mergeDealsByGroup,
+    mergeByModule,
   };
 }

@@ -1214,6 +1214,44 @@ model DuplicateRecord {
   @@index([groupId])
 }
 
+/// Tenant-configurable duplicate-detection rule (unified across all core
+/// modules). `module` is one of lead|contact|account|deal; `matchFields` names
+/// the record columns to compare (e.g. [email] or [firstName,lastName,phone]);
+/// `matchType` is EXACT (normalized equality on every field) or FUZZY
+/// (normalized similarity ≥ `threshold`% averaged across the fields).
+model DuplicateRule {
+  id          String    @id @default(cuid())
+  tenantId    String
+  module      String
+  name        String
+  matchFields String[]
+  matchType   String    @default("EXACT")
+  threshold   Int?
+  isActive    Boolean   @default(true)
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([id, tenantId])
+  @@index([tenantId, module, isActive])
+}
+
+/// A persisted duplicate finding produced by the rule-driven detector so it can
+/// be worked (surfaced, merged, or ignored). `recordIds` is the matched cluster
+/// (2+ ids of the same `module`); `status` is OPEN|MERGED|IGNORED.
+model DuplicateCandidate {
+  id        String   @id @default(cuid())
+  tenantId  String
+  module    String
+  recordIds String[]
+  ruleId    String?
+  score     Float    @default(0)
+  status    String   @default("OPEN")
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, module, status])
+}
+
 model LeadScore {
   id              String    @id @default(uuid())
   tenantId        String

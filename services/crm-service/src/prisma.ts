@@ -20,7 +20,7 @@ const softDeleteModels = new Set([
   'Pipeline', 'Stage', 'EmailThread', 'Competitor', 'Territory', 'SalesRep',
   'EnrichmentJob', 'LeadScore', 'AccountHealthScore', 'LeadScoringRule',
   'CustomFieldDefinition', 'Attachment', 'WinLossReason', 'FieldPermission',
-  'ValidationRule', 'DuplicateGroup', 'ConsentRecord', 'DealRoom',
+  'ValidationRule', 'DuplicateGroup', 'DuplicateRule', 'ConsentRecord', 'DealRoom',
   'DealCompetitor', 'LeadRoutingEvent', 'DealRoomDocument', 'MutualActionItem',
   'Quota',
 ]);

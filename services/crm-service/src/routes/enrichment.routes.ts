@@ -1,9 +1,27 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import type { JwtPayload } from '@nexus/shared-types';
-import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
+import { PERMISSIONS, requirePermission, ValidationError } from '@nexus/service-utils';
 import type { NexusProducer } from '@nexus/kafka';
 import type { CrmPrisma } from '../prisma.js';
 import { enrichAccount, enrichContact } from '../lib/enrichment.engine.js';
+
+const CreateCompetitorSchema = z.object({
+  name: z.string().min(1).max(200),
+  website: z.string().max(500).optional(),
+  description: z.string().max(2000).optional(),
+  strengths: z.array(z.string()).optional(),
+  weaknesses: z.array(z.string()).optional(),
+});
+
+const UpdateCompetitorSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  website: z.string().max(500).optional(),
+  description: z.string().max(2000).optional(),
+  strengths: z.array(z.string()).optional(),
+  weaknesses: z.array(z.string()).optional(),
+  winRateAgainst: z.number().optional(),
+});
 
 export async function registerEnrichmentRoutes(app: FastifyInstance, prisma: CrmPrisma, producer?: NexusProducer): Promise<void> {
   if (!process.env.CLEARBIT_API_KEY && !process.env.APOLLO_API_KEY) {
@@ -66,14 +84,11 @@ export async function registerEnrichmentRoutes(app: FastifyInstance, prisma: Crm
     { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) },
     async (req, reply) => {
       const jwt = (req as any).user as JwtPayload;
-      const body = req.body as {
-        name: string;
-        website?: string;
-        description?: string;
-        strengths?: string[];
-        weaknesses?: string[];
-      };
-      const created = await prisma.competitor.create({ data: { tenantId: jwt.tenantId, ...body } });
+      const parsed = CreateCompetitorSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new ValidationError('Invalid body', parsed.error.flatten());
+      }
+      const created = await prisma.competitor.create({ data: { tenantId: jwt.tenantId, ...parsed.data } });
       return reply.status(201).send({ success: true, data: created });
     }
   );
@@ -84,15 +99,11 @@ export async function registerEnrichmentRoutes(app: FastifyInstance, prisma: Crm
     async (req, reply) => {
       const jwt = (req as any).user as JwtPayload;
       const { id } = req.params as { id: string };
-      const body = req.body as Partial<{
-        name: string;
-        website: string;
-        description: string;
-        strengths: string[];
-        weaknesses: string[];
-        winRateAgainst: number;
-      }>;
-      await prisma.competitor.updateMany({ where: { id, tenantId: jwt.tenantId, deletedAt: null }, data: body });
+      const parsed = UpdateCompetitorSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new ValidationError('Invalid body', parsed.error.flatten());
+      }
+      await prisma.competitor.updateMany({ where: { id, tenantId: jwt.tenantId, deletedAt: null }, data: parsed.data });
       return reply.send({ success: true, data: { updated: true } });
     }
   );

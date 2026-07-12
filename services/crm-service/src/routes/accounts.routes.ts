@@ -23,7 +23,7 @@ import { getFieldHistory } from '../lib/field-history.js';
 import { createCustomerRecordsUseCase } from '../use-cases/customer-records.use-case.js';
 import { buildReadAccessContext } from '../lib/access-context.js';
 import { interceptForReview } from '../lib/review-process.js';
-import { guardRecordWrite } from '../lib/record-write-guard.js';
+import { guardRecordWrite, partitionWritableRecords } from '../lib/record-write-guard.js';
 import { canAccessRecord, filterReadableRecords, isSharingConfigured } from '../lib/sharing.js';
 import { withIdempotency } from '../lib/idempotency.js';
 import type { EngineContext } from '@nexus/domain-core';
@@ -444,6 +444,11 @@ export async function registerAccountsRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
+          // Data-governance guard (opt-in): record lock (423) → sharing write (403).
+          const guard = await guardRecordWrite(prisma, jwt, 'account', id);
+          if (!guard.ok) {
+            return reply.code(guard.status).send({ success: false, error: { code: guard.code, message: guard.message, requestId: request.id } });
+          }
           const data = await customerRecords.archive(engineContextFromJwt(request.id, jwt), { entityType: 'account', id });
           return reply.send({ success: true, data });
         }
@@ -455,12 +460,16 @@ export async function registerAccountsRoutes(
         async (request, reply) => {
           const body = AccountMassUpdateSchema.parse(request.body);
           const jwt = request.user as JwtPayload;
-          const data = await customerRecords.massUpdate(engineContextFromJwt(request.id, jwt), {
-            entityType: 'account',
-            ids: body.ids,
-            data: body.data,
-          });
-          return reply.send({ success: true, data });
+          // Data-governance guard (opt-in): skip locked/sharing-restricted records.
+          const { allowed, skipped } = await partitionWritableRecords(prisma, jwt, 'account', body.ids);
+          const data = allowed.length
+            ? await customerRecords.massUpdate(engineContextFromJwt(request.id, jwt), {
+                entityType: 'account',
+                ids: allowed,
+                data: body.data,
+              })
+            : { count: 0 };
+          return reply.send({ success: true, data: { ...data, skipped } });
         }
       );
 
@@ -470,11 +479,15 @@ export async function registerAccountsRoutes(
         async (request, reply) => {
           const body = MassIdsSchema.parse(request.body);
           const jwt = request.user as JwtPayload;
-          const data = await customerRecords.massArchive(engineContextFromJwt(request.id, jwt), {
-            entityType: 'account',
-            ids: body.ids,
-          });
-          return reply.send({ success: true, data });
+          // Data-governance guard (opt-in): skip locked/sharing-restricted records.
+          const { allowed, skipped } = await partitionWritableRecords(prisma, jwt, 'account', body.ids);
+          const data = allowed.length
+            ? await customerRecords.massArchive(engineContextFromJwt(request.id, jwt), {
+                entityType: 'account',
+                ids: allowed,
+              })
+            : { count: 0 };
+          return reply.send({ success: true, data: { ...data, skipped } });
         }
       );
 
@@ -484,6 +497,11 @@ export async function registerAccountsRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
+          // Data-governance guard (opt-in): record lock (423) → sharing write (403).
+          const guard = await guardRecordWrite(prisma, jwt, 'account', id);
+          if (!guard.ok) {
+            return reply.code(guard.status).send({ success: false, error: { code: guard.code, message: guard.message, requestId: request.id } });
+          }
           const account = await customerRecords.restore(engineContextFromJwt(request.id, jwt), { entityType: 'account', id });
           return reply.send({ success: true, data: account });
         }

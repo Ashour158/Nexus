@@ -1,7 +1,14 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import type { JwtPayload } from '@nexus/shared-types';
-import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
+import { PERMISSIONS, requirePermission, ValidationError } from '@nexus/service-utils';
 import type { CrmPrisma } from '../prisma.js';
+
+const ManualRoutingSchema = z.object({
+  territoryId: z.string().min(1),
+  salesRepId: z.string().min(1),
+  reason: z.string().optional(),
+});
 import {
   recalculateAccountHealth,
 } from '../lib/lead-scoring.engine.js';
@@ -196,11 +203,11 @@ export async function registerScoringRoutes(app: FastifyInstance, prisma: CrmPri
       const tenantId = resolveTenantId(req);
       if (!tenantId) return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'tenant is required', requestId: req.id } });
       const { leadId } = req.params as { leadId: string };
-      const { territoryId, salesRepId, reason } = req.body as {
-        territoryId: string;
-        salesRepId: string;
-        reason?: string;
-      };
+      const parsed = ManualRoutingSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new ValidationError('Invalid body', parsed.error.flatten());
+      }
+      const { territoryId, salesRepId, reason } = parsed.data;
 
       // Validate territory and sales rep exist
       const territory = await prisma.territory.findFirst({

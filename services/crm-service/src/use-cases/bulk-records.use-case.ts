@@ -1,6 +1,8 @@
 import { InvariantDomainError, NotFoundDomainError, PermissionDomainError, ValidationDomainError, type EngineContext } from '@nexus/domain-core';
 import type { NexusProducer } from '@nexus/kafka';
+import type { JwtPayload } from '@nexus/shared-types';
 import type { CrmPrisma } from '../prisma.js';
+import { partitionWritableRecords, type SkippedRecord } from '../lib/record-write-guard.js';
 
 export type BulkEntityType = 'contact' | 'deal' | 'lead' | 'account';
 export type BulkReassignEntityType = BulkEntityType | 'all';
@@ -53,6 +55,15 @@ function actor(ctx: EngineContext) {
   return ctx.audit.actor;
 }
 
+/**
+ * Reconstruct a JwtPayload from the engine actor so the shared record-write
+ * guard (record lock → sharing) can be applied per-record on bulk paths.
+ */
+function jwtFromCtx(ctx: EngineContext): JwtPayload {
+  const a = actor(ctx);
+  return { sub: a.userId, tenantId: a.tenantId, email: a.email ?? '', roles: a.roles ?? [] };
+}
+
 function requireManagerOrAdmin(ctx: EngineContext): void {
   const roles = new Set(actor(ctx).roles.map((role) => role.toLowerCase()));
   if (!roles.has('admin') && !roles.has('manager')) {
@@ -74,14 +85,17 @@ async function findRowsForEntity(prisma: CrmPrisma, entityType: BulkEntityType, 
 }
 
 export function createBulkRecordsUseCase(deps: BulkRecordsUseCaseDeps) {
-  async function bulkUpdate(ctx: EngineContext, input: BulkUpdateInput): Promise<{ updated: number }> {
+  async function bulkUpdate(ctx: EngineContext, input: BulkUpdateInput): Promise<{ updated: number; skipped: SkippedRecord[] }> {
     const safeUpdates = filterAllowedFields(input.entityType, input.updates);
     if (!Object.keys(safeUpdates).length) {
       throw new ValidationDomainError('NO_VALID_BULK_UPDATE_FIELDS', 'No valid update fields provided');
     }
 
+    // Data-governance guard (opt-in): skip locked/sharing-restricted records.
+    const { allowed, skipped } = await partitionWritableRecords(deps.prisma, jwtFromCtx(ctx), input.entityType, input.ids);
+
     let count = 0;
-    for (const id of input.ids) {
+    for (const id of allowed) {
       await deps.services[input.entityType].update(actor(ctx).tenantId, id, safeUpdates, actor(ctx).userId);
       count += 1;
     }
@@ -91,15 +105,15 @@ export function createBulkRecordsUseCase(deps: BulkRecordsUseCaseDeps) {
       tenantId: actor(ctx).tenantId,
       userId: actor(ctx).userId,
       entityType: input.entityType,
-      ids: input.ids,
+      ids: allowed,
       updates: safeUpdates,
       count,
     });
 
-    return { updated: count };
+    return { updated: count, skipped };
   }
 
-  async function bulkDelete(ctx: EngineContext, input: BulkDeleteInput): Promise<{ deleted: number }> {
+  async function bulkDelete(ctx: EngineContext, input: BulkDeleteInput): Promise<{ deleted: number; skipped: SkippedRecord[] }> {
     if (input.hard) {
       throw new InvariantDomainError(
         'UNSUPPORTED_BULK_HARD_DELETE',
@@ -107,8 +121,11 @@ export function createBulkRecordsUseCase(deps: BulkRecordsUseCaseDeps) {
       );
     }
 
+    // Data-governance guard (opt-in): skip locked/sharing-restricted records.
+    const { allowed, skipped } = await partitionWritableRecords(deps.prisma, jwtFromCtx(ctx), input.entityType, input.ids);
+
     let count = 0;
-    for (const id of input.ids) {
+    for (const id of allowed) {
       await deps.services[input.entityType].archive(actor(ctx).tenantId, id);
       count += 1;
     }
@@ -118,31 +135,43 @@ export function createBulkRecordsUseCase(deps: BulkRecordsUseCaseDeps) {
       tenantId: actor(ctx).tenantId,
       userId: actor(ctx).userId,
       entityType: input.entityType,
-      ids: input.ids,
+      ids: allowed,
       hard: false,
       count,
     });
 
-    return { deleted: count };
+    return { deleted: count, skipped };
   }
 
-  async function bulkTag(ctx: EngineContext, input: BulkTagInput): Promise<{ processed: number }> {
+  async function bulkTag(ctx: EngineContext, input: BulkTagInput): Promise<{ processed: number; skipped: SkippedRecord[] }> {
     const rows = await findRowsForEntity(deps.prisma, input.entityType, {
       id: { in: input.ids },
       tenantId: actor(ctx).tenantId,
       deletedAt: null,
     });
 
+    // Data-governance guard (opt-in): skip locked/sharing-restricted records.
+    const { allowed, skipped } = await partitionWritableRecords(
+      deps.prisma,
+      jwtFromCtx(ctx),
+      input.entityType,
+      rows.map((row) => row.id)
+    );
+    const allowedSet = new Set(allowed);
+
+    let processed = 0;
     for (const row of rows) {
+      if (!allowedSet.has(row.id)) continue;
       const existingTags = row.tags ?? [];
       const tags = [...new Set([...existingTags.filter((tag) => !input.removeTags.includes(tag)), ...input.addTags])];
       await deps.services[input.entityType].update(actor(ctx).tenantId, row.id, { tags }, actor(ctx).userId);
+      processed += 1;
     }
 
-    return { processed: rows.length };
+    return { processed, skipped };
   }
 
-  async function bulkReassign(ctx: EngineContext, input: BulkReassignInput): Promise<Record<string, number>> {
+  async function bulkReassign(ctx: EngineContext, input: BulkReassignInput): Promise<{ results: Record<string, number>; skipped: SkippedRecord[] }> {
     requireManagerOrAdmin(ctx);
 
     const targetUser = await (deps.prisma as any).user.findFirst({ where: { id: input.toUserId, tenantId: actor(ctx).tenantId } });
@@ -162,13 +191,18 @@ export function createBulkRecordsUseCase(deps: BulkRecordsUseCaseDeps) {
 
     const entities: BulkEntityType[] = input.entityType === 'all' ? ['contact', 'deal', 'lead', 'account'] : [input.entityType];
     const results: Record<string, number> = {};
+    const skipped: SkippedRecord[] = [];
+    const jwt = jwtFromCtx(ctx);
 
     for (const entity of entities) {
       const rows = await findRowsForEntity(deps.prisma, entity, where);
-      for (const row of rows) {
-        await deps.services[entity].update(actor(ctx).tenantId, row.id, { ownerId: input.toUserId }, actor(ctx).userId);
+      // Data-governance guard (opt-in): skip locked/sharing-restricted records.
+      const partition = await partitionWritableRecords(deps.prisma, jwt, entity, rows.map((row) => row.id));
+      for (const id of partition.allowed) {
+        await deps.services[entity].update(actor(ctx).tenantId, id, { ownerId: input.toUserId }, actor(ctx).userId);
       }
-      results[`${entity}s`] = rows.length;
+      results[`${entity}s`] = partition.allowed.length;
+      skipped.push(...partition.skipped);
     }
 
     await deps.producer.publish('records.bulk.reassigned', {
@@ -181,7 +215,7 @@ export function createBulkRecordsUseCase(deps: BulkRecordsUseCaseDeps) {
       results,
     });
 
-    return results;
+    return { results, skipped };
   }
 
   return { bulkUpdate, bulkDelete, bulkTag, bulkReassign };

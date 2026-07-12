@@ -1,7 +1,26 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import type { JwtPayload } from '@nexus/shared-types';
-import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
+import { PERMISSIONS, requirePermission, ValidationError } from '@nexus/service-utils';
 import type { CrmPrisma } from '../prisma.js';
+
+/** Structural validation; role/sentiment enum values are checked below. */
+const CreateStakeholderSchema = z.object({
+  contactId: z.string().min(1),
+  role: z.string().min(1),
+  influence: z.number().optional(),
+  sentiment: z.string().optional(),
+  reportsToId: z.string().min(1).nullish(),
+  notes: z.string().optional(),
+});
+
+const UpdateStakeholderSchema = z.object({
+  role: z.string().min(1).optional(),
+  influence: z.number().optional(),
+  sentiment: z.string().optional(),
+  reportsToId: z.string().min(1).nullish(),
+  notes: z.string().optional(),
+});
 
 const VALID_ROLES = [
   'Champion',
@@ -79,14 +98,11 @@ export async function registerStakeholderRoutes(app: FastifyInstance, prisma: Cr
           });
           if (!deal) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Deal not found', requestId: request.id } });
 
-          const body = request.body as {
-            contactId: string;
-            role: string;
-            influence?: number;
-            sentiment?: string;
-            reportsToId?: string | null;
-            notes?: string;
-          };
+          const parsedBody = CreateStakeholderSchema.safeParse(request.body);
+          if (!parsedBody.success) {
+            throw new ValidationError('Invalid body', parsedBody.error.flatten());
+          }
+          const body = parsedBody.data;
 
           if (!VALID_ROLES.includes(body.role as (typeof VALID_ROLES)[number])) {
             return reply.code(400).send({
@@ -156,13 +172,11 @@ export async function registerStakeholderRoutes(app: FastifyInstance, prisma: Cr
         async (request, reply) => {
           const jwt = request.user as JwtPayload;
           const { dealId, id } = request.params as { dealId: string; id: string };
-          const body = request.body as {
-            role?: string;
-            influence?: number;
-            sentiment?: string;
-            reportsToId?: string | null;
-            notes?: string;
-          };
+          const parsedBody = UpdateStakeholderSchema.safeParse(request.body);
+          if (!parsedBody.success) {
+            throw new ValidationError('Invalid body', parsedBody.error.flatten());
+          }
+          const body = parsedBody.data;
 
           const existing = await prisma.dealStakeholder.findFirst({
             where: { id, tenantId: jwt.tenantId, dealId },

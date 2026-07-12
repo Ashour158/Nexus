@@ -1,9 +1,19 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import type { JwtPayload } from '@nexus/shared-types';
-import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
+import { PERMISSIONS, requirePermission, ValidationError } from '@nexus/service-utils';
 import type { CrmPrisma } from '../prisma.js';
 
 const VALID_CHANNELS = ['EMAIL', 'SMS', 'WHATSAPP', 'PHONE', 'PROFILING', 'MARKETING'] as const;
+
+/** Structural validation; `channel` enum membership is checked below. */
+const CreateConsentSchema = z.object({
+  channel: z.string().min(1),
+  source: z.string().optional(),
+  expiresAt: z.string().optional(),
+  notes: z.string().optional(),
+  ipAddress: z.string().optional(),
+});
 
 export async function registerConsentRoutes(app: FastifyInstance, prisma: CrmPrisma): Promise<void> {
   app.get(
@@ -32,13 +42,11 @@ export async function registerConsentRoutes(app: FastifyInstance, prisma: CrmPri
       const jwt = request.user as JwtPayload;
       const userId = jwt.sub;
       const { contactId } = request.params as { contactId: string };
-      const body = request.body as {
-        channel: string;
-        source?: string;
-        expiresAt?: string;
-        notes?: string;
-        ipAddress?: string;
-      };
+      const parsedBody = CreateConsentSchema.safeParse(request.body);
+      if (!parsedBody.success) {
+        throw new ValidationError('Invalid body', parsedBody.error.flatten());
+      }
+      const body = parsedBody.data;
       const contact = await prisma.contact.findFirst({
         where: { id: contactId, tenantId: jwt.tenantId },
       });

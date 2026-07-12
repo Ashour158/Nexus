@@ -28,7 +28,7 @@ import { uploadToStorage } from '../lib/storage.js';
 import { createSalesRecordsUseCase } from '../use-cases/sales-records.use-case.js';
 import { buildReadAccessContext } from '../lib/access-context.js';
 import { interceptForReview } from '../lib/review-process.js';
-import { guardRecordWrite } from '../lib/record-write-guard.js';
+import { guardRecordWrite, partitionWritableRecords } from '../lib/record-write-guard.js';
 import { canAccessRecord, filterReadableRecords, isSharingConfigured } from '../lib/sharing.js';
 import { resolveAssignee } from '../lib/assignment.js';
 import { withIdempotency } from '../lib/idempotency.js';
@@ -381,12 +381,16 @@ export async function registerDealsRoutes(
         async (request, reply) => {
           const body = DealMassUpdateSchema.parse(request.body);
           const jwt = request.user as JwtPayload;
-          const data = await salesRecords.massUpdate(engineContextFromJwt(request.id, jwt), {
-            entityType: 'deal',
-            ids: body.ids,
-            data: body.data,
-          });
-          return reply.send({ success: true, data });
+          // Data-governance guard (opt-in): skip locked/sharing-restricted records.
+          const { allowed, skipped } = await partitionWritableRecords(prisma, jwt, 'deal', body.ids);
+          const data = allowed.length
+            ? await salesRecords.massUpdate(engineContextFromJwt(request.id, jwt), {
+                entityType: 'deal',
+                ids: allowed,
+                data: body.data,
+              })
+            : { count: 0 };
+          return reply.send({ success: true, data: { ...data, skipped } });
         }
       );
 
@@ -396,11 +400,15 @@ export async function registerDealsRoutes(
         async (request, reply) => {
           const body = MassIdsSchema.parse(request.body);
           const jwt = request.user as JwtPayload;
-          const data = await salesRecords.massArchive(engineContextFromJwt(request.id, jwt), {
-            entityType: 'deal',
-            ids: body.ids,
-          });
-          return reply.send({ success: true, data });
+          // Data-governance guard (opt-in): skip locked/sharing-restricted records.
+          const { allowed, skipped } = await partitionWritableRecords(prisma, jwt, 'deal', body.ids);
+          const data = allowed.length
+            ? await salesRecords.massArchive(engineContextFromJwt(request.id, jwt), {
+                entityType: 'deal',
+                ids: allowed,
+              })
+            : { count: 0 };
+          return reply.send({ success: true, data: { ...data, skipped } });
         }
       );
 
@@ -672,6 +680,11 @@ export async function registerDealsRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
+          // Data-governance guard (opt-in): record lock (423) → sharing write (403).
+          const guard = await guardRecordWrite(prisma, jwt, 'deal', id);
+          if (!guard.ok) {
+            return reply.code(guard.status).send({ success: false, error: { code: guard.code, message: guard.message, requestId: request.id } });
+          }
           const data = await salesRecords.archive(engineContextFromJwt(request.id, jwt), { entityType: 'deal', id });
           return reply.send({ success: true, data });
         }
@@ -683,6 +696,11 @@ export async function registerDealsRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
+          // Data-governance guard (opt-in): record lock (423) → sharing write (403).
+          const guard = await guardRecordWrite(prisma, jwt, 'deal', id);
+          if (!guard.ok) {
+            return reply.code(guard.status).send({ success: false, error: { code: guard.code, message: guard.message, requestId: request.id } });
+          }
           const deal = await salesRecords.restore(engineContextFromJwt(request.id, jwt), { entityType: 'deal', id });
           return reply.send({ success: true, data: deal });
         }

@@ -51,3 +51,39 @@ export async function guardRecordWrite(
 
   return { ok: true };
 }
+
+/** A record skipped by a bulk/mass operation because the write guard blocked it. */
+export type SkippedRecord = {
+  id: string;
+  status: 423 | 403;
+  code: 'LOCKED' | 'FORBIDDEN';
+  message: string;
+};
+
+/**
+ * Partition a set of record ids into those the caller may write and those the
+ * write guard blocks (locked → 423, sharing-restricted → 403). Used by the
+ * mass-/bulk-mutation paths so a locked or sharing-restricted record is never
+ * silently mutated: blocked records are skipped and reported, the rest proceed.
+ *
+ * Same opt-in / fail-open semantics as {@link guardRecordWrite} — an
+ * unconfigured tenant yields every id in `allowed` and an empty `skipped`.
+ */
+export async function partitionWritableRecords(
+  prisma: CrmPrisma,
+  jwt: JwtPayload,
+  module: SharingModule,
+  ids: string[]
+): Promise<{ allowed: string[]; skipped: SkippedRecord[] }> {
+  const allowed: string[] = [];
+  const skipped: SkippedRecord[] = [];
+  for (const id of ids) {
+    const guard = await guardRecordWrite(prisma, jwt, module, id);
+    if (guard.ok) {
+      allowed.push(id);
+    } else {
+      skipped.push({ id, status: guard.status, code: guard.code, message: guard.message });
+    }
+  }
+  return { allowed, skipped };
+}

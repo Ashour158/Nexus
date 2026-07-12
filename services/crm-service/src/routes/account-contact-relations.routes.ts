@@ -1,7 +1,32 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import type { JwtPayload } from '@nexus/shared-types';
-import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
+import { PERMISSIONS, requirePermission, ValidationError } from '@nexus/service-utils';
 import type { CrmPrisma } from '../prisma.js';
+
+/** Structural validation; influence/sentiment enum values are checked below. */
+const CreateRelationSchema = z.object({
+  contactId: z.string().min(1),
+  role: z.string().min(1),
+  isPrimary: z.boolean().optional(),
+  isDirect: z.boolean().optional(),
+  influence: z.string().nullish(),
+  sentiment: z.string().nullish(),
+  reportsToContactId: z.string().nullish(),
+  isChampion: z.boolean().optional(),
+  notes: z.string().nullish(),
+});
+
+const UpdateRelationSchema = z.object({
+  role: z.string().min(1).optional(),
+  isPrimary: z.boolean().optional(),
+  isDirect: z.boolean().optional(),
+  influence: z.string().nullish(),
+  sentiment: z.string().nullish(),
+  reportsToContactId: z.string().nullish(),
+  isChampion: z.boolean().optional(),
+  notes: z.string().nullish(),
+});
 
 /** Contact fields returned when listing an account's related contacts. */
 function relatedContactSelect() {
@@ -74,20 +99,12 @@ export async function registerAccountContactRelationsRoutes(
         async (request, reply) => {
           const jwt = request.user as JwtPayload;
           const { id } = request.params as { id: string };
-          const body = request.body as {
-            contactId?: string;
-            role?: string;
-            isPrimary?: boolean;
-            isDirect?: boolean;
-            influence?: string | null;
-            sentiment?: string | null;
-            reportsToContactId?: string | null;
-            isChampion?: boolean;
-            notes?: string | null;
-          };
+          const parsedBody = CreateRelationSchema.safeParse(request.body);
+          if (!parsedBody.success) {
+            throw new ValidationError('Invalid body', parsedBody.error.flatten());
+          }
+          const body = parsedBody.data;
 
-          if (!body.contactId) return validationError(reply, request.id, 'contactId is required');
-          if (!body.role) return validationError(reply, request.id, 'role is required');
           if (
             body.influence != null &&
             body.influence !== '' &&
@@ -172,16 +189,11 @@ export async function registerAccountContactRelationsRoutes(
         async (request, reply) => {
           const jwt = request.user as JwtPayload;
           const { id } = request.params as { id: string };
-          const body = request.body as {
-            role?: string;
-            isPrimary?: boolean;
-            isDirect?: boolean;
-            influence?: string | null;
-            sentiment?: string | null;
-            reportsToContactId?: string | null;
-            isChampion?: boolean;
-            notes?: string | null;
-          };
+          const parsedBody = UpdateRelationSchema.safeParse(request.body);
+          if (!parsedBody.success) {
+            throw new ValidationError('Invalid body', parsedBody.error.flatten());
+          }
+          const body = parsedBody.data;
 
           const existing = await prisma.accountContactRelation.findFirst({
             where: { id, tenantId: jwt.tenantId },

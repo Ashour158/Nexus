@@ -24,6 +24,7 @@ import { getFieldHistory } from '../lib/field-history.js';
 import { uploadToStorage } from '../lib/storage.js';
 import { createSalesRecordsUseCase } from '../use-cases/sales-records.use-case.js';
 import { buildReadAccessContext } from '../lib/access-context.js';
+import { guardRecordWrite, partitionWritableRecords } from '../lib/record-write-guard.js';
 import { resolveAssignee } from '../lib/assignment.js';
 import { withIdempotency } from '../lib/idempotency.js';
 import type { EngineContext } from '@nexus/domain-core';
@@ -376,12 +377,16 @@ export async function registerLeadsRoutes(
         async (request, reply) => {
           const body = LeadMassUpdateSchema.parse(request.body);
           const jwt = request.user as JwtPayload;
-          const data = await salesRecords.massUpdate(engineContextFromJwt(request.id, jwt), {
-            entityType: 'lead',
-            ids: body.ids,
-            data: body.data,
-          });
-          return reply.send({ success: true, data });
+          // Data-governance guard (opt-in): skip locked/sharing-restricted records.
+          const { allowed, skipped } = await partitionWritableRecords(prisma, jwt, 'lead', body.ids);
+          const data = allowed.length
+            ? await salesRecords.massUpdate(engineContextFromJwt(request.id, jwt), {
+                entityType: 'lead',
+                ids: allowed,
+                data: body.data,
+              })
+            : { count: 0 };
+          return reply.send({ success: true, data: { ...data, skipped } });
         }
       );
 
@@ -391,11 +396,15 @@ export async function registerLeadsRoutes(
         async (request, reply) => {
           const body = MassIdsSchema.parse(request.body);
           const jwt = request.user as JwtPayload;
-          const data = await salesRecords.massArchive(engineContextFromJwt(request.id, jwt), {
-            entityType: 'lead',
-            ids: body.ids,
-          });
-          return reply.send({ success: true, data });
+          // Data-governance guard (opt-in): skip locked/sharing-restricted records.
+          const { allowed, skipped } = await partitionWritableRecords(prisma, jwt, 'lead', body.ids);
+          const data = allowed.length
+            ? await salesRecords.massArchive(engineContextFromJwt(request.id, jwt), {
+                entityType: 'lead',
+                ids: allowed,
+              })
+            : { count: 0 };
+          return reply.send({ success: true, data: { ...data, skipped } });
         }
       );
 
@@ -518,6 +527,11 @@ export async function registerLeadsRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
+          // Data-governance guard (opt-in): record lock (423) → sharing write (403).
+          const guard = await guardRecordWrite(prisma, jwt, 'lead', id);
+          if (!guard.ok) {
+            return reply.code(guard.status).send({ success: false, error: { code: guard.code, message: guard.message, requestId: request.id } });
+          }
           const data = await salesRecords.archive(engineContextFromJwt(request.id, jwt), { entityType: 'lead', id });
           return reply.send({ success: true, data });
         }
@@ -529,6 +543,11 @@ export async function registerLeadsRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
+          // Data-governance guard (opt-in): record lock (423) → sharing write (403).
+          const guard = await guardRecordWrite(prisma, jwt, 'lead', id);
+          if (!guard.ok) {
+            return reply.code(guard.status).send({ success: false, error: { code: guard.code, message: guard.message, requestId: request.id } });
+          }
           const lead = await salesRecords.restore(engineContextFromJwt(request.id, jwt), { entityType: 'lead', id });
           return reply.send({ success: true, data: lead });
         }

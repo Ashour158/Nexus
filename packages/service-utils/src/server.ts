@@ -248,7 +248,15 @@ export async function createService(config: ServiceConfig): Promise<FastifyInsta
       // and marking the container unhealthy (→ restart loops under an orchestrator).
       allowList: (req: any) => {
         const path = pathOnly(req.url);
-        return path.startsWith('/health') || path.startsWith('/metrics') || path.startsWith('/ready');
+        if (path.startsWith('/health') || path.startsWith('/metrics') || path.startsWith('/ready')) return true;
+        // `/auth/login` is unauthenticated, so it can't be keyed per-user — it falls
+        // back to per-IP. Behind the single-IP web BFF, every user's login shares one
+        // bucket, so a login wave (mass onboarding, or the Monday-morning peak) trips
+        // the limit and legitimate logins are rejected. Login already has its own
+        // per-EMAIL brute-force control (login-throttle: lockout after repeated
+        // failures) + uniform errors, so the generic IP limiter is the wrong tool
+        // here and is removed for login. All other routes stay limited.
+        return path.endsWith('/auth/login');
       },
       keyGenerator: (req: any) => {
         // Bucket per authenticated (tenant, user) so one busy tenant can't starve

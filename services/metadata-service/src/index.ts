@@ -13,6 +13,8 @@ import { registerGlobalSetsRoutes } from './routes/global-sets.routes.js';
 import { registerFeatureFlagsRoutes } from './routes/feature-flags.routes.js';
 import { registerLayoutsRoutes } from './routes/layouts.routes.js';
 import { registerRelatedListsRoutes } from './routes/related-lists.routes.js';
+import { registerConfigRoutes } from './routes/config.routes.js';
+import { registerTranslationsRoutes } from './routes/translations.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 // REMOVED: Self-consuming sync consumer (anti-pattern). A service must not consume
 // its own events to update its own database — the write path already does that.
@@ -63,4 +65,6 @@ await startService(app, port, async () => {
   await registerFeatureFlagsRoutes(app, prisma);
   await registerLayoutsRoutes(app, prisma);
   await registerRelatedListsRoutes(app, prisma);
+  await registerConfigRoutes(app, prisma);
+  await registerTranslationsRoutes(app, prisma);
 });

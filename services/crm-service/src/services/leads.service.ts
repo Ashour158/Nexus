@@ -7,7 +7,7 @@ import type {
   UpdateLeadInput,
 } from '@nexus/validation';
 import { NexusProducer, TOPICS } from '@nexus/kafka';
-import { recordFieldChanges } from '../lib/field-history.js';
+import { recordFieldChanges, recordCreateSnapshot } from '../lib/field-history.js';
 import { Prisma } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type {
   Account,
@@ -369,6 +369,18 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
       // Data quality scoring (fire-and-forget)
       updateLeadDataQuality(prisma, created.id).catch(() => undefined);
 
+      // Full field-history: initial snapshot on CREATE (oldValue=null per tracked
+      // field). Fail-open inside the helper so history never breaks the create.
+      await recordCreateSnapshot(
+        prisma,
+        tenantId,
+        'lead',
+        created.id,
+        created as unknown as Record<string, unknown>,
+        created.ownerId,
+        'system'
+      );
+
       return created;
     },
 
@@ -528,9 +540,17 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
       return updated;
     },
 
-    async deleteLead(tenantId: string, id: string): Promise<void> {
+    async deleteLead(
+      tenantId: string,
+      id: string,
+      deletedBy?: string,
+      deletedByName?: string
+    ): Promise<void> {
       const existing = await loadOrThrow(tenantId, id);
-      await prisma.lead.update({ where: { id } as any, data: { deletedAt: new Date() } as any });
+      await prisma.lead.update({
+        where: { id } as any,
+        data: { deletedAt: new Date(), deletedBy: deletedBy ?? null, deletedByName: deletedByName ?? null } as any,
+      });
       await producer
         .publish(TOPICS.LEADS, {
           type: 'lead.archived',
@@ -547,7 +567,7 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
     async restoreLead(tenantId: string, id: string): Promise<Lead> {
       const result = await prisma.lead.updateMany({
         where: { id, tenantId, deletedAt: { not: null } } as any,
-        data: { deletedAt: null } as any,
+        data: { deletedAt: null, deletedBy: null, deletedByName: null } as any,
       });
       if (result.count === 0) throw new NotFoundError('Lead', id);
       const restored = await prisma.lead.findFirstOrThrow({ where: { id, tenantId } });

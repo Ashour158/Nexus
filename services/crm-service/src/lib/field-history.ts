@@ -208,3 +208,66 @@ export async function getFieldHistory(
     take: 200,
   });
 }
+
+export interface FieldHistoryPage {
+  items: Array<{
+    id: string;
+    fieldName: string;
+    oldValue: string | null;
+    newValue: string | null;
+    changedBy: string;
+    changedByName: string | null;
+    changedAt: Date;
+  }>;
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * Paginated, newest-first field-change timeline for a single record.
+ *
+ * `blockedFields` (from {@link getReadBlockedFields}) is applied at the SQL layer
+ * — rows for fields the caller cannot read are excluded from BOTH the page and
+ * the total, so FLS-masked fields never leak through the count either.
+ */
+export async function getFieldHistoryPaged(
+  prisma: CrmPrisma,
+  tenantId: string,
+  objectType: TrackedObject,
+  objectId: string,
+  opts: { page?: number; pageSize?: number; fieldName?: string; blockedFields?: Set<string> } = {}
+): Promise<FieldHistoryPage> {
+  const page = Math.max(1, Math.floor(opts.page ?? 1));
+  const pageSize = Math.min(200, Math.max(1, Math.floor(opts.pageSize ?? 50)));
+  const blocked = opts.blockedFields && opts.blockedFields.size > 0 ? [...opts.blockedFields] : undefined;
+
+  const where = {
+    tenantId,
+    objectType,
+    objectId,
+    ...(opts.fieldName ? { fieldName: opts.fieldName } : {}),
+    ...(blocked ? { fieldName: { notIn: blocked } } : {}),
+  };
+
+  const [total, items] = await Promise.all([
+    prisma.fieldChangeLog.count({ where }),
+    prisma.fieldChangeLog.findMany({
+      where,
+      orderBy: { changedAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: {
+        id: true,
+        fieldName: true,
+        oldValue: true,
+        newValue: true,
+        changedBy: true,
+        changedByName: true,
+        changedAt: true,
+      },
+    }),
+  ]);
+
+  return { items, total, page, pageSize };
+}

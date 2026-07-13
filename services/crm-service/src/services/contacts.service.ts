@@ -412,10 +412,18 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
     },
 
     /** Soft-deletes by setting `deletedAt`. */
-    async deleteContact(tenantId: string, id: string): Promise<void> {
+    async deleteContact(
+      tenantId: string,
+      id: string,
+      deletedBy?: string,
+      deletedByName?: string
+    ): Promise<void> {
       const existing = await loadOrThrow(tenantId, id);
       if (existing.deletedAt) return;
-      await prisma.contact.update({ where: { id }, data: { deletedAt: new Date(), isActive: false } });
+      await prisma.contact.update({
+        where: { id },
+        data: { deletedAt: new Date(), isActive: false, deletedBy: deletedBy ?? null, deletedByName: deletedByName ?? null },
+      });
       await recordSingleChange(
         prisma,
         tenantId,
@@ -443,7 +451,7 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
     async restoreContact(tenantId: string, id: string): Promise<Contact> {
       const result = await prisma.contact.updateMany({
         where: { id, tenantId, deletedAt: { not: null } },
-        data: { deletedAt: null, isActive: true },
+        data: { deletedAt: null, isActive: true, deletedBy: null, deletedByName: null },
       });
       if (result.count === 0) throw new NotFoundError('Contact', id);
       const restored = await prisma.contact.findFirstOrThrow({ where: { id, tenantId } });

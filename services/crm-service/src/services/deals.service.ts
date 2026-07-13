@@ -17,7 +17,7 @@ import type {
   DealContact,
 } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { CrmPrisma } from '../prisma.js';
-import { recordFieldChanges } from '../lib/field-history.js';
+import { recordFieldChanges, recordCreateSnapshot } from '../lib/field-history.js';
 import { toPaginatedResult } from '@nexus/shared-types';
 import { updateDealDataQuality } from '../lib/data-quality.js';
 import { computeDealHealth, deriveMeddicGaps } from '../lib/deal-health.engine.js';
@@ -534,6 +534,18 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
 
       updateDealDataQuality(prisma, created.id).catch(() => undefined);
 
+      // Full field-history: initial snapshot on CREATE (oldValue=null per tracked
+      // field). Fail-open inside the helper so history never breaks the create.
+      await recordCreateSnapshot(
+        prisma,
+        tenantId,
+        'deal',
+        created.id,
+        created as unknown as Record<string, unknown>,
+        created.ownerId,
+        'system'
+      );
+
       return created;
     },
 
@@ -944,7 +956,12 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
      * Soft-deletes the deal by setting `deletedAt`. The row is preserved
      * so relations (activities, notes, quotes) remain intact.
      */
-    async deleteDeal(tenantId: string, id: string): Promise<void> {
+    async deleteDeal(
+      tenantId: string,
+      id: string,
+      deletedBy?: string,
+      deletedByName?: string
+    ): Promise<void> {
       const existing = await loadDealOrThrow(tenantId, id);
       if (existing.deletedAt) {
         return;
@@ -953,6 +970,8 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         where: { id },
         data: {
           deletedAt: new Date(),
+          deletedBy: deletedBy ?? null,
+          deletedByName: deletedByName ?? null,
           version: { increment: 1 },
         },
       });
@@ -971,7 +990,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
     async restoreDeal(tenantId: string, id: string): Promise<Deal> {
       const result = await prisma.deal.updateMany({
         where: { id, tenantId, deletedAt: { not: null } },
-        data: { deletedAt: null },
+        data: { deletedAt: null, deletedBy: null, deletedByName: null },
       });
       if (result.count === 0) throw new NotFoundError('Deal', id);
       const restored = await prisma.deal.findFirstOrThrow({ where: { id, tenantId } });

@@ -509,7 +509,12 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
      * Soft-deletes an account. Refuses when open (non-lost/dormant) deals or active
      * contacts reference it; callers should reassign first.
      */
-    async deleteAccount(tenantId: string, id: string): Promise<void> {
+    async deleteAccount(
+      tenantId: string,
+      id: string,
+      deletedBy?: string,
+      deletedByName?: string
+    ): Promise<void> {
       const existing = await loadOrThrow(tenantId, id);
       if (existing.deletedAt) return;
       const [openDealCount, activeContactCount] = await Promise.all([
@@ -526,7 +531,10 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
       if (activeContactCount > 0) {
         throw new BusinessRuleError('Account cannot be archived while active contacts are linked');
       }
-      await prisma.account.update({ where: { id }, data: { deletedAt: new Date() } });
+      await prisma.account.update({
+        where: { id },
+        data: { deletedAt: new Date(), deletedBy: deletedBy ?? null, deletedByName: deletedByName ?? null },
+      });
       await recordSingleChange(
         prisma,
         tenantId,
@@ -554,7 +562,7 @@ export function createAccountsService(prisma: CrmPrisma, producer: NexusProducer
     async restoreAccount(tenantId: string, id: string): Promise<Account> {
       const result = await prisma.account.updateMany({
         where: { id, tenantId, deletedAt: { not: null } },
-        data: { deletedAt: null },
+        data: { deletedAt: null, deletedBy: null, deletedByName: null },
       });
       if (result.count === 0) throw new NotFoundError('Account', id);
       const restored = await prisma.account.findFirstOrThrow({ where: { id, tenantId } });

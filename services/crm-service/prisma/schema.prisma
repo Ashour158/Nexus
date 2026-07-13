@@ -49,6 +49,8 @@ model Lead {
   assignedTo       String?
   priority         String?            @default("medium") // urgent, high, medium, low
   deletedAt        DateTime?
+  deletedBy        String?
+  deletedByName    String?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   activities       Activity[]
@@ -76,6 +78,7 @@ model Lead {
   @@index([territoryId])
   @@index([assignedTo])
   @@index([priority])
+  @@index([tenantId, deletedAt])
 }
 
 enum LeadSource {
@@ -141,6 +144,8 @@ model Contact {
   isActive         Boolean           @default(true)
   dataQualityScore Int?
   deletedAt        DateTime?
+  deletedBy        String?
+  deletedByName    String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   deals            DealContact[]
@@ -165,6 +170,7 @@ model Contact {
   @@index([tenantId, createdAt])
   @@index([tenantId, updatedAt])
   @@index([tenantId, email])
+  @@index([tenantId, deletedAt])
 }
 
 model ContactEmail {
@@ -315,6 +321,8 @@ model Account {
   lng              Float?
   tags             String[]
   deletedAt        DateTime?
+  deletedBy        String?
+  deletedByName    String?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   contacts         Contact[]
@@ -336,6 +344,7 @@ model Account {
   @@index([tenantId, code])
   @@index([tenantId, taxId])
   @@index([tenantId, vatNumber])
+  @@index([tenantId, deletedAt])
 }
 
 enum AccountType {
@@ -390,6 +399,8 @@ model Deal {
   tags              String[]
   version           Int               @default(1)
   deletedAt         DateTime?
+  deletedBy         String?
+  deletedByName     String?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   contacts          DealContact[]
@@ -448,6 +459,7 @@ model Deal {
   @@index([tenantId, contractEndDate])
   @@index([tenantId, renewedFromDealId])
   @@index([tenantId, territoryId])
+  @@index([tenantId, deletedAt])
 }
 
 enum DealStatus {

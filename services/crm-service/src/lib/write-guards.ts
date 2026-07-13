@@ -245,3 +245,53 @@ export async function maskFieldPermissions<T extends Record<string, unknown>>(
     return records;
   }
 }
+
+/**
+ * Returns the set of field names the caller may NOT read for `objectType`,
+ * using the exact same DEFAULT-ALLOW, most-permissive-role-wins evaluation as
+ * {@link maskFieldPermissions}. This is the companion helper for surfaces that
+ * present field-keyed data (e.g. the field-change history timeline) and need to
+ * FILTER by field name rather than delete keys off an object.
+ *
+ * FAIL-OPEN contract (identical to the read-mask):
+ *  - `roles` undefined            → empty set (no restriction).
+ *  - ADMIN / SUPER_ADMIN callers  → empty set.
+ *  - No matching FieldPermission rows → empty set.
+ *  - Any lookup/eval error        → empty set (never hide history on our own bug).
+ */
+export async function getReadBlockedFields(
+  prisma: CrmPrisma,
+  tenantId: string,
+  objectType: string,
+  roles: string[] | undefined
+): Promise<Set<string>> {
+  const blocked = new Set<string>();
+  if (roles === undefined) return blocked;
+  try {
+    const roleSet = new Set(roles);
+    if (roleSet.has('ADMIN') || roleSet.has('SUPER_ADMIN')) return blocked;
+
+    const perms = await prisma.fieldPermission.findMany({
+      where: { tenantId, module: objectType, roleName: { in: roles } },
+      select: { field: true, canRead: true },
+    });
+    if (perms.length === 0) return blocked;
+
+    const readableByField = new Map<string, boolean>();
+    for (const p of perms) {
+      readableByField.set(p.field, (readableByField.get(p.field) ?? false) || p.canRead);
+    }
+    for (const [field, readable] of readableByField) {
+      if (!readable) blocked.add(field);
+    }
+    return blocked;
+  } catch (err) {
+    if (governanceFailClosed()) throw new GovernanceUnavailableError('field-read-masking');
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[write-guards] read-blocked-fields eval failed for ${objectType}; returning none (fail-open)`,
+      err
+    );
+    return blocked;
+  }
+}

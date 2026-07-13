@@ -44,6 +44,7 @@ import { registerDataQualityRoutes } from './data-quality.routes.js';
 import { registerSharingRoutes } from './sharing.routes.js';
 import { registerRecordLocksRoutes } from './record-locks.routes.js';
 import { registerAssignmentRulesRoutes } from './assignment-rules.routes.js';
+import { registerRecycleBinRoutes } from './recycle-bin.routes.js';
 
 /**
  * Registers every CRM HTTP route under `/api/v1` — Section 34.2 + 34.3.
@@ -96,4 +97,5 @@ export async function registerAllRoutes(
   await registerSharingRoutes(app, prisma);
   await registerRecordLocksRoutes(app, prisma);
   await registerAssignmentRulesRoutes(app, prisma, producer);
+  await registerRecycleBinRoutes(app, prisma, producer);
 }

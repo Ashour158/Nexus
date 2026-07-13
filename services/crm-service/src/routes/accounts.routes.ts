@@ -80,7 +80,7 @@ export async function registerAccountsRoutes(
         create: (tenantId, data) => accounts.createAccount(tenantId, data as never),
         get: (tenantId, id) => accounts.getAccountById(tenantId, id) as Promise<Record<string, unknown>>,
         update: (tenantId, id, updates, userId, userName, roles) => accounts.updateAccount(tenantId, id, updates as never, userId, userName, roles),
-        archive: (tenantId, id) => accounts.deleteAccount(tenantId, id),
+        archive: (tenantId, id, deletedBy, deletedByName) => accounts.deleteAccount(tenantId, id, deletedBy, deletedByName),
         restore: (tenantId, id) => accounts.restoreAccount(tenantId, id),
       },
     },

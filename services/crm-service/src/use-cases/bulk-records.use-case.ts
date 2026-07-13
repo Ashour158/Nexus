@@ -9,7 +9,7 @@ export type BulkReassignEntityType = BulkEntityType | 'all';
 
 type ModuleService = {
   update: (tenantId: string, id: string, updates: Record<string, unknown>, userId?: string) => Promise<unknown>;
-  archive: (tenantId: string, id: string) => Promise<unknown>;
+  archive: (tenantId: string, id: string, deletedBy?: string, deletedByName?: string) => Promise<unknown>;
 };
 
 export type BulkRecordsUseCaseDeps = {
@@ -126,7 +126,7 @@ export function createBulkRecordsUseCase(deps: BulkRecordsUseCaseDeps) {
 
     let count = 0;
     for (const id of allowed) {
-      await deps.services[input.entityType].archive(actor(ctx).tenantId, id);
+      await deps.services[input.entityType].archive(actor(ctx).tenantId, id, actor(ctx).userId, actor(ctx).email);
       count += 1;
     }
 

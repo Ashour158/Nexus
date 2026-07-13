@@ -445,3 +445,38 @@ model CodingAllocationLog {
   @@index([tenantId, code])
   @@unique([tenantId, entityType, code])
 }
+
+// ─── Custom Buttons & Actions (Zoho parity) ──────────────────────────────────
+// Admin-defined buttons that render on record detail / list views and run an
+// action when clicked. Fully tenant-scoped and additive; no other model
+// references this one. `config` is an action-typed JSON blob (validated with
+// zod at the route layer per `actionType`):
+//   RUN_WORKFLOW   { workflowId }
+//   UPDATE_FIELDS  { updates: { field: value, ... } }
+//   OPEN_URL       { urlTemplate }                 // supports {{record.field}}
+//   CALL_WEBHOOK   { url, method, bodyTemplate? }  // https-only, SSRF-guarded
+model CustomButton {
+  id              String   @id @default(cuid())
+  tenantId        String
+  // lead | contact | account | deal | quote | ticket
+  module          String
+  label           String
+  icon            String?
+  // RECORD | LIST | BOTH — where the button is offered in the UI.
+  placement       String   @default("RECORD")
+  // RUN_WORKFLOW | UPDATE_FIELDS | OPEN_URL | CALL_WEBHOOK
+  actionType      String
+  config          Json     @default("{}")
+  // Roles allowed to see/run the button; empty array = visible to all roles.
+  visibilityRoles String[] @default([])
+  // When true the UI must confirm before invoking /execute.
+  confirmRequired Boolean  @default(false)
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId, module, placement])
+  @@index([tenantId, module, isActive])
+  @@unique([id, tenantId])
+}

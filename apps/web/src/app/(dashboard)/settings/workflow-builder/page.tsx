@@ -126,12 +126,12 @@ const TRIGGER_ICON: Record<string, typeof Zap> = {
 };
 
 function emptyDraft(meta: BuilderMeta): Draft {
-  const module = meta.modules[0]?.module ?? '';
+  const moduleName = meta.modules[0]?.module ?? '';
   const triggerEvent = meta.modules[0]?.triggerEvents[0] ?? '';
   return {
     name: '',
     description: '',
-    module,
+    module: moduleName,
     triggerType: meta.triggerTypes[0]?.value ?? 'record_action',
     triggerEvent,
     conditionLogic: 'AND',

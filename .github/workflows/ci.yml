@@ -37,6 +37,27 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+  a11y:
+    name: Accessibility (jsx-a11y)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      # next/core-web-vitals bundles eslint-plugin-jsx-a11y; this named gate makes
+      # accessibility a first-class required check on the web app. WCAG-AA runtime
+      # (axe) checks over the built app are a follow-up (needs a running server in CI).
+      - name: Accessibility lint (web)
+        run: pnpm --filter @nexus/web exec next lint --max-warnings=0
+
   test:
     name: Tests
     runs-on: ubuntu-latest

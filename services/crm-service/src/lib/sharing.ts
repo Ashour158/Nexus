@@ -1,5 +1,6 @@
 import type { CrmPrisma } from '../prisma.js';
 import type { JwtPayload } from '@nexus/shared-types';
+import { governanceFailClosed } from './governance-mode.js';
 
 /**
  * Record-level access control — Org-Wide Defaults + Sharing Rules + Manual
@@ -229,6 +230,7 @@ export async function canAccessRecord(
 
     return false;
   } catch (err) {
+    if (governanceFailClosed()) return false;
     // eslint-disable-next-line no-console
     console.warn(`[sharing] canAccessRecord failed for ${module}; allowing (fail-open)`, err);
     return true;

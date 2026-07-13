@@ -1,6 +1,7 @@
 import type { CrmPrisma } from '../prisma.js';
 import { ValidationError } from '@nexus/service-utils';
 import { validateRecord } from './validation-rules.js';
+import { governanceFailClosed, GovernanceUnavailableError } from './governance-mode.js';
 
 /**
  * Additive, FAIL-SAFE write guards for the authoritative CRM write paths.
@@ -37,6 +38,7 @@ export async function enforceValidationRules(
   try {
     result = await validateRecord(prisma, tenantId, objectType, record);
   } catch (err) {
+    if (governanceFailClosed()) throw new GovernanceUnavailableError('validation-rules');
     // Evaluation failure must NEVER block a save. Fail-open + log.
     // eslint-disable-next-line no-console
     console.warn(
@@ -141,6 +143,7 @@ export async function applyFieldPermissions<T extends Record<string, unknown>>(
     }
     return { update: next, stripped };
   } catch (err) {
+    if (governanceFailClosed()) throw new GovernanceUnavailableError('field-permissions');
     // Any failure => fail-open (behave as if no permissions configured).
     // eslint-disable-next-line no-console
     console.warn(
@@ -231,6 +234,7 @@ export async function maskFieldPermissions<T extends Record<string, unknown>>(
 
     return (isArray ? masked : masked[0]) as T | T[];
   } catch (err) {
+    if (governanceFailClosed()) throw new GovernanceUnavailableError('field-read-masking');
     // Any failure => fail-open (behave as if no permissions configured). We log
     // so masking outages are visible, but we DO NOT blank the UI.
     // eslint-disable-next-line no-console

@@ -107,13 +107,16 @@ try {
   } catch (err) {
     app.log.warn({ err }, 'Automation-rules consumer failed to start');
   }
-  // AU-4 DLQ replay — opt-in re-driver for parked automation events.
-  if (process.env.AUTOMATION_DLQ_REPLAY_ENABLED === 'true') {
+  // WF-OPS DLQ intake — persists every parked automation event to DeadLetterEvent
+  // for the /api/v1/dlq admin replay surface. On by default; the legacy auto
+  // re-drive is a separate opt-in (AUTOMATION_DLQ_REPLAY_ENABLED) handled inside
+  // the consumer. Set AUTOMATION_DLQ_PERSIST_ENABLED=false to disable intake.
+  if (process.env.AUTOMATION_DLQ_PERSIST_ENABLED !== 'false') {
     try {
       automationDlqReplayConsumer = await startAutomationDlqReplayConsumer(prisma, producer);
-      app.log.info('Automation DLQ replay consumer started');
+      app.log.info('Automation DLQ intake/replay consumer started');
     } catch (err) {
-      app.log.warn({ err }, 'Automation DLQ replay consumer failed to start');
+      app.log.warn({ err }, 'Automation DLQ intake/replay consumer failed to start');
     }
   }
   branchConsumer = await startBranchConsumer(prisma, producer);

@@ -10,6 +10,7 @@ import { registerAutomationRulesRoutes } from './automation-rules.routes.js';
 import { registerEscalationRulesRoutes } from './escalation-rules.routes.js';
 import { registerScoringRulesRoutes } from './scoring-rules.routes.js';
 import { registerThresholdAlertsRoutes } from './threshold-alerts.routes.js';
+import { registerDlqRoutes } from './dlq.routes.js';
 
 export async function registerRoutes(
   app: FastifyInstance,
@@ -25,4 +26,5 @@ export async function registerRoutes(
   await registerEscalationRulesRoutes(app, prisma);
   await registerScoringRulesRoutes(app, prisma);
   await registerThresholdAlertsRoutes(app, prisma);
+  await registerDlqRoutes(app, prisma, producer);
 }

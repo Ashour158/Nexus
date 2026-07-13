@@ -601,3 +601,41 @@ model ThresholdAlertState {
   @@unique([alertId, recordId])
   @@index([tenantId, alertId])
 }
+
+// WF-OPS (Phase-4): dead-letter replay surface. When the automation consumer
+// exhausts its retries on a transient failure, the ORIGINAL event is parked on
+// `<topic>.dlq`. The DLQ consumer persists each parked message here so an admin
+// can inspect it and replay the original envelope back onto its source topic.
+//
+// `payload` holds the FULL original event envelope (eventId/correlationId/source/
+// timestamp/version/causation preserved) — republished verbatim via
+// NexusProducer.publishBatch so downstream consumers process it identically.
+// `dedupeKey` = `<originalTopic>:<partition>:<offset>` makes persistence
+// idempotent: re-consuming the same parked message (consumer restart / handler
+// retry) upserts the same row instead of creating duplicates.
+model DeadLetterEvent {
+  id         String           @id @default(cuid())
+  tenantId   String
+  topic      String           // original (source) topic the event replays onto
+  eventType  String
+  eventId    String?          // envelope eventId (for cross-referencing / ops search)
+  payload    Json             // full original event envelope — republished verbatim
+  headers    Json?            // original kafka message headers (string map)
+  error      String
+  attempts   Int              @default(0)
+  status     DeadLetterStatus @default(PENDING)
+  dedupeKey  String           // <originalTopic>:<partition>:<offset> — dedup identity
+  createdAt  DateTime         @default(now())
+  replayedAt DateTime?
+
+  @@unique([tenantId, dedupeKey])
+  @@index([tenantId, status])
+  @@index([tenantId, topic, status])
+  @@index([tenantId, createdAt])
+}
+
+enum DeadLetterStatus {
+  PENDING
+  REPLAYED
+  DISCARDED
+}

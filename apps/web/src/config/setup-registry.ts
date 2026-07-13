@@ -128,6 +128,7 @@ export const SETUP_CATEGORIES: SetupCategory[] = [
       { id: 'custom-fields', label: 'Custom Fields', href: '/settings/custom-fields', icon: Database, description: 'Low-code entity fields, field types, and validation hooks.' },
       { id: 'validation-rules', label: 'Validation Rules', href: '/settings/validation-rules', icon: GitBranch, description: 'Record validation rules and blocking conditions.' },
       { id: 'modules-custom', label: 'Modules', href: '/settings/modules', icon: Boxes, description: 'Custom modules, fields, and record layouts.' },
+      { id: 'schema-builder', label: 'Schema / ER Builder', href: '/settings/schema-builder', icon: Network, description: 'Visual entity-relationship diagram of standard + custom modules, fields, and lookup relationships.', isNew: true },
       { id: 'global-picklist-sets', label: 'Global Picklist Sets', href: '/settings/global-picklist-sets', icon: List, description: 'Reusable picklist value sets shared across fields.', isNew: true },
       { id: 'layouts', label: 'Page Layout Editor', href: '/settings/layouts', icon: LayoutGrid, description: 'Visual section/field layout editor with required/read-only marks, conditional layout rules, and live preview.', isNew: true },
       { id: 'review-process', label: 'Review Process', href: '/settings/review-process', icon: GitPullRequest, description: 'Maker-checker review configuration for record changes.', isNew: true },

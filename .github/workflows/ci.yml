@@ -2,9 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    # `fix/local-boot` is the current working branch — CI runs on pushes to it
+    # in addition to the long-lived branches. Add/remove working branches here.
+    branches: [main, develop, fix/local-boot]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 concurrency:
   group: ci-${{ github.ref }}-${{ github.event_name }}

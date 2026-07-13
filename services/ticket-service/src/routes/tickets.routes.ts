@@ -62,6 +62,11 @@ const AssignBody = z
 
 const TransitionBody = z.object({ status: z.enum(STATUSES) });
 
+const SlaStatusQuery = z.object({
+  status: z.enum(['at_risk', 'breached']),
+  limit: z.coerce.number().int().min(1).max(200).default(100),
+});
+
 const CommentBody = z.object({
   body: z.string().min(1),
   isInternal: z.boolean().default(false),
@@ -93,6 +98,15 @@ export async function registerTicketRoutes(app: FastifyInstance, tickets: Ticket
     const body = CreateBody.parse(request.body);
     const data = await tickets.createTicket(tenantId, actorId, body);
     return reply.code(201).send({ success: true, data });
+  });
+
+  // SLA queue view. Registered before `/:id` so `sla-status` is not captured as
+  // a ticket id. `status`=at_risk|breached selects the queue.
+  app.get('/api/v1/tickets/sla-status', { preHandler: requirePermission(R.READ) }, async (request, reply) => {
+    const { tenantId } = ctx(request);
+    const { status, limit } = SlaStatusQuery.parse(request.query);
+    const data = await tickets.getSlaStatus(tenantId, status, limit);
+    return reply.send({ success: true, data });
   });
 
   app.get('/api/v1/tickets/:id', { preHandler: requirePermission(R.READ) }, async (request, reply) => {

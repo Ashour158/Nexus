@@ -4,12 +4,14 @@ import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
 import type { TicketsService } from '../services/tickets.service.js';
 
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
+const SUPPORT_LEVELS = ['BASIC', 'STANDARD', 'PREMIUM'] as const;
 
 const Id = z.object({ id: z.string().min(1) });
 
 const CreateBody = z.object({
   name: z.string().min(1),
   priority: z.enum(PRIORITIES).nullable().optional(),
+  supportLevel: z.enum(SUPPORT_LEVELS).nullable().optional(),
   firstResponseMins: z.number().int().positive(),
   resolutionMins: z.number().int().positive(),
   businessHoursOnly: z.boolean().optional(),

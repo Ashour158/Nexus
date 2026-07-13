@@ -129,7 +129,7 @@ export const SETUP_CATEGORIES: SetupCategory[] = [
       { id: 'validation-rules', label: 'Validation Rules', href: '/settings/validation-rules', icon: GitBranch, description: 'Record validation rules and blocking conditions.' },
       { id: 'modules-custom', label: 'Modules', href: '/settings/modules', icon: Boxes, description: 'Custom modules, fields, and record layouts.' },
       { id: 'global-picklist-sets', label: 'Global Picklist Sets', href: '/settings/global-picklist-sets', icon: List, description: 'Reusable picklist value sets shared across fields.', isNew: true },
-      { id: 'layouts', label: 'Page Layouts & Layout Rules', href: '/settings/layouts', icon: LayoutGrid, description: 'Per-module page layouts and dynamic layout rules.', isNew: true },
+      { id: 'layouts', label: 'Page Layout Editor', href: '/settings/layouts', icon: LayoutGrid, description: 'Visual section/field layout editor with required/read-only marks, conditional layout rules, and live preview.', isNew: true },
       { id: 'review-process', label: 'Review Process', href: '/settings/review-process', icon: GitPullRequest, description: 'Maker-checker review configuration for record changes.', isNew: true },
       { id: 'config-export-import', label: 'Config Export/Import', href: '/settings/config-export-import', icon: FileJson, description: 'Move low-code customization between environments as a JSON bundle.', isNew: true },
       { id: 'label-translations', label: 'Label Translations', href: '/settings/label-translations', icon: Languages, description: 'Localize field, module, and picklist labels per locale.', isNew: true },
@@ -141,6 +141,7 @@ export const SETUP_CATEGORIES: SetupCategory[] = [
     icon: Workflow,
     description: 'Workflows, automation & scoring rules, assignment, escalation, approvals.',
     items: [
+      { id: 'workflow-builder', label: 'Workflow Rule Builder', href: '/settings/workflow-builder', icon: Workflow, description: 'Visual trigger → condition → action rule builder with delayed and date-based triggers.', isNew: true },
       { id: 'workflows', label: 'Workflow Rules', href: '/settings/workflows', icon: Workflow, description: 'Low-code workflow builder, execution engine, and SLA nodes.' },
       { id: 'automation-rules', label: 'Automation Rules', href: '/settings/automation-rules', icon: Bot, description: 'Event-driven assignment, notifications, and field updates.' },
       { id: 'scoring-rules', label: 'Scoring Rules', href: '/settings/scoring-rules', icon: Target, description: 'Deterministic record scoring rules, conditions, and points.' },
@@ -149,8 +150,9 @@ export const SETUP_CATEGORIES: SetupCategory[] = [
       { id: 'quotes', label: 'Quote Administration', href: '/settings/quotes', icon: FileCheck, description: 'Quote numbering, approval tiers, and discount thresholds.' },
       { id: 'assignment-rules', label: 'Assignment Rules', href: '/settings/assignment-rules', icon: Route, description: 'Round-robin and criteria-based record assignment.', isNew: true },
       { id: 'escalation-rules', label: 'Escalation Rules', href: '/settings/escalation-rules', icon: Clock, description: 'Time-based escalation of records and SLAs.', isNew: true },
-      { id: 'blueprint-transitions', label: 'Blueprint Transitions', href: '/settings/blueprint-transitions', icon: Compass, description: 'State-machine transitions and stage-gating for records.', isNew: true },
-      { id: 'approvals', label: 'Approval Processes', href: '/approvals', icon: CheckCircle2, description: 'Approval policies, requests, and governance queues.', external: true },
+      { id: 'blueprint-transitions', label: 'Blueprint Designer', href: '/settings/blueprint-transitions', icon: Compass, description: 'Visual state-machine designer — stages as nodes, transitions as labeled edges with guards and SLA.', isNew: true },
+      { id: 'approval-processes', label: 'Approval Process Builder', href: '/settings/approval-processes', icon: CheckCircle2, description: 'Ordered approval steps with role/user/manager approvers and parallel quorum (all / any / N-of-M).', isNew: true },
+      { id: 'approvals', label: 'Approval Queues', href: '/approvals', icon: CheckCircle2, description: 'Approval requests and governance queues.', external: true },
     ],
   },
   {

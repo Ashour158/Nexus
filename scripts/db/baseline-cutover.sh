@@ -22,6 +22,11 @@ baseline_svc(){
   [ -d "$migdir" ] || { echo "  SKIP $svc (no migrations)"; return; }
   # is the container up?
   docker compose ps "$svc" 2>/dev/null | grep -q Up || { echo "  SKIP $svc (not running)"; return; }
+  # Clean the target FIRST: `docker cp SRC container:DEST` copies SRC *into* DEST when DEST
+  # already exists, producing a spurious nested `migrations/migrations/` that Prisma reads as
+  # a bogus unapplied migration. Remove it (as root — the app user can't) so the copy lands as
+  # the dir, not inside it.
+  docker compose exec -T --user root "$svc" sh -c "rm -rf node_modules/.prisma/$client/migrations" >/dev/null 2>&1
   docker compose cp "$migdir" "$svc:/app/node_modules/.prisma/$client/migrations" >/dev/null 2>&1
   local n=0 ok=0
   for m in $(ls -1 "$migdir" | grep -v migration_lock.toml); do

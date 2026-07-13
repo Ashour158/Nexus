@@ -70,9 +70,6 @@ export async function startQuoteConsumer(io: Server): Promise<NexusConsumer> {
   consumer.on('rfq.converted_to_quote', async (event) => {
     emitQuoteEvent(io, { contact: 'contact:rfq_converted', account: 'account:rfq_converted', deal: 'deal:rfq_converted' }, event);
   });
-  consumer.on('rfq.converted', async (event) => {
-    emitQuoteEvent(io, { contact: 'contact:rfq_converted', account: 'account:rfq_converted', deal: 'deal:rfq_converted' }, event);
-  });
   consumer.on('order.created', async (event) => {
     emitQuoteEvent(io, { contact: 'contact:order_created', account: 'account:order_created', deal: 'deal:order_created' }, event);
   });

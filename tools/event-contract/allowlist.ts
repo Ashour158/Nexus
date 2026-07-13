@@ -175,16 +175,5 @@ export const KNOWN_EXTERNAL_PUBLISHERS: Record<string, string> = {
   //    L2, or another service’s worker).
   'email.received': 'published by email-sync-service via `const type = inbound?…` shorthand (L2)',
   'quote.esign.sent': 'published by comm-service e-sign worker (outside scan)',
-
-  // ── BUG: real orphan-subscriptions parked here so the guardrail is green.
-  //    Each is a subscriber with no matching publisher today — a wiring gap or a
-  //    name mismatch. Fix by publishing the event or correcting the name, then
-  //    delete the entry. Documented in docs/EVENTS.md.
-  'rfq.converted': 'BUG: realtime subscribes `rfq.converted` but finance emits `rfq.converted_to_quote` — name mismatch',
-  'subscription.canceled': 'BUG: analytics subscribes `subscription.canceled` (one L) but billing emits `subscription.cancelled` (two L) — spelling mismatch',
-  'commission.paid': 'BUG: analytics subscribes `commission.paid` but finance emits only calculated/approved/clawback — missing publisher',
-  'lead.status_changed': 'BUG: analytics subscribes `lead.status_changed` but crm emits lead.qualified/unqualified/updated — missing publisher',
-  'order.status_changed': 'BUG: analytics subscribes `order.status_changed` but finance emits order.created/updated/cancelled — missing publisher',
-  'subscription.updated': 'BUG: analytics subscribes `subscription.updated` but billing emits only created/cancelled/activated/renewed/etc — no generic update publisher',
-  'order.created_from_quote': 'BUG: analytics subscribes `order.created_from_quote` but finance emits `order.created` — name mismatch',
+  'custom_button.workflow.trigger': 'published by metadata-service via `emitEvent(eventType,…)`→`publish(topic,{type})` shorthand-var path (L2); consumed by workflow-service trigger consumer',
 };

@@ -280,7 +280,6 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
   consumer.on('lead.captured', projectLeadEvent);
   consumer.on('lead.assigned', projectLeadEvent);
   consumer.on('lead.updated', projectLeadEvent);
-  consumer.on('lead.status_changed', projectLeadEvent);
   consumer.on('lead.converted', projectLeadEvent);
 
   // ── Contacts (nexus.crm.contacts) — raw event stream ───────────────────────
@@ -350,9 +349,11 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
     });
   };
   consumer.on('order.created', projectOrderEvent);
-  consumer.on('order.created_from_quote', projectOrderEvent);
+  // Orders born from a quote conversion are emitted as `quote.converted_to_order`
+  // (finance commercial-records use-case), not `order.created` — subscribe it so
+  // the order_events read-model captures quote-originated orders.
+  consumer.on('quote.converted_to_order', projectOrderEvent);
   consumer.on('order.updated', projectOrderEvent);
-  consumer.on('order.status_changed', projectOrderEvent);
 
   // ── Tickets (nexus.ticket.events) ──────────────────────────────────────────
   // Best-effort status inference from the event type (payloads carry different
@@ -450,8 +451,6 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
     });
   };
   consumer.on('subscription.created', projectSubscriptionEvent);
-  consumer.on('subscription.updated', projectSubscriptionEvent);
-  consumer.on('subscription.canceled', projectSubscriptionEvent);
   consumer.on('subscription.cancelled', projectSubscriptionEvent);
 
   // ── Commissions (nexus.finance.commissions topic) ──────────────────────────
@@ -481,7 +480,6 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
   consumer.on('commission.calculated', projectCommissionEvent);
   consumer.on('commission.approved', projectCommissionEvent);
   consumer.on('commission.clawback', projectCommissionEvent);
-  consumer.on('commission.paid', projectCommissionEvent);
 
   await consumer.subscribe([
     TOPICS.DEALS,

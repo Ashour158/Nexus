@@ -1,4 +1,4 @@
-import type { PrismaClient } from '../../../node_modules/.prisma/planning-client/index.js';
+import type { PrismaClient } from '../../../../node_modules/.prisma/planning-client/index.js';
 import DataLoader from 'dataloader';
 
 export interface GraphQLContext {

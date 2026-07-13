@@ -1,9 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Calendar, CheckCircle2, FileText, Mail, MessageSquare, Phone, Clock, AlertCircle, Plus } from 'lucide-react';
+import { Calendar, CalendarDays, CheckCircle2, FileText, List, Mail, MessageSquare, Phone, Clock, AlertCircle, Plus } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ActivityCalendar } from '@/components/activities/ActivityCalendar';
 import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
+import { cn } from '@/lib/cn';
 import { ExportButton } from '@/components/export/ExportButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -95,6 +97,7 @@ function isOverdue(activity: ActivityItem): boolean {
 
 export default function ActivitiesPage() {
   const [tab, setTab] = useState<ActivityTab>('all');
+  const [view, setView] = useState<'list' | 'calendar'>('list');
   const [createOpen, setCreateOpen] = useState(false);
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const toast = useUiStore((s) => s.pushToast);
@@ -113,10 +116,17 @@ export default function ActivitiesPage() {
   }, [tab, userId]);
 
   const activitiesQuery = useActivities(filters);
+  // Calendar view needs a broader, unfiltered window to place items across the
+  // month; it shares the activities cache and only matters when calendar is on.
+  const calendarQuery = useActivities({ page: 1, limit: 200 });
   const completeActivity = useCompleteActivity();
   const createActivity = useCreateActivity();
 
   const activities = useMemo(() => (activitiesQuery.data?.data ?? []) as ActivityItem[], [activitiesQuery.data]);
+  const calendarActivities = useMemo(
+    () => (calendarQuery.data?.data ?? []) as ActivityItem[],
+    [calendarQuery.data]
+  );
 
   const openCreate = () => {
     setDraft(EMPTY_DRAFT);
@@ -176,6 +186,30 @@ export default function ActivitiesPage() {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-on-surface">Activity Feed</h1>
         <div className="flex items-center gap-3">
+          <div className="inline-flex rounded-lg border border-outline-variant p-0.5">
+            <button
+              type="button"
+              onClick={() => setView('list')}
+              aria-pressed={view === 'list'}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
+                view === 'list' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'
+              )}
+            >
+              <List className="h-4 w-4" /> List
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('calendar')}
+              aria-pressed={view === 'calendar'}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
+                view === 'calendar' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'
+              )}
+            >
+              <CalendarDays className="h-4 w-4" /> Calendar
+            </button>
+          </div>
           <ExportButton module="activities" />
           <SavedViewsControl
             entityType="activity"
@@ -189,6 +223,23 @@ export default function ActivitiesPage() {
         </div>
       </div>
 
+      {view === 'calendar' ? (
+        <ActivityCalendar
+          activities={calendarActivities.map((a) => ({
+            id: a.id,
+            type: a.type,
+            subject: a.subject,
+            status: a.status,
+            dueDate: a.dueDate,
+          }))}
+          loading={calendarQuery.isLoading}
+          onAddOnDay={(day) => {
+            setDraft({ ...EMPTY_DRAFT, dueDate: `${day}T09:00` });
+            setCreateOpen(true);
+          }}
+        />
+      ) : (
+        <>
       <div className="mb-4 flex flex-wrap gap-2">
         {tabs.map((t) => (
           <button
@@ -282,6 +333,8 @@ export default function ActivitiesPage() {
             />
           )}
         </div>
+      )}
+        </>
       )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

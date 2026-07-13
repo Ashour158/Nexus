@@ -39,6 +39,7 @@ import { FollowButton } from '@/components/crm/FollowButton';
 import { EnrichmentPanel } from '@/components/crm/EnrichmentPanel';
 import { CustomFieldsSection } from '@/components/crm/CustomFieldsSection';
 import { FieldHistory } from '@/components/crm/FieldHistory';
+import { DynamicRecordLayout } from '@/components/crm/DynamicRecordLayout';
 import { BuyingCommittee } from '@/components/crm/BuyingCommittee';
 import { api } from '@/lib/api-client';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format';
@@ -295,6 +296,9 @@ export default function AccountDetailPage() {
           </aside>
 
           <main className="space-y-6">
+            {/* Deployed page-layout (progressive enhancement): renders only when
+                a layout is assigned for `account`; otherwise nothing extra. */}
+            <DynamicRecordLayout module="account" record={account as unknown as Record<string, unknown>} />
             {editOpen && (
               <AccountEditPanel
                 account={account}

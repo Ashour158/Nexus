@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useConfirm } from '@/hooks/use-confirm';
 import Link from 'next/link';
 import type { Stage } from '@nexus/shared-types';
-import { LayoutGrid, List, Trash2 } from 'lucide-react';
+import { Columns3, LayoutGrid, List, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import { PipelineBoard } from '@/components/deals/pipeline-board';
+import { KanbanBoard } from '@/components/deals/KanbanBoard';
 import { ExportButton } from '@/components/export/ExportButton';
 import { ImportButton } from '@/components/export/ImportButton';
 import { EmptyState as SharedEmptyState } from '@/components/ui/EmptyState';
@@ -17,9 +18,10 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Avatar } from '@/components/ui/avatar';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { usePipelines, useStages } from '@/hooks/use-pipelines';
-import { useDeals, useDeleteDeal, useUpdateDeal } from '@/hooks/use-deals';
+import { useDeals, useDeleteDeal, useUpdateDeal, usePipelineDeals, useMoveDeal } from '@/hooks/use-deals';
 import { useUsers } from '@/hooks/use-users';
 import { usePipelineStore } from '@/stores/pipeline.store';
+import { useAuthStore } from '@/stores/auth.store';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { useColumnVisibility } from '@/components/ui/column-chooser';
@@ -34,7 +36,7 @@ const statusLabelMap: Record<string, string> = {
 
 export default function DealsPage() {
   const { confirm, ConfirmDialog } = useConfirm();
-  const [view, setView] = useState<'pipeline' | 'list'>('pipeline');
+  const [view, setView] = useState<'pipeline' | 'board' | 'list'>('pipeline');
   const [stageFilter, setStageFilter] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('');
   const [search, setSearch] = useState('');
@@ -100,6 +102,14 @@ export default function DealsPage() {
 
   const deleteMutation = useDeleteDeal();
   const updateDeal = useUpdateDeal();
+  const moveDeal = useMoveDeal();
+
+  // Board (Kanban) data — shares the pipeline deals query key with the Pipeline
+  // view, so switching between them is deduped (no extra fetch).
+  const boardDealsQuery = usePipelineDeals(resolvedPipelineId ?? '');
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const isDevPreview = process.env.NODE_ENV === 'development';
+  const canMoveDeals = isDevPreview || hasPermission('deals:update') || hasPermission('deals:*');
 
   const toggleSelection = (id: string, checked: boolean) => {
     setSelectedIds((prev) => {
@@ -153,6 +163,17 @@ export default function DealsPage() {
               aria-pressed={view === 'pipeline'}
             >
               <LayoutGrid className="h-4 w-4" /> Pipeline
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('board')}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
+                view === 'board' ? 'bg-primary-light text-primary' : 'text-on-surface-variant hover:text-on-surface'
+              )}
+              aria-pressed={view === 'board'}
+            >
+              <Columns3 className="h-4 w-4" /> Board
             </button>
             <button
               type="button"
@@ -392,6 +413,46 @@ export default function DealsPage() {
             }}
           />
         </div>
+      ) : view === 'board' ? (
+        <>
+          {isLoading || boardDealsQuery.isLoading ? (
+            <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--border-color)' }}>
+              <TableSkeleton rows={6} cols={5} />
+            </div>
+          ) : pipelinesQuery.isError ? (
+            <ErrorBanner message="Failed to load pipelines. Try again." />
+          ) : !resolvedPipelineId ? (
+            <SharedEmptyState
+              icon="🧭"
+              title="No pipelines configured yet"
+              description="Ask an administrator to create a pipeline in Settings."
+            />
+          ) : stagesQuery.isError ? (
+            <ErrorBanner message="Failed to load stages for this pipeline." />
+          ) : stages.length === 0 ? (
+            <SharedEmptyState
+              icon="🧱"
+              title="This pipeline has no stages yet"
+              description="Add stages in pipeline settings to start tracking deals."
+            />
+          ) : boardDealsQuery.isError ? (
+            <ErrorBanner message="Failed to load deals for this board." />
+          ) : (boardDealsQuery.data?.data.length ?? 0) === 0 ? (
+            <SharedEmptyState
+              icon="🗂️"
+              title="No deals in this pipeline yet"
+              description="Create a deal to see it on the board."
+            />
+          ) : (
+            <KanbanBoard
+              stages={stages}
+              deals={boardDealsQuery.data?.data ?? []}
+              owners={owners}
+              canMove={canMoveDeals}
+              onMove={(dealId, stageId) => moveDeal.mutate({ id: dealId, stageId })}
+            />
+          )}
+        </>
       ) : (
         <>
           {isLoading ? (

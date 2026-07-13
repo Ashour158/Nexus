@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useLead, useLeadAiPrediction, useConvertLead } from '@/hooks/use-leads';
 import { AiPredictionPanel } from '@/components/crm/AiPredictionPanel';
+import { DynamicRecordLayout } from '@/components/crm/DynamicRecordLayout';
 import { useLeadNotes } from '@/hooks/use-notes';
 import { useActivities } from '@/hooks/use-activities';
 import { usePipelines } from '@/hooks/use-pipelines';
@@ -187,27 +188,34 @@ export default function LeadDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-1">
-          <div className="rounded-xl border border-outline-variant bg-surface p-5">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-on-surface-variant">Lead Profile</h2>
-            <dl className="space-y-2 text-sm">
-              <DetailItem label="Code" value={String(leadRecord.code ?? '-')} />
-              <DetailItem label="Email" value={lead.email ?? '-'} />
-              <DetailItem label="Phone" value={lead.phone ?? '-'} />
-              <DetailItem label="Source" value={lead.source} />
-              <DetailItem label="Status" value={<StatusBadge status={lead.status} />} />
-              <DetailItem label="Score" value={String(lead.score)} />
-              <DetailItem label="Rating" value={String(leadRecord.rating ?? '-')} />
-              <DetailItem label="Job Title" value={lead.jobTitle ?? '-'} />
-              <DetailItem label="Company" value={lead.company ?? '-'} />
-              <DetailItem label="Industry" value={String(leadRecord.industry ?? '-')} />
-              <DetailItem label="Website" value={String(leadRecord.website ?? '-')} />
-              <DetailItem label="Owner" value={lead.ownerId ?? '-'} />
-              <DetailItem label="Territory" value={String(leadRecord.territoryId ?? '-')} />
-              <DetailItem label="Assigned To" value={String(leadRecord.assignedTo ?? '-')} />
-              <DetailItem label="Converted" value={lead.convertedAt ? formatDate(lead.convertedAt) : '-'} />
-              <DetailItem label="Created" value={formatDate(lead.createdAt)} />
-            </dl>
-          </div>
+          <DynamicRecordLayout
+            module="lead"
+            record={leadRecord}
+            labels={{ jobTitle: 'Job Title', ownerId: 'Owner', territoryId: 'Territory', assignedTo: 'Assigned To' }}
+            fallback={
+              <div className="rounded-xl border border-outline-variant bg-surface p-5">
+                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-on-surface-variant">Lead Profile</h2>
+                <dl className="space-y-2 text-sm">
+                  <DetailItem label="Code" value={String(leadRecord.code ?? '-')} />
+                  <DetailItem label="Email" value={lead.email ?? '-'} />
+                  <DetailItem label="Phone" value={lead.phone ?? '-'} />
+                  <DetailItem label="Source" value={lead.source} />
+                  <DetailItem label="Status" value={<StatusBadge status={lead.status} />} />
+                  <DetailItem label="Score" value={String(lead.score)} />
+                  <DetailItem label="Rating" value={String(leadRecord.rating ?? '-')} />
+                  <DetailItem label="Job Title" value={lead.jobTitle ?? '-'} />
+                  <DetailItem label="Company" value={lead.company ?? '-'} />
+                  <DetailItem label="Industry" value={String(leadRecord.industry ?? '-')} />
+                  <DetailItem label="Website" value={String(leadRecord.website ?? '-')} />
+                  <DetailItem label="Owner" value={lead.ownerId ?? '-'} />
+                  <DetailItem label="Territory" value={String(leadRecord.territoryId ?? '-')} />
+                  <DetailItem label="Assigned To" value={String(leadRecord.assignedTo ?? '-')} />
+                  <DetailItem label="Converted" value={lead.convertedAt ? formatDate(lead.convertedAt) : '-'} />
+                  <DetailItem label="Created" value={formatDate(lead.createdAt)} />
+                </dl>
+              </div>
+            }
+          />
           <div className="rounded-xl border border-outline-variant bg-surface p-5">
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-on-surface-variant">Readiness</h2>
             <div className="space-y-3 text-sm">

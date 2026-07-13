@@ -19,6 +19,7 @@ import {
   useUpdateDeal,
   useConvertDealToRenewal,
 } from '@/hooks/use-deals';
+import { useDealActivities } from '@/hooks/use-activities';
 import { useUsers } from '@/hooks/use-users';
 import type { UserRef } from '@/hooks/use-users';
 import type { DealHealth, DealScoringInsights } from '@/hooks/use-deals';
@@ -39,12 +40,14 @@ import {
   type SplitType,
 } from '@/hooks/use-deal-team';
 import { DealRoomPanel } from '@/components/crm/DealRoomPanel';
+import { DynamicRecordLayout } from '@/components/crm/DynamicRecordLayout';
+import { RecordTimeline } from '@/components/crm/RecordTimeline';
 import { api } from '@/lib/api-client';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/auth.store';
 
-type DealTab = 'health' | 'timeline' | 'notes' | 'products' | 'team' | 'dealroom' | 'cpq' | 'orders' | 'documents' | 'stakeholders' | 'governance' | 'competitors';
+type DealTab = 'health' | 'journey' | 'timeline' | 'notes' | 'products' | 'team' | 'dealroom' | 'cpq' | 'orders' | 'documents' | 'stakeholders' | 'governance' | 'competitors';
 type AnyRecord = Record<string, unknown>;
 
 interface Stakeholder {
@@ -83,6 +86,7 @@ export default function DealDetailPage() {
   const canUpdate = isDevPreview || hasPermission('deals:update') || hasPermission('deals:*');
   const dealQuery = useDeal(dealId);
   const timelineQuery = useDealTimeline(dealId);
+  const dealActivitiesQuery = useDealActivities(dealId, { limit: 100 });
   const insightsQuery = useDealScoringInsights(dealId);
   const notesQuery = useDealNotes(dealId, { limit: 50 });
   const usersQuery = useUsers({ limit: 100 });
@@ -182,6 +186,7 @@ export default function DealDetailPage() {
 
   const tabs: { id: DealTab; label: string }[] = [
     { id: 'health', label: 'Health' },
+    { id: 'journey', label: 'Journey' },
     { id: 'timeline', label: 'Timeline' },
     { id: 'notes', label: 'Notes' },
     { id: 'products', label: 'Products' },
@@ -234,22 +239,29 @@ export default function DealDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-1">
-          <div className="rounded-xl border border-outline-variant bg-surface p-5">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-on-surface-variant">Deal Control</h2>
-            <dl className="space-y-2 text-sm">
-              <DetailItem label="Code" value={String(dealRecord.code ?? '-')} />
-              <DetailItem label="Value" value={formatCurrency(deal.amount, deal.currency)} />
-              <DetailItem label="Stage" value={stageName} />
-              <DetailItem label="Status" value={<StatusBadge status={deal.status} />} />
-              <DetailItem label="Probability" value={`${deal.probability}%`} />
-              <DetailItem label="Owner" value={ownerName} />
-              <DetailItem label="Account" value={<Link href={`/accounts/${deal.accountId}`} className="text-brand-700 hover:underline">{accountName}</Link>} />
-              <DetailItem label="Close Date" value={deal.expectedCloseDate ? formatDate(deal.expectedCloseDate) : '-'} />
-              <DetailItem label="Forecast" value={deal.forecastCategory} />
-              <DetailItem label="MEDDIC" value={String(dealRecord.meddicicScore ?? '-')} />
-              <DetailItem label="Created" value={formatDate(deal.createdAt)} />
-            </dl>
-          </div>
+          <DynamicRecordLayout
+            module="deal"
+            record={dealRecord}
+            labels={{ meddicicScore: 'MEDDIC', expectedCloseDate: 'Close Date', pipelineId: 'Pipeline' }}
+            fallback={
+              <div className="rounded-xl border border-outline-variant bg-surface p-5">
+                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-on-surface-variant">Deal Control</h2>
+                <dl className="space-y-2 text-sm">
+                  <DetailItem label="Code" value={String(dealRecord.code ?? '-')} />
+                  <DetailItem label="Value" value={formatCurrency(deal.amount, deal.currency)} />
+                  <DetailItem label="Stage" value={stageName} />
+                  <DetailItem label="Status" value={<StatusBadge status={deal.status} />} />
+                  <DetailItem label="Probability" value={`${deal.probability}%`} />
+                  <DetailItem label="Owner" value={ownerName} />
+                  <DetailItem label="Account" value={<Link href={`/accounts/${deal.accountId}`} className="text-brand-700 hover:underline">{accountName}</Link>} />
+                  <DetailItem label="Close Date" value={deal.expectedCloseDate ? formatDate(deal.expectedCloseDate) : '-'} />
+                  <DetailItem label="Forecast" value={deal.forecastCategory} />
+                  <DetailItem label="MEDDIC" value={String(dealRecord.meddicicScore ?? '-')} />
+                  <DetailItem label="Created" value={formatDate(deal.createdAt)} />
+                </dl>
+              </div>
+            }
+          />
           <RenewalPanel deal={deal} canEdit={canUpdate} />
           <div className="rounded-xl border border-outline-variant bg-surface p-5">
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-on-surface-variant">Stage Hardening</h2>
@@ -286,6 +298,21 @@ export default function DealDetailPage() {
               data={insightsQuery.data}
               isLoading={insightsQuery.isLoading}
               isError={insightsQuery.isError}
+            />
+          )}
+          {tab === 'journey' && (
+            <RecordTimeline
+              objectType="deal"
+              objectId={dealId}
+              activities={(dealActivitiesQuery.data?.data ?? []).map((a) => ({
+                id: a.id,
+                type: a.type,
+                subject: a.subject,
+                at: a.dueDate ?? a.createdAt,
+                description: a.description ?? undefined,
+                status: a.status,
+              }))}
+              activitiesLoading={dealActivitiesQuery.isLoading}
             />
           )}
           {tab === 'timeline' && <TimelineTab data={timelineQuery.data} isLoading={timelineQuery.isLoading} />}

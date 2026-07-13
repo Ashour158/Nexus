@@ -39,6 +39,7 @@ import { useUsers } from '@/hooks/use-users';
 import { EnrichmentPanel } from '@/components/crm/EnrichmentPanel';
 import { CustomFieldsSection } from '@/components/crm/CustomFieldsSection';
 import { FieldHistory } from '@/components/crm/FieldHistory';
+import { DynamicRecordLayout } from '@/components/crm/DynamicRecordLayout';
 import { api } from '@/lib/api-client';
 import { formatDate } from '@/lib/format';
 import { cn } from '@/lib/cn';
@@ -339,6 +340,9 @@ export default function ContactDetailPage() {
           </div>
 
           <div className="space-y-6">
+            {/* Deployed page-layout (progressive enhancement): renders only when
+                a layout is assigned for `contact`; otherwise nothing extra. */}
+            <DynamicRecordLayout module="contact" record={contact as unknown as Record<string, unknown>} />
             <div className="grid gap-4 xl:grid-cols-2">
               <InfoCard title="Relationship" icon={<Building2 className="h-4 w-4" />}>
                 <DetailItem

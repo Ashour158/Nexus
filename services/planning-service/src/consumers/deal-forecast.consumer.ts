@@ -4,6 +4,7 @@ import {
   createForecastRollupService,
   normalizeDealEvent,
 } from '../services/forecast-rollup.service.js';
+import { createCategoryMapService } from '../services/category-map.service.js';
 
 interface LoggerLike {
   info: (...args: unknown[]) => void;
@@ -30,7 +31,9 @@ export async function startDealForecastConsumer(
   log: LoggerLike
 ): Promise<NexusConsumer> {
   const consumer = new NexusConsumer('planning-service.deal-forecast');
-  const rollup = createForecastRollupService(prisma);
+  // Categorize open deals by stage via the tenant's ForecastCategoryMap (cached).
+  const categoryResolver = createCategoryMapService(prisma);
+  const rollup = createForecastRollupService(prisma, { categoryResolver });
 
   const handle = async (event: {
     type?: string;

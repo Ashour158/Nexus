@@ -209,6 +209,10 @@ services:
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_crm
+      # Needed by team-resolver to resolve manager→reports for team-scoped
+      # visibility. Missing before → fell back to localhost:3001 (crm) → team
+      # scope silently collapsed to own.
+      AUTH_SERVICE_URL: http://auth-service:3000
       METADATA_SERVICE_URL: http://metadata-service:3004
       # Lead/deal create -> territory auto-routing + cadence auto-enroll (fail-open).
       TERRITORY_SERVICE_URL: http://territory-service:3019

@@ -4,8 +4,10 @@ import { createHttpClient } from '@nexus/service-utils';
  * Team-membership resolution for `team`-scoped record visibility.
  *
  * A SALES_MANAGER granted `<resource>:read:team` may see records owned by
- * themselves and their direct reports. This module resolves that set of user
- * ids from the auth-service, which owns the manager → report relationship.
+ * themselves and everyone in their reporting sub-tree (direct AND skip-level
+ * reports — a VP sees their whole org, not just their direct line). This module
+ * resolves that set of user ids from the auth-service, which owns the
+ * manager → report relationship, via the recursive sub-tree lookup.
  *
  * FAIL-CLOSED contract:
  *  - There is no guaranteed backing endpoint for "direct reports of a manager".
@@ -18,8 +20,10 @@ import { createHttpClient } from '@nexus/service-utils';
  *  - The acting user is ALWAYS included in the returned set.
  */
 
+// auth-service listens on :3000 (crm itself is :3001) — the old :3001 default
+// silently pointed team-resolution at crm and always collapsed team→own scope.
 const authClient = createHttpClient({
-  baseURL: process.env.AUTH_SERVICE_URL ?? 'http://localhost:3001',
+  baseURL: process.env.AUTH_SERVICE_URL ?? 'http://auth-service:3000',
 });
 
 /** Extract a list of string user ids from a loosely-typed internal response. */
@@ -63,7 +67,8 @@ function extractReportIds(body: unknown): string[] {
  */
 export async function resolveTeamMemberIds(
   userId: string,
-  token?: string
+  token?: string,
+  tenantId?: string
 ): Promise<string[]> {
   const self = new Set<string>([userId]);
   try {
@@ -71,9 +76,14 @@ export async function resolveTeamMemberIds(
     if (token) headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
     const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
     if (internalToken) headers['x-service-token'] = internalToken;
+    // auth-service's internal route can't read the caller's JWT tenant (its
+    // global JWT preHandler is skipped for /internal/*), and a manager may have
+    // no UserProfile row — so pass the caller's tenant explicitly to scope the
+    // lookup. Without it the resolver returns empty and team collapses to own.
+    if (tenantId) headers['x-tenant-id'] = tenantId;
 
     const body = await authClient.get(
-      `/api/v1/internal/users/${encodeURIComponent(userId)}/reports`,
+      `/api/v1/internal/users/${encodeURIComponent(userId)}/reports?recursive=true`,
       headers
     );
     for (const id of extractReportIds(body)) self.add(id);

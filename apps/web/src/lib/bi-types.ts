@@ -3,7 +3,20 @@
 export type AggFn = 'sum' | 'count' | 'count_distinct' | 'avg' | 'min' | 'max';
 export type TimeGrain = 'day' | 'week' | 'month' | 'quarter' | 'year';
 export type FilterOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'contains';
-export type Dataset = 'deals' | 'leads' | 'activities' | 'revenue' | 'quotes';
+export type Dataset =
+  | 'deals'
+  | 'leads'
+  | 'activities'
+  | 'revenue'
+  | 'quotes'
+  | 'contacts'
+  | 'accounts'
+  | 'orders'
+  | 'invoices'
+  | 'tickets'
+  | 'campaigns'
+  | 'subscriptions'
+  | 'commissions';
 export type ChartType = 'bar' | 'line' | 'area' | 'pie' | 'table' | 'kpi' | 'funnel';
 
 export interface ReportSpecMeasure {
@@ -89,6 +102,14 @@ export const DATASETS: Array<{ value: Dataset; label: string }> = [
   { value: 'activities', label: 'Activities' },
   { value: 'revenue', label: 'Revenue' },
   { value: 'quotes', label: 'Quotes' },
+  { value: 'contacts', label: 'Contacts' },
+  { value: 'accounts', label: 'Accounts' },
+  { value: 'orders', label: 'Orders' },
+  { value: 'invoices', label: 'Invoices' },
+  { value: 'tickets', label: 'Tickets' },
+  { value: 'campaigns', label: 'Campaigns' },
+  { value: 'subscriptions', label: 'Subscriptions' },
+  { value: 'commissions', label: 'Commissions' },
 ];
 
 export const AGG_FNS: Array<{ value: AggFn; label: string }> = [

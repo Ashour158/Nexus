@@ -382,7 +382,7 @@ export async function registerDealsRoutes(
           const body = DealMassUpdateSchema.parse(request.body);
           const jwt = request.user as JwtPayload;
           // Data-governance guard (opt-in): skip locked/sharing-restricted records.
-          const { allowed, skipped } = await partitionWritableRecords(prisma, jwt, 'deal', body.ids);
+          const { allowed, skipped } = await partitionWritableRecords(prisma, jwt, 'deal', body.ids, request.headers.authorization);
           const data = allowed.length
             ? await salesRecords.massUpdate(engineContextFromJwt(request.id, jwt), {
                 entityType: 'deal',
@@ -401,7 +401,7 @@ export async function registerDealsRoutes(
           const body = MassIdsSchema.parse(request.body);
           const jwt = request.user as JwtPayload;
           // Data-governance guard (opt-in): skip locked/sharing-restricted records.
-          const { allowed, skipped } = await partitionWritableRecords(prisma, jwt, 'deal', body.ids);
+          const { allowed, skipped } = await partitionWritableRecords(prisma, jwt, 'deal', body.ids, request.headers.authorization);
           const data = allowed.length
             ? await salesRecords.massArchive(engineContextFromJwt(request.id, jwt), {
                 entityType: 'deal',
@@ -616,7 +616,7 @@ export async function registerDealsRoutes(
           }
           const jwt = request.user as JwtPayload;
           // Data-governance guard (opt-in): record lock (423) → sharing write (403).
-          const guard = await guardRecordWrite(prisma, jwt, 'deal', id);
+          const guard = await guardRecordWrite(prisma, jwt, 'deal', id, request.headers.authorization);
           if (!guard.ok) {
             return reply.code(guard.status).send({ success: false, error: { code: guard.code, message: guard.message, requestId: request.id } });
           }
@@ -681,7 +681,7 @@ export async function registerDealsRoutes(
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
           // Data-governance guard (opt-in): record lock (423) → sharing write (403).
-          const guard = await guardRecordWrite(prisma, jwt, 'deal', id);
+          const guard = await guardRecordWrite(prisma, jwt, 'deal', id, request.headers.authorization);
           if (!guard.ok) {
             return reply.code(guard.status).send({ success: false, error: { code: guard.code, message: guard.message, requestId: request.id } });
           }
@@ -697,7 +697,7 @@ export async function registerDealsRoutes(
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
           // Data-governance guard (opt-in): record lock (423) → sharing write (403).
-          const guard = await guardRecordWrite(prisma, jwt, 'deal', id);
+          const guard = await guardRecordWrite(prisma, jwt, 'deal', id, request.headers.authorization);
           if (!guard.ok) {
             return reply.code(guard.status).send({ success: false, error: { code: guard.code, message: guard.message, requestId: request.id } });
           }

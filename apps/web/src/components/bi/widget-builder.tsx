@@ -68,6 +68,11 @@ export function WidgetBuilder({
   const [filters, setFilters] = useState<FilterRow[]>(
     initial?.spec.filters?.map((f) => ({ field: f.field, op: f.op, value: String(f.value ?? '') })) ?? []
   );
+  const [calcs, setCalcs] = useState<Array<{ alias: string; formula: string }>>(
+    initial?.spec.measures
+      ?.filter((m) => typeof m.formula === 'string')
+      .map((m) => ({ alias: m.alias ?? '', formula: m.formula ?? '' })) ?? []
+  );
   const [limit, setLimit] = useState<string>(
     initial?.spec.limit ? String(initial.spec.limit) : ''
   );
@@ -80,19 +85,32 @@ export function WidgetBuilder({
     setMeasures([]);
     setDimensions([]);
     setFilters([]);
+    setCalcs([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataset]);
 
+  // Base-measure aliases available for calculated formulas to reference.
+  const baseAliases = useMemo(
+    () => measures.filter((m) => m.field).map((m) => `${m.agg}_${m.field}`),
+    [measures]
+  );
+
   const spec: ReportSpec | null = useMemo(() => {
     const validMeasures = measures.filter((m) => m.field);
+    const validCalcs = calcs.filter((c) => c.alias.trim() && c.formula.trim());
     if (validMeasures.length === 0) return null;
     const built: ReportSpec = {
       dataset,
-      measures: validMeasures.map((m) => ({
-        field: m.field,
-        agg: m.agg,
-        alias: `${m.agg}_${m.field}`,
-      })),
+      measures: [
+        ...validMeasures.map((m) => ({
+          field: m.field,
+          agg: m.agg,
+          alias: `${m.agg}_${m.field}`,
+        })),
+        // Calculated measures come AFTER base measures so their referenced
+        // aliases are already defined in the spec.
+        ...validCalcs.map((c) => ({ formula: c.formula.trim(), alias: c.alias.trim() })),
+      ],
       dimensions: dimensions
         .filter((d) => d.field)
         .map((d) => ({ field: d.field, ...(d.timeGrain ? { timeGrain: d.timeGrain } : {}) })),
@@ -102,7 +120,7 @@ export function WidgetBuilder({
     };
     if (limit && Number(limit) > 0) built.limit = Number(limit);
     return built;
-  }, [dataset, measures, dimensions, filters, limit]);
+  }, [dataset, measures, calcs, dimensions, filters, limit]);
 
   const preview = useQueryPreview(spec, Boolean(spec));
 
@@ -223,6 +241,46 @@ export function WidgetBuilder({
                         ))}
                       </select>
                       <RemoveBtn onClick={() => setMeasures((p) => p.filter((_, i) => i !== index))} />
+                    </div>
+                  ))}
+                </Section>
+
+                {/* Calculated fields */}
+                <Section
+                  title="Calculated fields"
+                  onAdd={() => setCalcs((prev) => [...prev, { alias: '', formula: '' }])}
+                >
+                  {calcs.length === 0 ? (
+                    <p className="text-xs text-on-surface-variant">
+                      Optional. Derive a metric from your measures with a formula, e.g.{' '}
+                      <code className="rounded bg-surface-container px-1">won / total</code>.
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-on-surface-variant">
+                      Reference these measure names: {baseAliases.length ? baseAliases.map((a) => (
+                        <code key={a} className="mr-1 rounded bg-surface-container px-1">{a}</code>
+                      )) : <span className="italic">add measures first</span>}
+                    </p>
+                  )}
+                  {calcs.map((c, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <input
+                        value={c.alias}
+                        onChange={(e) =>
+                          setCalcs((prev) => prev.map((row, i) => (i === index ? { ...row, alias: e.target.value.replace(/[^A-Za-z0-9_]/g, '') } : row)))
+                        }
+                        placeholder="name"
+                        className={cn(inputCls, 'w-28')}
+                      />
+                      <input
+                        value={c.formula}
+                        onChange={(e) =>
+                          setCalcs((prev) => prev.map((row, i) => (i === index ? { ...row, formula: e.target.value } : row)))
+                        }
+                        placeholder="formula, e.g. sum_amount / count_deal_id"
+                        className={cn(inputCls, 'flex-1 font-mono text-xs')}
+                      />
+                      <RemoveBtn onClick={() => setCalcs((p) => p.filter((_, i) => i !== index))} />
                     </div>
                   ))}
                 </Section>

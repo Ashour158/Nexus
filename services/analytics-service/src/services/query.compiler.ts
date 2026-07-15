@@ -36,6 +36,8 @@ export interface Measure {
   field: string;
   agg: Agg;
   alias?: string;
+  /** Calculated measure: arithmetic over earlier measure aliases (no field/agg). */
+  formula?: string;
 }
 export interface Dimension {
   field: string;
@@ -408,6 +410,81 @@ function assertArray(v: unknown, name: string): unknown[] {
  * Compile a ReportSpec into a parameterized ClickHouse query.
  * Throws SpecError on any structural or whitelist violation.
  */
+// ── Safe formula compiler for calculated measures ───────────────────────────
+// A tiny recursive-descent parser for arithmetic over measure aliases. The ONLY
+// tokens accepted are numbers, identifiers (resolved to a whitelisted inner
+// aggregate SQL by the caller), the operators + - * /, and parentheses — nothing
+// else can reach the emitted SQL. Division is wrapped in nullIf(denominator, 0)
+// so a zero denominator yields NULL instead of inf/nan.
+type FormulaToken = { t: 'num' | 'id' | 'op'; v: string };
+
+function tokenizeFormula(formula: string): FormulaToken[] {
+  if (typeof formula !== 'string' || formula.length === 0 || formula.length > 500) {
+    throw new SpecError('calculated measure: formula must be a non-empty string (<=500 chars)');
+  }
+  const tokens: FormulaToken[] = [];
+  const re = /\s*([0-9]+(?:\.[0-9]+)?|[A-Za-z_][A-Za-z0-9_]*|[()+\-*/])/g;
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(formula)) !== null) {
+    if (m.index !== lastIndex) {
+      throw new SpecError(`calculated measure: illegal character near "${formula.slice(lastIndex, m.index + 1)}"`);
+    }
+    const v = m[1];
+    if (/^[0-9]/.test(v)) tokens.push({ t: 'num', v });
+    else if (/^[A-Za-z_]/.test(v)) tokens.push({ t: 'id', v });
+    else tokens.push({ t: 'op', v });
+    lastIndex = re.lastIndex;
+  }
+  if (lastIndex !== formula.length) throw new SpecError('calculated measure: illegal trailing character in formula');
+  if (tokens.length === 0) throw new SpecError('calculated measure: empty formula');
+  return tokens;
+}
+
+function compileFormula(formula: string, resolveId: (id: string) => string): string {
+  const tokens = tokenizeFormula(formula);
+  let pos = 0;
+  const peek = (): FormulaToken | undefined => tokens[pos];
+  const eat = (): FormulaToken => tokens[pos++];
+
+  function parseExpr(): string {
+    let left = parseTerm();
+    while (peek() && (peek()!.v === '+' || peek()!.v === '-')) {
+      const op = eat().v;
+      left = `(${left} ${op} ${parseTerm()})`;
+    }
+    return left;
+  }
+  function parseTerm(): string {
+    let left = parseFactor();
+    while (peek() && (peek()!.v === '*' || peek()!.v === '/')) {
+      const op = eat().v;
+      const right = parseFactor();
+      left = op === '/' ? `(${left} / nullIf(${right}, 0))` : `(${left} * ${right})`;
+    }
+    return left;
+  }
+  function parseFactor(): string {
+    const t = peek();
+    if (!t) throw new SpecError('calculated measure: unexpected end of formula');
+    if (t.v === '-') { eat(); return `(-1 * ${parseFactor()})`; }
+    if (t.v === '(') {
+      eat();
+      const inner = parseExpr();
+      if (!peek() || peek()!.v !== ')') throw new SpecError('calculated measure: missing closing ")"');
+      eat();
+      return `(${inner})`;
+    }
+    if (t.t === 'num') { eat(); return t.v; }
+    if (t.t === 'id') { eat(); return `(${resolveId(t.v)})`; }
+    throw new SpecError(`calculated measure: unexpected token "${t.v}"`);
+  }
+
+  const out = parseExpr();
+  if (pos !== tokens.length) throw new SpecError('calculated measure: trailing tokens in formula');
+  return out;
+}
+
 export function compileReportSpec(spec: unknown, tenantId: string): CompiledQuery {
   if (!spec || typeof spec !== 'object') throw new SpecError('spec must be an object');
   const s = spec as Record<string, unknown>;
@@ -474,8 +551,39 @@ export function compileReportSpec(spec: unknown, tenantId: string): CompiledQuer
 
   // Measures → aggregated SELECT
   const usedAliases = new Set<string>(groupByParts);
+  // Base measures record their inner aggregate SQL here so a later calculated
+  // measure can reference them by alias and combine them arithmetically.
+  const aliasInner = new Map<string, string>();
   for (const m of measuresIn) {
     if (!m || typeof m !== 'object') throw new SpecError('each measure must be an object');
+
+    // ── Calculated / formula measure ─────────────────────────────────────────
+    // A safe arithmetic expression (+ - * / and parens) over the aliases of
+    // measures defined EARLIER in this spec — e.g. win_rate = "won / total".
+    // Division is div-by-zero guarded (→ NULL). No raw field or SQL ever reaches
+    // the string beyond the whitelisted inner aggregates.
+    if (typeof m.formula === 'string') {
+      let alias = m.alias ?? 'calc';
+      if (!SAFE_ALIAS.test(alias)) throw new SpecError(`invalid measure alias: ${alias}`);
+      if (usedAliases.has(alias)) {
+        let n = 2;
+        while (usedAliases.has(`${alias}_${n}`)) n++;
+        alias = `${alias}_${n}`;
+      }
+      const sqlExpr = compileFormula(m.formula, (id) => {
+        const innerExpr = aliasInner.get(id);
+        if (!innerExpr) {
+          throw new SpecError(`calculated measure references unknown measure "${id}" (define it earlier in the spec)`);
+        }
+        return innerExpr;
+      });
+      usedAliases.add(alias);
+      selectParts.push(`${sqlExpr} AS ${alias}`);
+      columns.push({ key: alias, label: prettyLabel(m.alias ?? 'calculated'), type: 'number' });
+      outputAlias.set(alias, alias);
+      continue;
+    }
+
     if (!AGGS.includes(m.agg)) throw new SpecError(`invalid agg: ${JSON.stringify(m.agg)}`);
 
     let inner: string;
@@ -508,6 +616,7 @@ export function compileReportSpec(spec: unknown, tenantId: string): CompiledQuer
       alias = `${alias}_${n}`;
     }
     usedAliases.add(alias);
+    aliasInner.set(alias, inner);
     selectParts.push(`${inner} AS ${alias}`);
     columns.push({ key: alias, label: prettyLabel(m.alias ?? defaultKey), type: outType });
     outputAlias.set(alias, alias);

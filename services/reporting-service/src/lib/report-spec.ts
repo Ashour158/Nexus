@@ -24,11 +24,34 @@ export type Aggregation = 'sum' | 'count' | 'count_distinct' | 'avg' | 'min' | '
 export type TimeGrain = 'day' | 'week' | 'month' | 'quarter' | 'year';
 export type FilterOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'contains';
 export type SortDir = 'asc' | 'desc';
-export type ChartType = 'bar' | 'line' | 'area' | 'pie' | 'table' | 'kpi' | 'funnel';
+export type ChartType =
+  | 'bar'
+  | 'stacked_bar'
+  | 'hbar'
+  | 'line'
+  | 'area'
+  | 'combo'
+  | 'pie'
+  | 'donut'
+  | 'scatter'
+  | 'radar'
+  | 'treemap'
+  | 'radial'
+  | 'funnel'
+  | 'table'
+  | 'kpi';
 
 export interface Measure {
-  field: string;
-  agg: Aggregation;
+  /** Physical field for a base aggregate. Omitted on a calculated measure. */
+  field?: string;
+  /** Aggregation for a base measure. Omitted on a calculated measure. */
+  agg?: Aggregation;
+  /**
+   * Calculated measure — a safe arithmetic formula over the aliases of measures
+   * defined earlier in the spec (e.g. "won / total"). Compiled by
+   * analytics-service; div-by-zero guarded.
+   */
+  formula?: string;
   alias?: string;
 }
 
@@ -76,7 +99,10 @@ const AGGS: readonly Aggregation[] = ['sum', 'count', 'count_distinct', 'avg', '
 const TIME_GRAINS: readonly TimeGrain[] = ['day', 'week', 'month', 'quarter', 'year'];
 const FILTER_OPS: readonly FilterOp[] = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'contains'];
 const SORT_DIRS: readonly SortDir[] = ['asc', 'desc'];
-export const CHART_TYPES: readonly ChartType[] = ['bar', 'line', 'area', 'pie', 'table', 'kpi', 'funnel'];
+export const CHART_TYPES: readonly ChartType[] = [
+  'bar', 'stacked_bar', 'hbar', 'line', 'area', 'combo', 'pie', 'donut',
+  'scatter', 'radar', 'treemap', 'radial', 'funnel', 'table', 'kpi',
+];
 
 export interface ValidationResult {
   valid: boolean;
@@ -130,14 +156,28 @@ export function validateReportSpec(input: unknown): ValidationResult {
         errors.push(`measures[${i}] must be an object`);
         return;
       }
+      if (m.alias !== undefined && typeof m.alias !== 'string') {
+        errors.push(`measures[${i}].alias must be a string`);
+      }
+      // Calculated measure: a formula string, no field/agg. Deep validation of
+      // the expression (whitelisted tokens, alias resolution) happens in
+      // analytics-service's compiler; here we just carry it through.
+      if (typeof m.formula === 'string') {
+        if (m.formula.trim().length === 0) {
+          errors.push(`measures[${i}].formula must be a non-empty string`);
+        } else {
+          measures.push({
+            formula: m.formula,
+            ...(typeof m.alias === 'string' ? { alias: m.alias } : {}),
+          });
+        }
+        return;
+      }
       if (typeof m.field !== 'string' || m.field.length === 0) {
         errors.push(`measures[${i}].field is required`);
       }
       if (typeof m.agg !== 'string' || !AGGS.includes(m.agg as Aggregation)) {
         errors.push(`measures[${i}].agg must be one of: ${AGGS.join(', ')}`);
-      }
-      if (m.alias !== undefined && typeof m.alias !== 'string') {
-        errors.push(`measures[${i}].alias must be a string`);
       }
       if (typeof m.field === 'string' && typeof m.agg === 'string' && AGGS.includes(m.agg as Aggregation)) {
         measures.push({

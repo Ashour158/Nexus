@@ -17,11 +17,28 @@ export type Dataset =
   | 'campaigns'
   | 'subscriptions'
   | 'commissions';
-export type ChartType = 'bar' | 'line' | 'area' | 'pie' | 'table' | 'kpi' | 'funnel';
+export type ChartType =
+  | 'bar'
+  | 'stacked_bar'
+  | 'hbar'
+  | 'line'
+  | 'area'
+  | 'combo'
+  | 'pie'
+  | 'donut'
+  | 'scatter'
+  | 'radar'
+  | 'treemap'
+  | 'radial'
+  | 'funnel'
+  | 'table'
+  | 'kpi';
 
 export interface ReportSpecMeasure {
-  field: string;
-  agg: AggFn;
+  field?: string;
+  agg?: AggFn;
+  /** Calculated measure — arithmetic over earlier measure aliases (e.g. "won / total"). */
+  formula?: string;
   alias?: string;
 }
 export interface ReportSpecDimension {
@@ -141,11 +158,19 @@ export const FILTER_OPS: Array<{ value: FilterOp; label: string }> = [
 ];
 
 export const CHART_TYPES: Array<{ value: ChartType; label: string }> = [
-  { value: 'kpi', label: 'KPI' },
+  { value: 'kpi', label: 'KPI card' },
   { value: 'bar', label: 'Bar' },
+  { value: 'stacked_bar', label: 'Stacked bar' },
+  { value: 'hbar', label: 'Horizontal bar' },
   { value: 'line', label: 'Line' },
   { value: 'area', label: 'Area' },
+  { value: 'combo', label: 'Combo (bar + line)' },
   { value: 'pie', label: 'Pie' },
+  { value: 'donut', label: 'Donut' },
+  { value: 'scatter', label: 'Scatter' },
+  { value: 'radar', label: 'Radar' },
+  { value: 'treemap', label: 'Treemap' },
+  { value: 'radial', label: 'Radial gauge' },
   { value: 'funnel', label: 'Funnel' },
   { value: 'table', label: 'Table' },
 ];

@@ -14,6 +14,7 @@ import {
 import type { BiWidget } from '@/lib/bi-types';
 import { WidgetCard } from '@/components/bi/widget-card';
 import { WidgetBuilder, type WidgetDraft } from '@/components/bi/widget-builder';
+import { AnnotationsPanel } from '@/components/annotations/annotations-panel';
 
 export default function DashboardDetailPage(): ReactElement {
   const params = useParams<{ id: string }>();
@@ -131,6 +132,11 @@ export default function DashboardDetailPage(): ReactElement {
               ))}
             </div>
           )}
+
+          <div className="mt-2">
+            <h2 className="mb-2 text-sm font-semibold text-on-surface-variant">Discussion &amp; linked data</h2>
+            <AnnotationsPanel targetType="dashboard" targetId={id} targetLabel="this dashboard" />
+          </div>
         </>
       )}
 

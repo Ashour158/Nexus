@@ -60,7 +60,9 @@ export function WidgetBuilder({
   const [dataset, setDataset] = useState<Dataset>(initial?.spec.dataset ?? 'deals');
   const [chartType, setChartType] = useState<ChartType>(initial?.chartType ?? 'bar');
   const [measures, setMeasures] = useState<MeasureRow[]>(
-    initial?.spec.measures.map((m) => ({ field: m.field, agg: m.agg })) ?? []
+    initial?.spec.measures
+      .filter((m): m is { field: string; agg: AggFn } => typeof m.field === 'string' && typeof m.agg === 'string')
+      .map((m) => ({ field: m.field, agg: m.agg })) ?? []
   );
   const [dimensions, setDimensions] = useState<DimensionRow[]>(
     initial?.spec.dimensions.map((d) => ({ field: d.field, timeGrain: d.timeGrain })) ?? []

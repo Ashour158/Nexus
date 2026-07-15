@@ -24,6 +24,7 @@ export async function handleAssignNode(
     {
       ...node,
       config: {
+        internal: true,
         url: `${base}/api/v1/internal/automation/assign`,
         method: 'POST',
         headers: { 'x-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '', ...causationHeaders(context) },

@@ -28,13 +28,26 @@ export async function handleActionNode(
     method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
     body?: Record<string, unknown>;
     headers?: Record<string, string>;
+    // Trusted internal calls (create-activity/set-field/assign → CRM etc.). For
+    // these, a missing/blocked URL is a CONFIG error, not a security event, so we
+    // fail LOUD (throw → run FAILED, error recorded) instead of a silent skip
+    // that masks the misconfiguration as SUCCESS (the CRM_SERVICE_URL no-op bug).
+    internal?: boolean;
   };
-  if (!cfg.url) return { output: { skipped: true, reason: 'missing_url' } };
+  if (!cfg.url) {
+    if (cfg.internal) {
+      throw new ActionHttpError(500, 'Internal action misconfigured: target URL is empty (check the peer *_SERVICE_URL env var)');
+    }
+    return { output: { skipped: true, reason: 'missing_url' } };
+  }
 
   // SSRF protection: block internal/private addresses and non-HTTP(S) protocols
   const parsedUrl = new URL(cfg.url);
   const blockedProtocols = ['file:', 'ftp:', 'gopher:', 'mailto:', 'data:', 'javascript:', 'vbscript:'];
   if (blockedProtocols.includes(parsedUrl.protocol)) {
+    if (cfg.internal) {
+      throw new ActionHttpError(500, `Internal action misconfigured: blocked protocol ${parsedUrl.protocol}`);
+    }
     return { output: { skipped: true, reason: 'blocked_protocol' } };
   }
   const hostname = parsedUrl.hostname;
@@ -61,6 +74,12 @@ export async function handleActionNode(
     hostname.startsWith('192.168.') ||
     hostname.startsWith('169.254.');
   if (isPrivate) {
+    if (cfg.internal) {
+      throw new ActionHttpError(
+        500,
+        `Internal action misconfigured: target resolved to a private/loopback host (${hostname}) — the peer *_SERVICE_URL is unset, so it fell back to localhost`
+      );
+    }
     return { output: { skipped: true, reason: 'private_url_blocked' } };
   }
 

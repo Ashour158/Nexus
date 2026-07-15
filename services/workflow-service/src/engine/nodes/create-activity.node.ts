@@ -22,6 +22,7 @@ export async function handleCreateActivityNode(
     {
       ...node,
       config: {
+        internal: true,
         url: `${base}/api/v1/internal/automation/activities`,
         method: 'POST',
         headers: { 'x-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '', ...causationHeaders(context) },

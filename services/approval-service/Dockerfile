@@ -38,6 +38,6 @@ EXPOSE 3014
 ENV NODE_ENV=production PORT=3014
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=45s --retries=3 \
-  CMD wget -qO- http://localhost:3014/health || exit 1
+  CMD wget -qO- http://127.0.0.1:3014/health || exit 1
 
 CMD ["node", "dist/index.js"]

@@ -38,6 +38,6 @@ EXPOSE 3015
 ENV NODE_ENV=production PORT=3015
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=45s --retries=3 \
-  CMD wget -qO- http://localhost:3015/health || exit 1
+  CMD wget -qO- http://127.0.0.1:3015/health || exit 1
 
 CMD ["node", "dist/index.js"]

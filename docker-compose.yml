@@ -702,8 +702,11 @@ services:
     environment:
       MINIO_ENDPOINT: minio
       MINIO_PORT: '9000'
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      # Must carry the SAME defaults as the minio service (nexus / nexus-minio),
+      # else an unset MINIO_ROOT_* leaves these empty and MinIO returns
+      # AccessDenied on bucket init → storage-service crash-loops.
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-nexus}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-nexus-minio}
       MINIO_BUCKET: nexus-files
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_storage
       KAFKA_BROKERS: kafka:29092

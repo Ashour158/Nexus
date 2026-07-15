@@ -39,6 +39,7 @@ export async function handleSetFieldNode(
     {
       ...node,
       config: {
+        internal: true,
         url: `${base}/api/v1/internal/automation/set-field`,
         method: 'POST',
         headers: { 'x-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '', ...causationHeaders(context) },

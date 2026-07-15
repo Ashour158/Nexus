@@ -207,6 +207,11 @@ services:
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      # Governance posture: when true, a field-security / validation / sharing
+      # evaluation ERROR denies the operation (503) instead of silently allowing
+      # it. Safe default for production; unconfigured tenants (no rules) still
+      # allow in both modes, so this only bites on a real eval fault.
+      NEXUS_GOVERNANCE_FAIL_CLOSED: ${NEXUS_GOVERNANCE_FAIL_CLOSED:-false}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_crm
       # Needed by team-resolver to resolve manager→reports for team-scoped

@@ -300,7 +300,10 @@ export class NexusConsumer {
       // Process up to 10 messages concurrently per partition to increase throughput
       partitionsConsumedConcurrently: 10,
     } as any);
-    this.idempotencyStore = idempotencyStore ?? createIdempotencyStore();
+    // Namespace dedup keys by groupId so idempotency is per-consumer-group, not
+    // global — otherwise the first group to process an event blocks every other
+    // group from ever reacting to it (breaks cross-service event fan-out).
+    this.idempotencyStore = idempotencyStore ?? createIdempotencyStore(undefined, groupId);
     this.ignoredSources = new Set(ignoredSources);
     this.dlqEnabled = dlqEnabled;
     this.maxRetries = maxRetries;

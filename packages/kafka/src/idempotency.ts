@@ -66,8 +66,17 @@ export class MemoryIdempotencyStore implements IdempotencyStore {
 
 /* ─── Factory ─────────────────────────────────────────────────────────────── */
 
-export function createIdempotencyStore(redis?: Redis): IdempotencyStore {
-  if (redis) return new RedisIdempotencyStore(redis);
+export function createIdempotencyStore(redis?: Redis, namespace?: string): IdempotencyStore {
+  // Scope the dedup keys to the consumer group. Idempotency is a PER-GROUP
+  // concern: each consumer group must process every event exactly once, but a
+  // shared (namespace-less) key would let whichever group processes an event
+  // FIRST mark it globally — every other group would then skip it, silently
+  // killing cross-service event reactions (e.g. automation rules never firing on
+  // a deal.stage_changed already consumed by the scoring consumer).
+  const keyPrefix = namespace
+    ? `nexus:kafka:processed:${namespace}`
+    : 'nexus:kafka:processed';
+  if (redis) return new RedisIdempotencyStore(redis, keyPrefix);
   // Auto-provision from REDIS_URL so every consumer gets a durable, shared store
   // without each service wiring one explicitly. This is what keeps the whole
   // event-reaction layer alive in production.
@@ -77,7 +86,7 @@ export function createIdempotencyStore(redis?: Redis): IdempotencyStore {
       enableReadyCheck: false,
       lazyConnect: false,
     });
-    return new RedisIdempotencyStore(client);
+    return new RedisIdempotencyStore(client, keyPrefix);
   }
   if (process.env.NODE_ENV === 'production') {
     throw new Error(

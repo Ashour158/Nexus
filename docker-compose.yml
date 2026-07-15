@@ -460,6 +460,16 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+      # Peer service URLs the automation-rule action nodes call. Without these the
+      # nodes fall back to localhost and silently no-op (rule fires but nothing
+      # changes) — the concrete cause of "automation doesn't affect the system".
+      CRM_SERVICE_URL: http://crm-service:3001
+      APPROVAL_SERVICE_URL: http://approval-service:3014
+      BLUEPRINT_SERVICE_URL: http://blueprint-service:3013
+      WORKFLOW_SERVICE_URL: http://workflow-service:3007
+      NOTIFICATION_SERVICE_URL: http://notification-service:3003
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      BLUEPRINT_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy

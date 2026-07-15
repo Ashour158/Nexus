@@ -8,6 +8,7 @@ import {
   useAssignUserRoles,
   useDeactivateUser,
   useInviteUser,
+  useResetUserPassword,
   useRoles,
   useUpdateUser,
   useUsers,
@@ -21,6 +22,7 @@ export default function SettingsUsersPage(): JSX.Element {
   const [inviteLast, setInviteLast] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRoleId, setInviteRoleId] = useState('');
+  const [resetResult, setResetResult] = useState<{ email: string; password: string } | null>(null);
 
   const usersQuery = useUsers({ search, limit: 100 });
   const rolesQuery = useRoles();
@@ -28,6 +30,7 @@ export default function SettingsUsersPage(): JSX.Element {
   const assignRoles = useAssignUserRoles();
   const updateUser = useUpdateUser();
   const deactivateUser = useDeactivateUser();
+  const resetPassword = useResetUserPassword();
 
   const users = usersQuery.data?.data ?? [];
   const roles = useMemo(
@@ -128,7 +131,26 @@ export default function SettingsUsersPage(): JSX.Element {
                       >
                         {u.isActive ? 'Deactivate' : 'Activate'}
                       </Button>
-                      <Button type="button" variant="ghost">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={resetPassword.isPending}
+                        onClick={() => {
+                          if (
+                            !window.confirm(
+                              `Reset password for ${u.email}? A one-time temporary password will be generated and their current password will stop working.`
+                            )
+                          ) {
+                            return;
+                          }
+                          resetPassword.mutate(u.id, {
+                            onSuccess: (res) =>
+                              setResetResult({ email: u.email, password: res.temporaryPassword }),
+                            onError: (err) =>
+                              window.alert(`Could not reset password: ${err.message}`),
+                          });
+                        }}
+                      >
                         Reset password
                       </Button>
                     </div>
@@ -146,6 +168,35 @@ export default function SettingsUsersPage(): JSX.Element {
           </table>
         )}
       </section>
+
+      {resetResult ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-surface p-4 shadow-xl">
+            <h2 className="text-lg font-semibold text-on-surface">Temporary password</h2>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              Share this one-time password with <span className="font-medium">{resetResult.email}</span>. They
+              will be required to set a new password on their next sign-in. It won&apos;t be shown again.
+            </p>
+            <div className="mt-3 flex items-center gap-2 rounded-md bg-surface-container-high p-3">
+              <code className="flex-1 select-all break-all font-mono text-sm text-on-surface">
+                {resetResult.password}
+              </code>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => navigator.clipboard?.writeText(resetResult.password)}
+              >
+                Copy
+              </Button>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button type="button" onClick={() => setResetResult(null)}>
+                Done
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {inviteOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/50 p-4">

@@ -11,6 +11,7 @@ import {
   createKeycloakRealmUser,
   deleteKeycloakRealmUser,
   setKeycloakRealmUserEnabled,
+  setKeycloakUserPassword,
 } from '../lib/keycloak-admin.js';
 import { toPaginatedResult } from '@nexus/shared-types';
 import { resolveUserPermissions } from '../lib/permissions.js';
@@ -214,6 +215,46 @@ export function createUsersService(prisma: AuthPrisma) {
         include: { userRoles: { include: { role: true } } },
       });
       return updated;
+    },
+
+    /**
+     * Admin-triggered password reset. Generates a policy-compliant temporary
+     * password, forces a change on next login, and invalidates existing
+     * sessions so the old password stops working immediately. The temp password
+     * is returned to the admin to convey to the user (both local and Keycloak
+     * modes) — matching the invite flow's contract.
+     */
+    async adminResetPassword(
+      tenantId: string,
+      id: string,
+      actorUserId: string
+    ): Promise<{ temporaryPassword: string }> {
+      if (id === actorUserId) {
+        throw new BusinessRuleError('Use "Change password" to reset your own password');
+      }
+      const row = await prisma.user.findFirst({ where: { id, tenantId } });
+      if (!row) {
+        throw new NotFoundError('User', id);
+      }
+      const temporaryPassword = generateTempPassword();
+
+      if (localInviteMode() || row.keycloakId.startsWith('local:')) {
+        const passwordHash = await hashPassword(temporaryPassword);
+        await prisma.$transaction([
+          prisma.user.update({
+            where: { id_tenantId: { id, tenantId } },
+            data: { passwordHash, mustChangePassword: true },
+          }),
+          prisma.session.deleteMany({ where: { userId: id } }),
+        ]);
+        return { temporaryPassword };
+      }
+
+      // Keycloak-managed account: set a temporary password (forces change on
+      // next login) via the Admin API, then drop local sessions.
+      await setKeycloakUserPassword(row.keycloakId, temporaryPassword, true);
+      await prisma.session.deleteMany({ where: { userId: id } });
+      return { temporaryPassword };
     },
 
     /**

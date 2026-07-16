@@ -81,25 +81,40 @@ export function createInAppChannel(prisma: NotificationPrisma, producer?: NexusP
 
       let row: { id: string };
       if (dedupKey) {
+        // NOTE: query by plain fields, NOT the `tenantId_dedupKey` compound-unique
+        // shorthand, and create-then-catch instead of upsert.
+        //
+        // The shared tenant extension remaps findUnique -> findFirst, and merges a
+        // bare `tenantId` into an upsert's where. Neither accepts the compound
+        // shorthand Prisma generates for `@@unique([tenantId, dedupKey])`, so both
+        // forms died with `Unknown argument 'tenantId_dedupKey'` — every in-app
+        // notification threw, retried 3x, and was dropped. (The constraint itself
+        // is real and present in the DB; only the query syntax was incompatible.)
+        //
         // A prior replay of this event already persisted the row — reuse it and
         // suppress the realtime re-publish so the client isn't double-notified.
-        const existing = await prisma.notification.findUnique({
-          where: { tenantId_dedupKey: { tenantId: input.tenantId, dedupKey } },
+        const existing = await prisma.notification.findFirst({
+          where: { tenantId: input.tenantId, dedupKey },
           select: { id: true },
         });
         if (existing) {
           return { id: existing.id };
         }
-        // Upsert (not create) on the exact compound unique input Prisma
-        // generates for `@@unique([tenantId, dedupKey])`, so a concurrent replay
-        // that races the check above becomes a no-op update rather than a
-        // unique-constraint throw.
-        row = await prisma.notification.upsert({
-          where: { tenantId_dedupKey: { tenantId: input.tenantId, dedupKey } },
-          create: data,
-          update: {},
-          select: { id: true },
-        });
+        try {
+          row = await prisma.notification.create({ data, select: { id: true } });
+        } catch (err) {
+          // A concurrent replay raced the check above and won. The DB's unique
+          // index is the real guard — treat its violation as "already delivered"
+          // and return the winner's row rather than throwing.
+          if ((err as { code?: string })?.code === 'P2002') {
+            const winner = await prisma.notification.findFirst({
+              where: { tenantId: input.tenantId, dedupKey },
+              select: { id: true },
+            });
+            if (winner) return { id: winner.id };
+          }
+          throw err;
+        }
       } else {
         row = await prisma.notification.create({ data, select: { id: true } });
       }

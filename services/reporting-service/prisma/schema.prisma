@@ -188,9 +188,38 @@ model BiSavedReport {
   isShared    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  schedules   BiReportSchedule[]
 
   @@index([tenantId, ownerId])
   @@index([tenantId, isShared])
+  @@unique([id, tenantId])
+}
+
+/// Recurring delivery of a BiSavedReport (the modern ReportSpec → ClickHouse
+/// path). Mirrors ReportSchedule, which only ever covered the legacy
+/// SavedReport model — so BI reports, the ones people actually build, had no way
+/// to be subscribed to.
+model BiReportSchedule {
+  id         String        @id @default(cuid())
+  tenantId   String
+  reportId   String
+  report     BiSavedReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  cron       String
+  format     String        @default("csv")
+  recipients String[]
+  subject    String?
+  lastRunAt  DateTime?
+  nextRunAt  DateTime?
+  /// Populated when the last run failed, so a silently-broken subscription is
+  /// visible instead of just never arriving.
+  lastError  String?
+  isActive   Boolean       @default(true)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, isActive, nextRunAt])
+  @@index([isActive, nextRunAt])
   @@unique([id, tenantId])
 }
 

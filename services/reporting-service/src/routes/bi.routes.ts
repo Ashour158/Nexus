@@ -15,6 +15,7 @@ import { Prisma } from '../../../../node_modules/.prisma/reporting-client/index.
 import type { ReportingPrisma } from '../prisma.js';
 import { validateReportSpec, isValidChartType } from '../lib/report-spec.js';
 import { runReportSpec } from '../lib/analytics-client.js';
+import { computeNextRun, isValidCron } from '../lib/schedule-runner.js';
 import { createReportAuditLogger } from '../lib/audit-logger.js';
 
 const READ = { preHandler: requirePermission(PERMISSIONS.ANALYTICS.READ) };
@@ -118,6 +119,137 @@ export async function registerBiRoutes(app: FastifyInstance, prisma: ReportingPr
     audit
       .log({ tenantId: jwt.tenantId, userId: jwt.sub, action: 'report_deleted', reportId: id, reportName: existing?.name ?? id })
       .catch((err) => app.log.warn({ err }, 'audit log failed'));
+    return reply.send({ success: true });
+  });
+
+  // ─── Schedules / subscriptions ─────────────────────────────────────────────
+  // Recurring email delivery of a saved BI report. The runner
+  // (lib/schedule-runner.ts) executes the spec on the cron and mails a CSV.
+
+  app.get('/api/v1/bi/reports/:id/schedules', READ, async (req, reply) => {
+    const jwt = (req as any).user as JwtPayload;
+    const { id } = req.params as { id: string };
+    const report = await prisma.biSavedReport.findFirst({
+      where: { id, tenantId: jwt.tenantId, OR: [{ ownerId: jwt.sub }, { isShared: true }] },
+    });
+    if (!report) return notFound(reply, req.id);
+    const schedules = await prisma.biReportSchedule.findMany({
+      where: { reportId: id, tenantId: jwt.tenantId },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    });
+    return reply.send({ success: true, data: schedules });
+  });
+
+  app.post('/api/v1/bi/reports/:id/schedules', WRITE, async (req, reply) => {
+    const jwt = (req as any).user as JwtPayload;
+    const { id } = req.params as { id: string };
+    const report = await prisma.biSavedReport.findFirst({
+      where: { id, tenantId: jwt.tenantId, OR: [{ ownerId: jwt.sub }, { isShared: true }] },
+    });
+    if (!report) return notFound(reply, req.id);
+
+    const body = (req.body ?? {}) as {
+      cron?: string;
+      cronExpr?: string;
+      recipients?: string[];
+      format?: string;
+      subject?: string;
+    };
+    // Accept `cron` or the legacy saved-report spelling `cronExpr`.
+    const cron = body.cron ?? body.cronExpr;
+    const errors: string[] = [];
+    if (typeof cron !== 'string' || cron.trim().length === 0) errors.push('cron is required');
+    if (!Array.isArray(body.recipients) || body.recipients.length === 0) {
+      errors.push('recipients must be a non-empty array');
+    } else if (body.recipients.some((r) => typeof r !== 'string' || !r.includes('@'))) {
+      errors.push('recipients must all be email addresses');
+    }
+    // Reject a cron the runner cannot parse at CREATE time rather than letting it
+    // silently fall back to "tomorrow" forever on every tick.
+    if (typeof cron === 'string' && cron.trim().length > 0 && !isValidCron(cron)) {
+      errors.push(`unparseable cron expression: ${cron}`);
+    }
+    if (errors.length > 0) {
+      return reply
+        .code(422)
+        .send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid schedule', details: errors, requestId: req.id } });
+    }
+
+    // The spec must be runnable now, or the subscription would only fail later,
+    // in the background, where nobody is watching.
+    const validation = validateReportSpec(report.spec);
+    if (!validation.valid) return unprocessable(reply, req.id, validation.errors);
+
+    const schedule = await prisma.biReportSchedule.create({
+      data: {
+        tenantId: jwt.tenantId,
+        reportId: id,
+        cron: cron as string,
+        recipients: body.recipients as string[],
+        format: body.format ?? 'csv',
+        subject: body.subject,
+        nextRunAt: computeNextRun(cron as string, new Date()),
+      },
+    });
+    audit
+      .log({
+        tenantId: jwt.tenantId,
+        userId: jwt.sub,
+        action: 'report_scheduled',
+        reportId: id,
+        reportName: report.name,
+        format: body.format ?? 'csv',
+      })
+      .catch((err) => app.log.warn({ err }, 'audit log failed'));
+    return reply.code(201).send({ success: true, data: schedule });
+  });
+
+  app.patch('/api/v1/bi/schedules/:scheduleId', WRITE, async (req, reply) => {
+    const jwt = (req as any).user as JwtPayload;
+    const { scheduleId } = req.params as { scheduleId: string };
+    const body = (req.body ?? {}) as {
+      cron?: string;
+      recipients?: string[];
+      format?: string;
+      subject?: string;
+      isActive?: boolean;
+    };
+    if (body.cron !== undefined && !isValidCron(body.cron)) {
+      return reply.code(422).send({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: `unparseable cron expression: ${body.cron}`, requestId: req.id },
+      });
+    }
+
+    const data: Record<string, unknown> = {};
+    if (body.cron !== undefined) {
+      data.cron = body.cron;
+      // Re-anchor the next fire to the NEW cron; otherwise the old nextRunAt
+      // would still govern the next delivery.
+      data.nextRunAt = computeNextRun(body.cron, new Date());
+    }
+    if (body.recipients !== undefined) data.recipients = body.recipients;
+    if (body.format !== undefined) data.format = body.format;
+    if (body.subject !== undefined) data.subject = body.subject;
+    if (body.isActive !== undefined) data.isActive = body.isActive;
+
+    const result = await prisma.biReportSchedule.updateMany({
+      where: { id: scheduleId, tenantId: jwt.tenantId },
+      data,
+    });
+    if (result.count === 0) return notFound(reply, req.id);
+    const updated = await prisma.biReportSchedule.findFirst({ where: { id: scheduleId, tenantId: jwt.tenantId } });
+    return reply.send({ success: true, data: updated });
+  });
+
+  app.delete('/api/v1/bi/schedules/:scheduleId', WRITE, async (req, reply) => {
+    const jwt = (req as any).user as JwtPayload;
+    const { scheduleId } = req.params as { scheduleId: string };
+    const result = await prisma.biReportSchedule.deleteMany({
+      where: { id: scheduleId, tenantId: jwt.tenantId },
+    });
+    if (result.count === 0) return notFound(reply, req.id);
     return reply.send({ success: true });
   });
 

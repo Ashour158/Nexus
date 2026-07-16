@@ -526,24 +526,39 @@ function compileFormula(formula: string, resolveId: (id: string) => string): str
   return out;
 }
 
-export function compileReportSpec(spec: unknown, tenantId: string): CompiledQuery {
-  if (!spec || typeof spec !== 'object') throw new SpecError('spec must be an object');
-  const s = spec as Record<string, unknown>;
+/** A declared join, plus the joined fields a spec actually referenced. */
+interface JoinState {
+  def: DatasetDef;
+  keyField: string;
+  onExpr: string;
+  sqlAlias: string;
+  /** Joined fields actually referenced — only these get projected. */
+  used: Map<string, FieldDef>;
+}
 
-  if (!isDataset(s.dataset)) {
-    throw new SpecError(`unknown dataset: ${JSON.stringify(s.dataset)}`);
-  }
-  const def = CATALOG[s.dataset];
+/**
+ * The whitelist-enforcing machinery shared by every compiler entry point:
+ * parameter binding, join declaration, field resolution, and JOIN emission.
+ *
+ * This is the security boundary — nothing user-supplied reaches SQL except
+ * through `bind` (parameterized) or a `resolveField` lookup against the
+ * per-dataset field catalogue. Both aggregate reports and drill-down detail
+ * queries go through it, so they cannot drift apart in what they allow.
+ */
+interface SpecContext {
+  params: Record<string, unknown>;
+  bind: (value: unknown) => string;
+  resolveField: (field: unknown, role: string) => { key: string; def: FieldDef; expr: string };
+  /** Emit LEFT JOINs for the declared joins whose fields were referenced. */
+  joinClauses: () => string[];
+}
 
-  const measuresIn = assertArray(s.measures ?? [], 'measures') as Measure[];
-  const dimensionsIn = assertArray(s.dimensions ?? [], 'dimensions') as Dimension[];
-  const filtersIn = assertArray(s.filters ?? [], 'filters') as Filter[];
-  const sortIn = (s.sort === undefined ? [] : assertArray(s.sort, 'sort')) as Sort[];
-
-  if (measuresIn.length === 0 && dimensionsIn.length === 0) {
-    throw new SpecError('spec must include at least one measure or dimension');
-  }
-
+function createSpecContext(
+  dataset: Dataset,
+  def: DatasetDef,
+  joinsRaw: unknown,
+  tenantId: string
+): SpecContext {
   const params: Record<string, unknown> = { tenantId };
   let paramSeq = 0;
   const bind = (value: unknown): string => {
@@ -552,16 +567,7 @@ export function compileReportSpec(spec: unknown, tenantId: string): CompiledQuer
     return name;
   };
 
-  // ── Cross-object joins ────────────────────────────────────────────────────
-  interface JoinState {
-    def: DatasetDef;
-    keyField: string;
-    onExpr: string;
-    sqlAlias: string;
-    /** Joined fields actually referenced — only these get projected. */
-    used: Map<string, FieldDef>;
-  }
-  const joinsIn = (s.joins === undefined ? [] : assertArray(s.joins, 'joins')) as Join[];
+  const joinsIn = (joinsRaw === undefined ? [] : assertArray(joinsRaw, 'joins')) as Join[];
   if (joinsIn.length > MAX_JOINS) throw new SpecError(`at most ${MAX_JOINS} joins are supported`);
   const joinByAlias = new Map<string, JoinState>();
   joinsIn.forEach((j, i) => {
@@ -572,7 +578,7 @@ export function compileReportSpec(spec: unknown, tenantId: string): CompiledQuer
         ? def.fields[j.on]
         : undefined;
     if (!onDef) {
-      throw new SpecError(`join "on" field ${JSON.stringify(j.on)} is not a field on dataset "${s.dataset}"`);
+      throw new SpecError(`join "on" field ${JSON.stringify(j.on)} is not a field on dataset "${dataset}"`);
     }
     const alias = j.alias ?? j.dataset;
     if (!SAFE_ALIAS.test(alias)) throw new SpecError(`invalid join alias: ${alias}`);
@@ -586,12 +592,6 @@ export function compileReportSpec(spec: unknown, tenantId: string): CompiledQuer
     });
   });
 
-  const selectParts: string[] = [];
-  const groupByParts: string[] = [];
-  const columns: CompiledColumn[] = [];
-  // Map an output key back to its emitted SQL alias so ORDER BY can reference it.
-  const outputAlias = new Map<string, string>();
-
   /**
    * Resolve a spec field to its physical SQL expression. A dotted name
    * ("accounts.industry") resolves against a declared join and registers the
@@ -600,7 +600,7 @@ export function compileReportSpec(spec: unknown, tenantId: string): CompiledQuer
    */
   const resolveField = (field: unknown, role: string): { key: string; def: FieldDef; expr: string } => {
     if (typeof field !== 'string') {
-      throw new SpecError(`field ${JSON.stringify(field)} is not allowed as a ${role} on dataset "${s.dataset}"`);
+      throw new SpecError(`field ${JSON.stringify(field)} is not allowed as a ${role} on dataset "${dataset}"`);
     }
     const dot = field.indexOf('.');
     if (dot > 0) {
@@ -620,10 +620,66 @@ export function compileReportSpec(spec: unknown, tenantId: string): CompiledQuer
       return { key: outKey, def: fd, expr: `${js.sqlAlias}.${js.sqlAlias}_${fname}` };
     }
     if (!Object.prototype.hasOwnProperty.call(def.fields, field)) {
-      throw new SpecError(`field "${field}" is not allowed as a ${role} on dataset "${s.dataset}"`);
+      throw new SpecError(`field "${field}" is not allowed as a ${role} on dataset "${dataset}"`);
     }
     return { key: field, def: def.fields[field], expr: def.fields[field].expr };
   };
+
+  // Emit only the joins whose fields were actually referenced. Each collapses
+  // the append-only event table to ONE row per entity carrying its LATEST
+  // attribute values (argMax over occurred_at), then LEFT JOINs on the base
+  // dataset's foreign key. Projected columns are prefixed with the join's SQL
+  // alias so they can never collide with a base column.
+  const joinClauses = (): string[] => {
+    const out: string[] = [];
+    for (const js of joinByAlias.values()) {
+      if (js.used.size === 0) continue;
+      const projected = [...js.used.entries()].map(
+        ([fname, fdef]) => `argMax(${fdef.expr}, occurred_at) AS ${js.sqlAlias}_${fname}`
+      );
+      out.push(
+        [
+          `LEFT JOIN (`,
+          `  SELECT ${js.keyField} AS ${js.sqlAlias}_key, ${projected.join(', ')}`,
+          `  FROM ${js.def.table}`,
+          `  WHERE tenant_id = {tenantId:String}${js.def.baseWhere ? ` AND ${js.def.baseWhere}` : ''}`,
+          `  GROUP BY ${js.keyField}`,
+          `) AS ${js.sqlAlias} ON ${js.onExpr} = ${js.sqlAlias}.${js.sqlAlias}_key`,
+        ].join('\n')
+      );
+    }
+    return out;
+  };
+
+  return { params, bind, resolveField, joinClauses };
+}
+
+export function compileReportSpec(spec: unknown, tenantId: string): CompiledQuery {
+  if (!spec || typeof spec !== 'object') throw new SpecError('spec must be an object');
+  const s = spec as Record<string, unknown>;
+
+  if (!isDataset(s.dataset)) {
+    throw new SpecError(`unknown dataset: ${JSON.stringify(s.dataset)}`);
+  }
+  const def = CATALOG[s.dataset];
+
+  const measuresIn = assertArray(s.measures ?? [], 'measures') as Measure[];
+  const dimensionsIn = assertArray(s.dimensions ?? [], 'dimensions') as Dimension[];
+  const filtersIn = assertArray(s.filters ?? [], 'filters') as Filter[];
+  const sortIn = (s.sort === undefined ? [] : assertArray(s.sort, 'sort')) as Sort[];
+
+  if (measuresIn.length === 0 && dimensionsIn.length === 0) {
+    throw new SpecError('spec must include at least one measure or dimension');
+  }
+
+  const ctx = createSpecContext(s.dataset, def, s.joins, tenantId);
+  const { params, bind, resolveField } = ctx;
+
+  const selectParts: string[] = [];
+  const groupByParts: string[] = [];
+  const columns: CompiledColumn[] = [];
+  // Map an output key back to its emitted SQL alias so ORDER BY can reference it.
+  const outputAlias = new Map<string, string>();
 
   // Dimensions (with optional time bucketing) → SELECT + GROUP BY
   for (const dim of dimensionsIn) {
@@ -756,35 +812,162 @@ export function compileReportSpec(spec: unknown, tenantId: string): CompiledQuer
     limit = Math.min(Math.floor(n), MAX_LIMIT);
   }
 
-  // Emit only the joins whose fields were actually referenced. Each collapses
-  // the append-only event table to ONE row per entity carrying its LATEST
-  // attribute values (argMax over occurred_at), then LEFT JOINs on the base
-  // dataset's foreign key. Projected columns are prefixed with the join's SQL
-  // alias so they can never collide with a base column.
-  const joinClauses: string[] = [];
-  for (const js of joinByAlias.values()) {
-    if (js.used.size === 0) continue;
-    const projected = [...js.used.entries()].map(
-      ([fname, fdef]) => `argMax(${fdef.expr}, occurred_at) AS ${js.sqlAlias}_${fname}`
-    );
-    joinClauses.push(
-      [
-        `LEFT JOIN (`,
-        `  SELECT ${js.keyField} AS ${js.sqlAlias}_key, ${projected.join(', ')}`,
-        `  FROM ${js.def.table}`,
-        `  WHERE tenant_id = {tenantId:String}${js.def.baseWhere ? ` AND ${js.def.baseWhere}` : ''}`,
-        `  GROUP BY ${js.keyField}`,
-        `) AS ${js.sqlAlias} ON ${js.onExpr} = ${js.sqlAlias}.${js.sqlAlias}_key`,
-      ].join('\n')
-    );
+  const sql = [
+    `SELECT ${selectParts.join(', ')}`,
+    `FROM ${def.table}`,
+    ...ctx.joinClauses(),
+    `WHERE ${whereParts.join(' AND ')}`,
+    groupByParts.length ? `GROUP BY ${groupByParts.join(', ')}` : '',
+    orderParts.length ? `ORDER BY ${orderParts.join(', ')}` : '',
+    `LIMIT ${limit}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return { sql, params, columns };
+}
+
+// ── Drill-down ──────────────────────────────────────────────────────────────
+
+/**
+ * One clicked coordinate: the dimension and the value the user clicked on.
+ * `timeGrain` must match the grain the chart grouped by, so the bucket the user
+ * sees is the bucket we filter to.
+ */
+export interface DrillPoint {
+  field: string;
+  timeGrain?: TimeGrain;
+  value: unknown;
+}
+
+/**
+ * "Show me the rows behind this bar." Same dataset/joins/filters as the report
+ * that produced the chart, plus the clicked coordinates — but NOT aggregated.
+ */
+export interface DrillDownSpec {
+  dataset: Dataset;
+  joins?: Join[];
+  /** The originating report's filters, so the drill-down respects its scope. */
+  filters?: Filter[];
+  /** The clicked coordinates. Empty means "all rows matching filters". */
+  at?: DrillPoint[];
+  /** Detail columns to return. Defaults to every field on the base dataset. */
+  columns?: string[];
+  sort?: Sort[];
+  limit?: number;
+}
+
+/** Detail rows are read by humans, so they get a much tighter cap than aggregates. */
+const DRILL_DEFAULT_LIMIT = 100;
+const DRILL_MAX_LIMIT = 1000;
+
+/**
+ * Compile a drill-down into parameterized ClickHouse SQL: the individual rows
+ * underlying one aggregated point.
+ *
+ * Reuses the exact whitelist/binding machinery as `compileReportSpec` via
+ * `createSpecContext`, so a drill-down can never reach a field an aggregate
+ * report could not.
+ */
+export function compileDrillDown(spec: unknown, tenantId: string): CompiledQuery {
+  if (!spec || typeof spec !== 'object') throw new SpecError('spec must be an object');
+  const s = spec as Record<string, unknown>;
+
+  if (!isDataset(s.dataset)) {
+    throw new SpecError(`unknown dataset: ${JSON.stringify(s.dataset)}`);
+  }
+  const def = CATALOG[s.dataset];
+
+  const ctx = createSpecContext(s.dataset, def, s.joins, tenantId);
+  const { params, bind, resolveField } = ctx;
+
+  const filtersIn = (s.filters === undefined ? [] : assertArray(s.filters, 'filters')) as Filter[];
+  const atIn = (s.at === undefined ? [] : assertArray(s.at, 'at')) as DrillPoint[];
+  const sortIn = (s.sort === undefined ? [] : assertArray(s.sort, 'sort')) as Sort[];
+  const columnsIn = s.columns === undefined ? undefined : (assertArray(s.columns, 'columns') as string[]);
+
+  // ── SELECT — the detail columns (no aggregation, no GROUP BY) ─────────────
+  const selectParts: string[] = [];
+  const columns: CompiledColumn[] = [];
+  const outputAlias = new Map<string, string>();
+
+  const addColumn = (field: string): void => {
+    const { key, def: fd, expr } = resolveField(field, 'column');
+    if (outputAlias.has(key)) return; // tolerate duplicates rather than erroring
+    if (!SAFE_ALIAS.test(key)) throw new SpecError(`invalid column alias: ${key}`);
+    selectParts.push(`${expr} AS ${key}`);
+    columns.push({ key, label: fd.label, type: fd.type });
+    outputAlias.set(key, key);
+  };
+
+  if (columnsIn && columnsIn.length > 0) {
+    for (const c of columnsIn) addColumn(c);
+  } else {
+    // Default: the whole base row. Joined fields are opt-in via `columns`,
+    // since a join exists mainly to filter/label rather than to widen output.
+    for (const fname of Object.keys(def.fields)) addColumn(fname);
+  }
+
+  // ── WHERE — tenant scope, base predicate, report filters, clicked point ───
+  const whereParts: string[] = [`tenant_id = {tenantId:String}`];
+  if (def.baseWhere) whereParts.push(def.baseWhere);
+
+  for (const f of filtersIn) {
+    if (!f || typeof f !== 'object') throw new SpecError('each filter must be an object');
+    if (!FILTER_OPS.includes(f.op)) throw new SpecError(`invalid filter op: ${JSON.stringify(f.op)}`);
+    const { key, def: fd, expr } = resolveField(f.field, 'filter');
+    if (!fd.filterable) throw new SpecError(`field "${key}" cannot be used in a filter`);
+    whereParts.push(compileFilter(fd, expr, f, bind));
+  }
+
+  for (const pt of atIn) {
+    if (!pt || typeof pt !== 'object') throw new SpecError('each `at` entry must be an object');
+    const { key, def: fd, expr } = resolveField(pt.field, 'drill-down point');
+    if (!fd.filterable) throw new SpecError(`field "${key}" cannot be used in a filter`);
+
+    if (pt.timeGrain !== undefined) {
+      // Match the chart's bucket: compare the SAME truncation the report grouped
+      // by, so clicking "March" returns exactly March's rows.
+      if (!fd.time) throw new SpecError(`field "${key}" does not support timeGrain`);
+      if (!TIME_GRAINS.includes(pt.timeGrain)) {
+        throw new SpecError(`invalid timeGrain: ${JSON.stringify(pt.timeGrain)}`);
+      }
+      const name = bind(String(pt.value ?? ''));
+      whereParts.push(
+        `${TIME_GRAIN_FN[pt.timeGrain]}(${expr}) = ${TIME_GRAIN_FN[pt.timeGrain]}(parseDateTime64BestEffort({${name}:String}))`
+      );
+      continue;
+    }
+    whereParts.push(compileFilter(fd, expr, { field: pt.field, op: 'eq', value: pt.value }, bind));
+  }
+
+  // ── ORDER BY — over emitted columns; default to newest-first when possible ─
+  const orderParts: string[] = [];
+  for (const srt of sortIn) {
+    if (!srt || typeof srt !== 'object') throw new SpecError('each sort must be an object');
+    const aliasKey = outputAlias.get(srt.field as string);
+    if (!aliasKey) throw new SpecError(`sort field "${String(srt.field)}" is not a selected column`);
+    const dir = srt.dir === 'desc' ? 'DESC' : srt.dir === 'asc' ? 'ASC' : undefined;
+    if (!dir) throw new SpecError(`invalid sort dir: ${JSON.stringify(srt.dir)}`);
+    orderParts.push(`${aliasKey} ${dir}`);
+  }
+  if (orderParts.length === 0) {
+    const timeKey = Object.keys(def.fields).find((f) => def.fields[f].time && outputAlias.has(f));
+    if (timeKey) orderParts.push(`${timeKey} DESC`);
+  }
+
+  let limit = DRILL_DEFAULT_LIMIT;
+  if (s.limit !== undefined) {
+    const n = Number(s.limit);
+    if (!Number.isFinite(n) || n <= 0) throw new SpecError(`invalid limit: ${JSON.stringify(s.limit)}`);
+    limit = Math.min(Math.floor(n), DRILL_MAX_LIMIT);
   }
 
   const sql = [
     `SELECT ${selectParts.join(', ')}`,
     `FROM ${def.table}`,
-    ...joinClauses,
+    ...ctx.joinClauses(),
     `WHERE ${whereParts.join(' AND ')}`,
-    groupByParts.length ? `GROUP BY ${groupByParts.join(', ')}` : '',
     orderParts.length ? `ORDER BY ${orderParts.join(', ')}` : '',
     `LIMIT ${limit}`,
   ]

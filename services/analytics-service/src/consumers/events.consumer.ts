@@ -214,6 +214,10 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
   };
 
   consumer.on('quote.created', projectQuoteEvent);
+  // Quotes converted from an RFQ announce themselves as `quote.created_from_rfq`,
+  // never as `quote.created`. Since the commercial rules require a quote to
+  // originate from an RFQ, omitting this left quote creation uncounted entirely.
+  consumer.on('quote.created_from_rfq', projectQuoteEvent);
   consumer.on('quote.sent', projectQuoteEvent);
   consumer.on('quote.accepted', projectQuoteEvent);
   consumer.on('quote.rejected', projectQuoteEvent);
@@ -453,6 +457,15 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
   };
   consumer.on('subscription.created', projectSubscriptionEvent);
   consumer.on('subscription.cancelled', projectSubscriptionEvent);
+  // The rest of the lifecycle billing-service actually emits (all on PAYMENTS).
+  // The projection keys off `event_type`, so these need no special handling —
+  // without them the subscription read-model only ever saw births and deaths,
+  // and no renewal, activation, or dunning signal in between.
+  consumer.on('subscription.activated', projectSubscriptionEvent);
+  consumer.on('subscription.renewed', projectSubscriptionEvent);
+  consumer.on('subscription.past_due', projectSubscriptionEvent);
+  consumer.on('subscription.dunning', projectSubscriptionEvent);
+  consumer.on('subscription.payment_retry', projectSubscriptionEvent);
 
   // ── Commissions (nexus.finance.commissions topic) ──────────────────────────
   const projectCommissionEvent = async (event: NexusKafkaEvent): Promise<void> => {
@@ -488,6 +501,10 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
     TOPICS.QUOTES,
     TOPICS.CONTACTS,
     TOPICS.INVOICES,
+    // `invoice.paid` is published to PAYMENTS, not INVOICES. Without this topic
+    // the handler above is unreachable and collected cash — the one number the
+    // whole finance read-model exists to report — never lands.
+    TOPICS.PAYMENTS,
     TOPICS.CONTRACTS,
     TOPICS.LEADS,
     TOPICS.ACCOUNTS,

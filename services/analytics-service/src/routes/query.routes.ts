@@ -67,6 +67,27 @@ export async function registerQueryAnalyticsRoutes(
         }
       );
 
+      // Drill-down: the individual rows behind one aggregated point.
+      // Body: { dataset, joins?, filters?, at: [{ field, timeGrain?, value }], columns?, sort?, limit? }
+      r.post(
+        '/analytics/query/drilldown',
+        { preHandler: requirePermission(PERMISSIONS.ANALYTICS.READ) },
+        async (request, reply) => {
+          const jwt = request.user as JwtPayload;
+          const body = (request.body ?? {}) as Record<string, unknown>;
+          try {
+            const result = await svc.runDrillDown(jwt.tenantId, body);
+            return reply.send({ success: true, data: result });
+          } catch (err) {
+            if (err instanceof SpecError) throw new ValidationError(err.message);
+            if (err instanceof QueryExecutionError) {
+              throw new NexusError('ANALYTICS_QUERY_FAILED', err.message, 502);
+            }
+            throw err;
+          }
+        }
+      );
+
       r.get(
         '/analytics/query/fields',
         { preHandler: requirePermission(PERMISSIONS.ANALYTICS.READ) },

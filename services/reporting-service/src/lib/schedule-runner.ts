@@ -5,6 +5,8 @@ import { executeReport as executeDefinitionReport, type QuerySpec } from '../ser
 
 const CHECK_INTERVAL_MS = 60 * 1000;
 const BATCH = 20;
+/** Scheduled runs are background work, so they tolerate a slower query than a UI read. */
+const SCHEDULE_QUERY_TIMEOUT_MS = 15000;
 
 /**
  * Compute the next fire time for a standard 5-field cron expression
@@ -22,6 +24,63 @@ export function computeNextRun(cronExpr: string, from: Date): Date {
     const fallback = new Date(from);
     fallback.setDate(fallback.getDate() + 1);
     return fallback;
+  }
+}
+
+/**
+ * Whether `computeNextRun` can actually honor this expression.
+ *
+ * Worth checking at CREATE time: computeNextRun deliberately fails safe to
+ * "tomorrow" on a bad cron, which keeps the runner healthy but means a typo
+ * turns into a subscription that quietly fires at the wrong time forever.
+ */
+export function isValidCron(cronExpr: string): boolean {
+  try {
+    cronParser.parseExpression(cronExpr);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+interface InternalQueryResult {
+  columns: Array<{ key: string; label: string; type: string }>;
+  rows: Record<string, unknown>[];
+}
+
+/**
+ * Run a saved ReportSpec via analytics' internal service-token route.
+ *
+ * Deliberately THROWS on any failure, unlike the fail-open `analytics-client`
+ * used on the interactive read path: a scheduled email that silently ships zero
+ * rows because analytics was down looks exactly like "the business did nothing
+ * this week", which is worse than no email at all. The caller records the error
+ * and still advances nextRunAt.
+ */
+async function runSpecInternally(tenantId: string, spec: unknown, svc: string): Promise<InternalQueryResult> {
+  // ANALYTICS_SERVICE_URL carries the `/api/v1/analytics` suffix by convention;
+  // the internal route lives at `/api/v1/internal/analytics/query`, so derive the
+  // service root rather than assuming the base.
+  const configured = process.env.ANALYTICS_SERVICE_URL ?? 'http://localhost:3008/api/v1/analytics';
+  const root = configured.replace(/\/api\/v1\/analytics\/?$/, '');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SCHEDULE_QUERY_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${root}/api/v1/internal/analytics/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-service-token': svc },
+      body: JSON.stringify({ tenantId, spec }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`analytics query failed: ${res.status} ${text.slice(0, 300)}`);
+    }
+    const body = (await res.json()) as { data?: InternalQueryResult };
+    if (!body?.data) throw new Error('analytics query returned no data');
+    return { columns: body.data.columns ?? [], rows: body.data.rows ?? [] };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -180,20 +239,82 @@ async function processDefinitionSchedules(
 }
 
 /**
- * Single consolidated pass over BOTH schedule models. Exported so it can be
+ * Process due BiReportSchedule rows — the modern ReportSpec/ClickHouse path.
+ *
+ * A cron run has no logged-in user, and analytics' public `/query` derives the
+ * tenant from the caller's JWT, so this goes through analytics' internal
+ * service-token route (`/internal/analytics/query`) with an explicit tenantId.
+ *
+ * Unlike the two paths above, a failure here is also persisted to `lastError`:
+ * an email subscription that silently stops arriving is worse than one that
+ * reports why.
+ */
+async function processBiReportSchedules(
+  prisma: ReportingPrisma,
+  now: Date,
+  comm: string,
+  svc: string
+): Promise<number> {
+  const due = await prisma.biReportSchedule.findMany({
+    where: { isActive: true, nextRunAt: { lte: now } },
+    include: { report: true },
+    take: BATCH,
+  });
+
+  for (const schedule of due) {
+    let failure: string | null = null;
+    try {
+      const result = await runSpecInternally(schedule.tenantId, schedule.report.spec, svc);
+      // Column order comes from the compiler, so the CSV matches the on-screen report.
+      const columns = result.columns.map((c) => c.key);
+      const csv = await exportToCsv(result.rows, columns);
+      await deliverReportEmail(
+        comm,
+        svc,
+        schedule.tenantId,
+        schedule.recipients as string[],
+        schedule.subject ?? `Scheduled Report: ${schedule.report.name}`,
+        buildHtmlBody(schedule.report.name, schedule.format, csv, now, result.rows.length)
+      );
+    } catch (err) {
+      failure = (err as Error)?.message ?? String(err);
+      console.error(`BiReportSchedule ${schedule.id} failed:`, err);
+    } finally {
+      // ALWAYS advance nextRunAt — even on failure — so a broken report can never
+      // re-run every 60s in a hot loop.
+      try {
+        await prisma.biReportSchedule.update({
+          where: { id: schedule.id },
+          data: {
+            lastRunAt: now,
+            nextRunAt: computeNextRun(schedule.cron, now),
+            lastError: failure ? failure.slice(0, 500) : null,
+          },
+        });
+      } catch (err) {
+        console.error(`BiReportSchedule ${schedule.id} nextRunAt advance failed:`, err);
+      }
+    }
+  }
+  return due.length;
+}
+
+/**
+ * Single consolidated pass over ALL THREE schedule models. Exported so it can be
  * driven by the interval runner (index.ts) or triggered directly
  * (reports.service.processSchedules / tests).
  */
 export async function runDueSchedules(
   prisma: ReportingPrisma
-): Promise<{ savedProcessed: number; definitionProcessed: number }> {
+): Promise<{ savedProcessed: number; definitionProcessed: number; biProcessed: number }> {
   const now = new Date();
   const svc = process.env.INTERNAL_SERVICE_TOKEN ?? '';
   const comm = process.env.COMM_SERVICE_URL ?? 'http://localhost:3009';
 
   const savedProcessed = await processSavedReportSchedules(prisma, now, comm, svc);
   const definitionProcessed = await processDefinitionSchedules(prisma, now, comm, svc);
-  return { savedProcessed, definitionProcessed };
+  const biProcessed = await processBiReportSchedules(prisma, now, comm, svc);
+  return { savedProcessed, definitionProcessed, biProcessed };
 }
 
 export function startScheduleRunner(prisma: ReportingPrisma): NodeJS.Timeout {

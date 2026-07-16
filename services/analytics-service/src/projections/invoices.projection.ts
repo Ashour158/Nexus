@@ -1,3 +1,4 @@
+import { chDateTime } from '../lib/ch-datetime.js';
 import type { ClickHouseClient } from '@clickhouse/client';
 import type { NexusKafkaEvent } from '@nexus/shared-types';
 
@@ -28,7 +29,7 @@ export class InvoicesSummaryProjection {
           base_total_amount: baseTotal,
           base_paid_amount: status === 'PAID' ? baseTotal : 0,
           base_currency: baseCurrency,
-          updated_at: event.timestamp,
+          updated_at: chDateTime(event.timestamp),
         },
       ],
       format: 'JSONEachRow',

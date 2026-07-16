@@ -83,8 +83,23 @@ export interface SortClause {
   dir: SortDir;
 }
 
+/**
+ * Cross-object join. Attaches another dataset's latest attributes to the base
+ * rows so a report can span objects. Joined fields are then referenced with a
+ * dotted name — "<alias>.<field>", alias defaulting to the joined dataset.
+ * analytics-service resolves/whitelists the fields and compiles the SQL.
+ */
+export interface JoinClause {
+  dataset: Dataset;
+  /** Foreign-key field on the BASE dataset (e.g. 'account_id'). */
+  on: string;
+  /** Reference prefix for joined fields. Defaults to `dataset`. */
+  alias?: string;
+}
+
 export interface ReportSpec {
   dataset: Dataset;
+  joins?: JoinClause[];
   measures: Measure[];
   dimensions: Dimension[];
   filters: FilterClause[];
@@ -300,6 +315,40 @@ export function validateReportSpec(input: unknown): ValidationResult {
   // The only hard requirement beyond a known dataset is structural validity,
   // already checked above. (measures non-empty OR raw table both pass.)
 
+  // Joins — structural validation only; analytics-service whitelists the joined
+  // dataset/fields and compiles the SQL.
+  let joins: JoinClause[] | undefined;
+  if (input.joins !== undefined) {
+    if (!Array.isArray(input.joins)) {
+      errors.push('joins must be an array');
+    } else {
+      joins = [];
+      input.joins.forEach((j: unknown, i: number) => {
+        if (!isPlainObject(j)) {
+          errors.push(`joins[${i}] must be an object`);
+          return;
+        }
+        if (typeof j.dataset !== 'string' || !DATASETS.includes(j.dataset as Dataset)) {
+          errors.push(`joins[${i}].dataset must be one of: ${DATASETS.join(', ')}`);
+          return;
+        }
+        if (typeof j.on !== 'string' || j.on.length === 0) {
+          errors.push(`joins[${i}].on is required`);
+          return;
+        }
+        if (j.alias !== undefined && typeof j.alias !== 'string') {
+          errors.push(`joins[${i}].alias must be a string`);
+          return;
+        }
+        joins!.push({
+          dataset: j.dataset as Dataset,
+          on: j.on,
+          ...(typeof j.alias === 'string' ? { alias: j.alias } : {}),
+        });
+      });
+    }
+  }
+
   // A spec with neither a measure nor a dimension has nothing to project and is
   // rejected downstream by the compiler — reject it here so validation matches.
   if (measures.length === 0 && dimensions.length === 0) {
@@ -315,6 +364,7 @@ export function validateReportSpec(input: unknown): ValidationResult {
     errors: [],
     spec: {
       dataset: dataset as Dataset,
+      ...(joins !== undefined && joins.length > 0 ? { joins } : {}),
       measures,
       dimensions,
       filters,

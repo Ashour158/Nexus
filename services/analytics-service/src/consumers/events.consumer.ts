@@ -11,6 +11,7 @@ import {
   ContractsSummaryProjection,
 } from '../projections/index.js';
 import { ratesService } from '../services/rates.service.js';
+import { chDateTime } from '../lib/ch-datetime.js';
 
 export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<NexusConsumer> {
   const consumer = new NexusConsumer('analytics-service.events');
@@ -68,7 +69,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         base_currency: baseCurrency,
         probability: Number(p.probability ?? 0),
         forecast_category: String(p.forecastCategory ?? ''),
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -92,7 +93,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         base_amount: 0,
         base_currency: 'USD',
         forecast_category: String(p.forecastCategory ?? ''),
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -118,7 +119,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         base_amount: baseAmount,
         base_currency: baseCurrency,
         forecast_category: String(p.forecastCategory ?? 'CLOSED'),
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -143,7 +144,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         base_amount: baseAmount,
         base_currency: baseCurrency,
         forecast_category: String(p.forecastCategory ?? 'CLOSED'),
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -161,7 +162,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         deal_id: String(p.dealId ?? ''),
         activity_type: String(p.type ?? ''),
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -179,7 +180,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         deal_id: String(p.dealId ?? ''),
         activity_type: String(p.type ?? ''),
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -205,7 +206,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         currency: String(p.currency ?? 'USD'),
         base_amount: baseAmount,
         base_currency: baseCurrency,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -235,7 +236,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         base_amount: baseAmount,
         base_currency: baseCurrency,
         status,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -271,7 +272,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         source: String(p.source ?? ''),
         company: String(p.company ?? ''),
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -293,7 +294,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         account_id: String(p.accountId ?? ''),
         owner_id: String(p.ownerId ?? ''),
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -316,7 +317,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         name: String(p.name ?? ''),
         industry: String(p.industry ?? ''),
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -343,7 +344,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         currency: String(p.currency ?? 'USD'),
         base_amount: baseAmount,
         base_currency: baseCurrency,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -386,7 +387,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         assignee_id: String(p.assigneeId ?? ''),
         account_id: String(p.accountId ?? ''),
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -413,7 +414,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         owner_id: String(p.ownerId ?? ''),
         budget: Number(p.budget ?? 0),
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -445,7 +446,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         base_amount: baseAmount,
         base_currency: baseCurrency,
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -472,7 +473,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         base_amount: baseAmount,
         base_currency: baseCurrency,
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });

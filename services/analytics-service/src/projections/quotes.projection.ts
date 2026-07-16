@@ -1,3 +1,4 @@
+import { chDateTime } from '../lib/ch-datetime.js';
 import type { ClickHouseClient } from '@clickhouse/client';
 import type { NexusKafkaEvent } from '@nexus/shared-types';
 
@@ -27,7 +28,7 @@ export class QuotesSummaryProjection {
           quote_count: 1,
           base_total: baseTotal,
           base_currency: baseCurrency,
-          updated_at: event.timestamp,
+          updated_at: chDateTime(event.timestamp),
         },
       ],
       format: 'JSONEachRow',

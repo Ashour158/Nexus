@@ -1,3 +1,4 @@
+import { chDateTime } from '../lib/ch-datetime.js';
 import type { ClickHouseClient } from '@clickhouse/client';
 import { ReadModelProjection } from '@nexus/cqrs';
 import type { NexusKafkaEvent } from '@nexus/shared-types';
@@ -35,7 +36,7 @@ export class DealsSummaryProjection extends ReadModelProjection {
             base_total_amount: baseAmount,
             base_weighted_amount: baseAmount * (probability / 100),
             base_currency: baseCurrency,
-            updated_at: event.timestamp,
+            updated_at: chDateTime(event.timestamp),
           }],
           format: 'JSONEachRow',
         });

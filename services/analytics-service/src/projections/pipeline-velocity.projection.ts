@@ -1,3 +1,4 @@
+import { chDateTime } from '../lib/ch-datetime.js';
 import type { ClickHouseClient } from '@clickhouse/client';
 import { ReadModelProjection } from '@nexus/cqrs';
 import type { NexusKafkaEvent } from '@nexus/shared-types';
@@ -22,7 +23,7 @@ export class PipelineVelocityProjection extends ReadModelProjection {
             conversion_rate: 0,
             exit_count: 1,
             enter_count: 1,
-            updated_at: event.timestamp,
+            updated_at: chDateTime(event.timestamp),
           }],
           format: 'JSONEachRow',
         });

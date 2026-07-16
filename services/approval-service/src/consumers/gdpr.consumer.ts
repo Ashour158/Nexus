@@ -1,4 +1,4 @@
-import { NexusConsumer, TOPICS } from '@nexus/kafka';
+import { NexusConsumer } from '@nexus/kafka';
 import type { ApprovalPrisma } from '../prisma.js';
 
 /**
@@ -31,7 +31,12 @@ export async function startGdprConsumer(prisma: ApprovalPrisma): Promise<NexusCo
     }
   });
 
-  await consumer.subscribe([TOPICS.AUDIT]);
+  // auth-service publishes erasure to a topic literally named
+  // 'gdpr.erasure.requested' (routes/gdpr.routes.ts), NOT to the audit topic —
+  // this consumer subscribed AUDIT and so never received a single erasure, while
+  // the crm/comm/finance GDPR consumers (which subscribe the literal topic) all
+  // worked. Personal data in approvals therefore survived an erasure request.
+  await consumer.subscribe(['gdpr.erasure.requested']);
   await consumer.start();
   return consumer;
 }

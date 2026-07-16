@@ -697,11 +697,20 @@ export function createCommercialRecordsUseCase(deps: CommercialRecordsUseCaseDep
       },
     });
 
-    await producer.publish(topic, {
-      type: input.type,
-      tenantId,
-      payload: eventPayload,
-    }).catch(() => undefined);
+    // NO direct producer.publish here — the outbox row above IS the delivery.
+    //
+    // This used to ALSO publish directly, so every commercial event reached Kafka
+    // twice: once from this call and once when outbox-relay drained the row. The
+    // consumer's idempotency store dedups by eventId, but the two copies get
+    // DIFFERENT ids (the direct copy is assigned a fresh uuid inside
+    // producer.publish), so nothing collapsed them. Every downstream reader saw
+    // each event twice — analytics counted every quote/order twice, so summed
+    // money in the read model was exactly 2x reality.
+    //
+    // It was also unsafe: the direct publish fired even when the surrounding
+    // transaction later rolled back, emitting a phantom event for a record that
+    // does not exist. Relay-only delivery is the whole point of an outbox.
+    // Verified on prod: relay drains this table (150/150 SENT, 0 PENDING).
   }
 
   // ─── Quote-to-cash: create finance Subscription rows from a converted order ──

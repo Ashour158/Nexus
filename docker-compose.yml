@@ -845,6 +845,13 @@ services:
     environment:
       # crm calls POST /api/v1/internal/cadence/auto-enroll; the step-runner calls
       # crm's /internal/automation/activities — both use x-service-token.
+      # These two URLs were documented by the comment above but never set: the
+      # step-runner interpolates them unguarded, so the fetch target became
+      # "undefined/api/v1/..." and threw into a .catch(() => undefined). Every
+      # cadence email and task was silently dropped while the step still reported
+      # success and the enrollment advanced to the next step.
+      CRM_SERVICE_URL: http://crm-service:3001
+      COMM_SERVICE_URL: http://comm-service:3009
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}

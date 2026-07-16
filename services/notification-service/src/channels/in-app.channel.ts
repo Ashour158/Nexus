@@ -1,4 +1,5 @@
 import type { NotificationPrisma } from '../prisma.js';
+import { tenantAls } from '../prisma.js';
 import type { Prisma } from '../../../../node_modules/.prisma/notification-client/index.js';
 import { NexusProducer, TOPICS } from '@nexus/kafka';
 
@@ -41,6 +42,21 @@ export interface InAppChannel {
 export function createInAppChannel(prisma: NotificationPrisma, producer?: NexusProducer): InAppChannel {
   return {
     async send(input) {
+      // Seed the tenant ALS for the whole write.
+      //
+      // Every caller is a Kafka consumer, which has no HTTP request context — and
+      // the shared tenant Prisma extension THROWS (TenantContextError) when the
+      // ALS store is empty rather than no-op'ing as prisma.ts's comment assumed.
+      // The result: every in-app notification write threw, retried 3x, and was
+      // dropped. The service looked healthy (9 consumers Stable, lag 0) and had
+      // produced ZERO notifications. `input.tenantId` is already required on this
+      // interface, so the context is right here — seed it rather than turning
+      // enforcement off.
+      return tenantAls.run({ tenantId: input.tenantId }, () => sendInner(input));
+    },
+  };
+
+  async function sendInner(input: InAppNotificationInput): Promise<{ id: string }> {
       // RR-H4: derive a stable dedup key so at-least-once event delivery (retry
       // / DLQ replay) cannot create duplicate inbox rows. `eventId:userId:type`
       // keeps distinct notifications to the same user (e.g. two stage changes)
@@ -120,6 +136,5 @@ export function createInAppChannel(prisma: NotificationPrisma, producer?: NexusP
       }
 
       return { id: row.id };
-    },
-  };
+  }
 }

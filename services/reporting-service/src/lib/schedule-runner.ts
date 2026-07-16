@@ -1,6 +1,7 @@
 import cronParser from 'cron-parser';
 import type { ReportingPrisma } from '../prisma.js';
 import { executeReport, exportToCsv, type ReportObjectType } from './report-engine.js';
+import { toCsv } from './bi-export.js';
 import { executeReport as executeDefinitionReport, type QuerySpec } from '../services/executor.service.js';
 
 const CHECK_INTERVAL_MS = 60 * 1000;
@@ -265,9 +266,10 @@ async function processBiReportSchedules(
     let failure: string | null = null;
     try {
       const result = await runSpecInternally(schedule.tenantId, schedule.report.spec, svc);
-      // Column order comes from the compiler, so the CSV matches the on-screen report.
-      const columns = result.columns.map((c) => c.key);
-      const csv = await exportToCsv(result.rows, columns);
+      // Column order/labels come from the compiler, so the CSV matches the
+      // on-screen report. toCsv (not exportToCsv) because it also neutralises
+      // formula-injection — this CSV is emailed straight to people who open it.
+      const csv = toCsv(result.columns, result.rows);
       await deliverReportEmail(
         comm,
         svc,

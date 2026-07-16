@@ -16,6 +16,15 @@ import type { ReportingPrisma } from '../prisma.js';
 import { validateReportSpec, isValidChartType } from '../lib/report-spec.js';
 import { runReportSpec } from '../lib/analytics-client.js';
 import { computeNextRun, isValidCron } from '../lib/schedule-runner.js';
+import {
+  EXPORT_FORMATS,
+  isExportFormat,
+  renderPdfViaDocumentService,
+  toCsv,
+  toPrintableHtml,
+  toXlsx,
+  type ExportColumn,
+} from '../lib/bi-export.js';
 import { createReportAuditLogger } from '../lib/audit-logger.js';
 
 const READ = { preHandler: requirePermission(PERMISSIONS.ANALYTICS.READ) };
@@ -120,6 +129,82 @@ export async function registerBiRoutes(app: FastifyInstance, prisma: ReportingPr
       .log({ tenantId: jwt.tenantId, userId: jwt.sub, action: 'report_deleted', reportId: id, reportName: existing?.name ?? id })
       .catch((err) => app.log.warn({ err }, 'audit log failed'));
     return reply.send({ success: true });
+  });
+
+  // ─── Export ────────────────────────────────────────────────────────────────
+  // GET /api/v1/bi/reports/:id/export?format=csv|xlsx|pdf
+  // Real files: a genuine .xlsx workbook and a genuine PDF (rendered by
+  // document-service, which already runs the headless Chromium).
+  app.get('/api/v1/bi/reports/:id/export', WRITE, async (req, reply) => {
+    const jwt = (req as any).user as JwtPayload;
+    const { id } = req.params as { id: string };
+    const format = ((req.query as { format?: string }).format ?? 'csv').toLowerCase();
+    if (!isExportFormat(format)) {
+      return reply.code(422).send({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: `format must be one of ${EXPORT_FORMATS.join(', ')}`, requestId: req.id },
+      });
+    }
+
+    const report = await prisma.biSavedReport.findFirst({
+      where: { id, tenantId: jwt.tenantId, OR: [{ ownerId: jwt.sub }, { isShared: true }] },
+    });
+    if (!report) return notFound(reply, req.id);
+
+    const validation = validateReportSpec(report.spec);
+    if (!validation.valid) return unprocessable(reply, req.id, validation.errors);
+
+    const result = await runReportSpec(jwt.tenantId, validation.spec, req.headers.authorization);
+    // Unlike the interactive /run (which degrades to empty rows), an export must
+    // NOT hand back a file that looks like "no data" when analytics was simply
+    // unreachable — a spreadsheet is trusted and forwarded onward.
+    if (!result) {
+      return reply.code(502).send({
+        success: false,
+        error: { code: 'ANALYTICS_UNAVAILABLE', message: 'Could not query analytics; export not produced', requestId: req.id },
+      });
+    }
+
+    const columns = (result.columns as ExportColumn[] | undefined) ?? [];
+    const rows = result.rows ?? [];
+    // Fall back to row keys if the engine returned rows but no column metadata.
+    const cols: ExportColumn[] =
+      columns.length > 0
+        ? columns
+        : Object.keys((rows[0] as Record<string, unknown>) ?? {}).map((k) => ({ key: k, label: k }));
+
+    const safeName = (report.name || 'report').replace(/[^A-Za-z0-9._-]+/g, '-').slice(0, 60);
+
+    audit
+      .log({ tenantId: jwt.tenantId, userId: jwt.sub, action: 'report_exported', reportId: id, reportName: report.name, format })
+      .catch((err) => app.log.warn({ err }, 'audit log failed'));
+
+    if (format === 'csv') {
+      reply.header('Content-Type', 'text/csv; charset=utf-8');
+      reply.header('Content-Disposition', `attachment; filename="${safeName}.csv"`);
+      return reply.send(toCsv(cols, rows));
+    }
+
+    if (format === 'xlsx') {
+      const buf = toXlsx(cols, rows, report.name);
+      reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      reply.header('Content-Disposition', `attachment; filename="${safeName}.xlsx"`);
+      return reply.send(buf);
+    }
+
+    const html = toPrintableHtml(report.name, cols, rows, new Date());
+    try {
+      const pdf = await renderPdfViaDocumentService(html);
+      reply.header('Content-Type', 'application/pdf');
+      reply.header('Content-Disposition', `attachment; filename="${safeName}.pdf"`);
+      return reply.send(pdf);
+    } catch (err) {
+      app.log.warn({ err }, 'pdf render failed');
+      return reply.code(502).send({
+        success: false,
+        error: { code: 'PDF_RENDER_FAILED', message: (err as Error)?.message ?? 'render failed', requestId: req.id },
+      });
+    }
   });
 
   // ─── Schedules / subscriptions ─────────────────────────────────────────────

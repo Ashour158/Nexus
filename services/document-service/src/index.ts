@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { startTracing } from '@nexus/service-utils/tracing';
 import { createService, startService, registerHealthRoutes, checkDatabase } from '@nexus/service-utils';
 import { registerRoutes } from './routes/index.js';
+import { registerInternalDocumentRoutes } from './routes/internal.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 import { PrismaClient } from '../../../node_modules/.prisma/document-client/index.js';
 import { createTenantPrismaExtension } from '@nexus/service-utils/prisma-tenant';
@@ -40,6 +41,7 @@ app.addHook('preHandler', async (request) => {
 registerHealthRoutes(app, 'document-service', [() => checkDatabase(prismaBase)]);
 
 await registerRoutes(app, prisma as unknown as Parameters<typeof registerRoutes>[1]);
+await registerInternalDocumentRoutes(app);
 await registerGraphQL(app, prisma);
 
 await startService(app, port, async () => { /* routes already registered above */ });

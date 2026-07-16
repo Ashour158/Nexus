@@ -925,6 +925,12 @@ services:
       REPORTING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_reporting
       CRM_SERVICE_URL: http://crm-service:3001
       ANALYTICS_SERVICE_URL: http://analytics-service:3008/api/v1/analytics
+      # Scheduled reports are delivered through comm-service's outbox. Without
+      # this the runner fell back to localhost:3009 — itself — so every scheduled
+      # report silently failed to send.
+      COMM_SERVICE_URL: http://comm-service:3009
+      # PDF export renders via document-service, which ships the headless Chromium.
+      DOCUMENT_SERVICE_URL: http://document-service:3016
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}

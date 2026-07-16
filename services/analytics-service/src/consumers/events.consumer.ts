@@ -84,14 +84,24 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         tenant_id: event.tenantId,
         deal_id: String(p.dealId ?? ''),
         owner_id: String(p.ownerId ?? ''),
-        account_id: '',
+        // Was hardcoded '' — presumably written to match a publisher that did not
+        // send it. crm-service now includes accountId/currency on this event, and a
+        // blank account_id here silently dropped every stage-change row out of any
+        // report joined to accounts (they matched no account, so they landed under
+        // a blank industry).
+        account_id: String(p.accountId ?? ''),
         pipeline_id: String(p.pipelineId ?? ''),
         stage_id: String(p.stageId ?? ''),
         event_type: event.type,
+        // amount stays 0 DELIBERATELY. deal_events is append-only and the `deals`
+        // dataset has no baseWhere, so an unfiltered sum(amount) spans every event
+        // type for a deal. Carrying the amount here would inflate every existing
+        // report that doesn't filter on event_type. A stage change moves a deal; it
+        // does not add value. Group by event_type to measure per-stage value.
         amount: 0,
-        currency: 'USD',
+        currency: String(p.currency ?? 'USD'),
         base_amount: 0,
-        base_currency: 'USD',
+        base_currency: String(p.currency ?? 'USD'),
         forecast_category: String(p.forecastCategory ?? ''),
         occurred_at: chDateTime(event.timestamp),
       }],

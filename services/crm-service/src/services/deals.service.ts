@@ -1118,6 +1118,17 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           dealId: updated.id,
           previousStageId: existing.stageId,
           newStageId: stage.id,
+          // `stageId`/`accountId`/`pipelineId`/`currency` are the field names every
+          // consumer of the deals topic reads (analytics projects them straight
+          // into deal_events). Publishing only `newStageId` meant the one event
+          // that REPORTS a stage change landed in the read model with a blank
+          // stage_id — and a blank account_id, which also broke any report joined
+          // to accounts. Keep both spellings: `newStageId` is what the
+          // stage-transition consumers already pair with `previousStageId`.
+          stageId: stage.id,
+          accountId: updated.accountId,
+          pipelineId: updated.pipelineId,
+          currency: updated.currency,
           ownerId: updated.ownerId,
           amount: decimalToNumber(updated.amount),
           rottenDays: stage.rottenDays,
@@ -1156,6 +1167,11 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
             dealId: updated.id,
             ownerId: updated.ownerId,
             accountId: updated.accountId,
+            // Without stage/pipeline, won deals land in the read model with a
+            // blank stage_id — so win-rate BY STAGE, the whole point of the
+            // measure, has nothing to group on.
+            stageId: updated.stageId,
+            pipelineId: updated.pipelineId,
             amount: decimalToNumber(updated.amount),
             currency: updated.currency,
             expectedCloseDate: updated.expectedCloseDate?.toISOString() ?? null,
@@ -1170,6 +1186,13 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           payload: {
             dealId: updated.id,
             ownerId: updated.ownerId,
+            // deal.lost carried no accountId/currency at all, so "lost deals by
+            // account industry" could never join, and lost value was untotalled
+            // in any non-USD tenant.
+            accountId: updated.accountId,
+            stageId: updated.stageId,
+            pipelineId: updated.pipelineId,
+            currency: updated.currency,
             reason: updated.lostReason ?? 'Moved to lost stage',
             amount: decimalToNumber(updated.amount),
             expectedCloseDate: updated.expectedCloseDate?.toISOString() ?? null,

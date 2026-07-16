@@ -32,13 +32,19 @@ export type ChartType =
   | 'radial'
   | 'funnel'
   | 'table'
+  | 'pivot'
   | 'kpi';
+
+/** Excel-style "show value as" transforms, applied client-side to the rows. */
+export type QuickCalc = 'percent_of_total' | 'running_total' | 'growth' | 'rank';
 
 export interface ReportSpecMeasure {
   field?: string;
   agg?: AggFn;
   /** Calculated measure — arithmetic over earlier measure aliases (e.g. "won / total"). */
   formula?: string;
+  /** Client-side "show value as" transform. */
+  quickCalc?: QuickCalc;
   alias?: string;
 }
 export interface ReportSpecDimension {
@@ -173,4 +179,12 @@ export const CHART_TYPES: Array<{ value: ChartType; label: string }> = [
   { value: 'radial', label: 'Radial gauge' },
   { value: 'funnel', label: 'Funnel' },
   { value: 'table', label: 'Table' },
+  { value: 'pivot', label: 'Pivot table' },
+];
+
+export const QUICK_CALCS: Array<{ value: QuickCalc; label: string }> = [
+  { value: 'percent_of_total', label: '% of total' },
+  { value: 'running_total', label: 'Running total' },
+  { value: 'growth', label: 'Growth vs previous' },
+  { value: 'rank', label: 'Rank' },
 ];

@@ -69,7 +69,7 @@ export function WidgetCard({
             {(error as Error).message || 'Failed to run widget'}
           </div>
         ) : data ? (
-          <WidgetChart chartType={widget.chartType} result={data} height={240} />
+          <WidgetChart chartType={widget.chartType} result={data} height={240} measures={widget.spec?.measures} />
         ) : null}
       </div>
     </div>

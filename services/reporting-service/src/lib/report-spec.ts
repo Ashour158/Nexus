@@ -39,7 +39,17 @@ export type ChartType =
   | 'radial'
   | 'funnel'
   | 'table'
+  | 'pivot'
   | 'kpi';
+
+/**
+ * Excel-style "show value as" transforms. These are PRESENTATION concerns: the
+ * query engine ignores them (they are not compiled to SQL); the client applies
+ * them to the returned rows. Persisted on the measure so a saved report keeps
+ * its formatting.
+ */
+export type QuickCalc = 'percent_of_total' | 'running_total' | 'growth' | 'rank';
+export const QUICK_CALCS: readonly QuickCalc[] = ['percent_of_total', 'running_total', 'growth', 'rank'];
 
 export interface Measure {
   /** Physical field for a base aggregate. Omitted on a calculated measure. */
@@ -52,6 +62,8 @@ export interface Measure {
    * analytics-service; div-by-zero guarded.
    */
   formula?: string;
+  /** Client-side "show value as" transform (% of total, running total, …). */
+  quickCalc?: QuickCalc;
   alias?: string;
 }
 
@@ -101,7 +113,7 @@ const FILTER_OPS: readonly FilterOp[] = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 
 const SORT_DIRS: readonly SortDir[] = ['asc', 'desc'];
 export const CHART_TYPES: readonly ChartType[] = [
   'bar', 'stacked_bar', 'hbar', 'line', 'area', 'combo', 'pie', 'donut',
-  'scatter', 'radar', 'treemap', 'radial', 'funnel', 'table', 'kpi',
+  'scatter', 'radar', 'treemap', 'radial', 'funnel', 'table', 'pivot', 'kpi',
 ];
 
 export interface ValidationResult {
@@ -159,6 +171,13 @@ export function validateReportSpec(input: unknown): ValidationResult {
       if (m.alias !== undefined && typeof m.alias !== 'string') {
         errors.push(`measures[${i}].alias must be a string`);
       }
+      if (m.quickCalc !== undefined && !QUICK_CALCS.includes(m.quickCalc as QuickCalc)) {
+        errors.push(`measures[${i}].quickCalc must be one of: ${QUICK_CALCS.join(', ')}`);
+      }
+      const quick =
+        typeof m.quickCalc === 'string' && QUICK_CALCS.includes(m.quickCalc as QuickCalc)
+          ? { quickCalc: m.quickCalc as QuickCalc }
+          : {};
       // Calculated measure: a formula string, no field/agg. Deep validation of
       // the expression (whitelisted tokens, alias resolution) happens in
       // analytics-service's compiler; here we just carry it through.
@@ -168,6 +187,7 @@ export function validateReportSpec(input: unknown): ValidationResult {
         } else {
           measures.push({
             formula: m.formula,
+            ...quick,
             ...(typeof m.alias === 'string' ? { alias: m.alias } : {}),
           });
         }
@@ -183,6 +203,7 @@ export function validateReportSpec(input: unknown): ValidationResult {
         measures.push({
           field: m.field,
           agg: m.agg as Aggregation,
+          ...quick,
           ...(typeof m.alias === 'string' ? { alias: m.alias } : {}),
         });
       }

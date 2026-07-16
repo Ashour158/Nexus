@@ -33,8 +33,62 @@ import {
   YAxis,
   ZAxis,
 } from 'recharts';
-import type { ChartType, QueryResult } from '@/lib/bi-types';
+import type { ChartType, QueryResult, ReportSpecMeasure } from '@/lib/bi-types';
 import { formatCurrency } from '@/lib/format';
+import { cn } from '@/lib/cn';
+
+/**
+ * Excel-style "show value as" transforms. Applied to the returned rows in the
+ * order they arrive (the engine already sorted/limited them). Purely
+ * presentational — the underlying query is untouched.
+ */
+function applyQuickCalcs(result: QueryResult, measures?: ReportSpecMeasure[]): QueryResult {
+  const withCalc = (measures ?? []).filter((m) => m.quickCalc && m.alias);
+  if (withCalc.length === 0) return result;
+
+  const rows = result.rows.map((r) => ({ ...r }));
+  for (const m of withCalc) {
+    const key = m.alias as string;
+    const vals = rows.map((r) => Number(r[key] ?? 0));
+    if (m.quickCalc === 'percent_of_total') {
+      const total = vals.reduce((a, b) => a + b, 0);
+      rows.forEach((r, i) => {
+        r[key] = total ? (vals[i] / total) * 100 : 0;
+      });
+    } else if (m.quickCalc === 'running_total') {
+      let acc = 0;
+      rows.forEach((r, i) => {
+        acc += vals[i];
+        r[key] = acc;
+      });
+    } else if (m.quickCalc === 'growth') {
+      rows.forEach((r, i) => {
+        const prev = i === 0 ? undefined : vals[i - 1];
+        r[key] = i === 0 || !prev ? 0 : ((vals[i] - prev) / Math.abs(prev)) * 100;
+      });
+    } else if (m.quickCalc === 'rank') {
+      const order = vals.map((v, i) => ({ v, i })).sort((a, b) => b.v - a.v);
+      const rankByIndex = new Map<number, number>();
+      order.forEach((o, idx) => rankByIndex.set(o.i, idx + 1));
+      rows.forEach((r, i) => {
+        r[key] = rankByIndex.get(i) ?? 0;
+      });
+    }
+  }
+
+  const suffixFor: Record<string, string> = {
+    percent_of_total: ' (% of total)',
+    running_total: ' (running)',
+    growth: ' (growth %)',
+    rank: ' (rank)',
+  };
+  const columns = result.columns.map((c) => {
+    const m = withCalc.find((x) => x.alias === c.key);
+    if (!m || !m.quickCalc) return c;
+    return { ...c, label: `${c.label}${suffixFor[m.quickCalc] ?? ''}`, type: 'number' };
+  });
+  return { columns, rows };
+}
 
 const PALETTE = [
   '#2563eb',
@@ -64,13 +118,17 @@ function fmt(value: unknown, type?: string): string {
 
 export function WidgetChart({
   chartType,
-  result,
+  result: rawResult,
   height = 260,
+  measures,
 }: {
   chartType: ChartType;
   result: QueryResult;
   height?: number;
+  /** Spec measures — used to apply per-measure quick calcs (% of total, …). */
+  measures?: ReportSpecMeasure[];
 }): ReactElement {
+  const result = useMemo(() => applyQuickCalcs(rawResult, measures), [rawResult, measures]);
   const { columns, rows } = result;
   // A dimension column is a string/date; everything else is a measure. When no
   // string/date column exists (e.g. a single aggregate for a KPI), there is no
@@ -142,6 +200,80 @@ export function WidgetChart({
                 ))}
               </tr>
             ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // ---- Pivot (Excel crosstab: rows × columns × value, with totals) ----
+  if (chartType === 'pivot') {
+    const dimCols = columns.filter((c) => c.type === 'string' || c.type === 'date');
+    const valueCol = columns.find((c) => !dimCols.some((d) => d.key === c.key));
+    if (dimCols.length < 2 || !valueCol) {
+      return (
+        <div
+          className="flex items-center justify-center rounded-lg border border-dashed border-outline-variant p-4 text-center text-sm text-on-surface-variant"
+          style={{ height }}
+        >
+          A pivot needs two dimensions (rows &amp; columns) and one measure.
+        </div>
+      );
+    }
+    const rowDim = dimCols[0];
+    const colDim = dimCols[1];
+    const rowKeys: string[] = [];
+    const colKeys: string[] = [];
+    const cells = new Map<string, number>();
+    for (const r of rows) {
+      const rk = fmt(r[rowDim.key], rowDim.type);
+      const ck = fmt(r[colDim.key], colDim.type);
+      if (!rowKeys.includes(rk)) rowKeys.push(rk);
+      if (!colKeys.includes(ck)) colKeys.push(ck);
+      const cellKey = `${rk}||${ck}`;
+      cells.set(cellKey, (cells.get(cellKey) ?? 0) + Number(r[valueCol.key] ?? 0));
+    }
+    const rowTotal = (rk: string) => colKeys.reduce((a, ck) => a + (cells.get(`${rk}||${ck}`) ?? 0), 0);
+    const colTotal = (ck: string) => rowKeys.reduce((a, rk) => a + (cells.get(`${rk}||${ck}`) ?? 0), 0);
+    const grand = rowKeys.reduce((a, rk) => a + rowTotal(rk), 0);
+    const cellCls = 'px-3 py-2 text-right tabular-nums text-on-surface';
+    return (
+      <div className="overflow-auto" style={{ maxHeight: height + 40 }}>
+        <table className="w-full border-collapse text-left text-sm">
+          <thead>
+            <tr className="bg-surface-container-low">
+              <th className="sticky left-0 z-10 border-b border-outline-variant bg-surface-container-low px-3 py-2 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+                {rowDim.label} / {colDim.label}
+              </th>
+              {colKeys.map((ck) => (
+                <th key={ck} className="border-b border-outline-variant px-3 py-2 text-right text-xs font-semibold text-on-surface-variant">
+                  {ck}
+                </th>
+              ))}
+              <th className="border-b border-outline-variant px-3 py-2 text-right text-xs font-bold text-on-surface">Total</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-outline-variant">
+            {rowKeys.map((rk) => (
+              <tr key={rk} className="hover:bg-surface-container-low">
+                <td className="sticky left-0 z-10 bg-surface px-3 py-2 font-medium text-on-surface">{rk}</td>
+                {colKeys.map((ck) => (
+                  <td key={ck} className={cellCls}>
+                    {fmt(cells.get(`${rk}||${ck}`) ?? 0, valueCol.type)}
+                  </td>
+                ))}
+                <td className={cn(cellCls, 'font-semibold')}>{fmt(rowTotal(rk), valueCol.type)}</td>
+              </tr>
+            ))}
+            <tr className="bg-surface-container-low">
+              <td className="sticky left-0 z-10 bg-surface-container-low px-3 py-2 font-semibold text-on-surface">Total</td>
+              {colKeys.map((ck) => (
+                <td key={ck} className={cn(cellCls, 'font-semibold')}>
+                  {fmt(colTotal(ck), valueCol.type)}
+                </td>
+              ))}
+              <td className={cn(cellCls, 'font-bold')}>{fmt(grand, valueCol.type)}</td>
+            </tr>
           </tbody>
         </table>
       </div>

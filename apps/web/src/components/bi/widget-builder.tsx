@@ -8,11 +8,13 @@ import {
   CHART_TYPES,
   DATASETS,
   FILTER_OPS,
+  QUICK_CALCS,
   TIME_GRAINS,
   type AggFn,
   type ChartType,
   type Dataset,
   type FilterOp,
+  type QuickCalc,
   type ReportSpec,
   type ReportSpecFilter,
   type TimeGrain,
@@ -29,6 +31,7 @@ export interface WidgetDraft {
 interface MeasureRow {
   field: string;
   agg: AggFn;
+  quickCalc?: QuickCalc;
 }
 interface DimensionRow {
   field: string;
@@ -61,8 +64,8 @@ export function WidgetBuilder({
   const [chartType, setChartType] = useState<ChartType>(initial?.chartType ?? 'bar');
   const [measures, setMeasures] = useState<MeasureRow[]>(
     initial?.spec.measures
-      .filter((m): m is { field: string; agg: AggFn } => typeof m.field === 'string' && typeof m.agg === 'string')
-      .map((m) => ({ field: m.field, agg: m.agg })) ?? []
+      .filter((m) => typeof m.field === 'string' && typeof m.agg === 'string')
+      .map((m) => ({ field: m.field as string, agg: m.agg as AggFn, quickCalc: m.quickCalc })) ?? []
   );
   const [dimensions, setDimensions] = useState<DimensionRow[]>(
     initial?.spec.dimensions.map((d) => ({ field: d.field, timeGrain: d.timeGrain })) ?? []
@@ -108,6 +111,7 @@ export function WidgetBuilder({
           field: m.field,
           agg: m.agg,
           alias: `${m.agg}_${m.field}`,
+          ...(m.quickCalc ? { quickCalc: m.quickCalc } : {}),
         })),
         // Calculated measures come AFTER base measures so their referenced
         // aliases are already defined in the spec.
@@ -239,6 +243,27 @@ export function WidgetBuilder({
                         {measureOpts.map((f) => (
                           <option key={f.key} value={f.key}>
                             {f.label}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={m.quickCalc ?? ''}
+                        onChange={(e) =>
+                          setMeasures((prev) =>
+                            prev.map((row, i) =>
+                              i === index
+                                ? { ...row, quickCalc: (e.target.value || undefined) as QuickCalc | undefined }
+                                : row
+                            )
+                          )
+                        }
+                        title="Show value as"
+                        className={selectCls}
+                      >
+                        <option value="">(raw value)</option>
+                        {QUICK_CALCS.map((q) => (
+                          <option key={q.value} value={q.value}>
+                            {q.label}
                           </option>
                         ))}
                       </select>
@@ -449,7 +474,7 @@ export function WidgetBuilder({
                   {(preview.error as Error).message || 'Query failed'}
                 </div>
               ) : preview.data ? (
-                <WidgetChart chartType={chartType} result={preview.data} height={240} />
+                <WidgetChart chartType={chartType} result={preview.data} height={240} measures={spec?.measures} />
               ) : null}
             </div>
           </div>

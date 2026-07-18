@@ -1,8 +1,8 @@
-import type { PrismaClient } from '@prisma/client';
 import DataLoader from 'dataloader';
+import type { BlueprintPrisma } from '../prisma.js';
 
 export interface GraphQLContext {
-  prisma: PrismaClient;
+  prisma: BlueprintPrisma;
   tenantId: string | null;
   userId: string | null;
   loaders: {
@@ -13,7 +13,7 @@ export interface GraphQLContext {
   };
 }
 
-function createLoaders(prisma: PrismaClient) {
+function createLoaders(prisma: BlueprintPrisma) {
   const playbookLoader = new DataLoader<string, any>(async (ids) => {
     const items = await prisma.playbook.findMany({ where: { id: { in: [...ids] } } });
     const map = new Map(items.map((i: any) => [i.id, i]));
@@ -37,7 +37,7 @@ function createLoaders(prisma: PrismaClient) {
   return { playbookLoader, stageLoader, templateLoader, ruleLoader };
 }
 
-export function buildContext(prisma: PrismaClient) {
+export function buildContext(prisma: BlueprintPrisma) {
   return async function createContext({ request }: { request: Request }): Promise<GraphQLContext> {
     let tenantId: string | null = request.headers.get('x-tenant-id');
     let userId: string | null = null;

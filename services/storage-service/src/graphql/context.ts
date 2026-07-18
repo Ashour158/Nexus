@@ -1,8 +1,8 @@
-import type { PrismaClient } from '@prisma/client';
 import DataLoader from 'dataloader';
+import type { StoragePrisma } from '../prisma.js';
 
 export interface GraphQLContext {
-  prisma: PrismaClient;
+  prisma: StoragePrisma;
   tenantId: string | null;
   userId: string | null;
   loaders: {
@@ -10,7 +10,7 @@ export interface GraphQLContext {
   };
 }
 
-function createLoaders(prisma: PrismaClient) {
+function createLoaders(prisma: StoragePrisma) {
   const fileLoader = new DataLoader<string, any>(async (ids) => {
     const items = await prisma.fileAttachment.findMany({ where: { id: { in: [...ids] } } });
     const map = new Map(items.map((i: any) => [i.id, i]));
@@ -19,7 +19,7 @@ function createLoaders(prisma: PrismaClient) {
   return { fileLoader };
 }
 
-export function buildContext(prisma: PrismaClient) {
+export function buildContext(prisma: StoragePrisma) {
   return async function createContext({ request }: { request: Request }): Promise<GraphQLContext> {
     let tenantId: string | null = request.headers.get('x-tenant-id');
     let userId: string | null = null;

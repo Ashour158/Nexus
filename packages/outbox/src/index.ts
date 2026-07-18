@@ -10,8 +10,20 @@
  *   });
  */
 
-import type { PrismaClient, Prisma } from '@prisma/client';
-import { TOPICS, type TopicName } from '@nexus/kafka';
+import { TOPICS } from '@nexus/kafka';
+
+export interface OutboxTransactionClient {
+  $executeRaw: (
+    strings: TemplateStringsArray,
+    ...values: unknown[]
+  ) => Promise<unknown>;
+}
+
+export interface OutboxPrismaClient {
+  $transaction<T>(
+    fn: (tx: OutboxTransactionClient) => Promise<T>
+  ): Promise<T>;
+}
 
 const VALID_TOPICS = new Set<string>(Object.values(TOPICS));
 
@@ -33,10 +45,10 @@ export interface OutboxMessage {
 }
 
 export class OutboxWriter {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: OutboxPrismaClient) {}
 
   async schedule(
-    tx: Prisma.TransactionClient,
+    tx: OutboxTransactionClient,
     message: OutboxMessage
   ): Promise<void> {
     validateTopic(message.topic);
@@ -60,9 +72,9 @@ export class OutboxWriter {
   }
 
   async withTransaction<T>(
-    fn: (tx: Prisma.TransactionClient, outbox: OutboxWriter) => Promise<T>
+    fn: (tx: OutboxTransactionClient, outbox: OutboxWriter) => Promise<T>
   ): Promise<T> {
-    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    return this.prisma.$transaction(async (tx) => {
       return fn(tx, this);
     });
   }

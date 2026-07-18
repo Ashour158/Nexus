@@ -1,8 +1,8 @@
-import type { PrismaClient } from '@prisma/client';
 import DataLoader from 'dataloader';
+import type { ChatbotPrisma } from '../prisma.js';
 
 export interface GraphQLContext {
-  prisma: PrismaClient;
+  prisma: ChatbotPrisma;
   tenantId: string | null;
   userId: string | null;
   loaders: {
@@ -11,7 +11,7 @@ export interface GraphQLContext {
   };
 }
 
-function createLoaders(prisma: PrismaClient) {
+function createLoaders(prisma: ChatbotPrisma) {
   const conversationLoader = new DataLoader<string, any>(async (ids) => {
     const items = await prisma.conversation.findMany({ where: { id: { in: [...ids] } } });
     const map = new Map(items.map((i: any) => [i.id, i]));
@@ -25,7 +25,7 @@ function createLoaders(prisma: PrismaClient) {
   return { conversationLoader, messageLoader };
 }
 
-export function buildContext(prisma: PrismaClient) {
+export function buildContext(prisma: ChatbotPrisma) {
   return async function createContext({ request }: { request: Request }): Promise<GraphQLContext> {
     let tenantId: string | null = request.headers.get('x-tenant-id');
     let userId: string | null = null;

@@ -1,4 +1,18 @@
-import type { PrismaClient } from '@prisma/client';
+/**
+ * Structural stand-in for a generated Prisma client.
+ *
+ * NOT `import type { PrismaClient } from '@prisma/client'`: every service here
+ * generates its client to its own output path (`node_modules/.prisma/
+ * <service>-client`), so the bare `@prisma/client` package has no generated
+ * `default.d.ts` and exports no `PrismaClient`. That import failed this
+ * package's typecheck AND build, and since every service depends on
+ * @nexus/service-utils it failed the whole root build with it.
+ *
+ * This extension only ever reaches delegates dynamically
+ * (`base[delegateName(model)]`), so an index signature is the honest type — and
+ * it correctly accepts any service's generated client.
+ */
+type PrismaClientLike = Record<string, unknown>;
 
 /**
  * Thrown when a tenant-scoped Prisma model operation runs without a tenantId in
@@ -125,8 +139,8 @@ export function applyTenantArgs(
   }
 }
 
-export function delegateName(model: string): keyof PrismaClient {
-  return (model.charAt(0).toLowerCase() + model.slice(1)) as keyof PrismaClient;
+export function delegateName(model: string): string {
+  return model.charAt(0).toLowerCase() + model.slice(1);
 }
 
 export interface TenantExtensionOptions {
@@ -150,7 +164,7 @@ export interface TenantExtensionOptions {
  * `findUniqueOrThrow` → `findFirstOrThrow` so composite unique constraints
  * that include `tenantId` work correctly.
  */
-export function createTenantPrismaExtension<T extends PrismaClient>(
+export function createTenantPrismaExtension<T extends PrismaClientLike>(
   base: T,
   opts: TenantExtensionOptions
 ) {

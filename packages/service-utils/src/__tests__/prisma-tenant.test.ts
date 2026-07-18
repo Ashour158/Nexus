@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { flattenCompoundUniqueWhere, mergeWhere, applyTenantArgs } from '../prisma-tenant.js';
+import {
+  flattenCompoundUniqueWhere,
+  mergeWhere,
+  applyTenantArgs,
+  runCrossTenant,
+  isCrossTenant,
+} from '../prisma-tenant.js';
 
 /**
  * These cover the failure that silently disabled notification-service: the
@@ -66,6 +72,52 @@ describe('mergeWhere', () => {
 
   it('injects tenantId when there is no where at all', () => {
     expect(mergeWhere({}, 't1').where).toEqual({ tenantId: 't1' });
+  });
+});
+
+/**
+ * The escape hatch is the ONLY way to run unscoped once enforcement is on, so it
+ * has to be hard to reach by accident and impossible to reach silently.
+ */
+describe('runCrossTenant', () => {
+  it('marks the call stack as cross-tenant, and only inside the callback', async () => {
+    expect(isCrossTenant()).toBe(false);
+    await runCrossTenant('rotten-deal sweep spans all tenants', async () => {
+      expect(isCrossTenant()).toBe(true);
+    });
+    expect(isCrossTenant()).toBe(false);
+  });
+
+  it('does not leak across sibling async work', async () => {
+    const inside = runCrossTenant('sweep', async () => {
+      await new Promise((r) => setTimeout(r, 5));
+      return isCrossTenant();
+    });
+    // Concurrent work started outside the wrapper must NOT inherit the flag.
+    const outside = (async () => {
+      await new Promise((r) => setTimeout(r, 1));
+      return isCrossTenant();
+    })();
+    expect(await inside).toBe(true);
+    expect(await outside).toBe(false);
+  });
+
+  it('clears the flag even when the callback throws', async () => {
+    await expect(
+      runCrossTenant('sweep', async () => {
+        throw new Error('boom');
+      })
+    ).rejects.toThrow('boom');
+    expect(isCrossTenant()).toBe(false);
+  });
+
+  it('REQUIRES a reason — it is an audit record, not a flag', () => {
+    expect(() => runCrossTenant('', async () => undefined)).toThrow(/non-empty reason/);
+    expect(() => runCrossTenant('   ', async () => undefined)).toThrow(/non-empty reason/);
+  });
+
+  it('returns the callback result', async () => {
+    await expect(runCrossTenant('sweep', async () => 42)).resolves.toBe(42);
   });
 });
 

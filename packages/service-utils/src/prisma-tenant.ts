@@ -42,12 +42,49 @@ export const DEFAULT_SKIP_TENANT_MODELS: ReadonlySet<string> = new Set<string>([
   'PrismaMigration',
 ]);
 
+/**
+ * Expand Prisma's compound-unique shorthand into its component fields.
+ *
+ * `findUnique({ where: { id_tenantId: { id, tenantId } } })` is valid ONLY on
+ * findUnique. This extension remaps findUnique → findFirst, and findFirst
+ * rejects that key with `Unknown argument 'id_tenantId'` — so before this
+ * function existed, every compound-unique lookup through the extension threw.
+ * (That silently killed notification-service's entire consumer path: each write
+ * threw, retried 3x, and was dropped, while the service reported healthy.)
+ *
+ * Detection is exact, not heuristic: a key is treated as compound-unique only
+ * when its own name equals its inner keys joined by `_` — precisely how Prisma
+ * generates these names. A JSON column that happens to be named `foo_bar` and
+ * holds a nested filter will not match, so it is left untouched.
+ */
+export function flattenCompoundUniqueWhere(
+  where: Record<string, unknown>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(where)) {
+    if (
+      value !== null &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      key.includes('_') &&
+      Object.keys(value as Record<string, unknown>).join('_') === key
+    ) {
+      Object.assign(out, value as Record<string, unknown>);
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
 export function mergeWhere(
   args: Record<string, unknown>,
   tenantId: string
 ): Record<string, unknown> {
   const where = (args.where as Record<string, unknown> | undefined) ?? {};
-  return { ...args, where: { ...where, tenantId } };
+  // Flatten first: the caller may have used compound-unique shorthand, which the
+  // findFirst we are about to delegate to cannot parse.
+  return { ...args, where: { ...flattenCompoundUniqueWhere(where), tenantId } };
 }
 
 export function applyTenantArgs(

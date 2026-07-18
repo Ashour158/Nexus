@@ -52,11 +52,6 @@ on:
         default: 'production'
         type: choice
         options: [production, staging]
-      image_tag:
-        description: 'Image tag to build & deploy (default: commit SHA)'
-        required: false
-        default: ''
-        type: string
       skip_migrations:
         description: 'Skip prisma migrate deploy'
         required: false
@@ -76,7 +71,9 @@ env:
   PNPM_VERSION: '9'
   REGISTRY: ${{ secrets.REGISTRY || 'ghcr.io' }}
   IMAGE_OWNER: ${{ vars.GHCR_OWNER || github.repository_owner }}
-  IMAGE_TAG: ${{ github.event.inputs.image_tag || github.sha }}
+  # Releases always deploy the immutable source commit. `latest` is published
+  # only as a convenience tag and is never consumed by this workflow.
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -126,6 +123,9 @@ jobs:
           - { context: services/auth-service, image: auth-service }
           - { context: services/crm-service, image: crm-service }
           - { context: services/finance-service, image: finance-service }
+          - { context: services/billing-service, image: billing-service }
+          - { context: services/activities-service, image: activities-service }
+          - { context: services/notes-service, image: notes-service }
           - { context: services/notification-service, image: notification-service }
           - { context: services/realtime-service, image: realtime-service }
           - { context: services/search-service, image: search-service }
@@ -137,6 +137,7 @@ jobs:
           - { context: services/document-service, image: document-service }
           - { context: services/chatbot-service, image: chatbot-service }
           - { context: services/cadence-service, image: cadence-service }
+          - { context: services/campaign-service, image: campaign-service }
           - { context: services/territory-service, image: territory-service }
           - { context: services/planning-service, image: planning-service }
           - { context: services/reporting-service, image: reporting-service }
@@ -146,6 +147,7 @@ jobs:
           - { context: services/graphql-gateway, image: graphql-gateway }
           - { context: services/comm-service, image: comm-service }
           - { context: services/storage-service, image: storage-service }
+          - { context: services/ticket-service, image: ticket-service }
           - { context: services/email-sync-service, image: email-sync-service }
           - { context: services/analytics-service, image: analytics-service }
           - { context: services/metadata-service, image: metadata-service }
@@ -228,6 +230,10 @@ jobs:
 
             # docker-compose.prod.yml resolves images from these two vars.
             export IMAGE_TAG="$DEPLOY_IMAGE_TAG"
+            export GIT_SHA="$DEPLOY_IMAGE_TAG"
+            export BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            printf '%s\n' "$BUILT_AT" > .nexus-deploy-built-at
+            export REGISTRY="$DEPLOY_REGISTRY"
             export GHCR_OWNER="$DEPLOY_OWNER"
             case "$IMAGE_TAG" in *[!A-Za-z0-9._-]*) echo "invalid image tag: $IMAGE_TAG"; exit 1;; esac
 
@@ -237,7 +243,7 @@ jobs:
             fi
 
             echo "Pulling images ($DEPLOY_REGISTRY/$GHCR_OWNER/nexus-*:$IMAGE_TAG)..."
-            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
 
             if [ "$DEPLOY_SKIP_MIGRATIONS" != "true" ]; then
               echo "Running prisma migrate deploy..."
@@ -247,7 +253,7 @@ jobs:
             fi
 
             echo "Starting services..."
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans --wait
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans --wait
 
             echo "Pruning old images..."
             docker system prune -f --filter "until=24h" || true
@@ -258,21 +264,37 @@ jobs:
         uses: appleboy/ssh-action@v1
         env:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/nexus' }}
+          DEPLOY_IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          DEPLOY_OWNER: ${{ env.IMAGE_OWNER }}
+          DEPLOY_REGISTRY: ${{ env.REGISTRY }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          envs: DEPLOY_PATH
+          envs: DEPLOY_PATH,DEPLOY_IMAGE_TAG,DEPLOY_OWNER,DEPLOY_REGISTRY
           script_stop: true
           script: |
             set -euo pipefail
             cd "$DEPLOY_PATH"
+            DEPLOY_BUILT_AT="$(cat .nexus-deploy-built-at)"
+            export REGISTRY="$DEPLOY_REGISTRY"
+            export GHCR_OWNER="$DEPLOY_OWNER"
             bash scripts/health-check.sh || {
               echo "❌ Smoke tests failed — rolling back..."
-              bash scripts/rollback.sh || { echo "❌ Rollback failed." >&2; exit 1; }
+              NEXUS_DIR="$DEPLOY_PATH" bash scripts/rollback.sh || {
+                echo "❌ Rollback failed." >&2
+                exit 1
+              }
               exit 1
             }
+            IMAGE_TAG="$DEPLOY_IMAGE_TAG" \
+              GIT_SHA="$DEPLOY_IMAGE_TAG" \
+              BUILT_AT="$DEPLOY_BUILT_AT" \
+              REGISTRY="$DEPLOY_REGISTRY" \
+              GHCR_OWNER="$DEPLOY_OWNER" \
+              NEXUS_DIR="$DEPLOY_PATH" \
+              bash scripts/rollback.sh record
             echo "✅ Smoke tests passed."
 
       - name: Update deployment status

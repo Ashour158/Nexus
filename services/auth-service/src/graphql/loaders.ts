@@ -1,5 +1,5 @@
 import DataLoader from 'dataloader';
-import type { PrismaClient } from '@prisma/client';
+import type { AuthPrisma } from '../prisma.js';
 
 export interface GraphQLLoaders {
   userLoader: DataLoader<string, any>;
@@ -7,7 +7,7 @@ export interface GraphQLLoaders {
   roleLoader: DataLoader<string, any[]>;
 }
 
-export function createLoaders(prisma: PrismaClient): GraphQLLoaders {
+export function createLoaders(prisma: AuthPrisma): GraphQLLoaders {
   const userLoader = new DataLoader<string, any>(async (ids) => {
     const users = await prisma.user.findMany({
       where: { id: { in: [...ids] } },

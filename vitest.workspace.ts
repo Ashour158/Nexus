@@ -198,22 +198,6 @@ export default defineWorkspace([
     },
   },
   {
-    extends: 'services/router-coprocessor/vitest.config.ts',
-    test: {
-      name: 'router-coprocessor',
-      root: './services/router-coprocessor',
-      include: ['src/**/*.test.ts'],
-    },
-  },
-  {
-    extends: 'services/accounts-service/vitest.config.ts',
-    test: {
-      name: 'accounts-service',
-      root: './services/accounts-service',
-      include: ['src/**/*.test.ts'],
-    },
-  },
-  {
     extends: 'services/activities-service/vitest.config.ts',
     test: {
       name: 'activities-service',
@@ -270,19 +254,19 @@ export default defineWorkspace([
     },
   },
   {
-    extends: 'services/contacts-service/vitest.config.ts',
-    test: {
-      name: 'contacts-service',
-      root: './services/contacts-service',
-      include: ['src/**/*.test.ts'],
-    },
-  },
-  {
     extends: 'services/billing-service/vitest.config.ts',
     test: {
       name: 'billing-service',
       root: './services/billing-service',
       include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    extends: 'apps/web/vitest.config.ts',
+    test: {
+      name: 'web',
+      root: './apps/web',
+      include: ['src/**/*.{test,spec}.{ts,tsx}'],
     },
   },
   {

@@ -15,6 +15,9 @@ function makeDeps() {
     deal: { findMany: vi.fn() },
     lead: { findMany: vi.fn() },
     account: { findMany: vi.fn() },
+    recordLock: { findFirst: vi.fn().mockResolvedValue(null) },
+    orgWideDefault: { findFirst: vi.fn().mockResolvedValue(null) },
+    sharingRule: { findFirst: vi.fn().mockResolvedValue(null) },
   };
   const producer = { publish: vi.fn() };
   return { services, prisma, producer };

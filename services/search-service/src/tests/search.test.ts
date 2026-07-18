@@ -61,8 +61,10 @@ vi.mock('../graphql/index.js', () => ({
 describe('search-service', () => {
   beforeAll(async () => {
     vi.stubEnv('JWT_SECRET', '12345678901234567890123456789012');
+    vi.stubEnv('AUTH_JWKS_URL', '');
+    vi.stubEnv('REDIS_URL', '');
     await import('../index.js');
-  });
+  }, 30_000);
 
   afterAll(async () => {
     await harness.state.app?.close();

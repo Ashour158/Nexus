@@ -83,7 +83,15 @@ describe('finance approval consumer', () => {
         createdById: 'mgr_1',
       }),
     }));
-    expect(producer.publish).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ type: 'quote.revision_created' }));
+    expect(prisma.outboxMessage.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          eventType: 'quote.revision_created',
+          status: 'PENDING',
+        }),
+      })
+    );
+    expect(producer.publish).not.toHaveBeenCalled();
   });
 
   it('routes rejected quote callbacks through CPQ transition authority', async () => {
@@ -125,6 +133,14 @@ describe('finance approval consumer', () => {
       where: { id: 'quote_1' },
       data: expect.objectContaining({ status: 'REJECTED', approvalStatus: 'REJECTED' }),
     }));
-    expect(producer.publish).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ type: 'quote.rejected' }));
+    expect(prisma.outboxMessage.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          eventType: 'quote.rejected',
+          status: 'PENDING',
+        }),
+      })
+    );
+    expect(producer.publish).not.toHaveBeenCalled();
   });
 });

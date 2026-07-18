@@ -1,16 +1,16 @@
-import type { PrismaClient } from '@prisma/client';
 import type { JwksKeyStore } from '../lib/jwt.js';
+import type { AuthPrisma } from '../prisma.js';
 import { createLoaders, type GraphQLLoaders } from './loaders.js';
 
 export interface GraphQLContext {
-  prisma: PrismaClient;
+  prisma: AuthPrisma;
   keyStore: JwksKeyStore;
   tenantId: string | null;
   userId: string | null;
   loaders: GraphQLLoaders;
 }
 
-export function buildContext(prisma: PrismaClient, keyStore: JwksKeyStore) {
+export function buildContext(prisma: AuthPrisma, keyStore: JwksKeyStore) {
   return async function createContext({ request }: { request: Request }): Promise<GraphQLContext> {
     const authHeader = request.headers.get('authorization');
     let tenantId: string | null = null;

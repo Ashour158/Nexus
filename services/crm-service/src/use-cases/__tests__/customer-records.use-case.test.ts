@@ -34,7 +34,8 @@ describe('customer records use-case', () => {
       'contact_1',
       { ownerId: 'usr_owner', tags: ['vip'] },
       'usr_test',
-      undefined
+      undefined,
+      ['admin']
     );
   });
 
@@ -61,7 +62,12 @@ describe('customer records use-case', () => {
     const result = await useCase.massArchive(ctx, { entityType: 'account', ids: ['account_1'] });
 
     expect(result.count).toBe(1);
-    expect(deps.services.account.archive).toHaveBeenCalledWith('tenant_test', 'account_1');
+    expect(deps.services.account.archive).toHaveBeenCalledWith(
+      'tenant_test',
+      'account_1',
+      'usr_test',
+      undefined
+    );
     expect(deps.recycle).toHaveBeenCalledWith({
       module: 'accounts',
       recordId: 'account_1',
@@ -80,7 +86,12 @@ describe('customer records use-case', () => {
     const result = await useCase.archive(ctx, { entityType: 'contact', id: 'contact_1' });
 
     expect(result).toEqual({ id: 'contact_1', deleted: true });
-    expect(deps.services.contact.archive).toHaveBeenCalledWith('tenant_test', 'contact_1');
+    expect(deps.services.contact.archive).toHaveBeenCalledWith(
+      'tenant_test',
+      'contact_1',
+      'usr_test',
+      undefined
+    );
   });
 
   it('checks person duplicates through repositories', async () => {

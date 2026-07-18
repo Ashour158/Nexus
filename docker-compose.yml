@@ -998,6 +998,10 @@ services:
       - '127.0.0.1:3023:3023'
     environment:
       PORT: '3023'
+      # Required for /api/v1/internal/* : createService only bypasses its JWT
+      # preHandler when x-service-token matches this, so without it search's
+      # reindex source call fell through to end-user auth and returned 401.
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_knowledge
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json

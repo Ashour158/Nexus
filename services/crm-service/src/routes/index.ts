@@ -27,6 +27,7 @@ import { registerCustomFieldsRoutes } from './custom-fields.routes.js';
 import { registerInternalReportingRoutes } from './internal-reporting.routes.js';
 import { registerCrmInternalRoutes } from './internal.routes.js';
 import { registerInternalAutomationRoutes } from './internal-automation.routes.js';
+import { registerInternalSearchSourceRoutes } from './internal-search-source.routes.js';
 import { registerWinLossRoutes } from './win-loss.routes.js';
 import { registerFieldHistoryRoutes } from './field-history.routes.js';
 import { registerValidationRulesRoutes } from './validation-rules.routes.js';
@@ -80,6 +81,7 @@ export async function registerAllRoutes(
   await registerInternalReportingRoutes(app, prisma);
   await registerCrmInternalRoutes(app, prisma, producer);
   await registerInternalAutomationRoutes(app, prisma, producer);
+  await registerInternalSearchSourceRoutes(app, prisma);
   await registerWinLossRoutes(app, prisma);
   await registerFieldHistoryRoutes(app, prisma);
   await registerValidationRulesRoutes(app, prisma);

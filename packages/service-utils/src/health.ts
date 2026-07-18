@@ -54,6 +54,28 @@ export interface HealthResponse {
   }[];
 }
 
+export interface VersionResponse {
+  service: string;
+  gitSha: string;
+  builtAt: string;
+}
+
+export function getVersionInfo(serviceName: string): VersionResponse {
+  return {
+    service: serviceName,
+    gitSha: process.env.GIT_SHA?.trim() || 'unknown',
+    builtAt: process.env.BUILT_AT?.trim() || 'unknown',
+  };
+}
+
+/** Register an unauthenticated release-identity endpoint for deployment verification. */
+export function registerVersionRoute(app: FastifyInstance, serviceName: string): void {
+  app.get('/version', async (_req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    return getVersionInfo(serviceName);
+  });
+}
+
 /** Minimal client shape for `SELECT 1` (any Prisma client). */
 export type SqlPingClient = {
   $queryRaw: (args: TemplateStringsArray, ...values: unknown[]) => Promise<unknown>;

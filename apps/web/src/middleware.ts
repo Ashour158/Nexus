@@ -13,6 +13,8 @@ import type { NextRequest } from 'next/server';
 
 const PUBLIC_PATHS = [
   '/login',
+  '/health',
+  '/version',
   '/bff',
   '/_next',
   '/favicon.ico',

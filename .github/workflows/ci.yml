@@ -232,6 +232,12 @@ jobs:
             image: crm-service
           - context: services/finance-service
             image: finance-service
+          - context: services/billing-service
+            image: billing-service
+          - context: services/activities-service
+            image: activities-service
+          - context: services/notes-service
+            image: notes-service
           - context: services/notification-service
             image: notification-service
           - context: services/realtime-service
@@ -254,6 +260,8 @@ jobs:
             image: chatbot-service
           - context: services/cadence-service
             image: cadence-service
+          - context: services/campaign-service
+            image: campaign-service
           - context: services/territory-service
             image: territory-service
           - context: services/planning-service
@@ -272,6 +280,8 @@ jobs:
             image: comm-service
           - context: services/storage-service
             image: storage-service
+          - context: services/ticket-service
+            image: ticket-service
           - context: services/email-sync-service
             image: email-sync-service
           - context: services/analytics-service

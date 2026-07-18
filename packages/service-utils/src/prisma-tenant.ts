@@ -9,10 +9,14 @@
  * @nexus/service-utils it failed the whole root build with it.
  *
  * This extension only ever reaches delegates dynamically
- * (`base[delegateName(model)]`), so an index signature is the honest type — and
- * it correctly accepts any service's generated client.
+ * (`base[delegateName(model)]`, via an explicit cast), so it needs no structural
+ * guarantees at all — `object` is the honest constraint.
+ *
+ * NOTE: do NOT tighten this to `Record<string, unknown>`. A generated
+ * PrismaClient is a class instance with no index signature, so that constraint
+ * rejects every real client (`Index signature for type 'string' is missing`).
  */
-type PrismaClientLike = Record<string, unknown>;
+type PrismaClientLike = object;
 
 /**
  * Thrown when a tenant-scoped Prisma model operation runs without a tenantId in

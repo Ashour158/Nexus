@@ -121,6 +121,21 @@ We are specifically hunting for real defects hidden behind harness noise; silenc
 would be worse than leaving the suite red. Prefer extending mocks/fixtures over editing
 expectations. If you must change an expectation, justify it explicitly in your report.
 
+⚠️ **Known interaction — read before touching crm-service tests.**
+The other engineer just made two crm access-control gates **fail-closed**
+(`src/lib/sharing.ts` `isSharingConfigured`, `src/lib/record-lock.ts`
+`getActiveLock`). They previously swallowed DB errors and returned
+"no sharing configured" / "not locked", which silently **skipped the permission
+check entirely** — a real access-control bypass. They now throw
+`SharingCheckUnavailableError` / `LockCheckUnavailableError`.
+
+Consequence for you: crm went from **10 → 11** failures, and the new one is
+`src/routes/deals.routes.test.ts > GET /api/v1/deals/:id returns deal`. That test
+was only passing because the broken mock made the security gate disable itself.
+**The correct fix is to add `orgWideDefault` / `sharingRule` / `recordLock` to the
+Prisma mock** so the gate can evaluate. Do **not** revert the fail-closed change
+and do **not** weaken the assertion.
+
 Also fix: the search-service setup-hook timeout, the service-utils worker-exit warning,
 and the root workspace referencing packages with no tests (`vitest.workspace.ts`).
 `apps/web` has 23 unit tests + 5 E2E files but is **not** in the root workspace gate — add

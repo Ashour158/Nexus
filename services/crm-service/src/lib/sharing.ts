@@ -34,13 +34,35 @@ export interface AccessibleRecord {
 }
 
 /**
+ * Raised when we could not determine whether sharing is configured for a module.
+ *
+ * Distinct from "sharing is not configured": callers MUST NOT treat this as a
+ * reason to skip access checks.
+ */
+export class SharingCheckUnavailableError extends Error {
+  constructor(module: string, cause: unknown) {
+    super(`Could not determine sharing configuration for ${module}`);
+    this.name = 'SharingCheckUnavailableError';
+    this.cause = cause;
+  }
+}
+
+/**
  * Is record-level sharing CONFIGURED for this (tenant, module)? True when at
  * least one OrgWideDefault OR one SharingRule row exists. When false, callers
  * MUST skip all sharing checks (zero behavior change). ManualShare rows alone do
  * not "configure" a module — with no OWD the module is fail-open PUBLIC_READ_WRITE
  * anyway, so a manual grant can never be the sole thing restricting access.
  *
- * FAIL-OPEN: on any error returns false (skip checks).
+ * FAIL-CLOSED: on any error this THROWS rather than returning false.
+ *
+ * Returning false on error was an access-control bypass, not a graceful
+ * degradation: every caller uses this as a gate —
+ * `if (await isSharingConfigured(...)) { ...check access... }` — so a transient
+ * DB error made the sharing check disappear entirely and the record was
+ * read/written with NO permission evaluation, leaving only a console warning.
+ * A failed request is the correct outcome when we cannot evaluate access;
+ * "I couldn't check" must never resolve to "allow".
  */
 export async function isSharingConfigured(
   prisma: CrmPrisma,
@@ -54,9 +76,7 @@ export async function isSharingConfigured(
     ]);
     return Boolean(owd || rule);
   } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn(`[sharing] isSharingConfigured failed for ${module}; treating as unconfigured (fail-open)`, err);
-    return false;
+    throw new SharingCheckUnavailableError(module, err);
   }
 }
 

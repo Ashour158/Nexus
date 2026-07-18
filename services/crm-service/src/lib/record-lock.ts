@@ -23,7 +23,28 @@ export interface ActiveLock {
   lockedAt: Date;
 }
 
-/** Return the active lock on a record, or null. FAIL-OPEN: errors → null. */
+/**
+ * Raised when we could not determine whether a record is locked.
+ *
+ * Distinct from "there is no lock": callers MUST NOT treat this as unlocked.
+ */
+export class LockCheckUnavailableError extends Error {
+  constructor(module: string, recordId: string, cause: unknown) {
+    super(`Could not determine lock state for ${module}/${recordId}`);
+    this.name = 'LockCheckUnavailableError';
+    this.cause = cause;
+  }
+}
+
+/**
+ * Return the active lock on a record, or null when there is genuinely no lock.
+ *
+ * FAIL-CLOSED: if the lock table cannot be read we THROW rather than return
+ * null. Returning null on error meant a transient DB blip silently disabled
+ * record locking entirely — a record an admin had explicitly locked became
+ * editable, and the only trace was a console warning. "I don't know" is not
+ * "unlocked".
+ */
 export async function getActiveLock(
   prisma: CrmPrisma,
   tenantId: string,
@@ -31,16 +52,13 @@ export async function getActiveLock(
   recordId: string
 ): Promise<ActiveLock | null> {
   try {
-    const lock = await prisma.recordLock.findFirst({
+    return await prisma.recordLock.findFirst({
       where: { tenantId, module, recordId, unlockedAt: null },
       select: { id: true, reason: true, lockedBy: true, lockedAt: true },
       orderBy: { lockedAt: 'desc' },
     });
-    return lock;
   } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn(`[record-lock] getActiveLock failed for ${module}/${recordId}; treating as unlocked (fail-open)`, err);
-    return null;
+    throw new LockCheckUnavailableError(module, recordId, err);
   }
 }
 
@@ -55,7 +73,11 @@ export function callerMayBypassLock(lock: ActiveLock, jwt: JwtPayload): boolean 
  * Enforcement helper for write paths: returns the active lock IFF the caller is
  * BLOCKED by it (i.e. a lock exists AND the caller cannot bypass it). Returns
  * null when there is no lock or the caller may write. The route turns a non-null
- * result into an HTTP 423. FAIL-OPEN: errors → null (write proceeds).
+ * result into an HTTP 423.
+ *
+ * FAIL-CLOSED: if the lock state cannot be read this propagates
+ * {@link LockCheckUnavailableError} instead of returning null, so the write is
+ * rejected rather than silently allowed through an unreadable lock table.
  */
 export async function lockBlockingWrite(
   prisma: CrmPrisma,

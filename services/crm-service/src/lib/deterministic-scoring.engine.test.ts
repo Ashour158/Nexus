@@ -18,6 +18,9 @@ const mockPrisma = {
   territory: {
     findMany: vi.fn(),
   },
+  salesRep: {
+    findMany: vi.fn().mockResolvedValue([]),
+  },
 };
 
 describe('DeterministicScoringEngine', () => {

@@ -3,6 +3,22 @@ import Fastify from 'fastify';
 import { registerProductsRoutes } from './products.routes.js';
 import { productFactory } from '../test/factories/product.factory.js';
 
+vi.mock('@nexus/cache', () => ({
+  NexusCache: class {
+    async cacheAside<T>(
+      _key: string,
+      factory: () => Promise<T>
+    ): Promise<T> {
+      return factory();
+    }
+
+    async invalidatePattern(): Promise<void> {}
+    async del(): Promise<void> {}
+  },
+}));
+
+const PRODUCT_ID = 'cproduct0000000000000001';
+
 function createMockPrisma() {
   return {
     product: {
@@ -76,9 +92,9 @@ describe('products routes', () => {
 
   it('GET /api/v1/products/:id returns product', async () => {
     const app = createTestApp(prisma);
-    prisma.product.findFirst.mockResolvedValue(productFactory());
+    prisma.product.findFirst.mockResolvedValue(productFactory({ id: PRODUCT_ID }));
 
-    const res = await app.inject({ method: 'GET', url: '/api/v1/products/prd_test' });
+    const res = await app.inject({ method: 'GET', url: `/api/v1/products/${PRODUCT_ID}` });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.payload);
     expect(body.success).toBe(true);

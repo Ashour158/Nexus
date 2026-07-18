@@ -50,6 +50,7 @@ function buildPrismaMock() {
       findFirstOrThrow: vi.fn(),
     },
     fieldChangeLog: { createMany: vi.fn() },
+    validationRule: { findMany: vi.fn().mockResolvedValue([]) },
   };
 }
 

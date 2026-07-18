@@ -43,7 +43,14 @@ describe('sales records use-case', () => {
     });
 
     expect(result.count).toBe(2);
-    expect(deps.leads.update).toHaveBeenCalledWith('tenant_test', 'lead_1', { ownerId: 'usr_owner', status: 'WORKING' }, 'usr_test', undefined);
+    expect(deps.leads.update).toHaveBeenCalledWith(
+      'tenant_test',
+      'lead_1',
+      { ownerId: 'usr_owner', status: 'WORKING' },
+      'usr_test',
+      undefined,
+      ['admin']
+    );
   });
 
   it('rejects mass updates with no governed fields', async () => {
@@ -68,7 +75,12 @@ describe('sales records use-case', () => {
     const result = await useCase.massArchive(ctx, { entityType: 'deal', ids: ['deal_1'] });
 
     expect(result.count).toBe(1);
-    expect(deps.deals.archive).toHaveBeenCalledWith('tenant_test', 'deal_1');
+    expect(deps.deals.archive).toHaveBeenCalledWith(
+      'tenant_test',
+      'deal_1',
+      'usr_test',
+      undefined
+    );
     expect(deps.recycle).toHaveBeenCalled();
   });
 

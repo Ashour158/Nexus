@@ -1,41 +1,88 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { PrismaClient } from '../../../../node_modules/.prisma/crm-client/index.js';
-import { buildServer } from '../server.js';
+import type { FastifyInstance } from 'fastify';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { createService, globalErrorHandler } from '@nexus/service-utils';
+import { registerDealsRoutes } from '../routes/deals.routes.js';
 
-const prisma = new PrismaClient({
-  datasources: { db: { url: process.env.DATABASE_URL } },
-});
+vi.mock('@nexus/cache', () => ({
+  getSharedCache: () => ({
+    cacheAside: async <T>(
+      _key: string,
+      factory: () => Promise<T>
+    ): Promise<T> => factory(),
+    invalidatePattern: vi.fn(),
+  }),
+}));
 
-let app: Awaited<ReturnType<typeof buildServer>>['app'];
+const JWT_SECRET = '12345678901234567890123456789012';
+
+const prisma = {
+  deal: {
+    count: vi.fn().mockResolvedValue(0),
+    findMany: vi.fn().mockResolvedValue([]),
+  },
+};
+
+const producer = {
+  publish: vi.fn().mockResolvedValue(undefined),
+};
+
+let app: FastifyInstance;
+let token: string;
 
 beforeAll(async () => {
-  const result = await buildServer();
-  app = result.app;
+  vi.stubEnv('AUTH_JWKS_URL', '');
+  vi.stubEnv('REDIS_URL', '');
+
+  app = await createService({
+    name: 'crm-service',
+    port: 3001,
+    jwtSecret: JWT_SECRET,
+    corsOrigins: ['http://localhost:3000'],
+  });
+  app.setErrorHandler(globalErrorHandler);
+  await registerDealsRoutes(app, prisma as never, producer as never);
   await app.ready();
+
+  token = app.jwt.sign({
+    sub: 'usr_test',
+    tenantId: 'tenant_test',
+    email: 'test@example.com',
+    roles: ['ADMIN'],
+    permissions: ['*'],
+  });
 });
 
 afterAll(async () => {
   await app.close();
-  await prisma.$disconnect();
+  vi.unstubAllEnvs();
 });
 
-describe('GET /deals', () => {
-  it('returns list of deals with 200', async () => {
+describe('GET /api/v1/deals', () => {
+  it('returns a tenant-scoped list for an authenticated caller', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: '/deals',
-      headers: { 'x-tenant-id': 'test-tenant' },
+      url: '/api/v1/deals',
+      headers: { authorization: `Bearer ${token}` },
     });
+
     expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.payload);
-    expect(Array.isArray(body.data)).toBe(true);
+    expect(res.json()).toMatchObject({
+      success: true,
+      data: { data: [], total: 0 },
+    });
+    expect(prisma.deal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ tenantId: 'tenant_test' }),
+      })
+    );
   });
 
-  it('returns 400 without tenant header', async () => {
+  it('rejects requests without a bearer token', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: '/deals',
+      url: '/api/v1/deals',
     });
-    expect(res.statusCode).toBe(400);
+
+    expect(res.statusCode).toBe(401);
   });
 });

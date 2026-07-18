@@ -30,10 +30,10 @@ const STATUS_CONFIG: Record<
   UiStatus,
   { icon: typeof CheckCircle2; color: string; label: string }
 > = {
-  CLEARED: { icon: CheckCircle2, color: 'text-green-600 bg-green-50', label: 'Cleared' },
-  PENDING: { icon: Clock, color: 'text-yellow-600 bg-yellow-50', label: 'Pending' },
-  REJECTED: { icon: XCircle, color: 'text-red-600 bg-red-50', label: 'Rejected' },
-  ERROR: { icon: AlertTriangle, color: 'text-orange-600 bg-orange-50', label: 'Error' },
+  CLEARED: { icon: CheckCircle2, color: 'text-success bg-success-container', label: 'Cleared' },
+  PENDING: { icon: Clock, color: 'text-warning bg-warning-container', label: 'Pending' },
+  REJECTED: { icon: XCircle, color: 'text-error bg-error-container', label: 'Rejected' },
+  ERROR: { icon: AlertTriangle, color: 'text-warning bg-warning-container', label: 'Error' },
 };
 
 export default function ZatcaStatusPage(): JSX.Element {
@@ -82,32 +82,32 @@ export default function ZatcaStatusPage(): JSX.Element {
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">ZATCA e-Invoicing</h1>
-        <p className="mt-1 text-sm text-gray-500">Saudi Phase 2 clearance status for submitted invoices</p>
+        <h1 className="text-2xl font-bold text-on-surface">ZATCA e-Invoicing</h1>
+        <p className="mt-1 text-sm text-on-surface-variant">Saudi Phase 2 clearance status for submitted invoices</p>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-xl border border-green-100 bg-green-50 p-4">
-          <div className="text-2xl font-bold text-green-700">{cleared}</div>
-          <div className="mt-1 text-sm text-green-600">Cleared</div>
+        <div className="rounded-xl border border-success/30 bg-success-container p-4">
+          <div className="text-2xl font-bold text-success">{cleared}</div>
+          <div className="mt-1 text-sm text-success">Cleared</div>
         </div>
-        <div className="rounded-xl border border-yellow-100 bg-yellow-50 p-4">
-          <div className="text-2xl font-bold text-yellow-700">{pending}</div>
-          <div className="mt-1 text-sm text-yellow-600">Pending clearance</div>
+        <div className="rounded-xl border border-warning/30 bg-warning-container p-4">
+          <div className="text-2xl font-bold text-warning">{pending}</div>
+          <div className="mt-1 text-sm text-warning">Pending clearance</div>
         </div>
-        <div className="rounded-xl border border-red-100 bg-red-50 p-4">
-          <div className="text-2xl font-bold text-red-700">{rejected}</div>
-          <div className="mt-1 text-sm text-red-600">Rejected / Error</div>
+        <div className="rounded-xl border border-error/30 bg-error-container p-4">
+          <div className="text-2xl font-bold text-error">{rejected}</div>
+          <div className="mt-1 text-sm text-error">Rejected / Error</div>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-          <h2 className="text-sm font-semibold text-gray-900">Submission History</h2>
+      <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
+        <div className="flex items-center justify-between border-b border-outline-variant px-5 py-4">
+          <h2 className="text-sm font-semibold text-on-surface">Submission History</h2>
           <button
             type="button"
             onClick={() => void qc.invalidateQueries({ queryKey: ['zatca-submissions'] })}
-            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700"
+            className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             Refresh
@@ -115,14 +115,14 @@ export default function ZatcaStatusPage(): JSX.Element {
         </div>
 
         {submissionsQuery.isLoading ? (
-          <div className="p-8 text-center text-sm text-gray-400">Loading submissions…</div>
+          <div className="p-8 text-center text-sm text-on-surface-variant">Loading submissions…</div>
         ) : normalized.length === 0 ? (
-          <div className="p-8 text-center text-sm text-gray-400">
+          <div className="p-8 text-center text-sm text-on-surface-variant">
             No ZATCA submissions yet. Submit an invoice from the Invoices page.
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-xs font-medium uppercase text-gray-500">
+            <thead className="bg-surface-container-low text-xs font-medium uppercase text-on-surface-variant">
               <tr>
                 <th className="px-5 py-3 text-start">Invoice</th>
                 <th className="px-5 py-3 text-start">Status</th>
@@ -132,14 +132,14 @@ export default function ZatcaStatusPage(): JSX.Element {
                 <th className="px-5 py-3 text-start">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-outline-variant">
               {normalized.map((s) => {
                 const cfg = STATUS_CONFIG[s.uiStatus] ?? STATUS_CONFIG.ERROR;
                 const Icon = cfg.icon;
                 const uuidDisplay = s.uuid?.slice(0, 16);
                 return (
-                  <tr key={s.id} className="hover:bg-gray-50">
-                    <td className="px-5 py-3 font-medium text-gray-900">{s.invoiceNumber}</td>
+                  <tr key={s.id} className="hover:bg-surface-container-low">
+                    <td className="px-5 py-3 font-medium text-on-surface">{s.invoiceNumber}</td>
                     <td className="px-5 py-3">
                       <span
                         className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${cfg.color}`}
@@ -148,18 +148,18 @@ export default function ZatcaStatusPage(): JSX.Element {
                         {cfg.label}
                       </span>
                     </td>
-                    <td className="px-5 py-3 font-mono text-xs text-gray-500">{uuidDisplay ? `${uuidDisplay}…` : '—'}</td>
-                    <td className="px-5 py-3 text-gray-500">
+                    <td className="px-5 py-3 font-mono text-xs text-on-surface-variant">{uuidDisplay ? `${uuidDisplay}…` : '—'}</td>
+                    <td className="px-5 py-3 text-on-surface-variant">
                       {s.clearedAt ? new Date(s.clearedAt).toLocaleDateString() : '—'}
                     </td>
-                    <td className="px-5 py-3 text-gray-500">{new Date(s.submittedAt).toLocaleDateString()}</td>
+                    <td className="px-5 py-3 text-on-surface-variant">{new Date(s.submittedAt).toLocaleDateString()}</td>
                     <td className="px-5 py-3">
                       {(s.uiStatus === 'REJECTED' || s.uiStatus === 'ERROR') && (
                         <button
                           type="button"
                           onClick={() => resubmit.mutate(s.invoiceId)}
                           disabled={resubmit.isPending}
-                          className="text-xs font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                          className="text-xs font-medium text-primary hover:text-on-primary-container disabled:opacity-50"
                         >
                           Resubmit
                         </button>

@@ -7,7 +7,7 @@ import type {
   UpdateLeadInput,
 } from '@nexus/validation';
 import { NexusProducer, TOPICS } from '@nexus/kafka';
-import { recordFieldChanges } from '../lib/field-history.js';
+import { recordFieldChanges, recordCreateSnapshot } from '../lib/field-history.js';
 import { Prisma } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type {
   Account,
@@ -17,7 +17,10 @@ import type {
 } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { CrmPrisma } from '../prisma.js';
 import { toPaginatedResult } from '@nexus/shared-types';
+import { cachedListRead } from '../lib/read-cache.js';
 import { assignLeadToTerritory } from '../lib/territory-router.js';
+import { assignTerritory, isTerritoryRoutingEnabled } from '../lib/territory-client.js';
+import { autoEnrollCadence, isCadenceEnrollEnabled } from '../lib/cadence-client.js';
 import {
   updateLeadDataQuality,
   updateAccountDataQuality,
@@ -125,23 +128,32 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
       const orderBy: Prisma.LeadOrderByWithRelationInput = {
         [sortField]: pagination.sortDir,
       };
-      const [total, rows] = await Promise.all([
-        prisma.lead.count({ where }),
-        prisma.lead.findMany({
-          where,
-          skip: (pagination.page - 1) * pagination.limit,
-          take: pagination.limit,
-          orderBy,
-        }),
-      ]);
-      const masked = (await maskFieldPermissions(
-        prisma,
-        tenantId,
+      // RR-H13: cache-aside; key folds tenant + filters + pagination + ownership
+      // scope + roles so RBAC-scoped / field-masked results never leak.
+      return cachedListRead(
         'lead',
-        rows as unknown as Record<string, unknown>[],
-        access?.roles
-      )) as unknown as Lead[];
-      return toPaginatedResult(masked, total, pagination.page, pagination.limit);
+        tenantId,
+        { filters, pagination, ownership: access?.ownershipWhere ?? null, roles: access?.roles ?? null },
+        async () => {
+          const [total, rows] = await Promise.all([
+            prisma.lead.count({ where }),
+            prisma.lead.findMany({
+              where,
+              skip: (pagination.page - 1) * pagination.limit,
+              take: pagination.limit,
+              orderBy,
+            }),
+          ]);
+          const masked = (await maskFieldPermissions(
+            prisma,
+            tenantId,
+            'lead',
+            rows as unknown as Record<string, unknown>[],
+            access?.roles
+          )) as unknown as Lead[];
+          return toPaginatedResult(masked, total, pagination.page, pagination.limit);
+        }
+      );
     },
 
     async getLeadById(tenantId: string, id: string, access?: ReadAccessContext): Promise<Lead> {
@@ -284,8 +296,90 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
           .catch(() => undefined);
       }
 
+      // ─── External territory-service routing + cadence auto-enroll ───────────
+      // Additive, enrichment-only, and STRICTLY FAIL-OPEN. Both calls run AFTER
+      // the row is committed (no open transaction) and the clients swallow every
+      // error (returning null + warn), so a territory/cadence outage, timeout, or
+      // non-2xx can NEVER fail or roll back the lead create. When the env URLs
+      // are unset the clients are disabled and these calls are skipped entirely.
+      //
+      // The in-CRM native router (assignLeadToTerritory, above) remains
+      // authoritative for owner assignment when a CRM-native Territory matches.
+      // We only consult the standalone territory-service as a fallback when the
+      // native router did not assign, and only override the owner when the caller
+      // did not explicitly choose one (territoryId enrichment always applies).
+      if (!assignment && isTerritoryRoutingEnabled()) {
+        const routing = await assignTerritory(tenantId, 'lead', {
+          country: created.country ?? undefined,
+          city: created.city ?? undefined,
+          industry: created.industry ?? undefined,
+          source: created.source ?? undefined,
+          companySize: created.employeeCount ?? undefined,
+          employeeCount: created.employeeCount ?? undefined,
+          annualRevenue:
+            created.annualRevenue != null ? Number(created.annualRevenue) : undefined,
+        });
+        if (routing?.territoryId) {
+          const ownerExplicitlySet = Boolean(data.ownerId);
+          const prevOwnerId = created.ownerId;
+          const nextOwnerId =
+            !ownerExplicitlySet && routing.ownerId ? routing.ownerId : prevOwnerId;
+          try {
+            await prisma.lead.update({
+              where: { id: created.id },
+              data: { territoryId: routing.territoryId, ownerId: nextOwnerId },
+            });
+            // Reflect the persisted routing on the returned object.
+            created.territoryId = routing.territoryId;
+            created.ownerId = nextOwnerId;
+            if (nextOwnerId !== prevOwnerId) {
+              await producer
+                .publish(TOPICS.LEADS, {
+                  type: 'lead.assigned',
+                  tenantId,
+                  payload: {
+                    leadId: created.id,
+                    tenantId,
+                    ownerId: nextOwnerId,
+                    territoryId: routing.territoryId,
+                  },
+                })
+                .catch(() => undefined);
+            }
+          } catch (err) {
+            // e.g. the external territoryId is not a CRM-native Territory row and
+            // the FK rejects it. Fail-open: the lead is already created.
+            console.warn(
+              '[territory-client] lead territory persist failed; continuing',
+              err
+            );
+          }
+        }
+      }
+
+      // Cadence auto-enroll on lead.created — independent of territory routing.
+      if (isCadenceEnrollEnabled()) {
+        await autoEnrollCadence(tenantId, 'lead.created', {
+          objectType: 'LEAD',
+          objectId: created.id,
+          ownerId: created.ownerId,
+        });
+      }
+
       // Data quality scoring (fire-and-forget)
       updateLeadDataQuality(prisma, created.id).catch(() => undefined);
+
+      // Full field-history: initial snapshot on CREATE (oldValue=null per tracked
+      // field). Fail-open inside the helper so history never breaks the create.
+      await recordCreateSnapshot(
+        prisma,
+        tenantId,
+        'lead',
+        created.id,
+        created as unknown as Record<string, unknown>,
+        created.ownerId,
+        'system'
+      );
 
       return created;
     },
@@ -446,9 +540,17 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
       return updated;
     },
 
-    async deleteLead(tenantId: string, id: string): Promise<void> {
+    async deleteLead(
+      tenantId: string,
+      id: string,
+      deletedBy?: string,
+      deletedByName?: string
+    ): Promise<void> {
       const existing = await loadOrThrow(tenantId, id);
-      await prisma.lead.update({ where: { id } as any, data: { deletedAt: new Date() } as any });
+      await prisma.lead.update({
+        where: { id } as any,
+        data: { deletedAt: new Date(), deletedBy: deletedBy ?? null, deletedByName: deletedByName ?? null } as any,
+      });
       await producer
         .publish(TOPICS.LEADS, {
           type: 'lead.archived',
@@ -465,7 +567,7 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
     async restoreLead(tenantId: string, id: string): Promise<Lead> {
       const result = await prisma.lead.updateMany({
         where: { id, tenantId, deletedAt: { not: null } } as any,
-        data: { deletedAt: null } as any,
+        data: { deletedAt: null, deletedBy: null, deletedByName: null } as any,
       });
       if (result.count === 0) throw new NotFoundError('Lead', id);
       const restored = await prisma.lead.findFirstOrThrow({ where: { id, tenantId } });

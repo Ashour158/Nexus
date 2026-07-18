@@ -68,18 +68,18 @@ const STATUS_OPTIONS = STATUS_COLUMNS.map((status) => ({
 }));
 
 function scoreColor(score: number): string {
-  if (score >= 80) return 'bg-emerald-500 text-white';
-  if (score >= 60) return 'bg-amber-500 text-white';
-  if (score >= 40) return 'bg-orange-500 text-white';
-  return 'bg-slate-400 text-white';
+  if (score >= 80) return 'bg-success text-on-success';
+  if (score >= 60) return 'bg-warning text-on-warning';
+  if (score >= 40) return 'bg-tertiary text-on-tertiary';
+  return 'bg-surface-container-highest text-on-surface-variant';
 }
 
 function statusClass(status: LeadStatusLiteral): string {
-  if (status === 'CONVERTED') return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
-  if (status === 'QUALIFIED') return 'bg-blue-50 text-blue-700 ring-blue-200';
-  if (status === 'UNQUALIFIED') return 'bg-rose-50 text-rose-700 ring-rose-200';
-  if (status === 'WORKING') return 'bg-amber-50 text-amber-700 ring-amber-200';
-  return 'bg-slate-100 text-slate-700 ring-slate-200';
+  if (status === 'CONVERTED') return 'bg-success-container text-on-success-container ring-success/20';
+  if (status === 'QUALIFIED') return 'bg-primary-container text-on-primary-container ring-primary/20';
+  if (status === 'UNQUALIFIED') return 'bg-error-container text-on-error-container ring-error/20';
+  if (status === 'WORKING') return 'bg-warning-container text-on-warning-container ring-warning/20';
+  return 'bg-surface-container-high text-on-surface-variant ring-outline-variant';
 }
 
 function displayName(lead: Lead): string {
@@ -104,25 +104,25 @@ function LeadCard({ lead }: { lead: Lead }): ReactElement {
       {...attributes}
       {...listeners}
       className={cn(
-        'cursor-grab rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md',
+        'cursor-grab rounded-lg border border-outline-variant bg-surface p-4 shadow-card transition hover:border-primary/40 hover:shadow-elevated',
         isDragging && 'opacity-50'
       )}
     >
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-xs font-black text-[#005baf]">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-container text-xs font-black text-primary">
           {initials(lead)}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-bold text-slate-950">{displayName(lead)}</div>
-          <div className="truncate text-xs text-slate-500">{lead.company ?? 'No account yet'}</div>
+          <div className="truncate text-sm font-bold text-on-surface">{displayName(lead)}</div>
+          <div className="truncate text-xs text-on-surface-variant">{lead.company ?? 'No account yet'}</div>
         </div>
-        <GripVertical className="h-4 w-4 shrink-0 text-slate-300" />
+        <GripVertical className="h-4 w-4 shrink-0 text-outline" />
       </div>
       <div className="mt-4 flex items-center justify-between gap-2">
         <span className={cn('inline-flex h-7 min-w-9 items-center justify-center rounded px-2 text-xs font-black', scoreColor(lead.score))}>
           {lead.score}
         </span>
-        <span className="truncate text-xs font-medium text-slate-400">{lead.source ?? 'OTHER'}</span>
+        <span className="truncate text-xs font-medium text-on-surface-variant">{lead.source ?? 'OTHER'}</span>
       </div>
     </div>
   );
@@ -146,31 +146,31 @@ function KanbanColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        'flex min-h-[520px] w-80 shrink-0 flex-col rounded-xl border bg-slate-50 p-3',
-        isOver ? 'border-[#137fec] bg-blue-50' : 'border-slate-200'
+        'flex min-h-[520px] w-80 shrink-0 flex-col rounded-xl border bg-surface-container-low p-3',
+        isOver ? 'border-primary bg-primary-container' : 'border-outline-variant'
       )}
     >
       <div className="mb-3 flex items-start justify-between gap-3 px-1">
         <div>
-          <div className="text-sm font-black text-slate-950">{label}</div>
-          <div className="mt-0.5 text-xs text-slate-500">{hint}</div>
+          <div className="text-sm font-black text-on-surface">{label}</div>
+          <div className="mt-0.5 text-xs text-on-surface-variant">{hint}</div>
         </div>
-        <span className="rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-slate-500 shadow-sm">
+        <span className="rounded-lg bg-surface px-2.5 py-1 text-xs font-bold text-on-surface-variant shadow-card">
           {leads.length}
         </span>
       </div>
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto pr-1">
         {leads.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-200 bg-white/70 p-6 text-center text-xs text-slate-400">
+          <div className="rounded-lg border border-dashed border-outline-variant bg-surface/70 p-6 text-center text-xs text-on-surface-variant">
             Drop leads here
           </div>
         ) : canDrag ? (
           leads.map((lead) => <LeadCard key={lead.id} lead={lead} />)
         ) : (
           leads.map((lead) => (
-            <div key={lead.id} className="rounded-lg border border-slate-200 bg-white p-4 text-sm">
-              <div className="truncate font-bold text-slate-950">{displayName(lead)}</div>
-              <div className="truncate text-xs text-slate-500">{lead.company ?? 'No account yet'}</div>
+            <div key={lead.id} className="rounded-lg border border-outline-variant bg-surface p-4 text-sm">
+              <div className="truncate font-bold text-on-surface">{displayName(lead)}</div>
+              <div className="truncate text-xs text-on-surface-variant">{lead.company ?? 'No account yet'}</div>
             </div>
           ))
         )}
@@ -324,26 +324,26 @@ export default function LeadsPage(): ReactElement {
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-card">
         <div className="grid lg:grid-cols-[1fr_360px]">
           <div className="p-6 sm:p-8">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#005baf]">
+              <span className="inline-flex items-center gap-2 rounded-lg bg-primary-container px-3 py-2 text-xs font-bold uppercase tracking-wider text-primary">
                 <Target className="h-4 w-4" />
                 Lead command center
               </span>
-              <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
+              <span className="rounded-lg bg-surface-container-high px-3 py-2 text-xs font-semibold text-on-surface-variant">
                 Codes, routing, scoring, conversion
               </span>
             </div>
-            <h1 className="mt-5 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+            <h1 className="mt-5 text-3xl font-black tracking-tight text-on-surface sm:text-4xl">
               Leads
             </h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-500 sm:text-base">
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-on-surface-variant sm:text-base">
               Capture prospects, qualify intent, assign ownership, and convert cleanly into accounts, contacts, and deals.
             </p>
           </div>
-          <div className="border-t border-slate-100 bg-slate-50 p-5 lg:border-l lg:border-t-0">
+          <div className="border-t border-outline-variant bg-surface-container-low p-5 lg:border-l lg:border-t-0">
             <div className="grid grid-cols-2 gap-3">
               <MetricCard icon={Users} label="Total leads" value={stats.total.toLocaleString()} note={`${leads.length} visible`} />
               <MetricCard icon={CheckCircle2} label="Qualified" value={stats.qualified.toLocaleString()} note="ready handoff" />
@@ -368,7 +368,7 @@ export default function LeadsPage(): ReactElement {
         </aside>
 
         <div className="min-w-0 space-y-5">
-          <section className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+          <section className="rounded-xl border border-outline-variant bg-surface p-4 shadow-card">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap gap-2">
                 <button
@@ -377,8 +377,8 @@ export default function LeadsPage(): ReactElement {
                   className={cn(
                     'rounded-lg px-4 py-2 text-sm font-bold transition',
                     statusFilter === 'ALL'
-                      ? 'bg-[#137fec] text-white'
-                      : 'border border-slate-200 bg-white text-slate-600 hover:bg-blue-50 hover:text-[#005baf]'
+                      ? 'bg-primary text-on-primary'
+                      : 'border border-outline-variant bg-surface text-on-surface-variant hover:bg-primary-container hover:text-primary'
                   )}
                 >
                   All
@@ -391,8 +391,8 @@ export default function LeadsPage(): ReactElement {
                     className={cn(
                       'rounded-lg px-4 py-2 text-sm font-bold transition',
                       statusFilter === status.id
-                        ? 'bg-[#137fec] text-white'
-                        : 'border border-slate-200 bg-white text-slate-600 hover:bg-blue-50 hover:text-[#005baf]'
+                        ? 'bg-primary text-on-primary'
+                        : 'border border-outline-variant bg-surface text-on-surface-variant hover:bg-primary-container hover:text-primary'
                     )}
                   >
                     {status.label}
@@ -402,13 +402,13 @@ export default function LeadsPage(): ReactElement {
 
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                 <label className="relative block min-w-0 lg:w-80">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
                   <input
                     type="search"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder="Search name, company, email, code..."
-                    className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                    className="h-11 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-10 pr-3 text-sm outline-none transition focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
                   />
                 </label>
                 <div className="flex flex-wrap items-center gap-2">
@@ -422,7 +422,7 @@ export default function LeadsPage(): ReactElement {
                   <ExportButton module="leads" filters={{ search, status: statusFilter }} />
                   <Link
                     href="/leads/new"
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#137fec] px-4 text-sm font-bold text-white transition hover:bg-[#005baf]"
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary transition hover:opacity-90"
                   >
                     <UserPlus className="h-4 w-4" />
                     New Lead
@@ -431,13 +431,13 @@ export default function LeadsPage(): ReactElement {
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-              <div className="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant pt-4">
+              <div className="inline-flex overflow-hidden rounded-lg border border-outline-variant bg-surface">
                 <button
                   type="button"
                   className={cn(
                     'inline-flex h-10 items-center gap-2 px-4 text-sm font-bold',
-                    viewMode === 'table' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'
+                    viewMode === 'table' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container-low'
                   )}
                   onClick={() => setViewMode('table')}
                 >
@@ -448,7 +448,7 @@ export default function LeadsPage(): ReactElement {
                   type="button"
                   className={cn(
                     'inline-flex h-10 items-center gap-2 px-4 text-sm font-bold',
-                    viewMode === 'kanban' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'
+                    viewMode === 'kanban' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container-low'
                   )}
                   onClick={() => setViewMode('kanban')}
                 >
@@ -456,7 +456,7 @@ export default function LeadsPage(): ReactElement {
                   Kanban
                 </button>
               </div>
-              <div className="inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+              <div className="inline-flex items-center gap-2 rounded-lg bg-surface-container-low px-3 py-2 text-xs font-semibold text-on-surface-variant">
                 <Filter className="h-4 w-4" />
                 {statusFilter === 'ALL' ? 'All statuses' : STATUS_COLUMNS.find((item) => item.id === statusFilter)?.label}
               </div>
@@ -464,15 +464,15 @@ export default function LeadsPage(): ReactElement {
           </section>
 
           {isLoading ? (
-            <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-card">
               <TableSkeleton rows={8} cols={8} />
             </div>
           ) : isError ? (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
+            <div className="rounded-xl border border-error/30 bg-error-container p-6 text-sm text-on-error-container">
               Failed to load leads: {error instanceof Error ? error.message : 'Unknown error'}
             </div>
           ) : leads.length === 0 ? (
-            <div className="rounded-xl border border-slate-100 bg-white shadow-sm">
+            <div className="rounded-xl border border-outline-variant bg-surface shadow-card">
               <EmptyState
                 icon="target"
                 title="No leads match this view"
@@ -483,7 +483,7 @@ export default function LeadsPage(): ReactElement {
             </div>
           ) : viewMode === 'kanban' ? (
             <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-              <div className="flex gap-4 overflow-x-auto rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className="flex gap-4 overflow-x-auto rounded-xl border border-outline-variant bg-surface p-4 shadow-card">
                 {STATUS_COLUMNS.map((column) => (
                   <KanbanColumn
                     key={column.id}
@@ -519,19 +519,19 @@ export default function LeadsPage(): ReactElement {
 
       {ConfirmDialog}
       {convertTarget ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-50 text-[#005baf]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-on-surface/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-surface p-6 shadow-modal">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary-container text-primary">
               <Briefcase className="h-5 w-5" />
             </div>
-            <h2 className="mt-4 text-xl font-black text-slate-950">Convert lead?</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
+            <h2 className="mt-4 text-xl font-black text-on-surface">Convert lead?</h2>
+            <p className="mt-2 text-sm leading-6 text-on-surface-variant">
               This will create linked CRM records for <span className="font-bold">{displayName(convertTarget)}</span> and mark the lead as converted.
             </p>
             <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-bold text-on-surface-variant hover:bg-surface-container-low"
                 onClick={() => setConvertTarget(null)}
                 disabled={convertLead.isPending}
               >
@@ -539,7 +539,7 @@ export default function LeadsPage(): ReactElement {
               </button>
               <button
                 type="button"
-                className="rounded-lg bg-[#137fec] px-4 py-2 text-sm font-bold text-white hover:bg-[#005baf] disabled:opacity-60"
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:opacity-90 disabled:opacity-60"
                 onClick={onConfirmConvert}
                 disabled={convertLead.isPending}
               >
@@ -565,13 +565,13 @@ function MetricCard({
   note: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-      <div className="mb-3 inline-flex rounded-lg bg-blue-50 p-2 text-[#005baf]">
+    <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-card">
+      <div className="mb-3 inline-flex rounded-lg bg-primary-container p-2 text-primary">
         <Icon className="h-4 w-4" />
       </div>
-      <p className="text-2xl font-black text-slate-950">{value}</p>
-      <p className="mt-1 text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
-      <p className="mt-1 text-xs text-slate-500">{note}</p>
+      <p className="text-2xl font-black text-on-surface">{value}</p>
+      <p className="mt-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant">{label}</p>
+      <p className="mt-1 text-xs text-on-surface-variant">{note}</p>
     </div>
   );
 }
@@ -608,10 +608,10 @@ function LeadTable({
   return (
     <div className="space-y-3">
       {selectedIds.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm shadow-sm">
-          <span className="font-bold text-[#005baf]">{selectedIds.length} selected</span>
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/20 bg-primary-container p-3 text-sm shadow-card">
+          <span className="font-bold text-primary">{selectedIds.length} selected</span>
           <select
-            className="h-9 rounded-lg border border-blue-100 bg-white px-3 text-xs text-slate-700 outline-none"
+            className="h-9 rounded-lg border border-primary/20 bg-surface px-3 text-xs text-on-surface outline-none"
             value={massOwnerId}
             onChange={(event) => setMassOwnerId(event.target.value)}
           >
@@ -622,22 +622,22 @@ function LeadTable({
               </option>
             ))}
           </select>
-          <button type="button" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-700" onClick={() => void onMassOwnerChange()}>
+          <button type="button" className="rounded-lg bg-surface px-3 py-2 text-xs font-bold text-on-surface" onClick={() => void onMassOwnerChange()}>
             Change Owner
           </button>
-          <button type="button" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-rose-600" onClick={() => void onMassDelete()}>
+          <button type="button" className="rounded-lg bg-surface px-3 py-2 text-xs font-bold text-error" onClick={() => void onMassDelete()}>
             Delete
           </button>
-          <button type="button" className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-500" onClick={() => setSelectedIds([])}>
+          <button type="button" className="rounded-lg bg-surface px-3 py-2 text-xs font-bold text-on-surface-variant" onClick={() => setSelectedIds([])}>
             Clear
           </button>
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-card">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1080px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500">
+            <thead className="bg-surface-container-low text-xs font-bold uppercase tracking-wider text-on-surface-variant">
               <tr>
                 <th className="w-12 px-5 py-3">
                   <input
@@ -657,9 +657,9 @@ function LeadTable({
                 <th className="px-5 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-outline-variant">
               {leads.map((lead) => (
-                <tr key={lead.id} className="transition hover:bg-slate-50/80">
+                <tr key={lead.id} className="transition hover:bg-surface-container-low/80">
                   <td className="px-5 py-4">
                     <input
                       type="checkbox"
@@ -675,20 +675,20 @@ function LeadTable({
                   {visibleColumns.includes('name') ? (
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-xs font-black text-[#005baf]">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-container text-xs font-black text-primary">
                           {initials(lead)}
                         </div>
                         <div className="min-w-0">
-                          <Link href={`/leads/${lead.id}`} className="block truncate font-bold text-slate-950 hover:text-[#005baf]">
+                          <Link href={`/leads/${lead.id}`} className="block truncate font-bold text-on-surface hover:text-primary">
                             {displayName(lead)}
                           </Link>
-                          <p className="mt-0.5 truncate text-xs text-slate-500">{lead.email ?? lead.code ?? 'No email'}</p>
+                          <p className="mt-0.5 truncate text-xs text-on-surface-variant">{lead.email ?? lead.code ?? 'No email'}</p>
                         </div>
                       </div>
                     </td>
                   ) : null}
                   {visibleColumns.includes('company') ? (
-                    <td className="px-5 py-4 text-slate-600">
+                    <td className="px-5 py-4 text-on-surface-variant">
                       <EditableCell value={lead.company ?? ''} onSave={(value) => updateLead(lead.id, { company: value || undefined })}>
                         {lead.company ?? 'No company'}
                       </EditableCell>
@@ -723,14 +723,14 @@ function LeadTable({
                     </td>
                   ) : null}
                   {visibleColumns.includes('source') ? (
-                    <td className="px-5 py-4 text-slate-600">
+                    <td className="px-5 py-4 text-on-surface-variant">
                       <EditableCell value={lead.source ?? ''} onSave={(value) => updateLead(lead.id, { source: (value || undefined) as UpdateLeadInput['source'] })}>
                         {lead.source ?? 'OTHER'}
                       </EditableCell>
                     </td>
                   ) : null}
                   {visibleColumns.includes('owner') ? (
-                    <td className="px-5 py-4 text-slate-600">
+                    <td className="px-5 py-4 text-on-surface-variant">
                       <EditableSelectCell
                         value={lead.ownerId ?? ''}
                         options={users.map((user) => ({ label: `${user.firstName} ${user.lastName}`, value: user.id }))}
@@ -741,7 +741,7 @@ function LeadTable({
                     </td>
                   ) : null}
                   {visibleColumns.includes('created') ? (
-                    <td className="px-5 py-4 text-slate-500">{formatDate(lead.createdAt)}</td>
+                    <td className="px-5 py-4 text-on-surface-variant">{formatDate(lead.createdAt)}</td>
                   ) : null}
                   <td className="px-5 py-4 text-right">
                     <div className="inline-flex items-center gap-2">
@@ -749,12 +749,12 @@ function LeadTable({
                         <button
                           type="button"
                           onClick={() => setConvertTarget(lead)}
-                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-blue-50 hover:text-[#005baf]"
+                          className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-xs font-bold text-on-surface transition hover:bg-primary-container hover:text-primary"
                         >
                           Convert
                         </button>
                       ) : null}
-                      <button type="button" className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="More actions">
+                      <button type="button" className="rounded-lg p-2 text-on-surface-variant transition hover:bg-surface-container-high hover:text-on-surface" aria-label="More actions">
                         <MoreVertical className="h-4 w-4" />
                       </button>
                     </div>

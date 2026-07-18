@@ -8,8 +8,11 @@ import { registerExportRoutes } from './routes/export.routes.js';
 import { registerRecycleRoutes } from './routes/recycle.routes.js';
 import { registerAuditRoutes } from './routes/audit.routes.js';
 import { registerViewsRoutes } from './routes/views.routes.js';
+import { registerMappingTemplateRoutes } from './routes/mapping-template.routes.js';
+import { registerDataJobRoutes } from './routes/data-job.routes.js';
 import { registerGraphQL } from './graphql/index.js';
 import { startRetentionJob } from './jobs/retention.job.js';
+import { startDataJobPoller } from './jobs/data-job.poller.js';
 
 startTracing({ serviceName: 'data-service' });
 const port = parseInt(process.env.PORT ?? '3015', 10);
@@ -40,10 +43,12 @@ app.addHook('onClose', async () => {
 await registerGraphQL(app, prisma);
 
 const retentionJob = startRetentionJob(prisma);
+const dataJobPoller = startDataJobPoller(prisma, producer);
 // Hooks must be registered before startService() calls app.listen() — Fastify
 // throws FST_ERR_INSTANCE_ALREADY_LISTENING on addHook after the server starts.
 app.addHook('onClose', async () => {
   retentionJob.stop();
+  dataJobPoller.stop();
 });
 
 await startService(app, port, async () => {
@@ -52,4 +57,6 @@ await startService(app, port, async () => {
   await registerRecycleRoutes(app, prisma);
   await registerAuditRoutes(app, prisma);
   await registerViewsRoutes(app, prisma);
+  await registerMappingTemplateRoutes(app, prisma);
+  await registerDataJobRoutes(app, prisma, producer);
 });

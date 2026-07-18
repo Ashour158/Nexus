@@ -117,8 +117,8 @@ export default function MigrationPage() {
 
   return (
     <div className="max-w-2xl p-6">
-      <h1 className="mb-2 text-xl font-bold text-gray-900">CRM Migration Wizard</h1>
-      <p className="mb-6 text-sm text-gray-500">
+      <h1 className="mb-2 text-xl font-bold text-on-surface">CRM Migration Wizard</h1>
+      <p className="mb-6 text-sm text-on-surface-variant">
         Import contacts and accounts from Salesforce, HubSpot, or CSV exports
       </p>
 
@@ -129,16 +129,16 @@ export default function MigrationPage() {
               <div
                 className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
                   step === s
-                    ? 'bg-indigo-600 text-white'
+                    ? 'bg-primary text-white'
                     : ['source', 'upload', 'mapping', 'preview', 'importing', 'done'].indexOf(step) >
                         i
-                      ? 'bg-green-500 text-white'
-                      : 'bg-gray-200 text-gray-400'
+                      ? 'bg-success text-white'
+                      : 'bg-surface-container-highest text-on-surface-variant'
                 }`}
               >
                 {i + 1}
               </div>
-              {i < 5 ? <div className="h-0.5 w-6 bg-gray-200" /> : null}
+              {i < 5 ? <div className="h-0.5 w-6 bg-surface-container-highest" /> : null}
             </div>
           )
         )}
@@ -146,7 +146,7 @@ export default function MigrationPage() {
 
       {step === 'source' ? (
         <div>
-          <h2 className="mb-4 font-semibold text-gray-900">Choose source CRM</h2>
+          <h2 className="mb-4 font-semibold text-on-surface">Choose source CRM</h2>
           <div className="mb-4 grid grid-cols-3 gap-3">
             {([
               { id: 'salesforce', label: 'Salesforce', desc: 'Export as CSV from reports' },
@@ -158,11 +158,11 @@ export default function MigrationPage() {
                 type="button"
                 onClick={() => setSource(src.id)}
                 className={`rounded-xl border-2 p-4 text-start ${
-                  source === src.id ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200'
+                  source === src.id ? 'border-primary bg-primary-container' : 'border-outline-variant'
                 }`}
               >
-                <div className="text-sm font-medium text-gray-900">{src.label}</div>
-                <div className="mt-1 text-xs text-gray-500">{src.desc}</div>
+                <div className="text-sm font-medium text-on-surface">{src.label}</div>
+                <div className="mt-1 text-xs text-on-surface-variant">{src.desc}</div>
               </button>
             ))}
           </div>
@@ -171,7 +171,7 @@ export default function MigrationPage() {
               type="button"
               onClick={() => setEntityType('contacts')}
               className={`rounded-lg px-4 py-2 text-sm font-medium ${
-                entityType === 'contacts' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'
+                entityType === 'contacts' ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface-variant'
               }`}
             >
               Contacts / Leads
@@ -180,7 +180,7 @@ export default function MigrationPage() {
               type="button"
               onClick={() => setEntityType('accounts')}
               className={`rounded-lg px-4 py-2 text-sm font-medium ${
-                entityType === 'accounts' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'
+                entityType === 'accounts' ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface-variant'
               }`}
             >
               Accounts / Companies
@@ -189,7 +189,7 @@ export default function MigrationPage() {
           <button
             type="button"
             onClick={() => setStep('upload')}
-            className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white"
+            className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white"
           >
             Next: Upload File
           </button>
@@ -198,9 +198,9 @@ export default function MigrationPage() {
 
       {step === 'upload' ? (
         <div>
-          <h2 className="mb-2 font-semibold text-gray-900">Upload your CSV file</h2>
-          <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 p-10">
-            <span className="text-sm font-medium text-gray-600">Click to upload CSV</span>
+          <h2 className="mb-2 font-semibold text-on-surface">Upload your CSV file</h2>
+          <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant p-10">
+            <span className="text-sm font-medium text-on-surface-variant">Click to upload CSV</span>
             <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
           </label>
         </div>
@@ -208,15 +208,15 @@ export default function MigrationPage() {
 
       {step === 'mapping' ? (
         <div>
-          <h2 className="mb-1 font-semibold text-gray-900">Map your fields</h2>
+          <h2 className="mb-1 font-semibold text-on-surface">Map your fields</h2>
           <div className="max-h-80 space-y-2 overflow-y-auto pe-1">
             {mappings.map((m, i) => (
               <div key={`${m.sourceField}-${i}`} className="flex items-center gap-3">
-                <span className="flex-1 rounded border border-gray-200 bg-gray-50 px-2 py-1.5 font-mono text-sm text-gray-700">
+                <span className="flex-1 rounded border border-outline-variant bg-surface-container-low px-2 py-1.5 font-mono text-sm text-on-surface">
                   {m.sourceField}
                 </span>
                 <select
-                  className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm"
+                  className="flex-1 rounded-lg border border-outline-variant px-3 py-1.5 text-sm"
                   value={m.nexusField}
                   onChange={(e) => {
                     const next = [...mappings];
@@ -238,14 +238,14 @@ export default function MigrationPage() {
             <button
               type="button"
               onClick={() => setStep('upload')}
-              className="rounded-lg bg-gray-100 px-4 py-2 text-sm text-gray-700"
+              className="rounded-lg bg-surface-container-high px-4 py-2 text-sm text-on-surface"
             >
               Back
             </button>
             <button
               type="button"
               onClick={() => setStep('preview')}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white"
+              className="rounded-lg bg-primary px-4 py-2 text-sm text-white"
             >
               Preview Import
             </button>
@@ -255,15 +255,15 @@ export default function MigrationPage() {
 
       {step === 'preview' ? (
         <div>
-          <h2 className="mb-1 font-semibold text-gray-900">Preview (first 3 rows)</h2>
+          <h2 className="mb-1 font-semibold text-on-surface">Preview (first 3 rows)</h2>
           <div className="mb-4 overflow-x-auto">
-            <table className="w-full overflow-hidden rounded-lg border border-gray-200 text-xs">
-              <thead className="bg-gray-50">
+            <table className="w-full overflow-hidden rounded-lg border border-outline-variant text-xs">
+              <thead className="bg-surface-container-low">
                 <tr>
                   {mappings
                     .filter((m) => m.nexusField)
                     .map((m, i) => (
-                      <th key={`${m.nexusField}-${i}`} className="px-3 py-2 text-start font-medium text-gray-500">
+                      <th key={`${m.nexusField}-${i}`} className="px-3 py-2 text-start font-medium text-on-surface-variant">
                         {m.nexusField}
                       </th>
                     ))}
@@ -271,9 +271,9 @@ export default function MigrationPage() {
               </thead>
               <tbody>
                 {previewRows.map((row, i) => (
-                  <tr key={i} className="border-t border-gray-100">
+                  <tr key={i} className="border-t border-outline-variant">
                     {mappings.filter((m) => m.nexusField).map((m) => (
-                      <td key={m.sourceField} className="px-3 py-2 text-gray-700">
+                      <td key={m.sourceField} className="px-3 py-2 text-on-surface">
                         {row[m.sourceField] || '-'}
                       </td>
                     ))}
@@ -286,14 +286,14 @@ export default function MigrationPage() {
             <button
               type="button"
               onClick={() => setStep('mapping')}
-              className="rounded-lg bg-gray-100 px-4 py-2 text-sm text-gray-700"
+              className="rounded-lg bg-surface-container-high px-4 py-2 text-sm text-on-surface"
             >
               Edit Mapping
             </button>
             <button
               type="button"
               onClick={handleStartImport}
-              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white"
+              className="rounded-lg bg-success px-4 py-2 text-sm font-medium text-white"
             >
               Start Import
             </button>
@@ -303,25 +303,25 @@ export default function MigrationPage() {
 
       {step === 'importing' ? (
         <div className="py-8 text-center">
-          <h2 className="mb-3 font-semibold text-gray-900">Importing your data...</h2>
-          <div className="mb-2 h-3 w-full overflow-hidden rounded-full bg-gray-100">
+          <h2 className="mb-3 font-semibold text-on-surface">Importing your data...</h2>
+          <div className="mb-2 h-3 w-full overflow-hidden rounded-full bg-surface-container-high">
             <div
-              className="h-full rounded-full bg-indigo-500 transition-all duration-500"
+              className="h-full rounded-full bg-primary transition-all duration-500"
               style={{ width: `${importProgress}%` }}
             />
           </div>
-          <p className="text-sm text-gray-500">{importProgress}% complete</p>
+          <p className="text-sm text-on-surface-variant">{importProgress}% complete</p>
         </div>
       ) : null}
 
       {step === 'done' ? (
         <div className="py-8 text-center">
-          <h2 className="mb-2 text-xl font-semibold text-gray-900">Import Complete</h2>
-          <p className="mb-6 text-sm text-gray-500">Your {entityType} were imported into NEXUS</p>
+          <h2 className="mb-2 text-xl font-semibold text-on-surface">Import Complete</h2>
+          <p className="mb-6 text-sm text-on-surface-variant">Your {entityType} were imported into NEXUS</p>
           <div className="flex justify-center gap-3">
             <a
               href={`/${entityType}`}
-              className="rounded-lg bg-indigo-600 px-5 py-2 text-sm text-white"
+              className="rounded-lg bg-primary px-5 py-2 text-sm text-white"
             >
               View {entityType}
             </a>
@@ -334,7 +334,7 @@ export default function MigrationPage() {
                 setPreviewRows([]);
                 setImportProgress(0);
               }}
-              className="rounded-lg bg-gray-100 px-5 py-2 text-sm text-gray-700"
+              className="rounded-lg bg-surface-container-high px-5 py-2 text-sm text-on-surface"
             >
               Import More
             </button>

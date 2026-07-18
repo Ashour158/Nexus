@@ -30,6 +30,7 @@ model User {
   emailVerified   Boolean       @default(false)
   keycloakId      String        @unique
   passwordHash    String?       // For local auth (bcrypt/scrypt)
+  mustChangePassword Boolean    @default(false) // set on invite → forced change on first login
   firstName       String
   lastName        String
   avatarUrl       String?

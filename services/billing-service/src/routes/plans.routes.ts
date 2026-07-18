@@ -11,6 +11,9 @@ const CreatePlanSchema = z.object({
   description: z.string().optional(),
   amount: z.number().positive(),
   currency: z.string().length(3).default('USD'),
+  // Optional plan-level tax rate as a PERCENT (e.g. 15 = 15%). When omitted the
+  // renewal/trial invoices fall back to BILLING_DEFAULT_TAX_RATE_PERCENT, then 0.
+  taxRate: z.number().min(0).max(100).optional(),
   interval: z.enum(['MONTHLY', 'ANNUAL', 'WEEKLY', 'DAILY']).default('MONTHLY'),
   trialDays: z.number().int().min(0).default(0),
   features: z.array(z.string()).default([]),

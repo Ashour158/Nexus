@@ -25,10 +25,10 @@ export default async function PublicDealRoomPage({ params }: { params: { slug: s
 
   if (!room) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+      <div className="flex min-h-screen items-center justify-center bg-surface-container-low">
         <div className="text-center">
-          <h1 className="mb-2 text-2xl font-bold text-slate-900">Deal Room Not Found</h1>
-          <p className="text-slate-500">This link may have expired or been unpublished.</p>
+          <h1 className="mb-2 text-2xl font-bold text-on-surface">Deal Room Not Found</h1>
+          <p className="text-on-surface-variant">This link may have expired or been unpublished.</p>
         </div>
       </div>
     );
@@ -44,21 +44,21 @@ export default async function PublicDealRoomPage({ params }: { params: { slug: s
       : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white px-4 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-primary to-white px-4 py-12">
       <div className="mx-auto max-w-2xl space-y-6">
         <div className="space-y-1 text-center">
-          <h1 className="text-3xl font-bold text-slate-900">{room.title}</h1>
-          <p className="text-sm text-slate-500">Shared deal workspace</p>
+          <h1 className="text-3xl font-bold text-on-surface">{room.title}</h1>
+          <p className="text-sm text-on-surface-variant">Shared deal workspace</p>
         </div>
 
-        <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="flex justify-between text-sm text-slate-600">
+        <div className="space-y-2 rounded-2xl border border-outline-variant bg-surface p-4">
+          <div className="flex justify-between text-sm text-on-surface-variant">
             <span>Overall progress</span>
             <span className="font-semibold">{progress}%</span>
           </div>
-          <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+          <div className="h-3 overflow-hidden rounded-full bg-surface-container-high">
             <div
-              className="h-full rounded-full bg-indigo-500 transition-all"
+              className="h-full rounded-full bg-primary transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -68,23 +68,23 @@ export default async function PublicDealRoomPage({ params }: { params: { slug: s
           { title: '🧑‍💼 Sales team actions', items: repItems },
           { title: '🤝 Your actions', items: buyerItems },
         ].map(({ title, items }) => (
-          <div key={title} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
-            <h2 className="font-semibold text-slate-800">{title}</h2>
+          <div key={title} className="space-y-3 rounded-2xl border border-outline-variant bg-surface p-5">
+            <h2 className="font-semibold text-on-surface">{title}</h2>
             {items.map((item) => (
               <div key={item.id} className="flex items-start gap-3">
                 {item.completedAt ? (
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-500" />
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-success" />
                 ) : (
-                  <Circle className="mt-0.5 h-5 w-5 flex-shrink-0 text-slate-300" />
+                  <Circle className="mt-0.5 h-5 w-5 flex-shrink-0 text-outline" />
                 )}
                 <div>
                   <p
-                    className={`text-sm ${item.completedAt ? 'text-slate-400 line-through' : 'text-slate-800'}`}
+                    className={`text-sm ${item.completedAt ? 'text-on-surface-variant line-through' : 'text-on-surface'}`}
                   >
                     {item.title}
                   </p>
                   {item.dueDate ? (
-                    <p className="mt-0.5 text-xs text-slate-400">
+                    <p className="mt-0.5 text-xs text-on-surface-variant">
                       Due{' '}
                       {new Date(
                         typeof item.dueDate === 'string' ? item.dueDate : item.dueDate
@@ -94,20 +94,20 @@ export default async function PublicDealRoomPage({ params }: { params: { slug: s
                 </div>
               </div>
             ))}
-            {items.length === 0 ? <p className="text-sm italic text-slate-400">No items</p> : null}
+            {items.length === 0 ? <p className="text-sm italic text-on-surface-variant">No items</p> : null}
           </div>
         ))}
 
         {room.documents.length > 0 ? (
-          <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
-            <h2 className="font-semibold text-slate-800">📄 Documents</h2>
+          <div className="space-y-3 rounded-2xl border border-outline-variant bg-surface p-5">
+            <h2 className="font-semibold text-on-surface">📄 Documents</h2>
             {room.documents.map((doc) => (
               <a
                 key={doc.id}
                 href={doc.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 hover:underline"
+                className="flex items-center gap-2 text-sm text-primary hover:text-on-primary-container hover:underline"
               >
                 <FileText className="h-4 w-4" /> {doc.name}
               </a>

@@ -40,8 +40,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
           duration: 4000,
           classNames: {
             toast: 'font-sans text-sm',
-            error: 'border-red-200',
-            success: 'border-green-200',
+            error: 'border-error/30',
+            success: 'border-success/30',
           },
         }}
       />
@@ -110,12 +110,12 @@ function CustomToastViewport() {
       {toasts.map((t) => {
         const tone =
           t.variant === 'error'
-            ? 'border-red-300 bg-red-50 text-red-900'
+            ? 'border-error/40 bg-error-container text-on-error-container'
             : t.variant === 'success'
-              ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+              ? 'border-success/40 bg-success-container text-on-success-container'
               : t.variant === 'warning'
-                ? 'border-amber-300 bg-amber-50 text-amber-900'
-                : 'border-slate-300 bg-white text-slate-900';
+                ? 'border-warning/40 bg-warning-container text-on-warning-container'
+                : 'border-outline-variant bg-surface text-on-surface';
         return (
           <div
             key={t.id}

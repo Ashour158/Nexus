@@ -1,41 +1,34 @@
 import type { Server } from 'socket.io';
 import { NexusConsumer, TOPICS } from '@nexus/kafka';
 import { accountRoom, contactRoom, dealRoom, tenantRoom } from '../socket/rooms.js';
+import { buildEnvelope, emitEnvelope, type DomainEvent } from '../socket/envelope.js';
 
 function emitQuoteEvent(
   io: Server,
   eventNames: { contact: string; account: string; deal?: string },
-  event: { type: string; tenantId: string; payload: unknown }
+  event: DomainEvent
 ): void {
-  const payload = event.payload as Record<string, unknown>;
+  const payload = (event.payload ?? {}) as Record<string, unknown>;
+  const quoteId = typeof payload.quoteId === 'string' ? payload.quoteId : '';
+  // One consistent envelope reused across every channel below (tenant-less
+  // events are dropped).
+  const envelope = buildEnvelope('quotes', event, quoteId || undefined);
+  if (!envelope) return;
+  // Canonical `quotes:event` stream for generic `subscribe({ module: 'quotes' })`.
+  emitEnvelope(io, envelope);
   const contactId = typeof payload.contactId === 'string' ? payload.contactId : '';
   const accountId = typeof payload.accountId === 'string' ? payload.accountId : '';
   const dealId = typeof payload.dealId === 'string' ? payload.dealId : '';
-  io.to(tenantRoom(event.tenantId)).emit('contact:commercial_updated', {
-    type: event.type,
-    payload,
-  });
-  io.to(tenantRoom(event.tenantId)).emit('account:commercial_updated', {
-    type: event.type,
-    payload,
-  });
+  io.to(tenantRoom(envelope.tenantId)).emit('contact:commercial_updated', envelope);
+  io.to(tenantRoom(envelope.tenantId)).emit('account:commercial_updated', envelope);
   if (contactId) {
-    io.to(contactRoom(contactId)).emit(eventNames.contact, {
-      type: event.type,
-      payload,
-    });
+    io.to(contactRoom(contactId)).emit(eventNames.contact, envelope);
   }
   if (accountId) {
-    io.to(accountRoom(accountId)).emit(eventNames.account, {
-      type: event.type,
-      payload,
-    });
+    io.to(accountRoom(accountId)).emit(eventNames.account, envelope);
   }
   if (dealId) {
-    io.to(dealRoom(dealId)).emit(eventNames.deal ?? 'deal:commercial_updated', {
-      type: event.type,
-      payload,
-    });
+    io.to(dealRoom(dealId)).emit(eventNames.deal ?? 'deal:commercial_updated', envelope);
   }
 }
 
@@ -75,9 +68,6 @@ export async function startQuoteConsumer(io: Server): Promise<NexusConsumer> {
     });
   }
   consumer.on('rfq.converted_to_quote', async (event) => {
-    emitQuoteEvent(io, { contact: 'contact:rfq_converted', account: 'account:rfq_converted', deal: 'deal:rfq_converted' }, event);
-  });
-  consumer.on('rfq.converted', async (event) => {
     emitQuoteEvent(io, { contact: 'contact:rfq_converted', account: 'account:rfq_converted', deal: 'deal:rfq_converted' }, event);
   });
   consumer.on('order.created', async (event) => {

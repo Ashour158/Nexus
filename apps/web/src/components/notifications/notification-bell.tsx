@@ -59,38 +59,38 @@ export function NotificationBell() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative rounded-lg p-2 transition-colors hover:bg-gray-100"
+        className="relative rounded-lg p-2 transition-colors hover:bg-surface-container-high"
         aria-label="Notifications"
         title="Notifications"
       >
-        <Bell className="h-5 w-5 text-gray-600" />
+        <Bell className="h-5 w-5 text-on-surface-variant" />
         {unreadCount > 0 ? (
-          <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-error px-1 text-[10px] font-bold text-on-primary">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         ) : null}
       </button>
 
       {open ? (
-        <div className="absolute end-0 top-full z-50 mt-2 w-96 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
-          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-            <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+        <div className="absolute end-0 top-full z-50 mt-2 w-96 overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-xl">
+          <div className="flex items-center justify-between border-b border-outline-variant px-4 py-3">
+            <h3 className="text-sm font-semibold text-on-surface">Notifications</h3>
             {unreadCount > 0 ? (
               <button
                 onClick={() => markAllRead.mutate()}
                 disabled={markAllRead.isPending}
-                className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
+                className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
               >
                 {markAllRead.isPending ? 'Marking…' : 'Mark all read'}
               </button>
             ) : null}
           </div>
 
-          <div className="max-h-80 divide-y divide-gray-50 overflow-y-auto">
+          <div className="max-h-80 divide-y divide-outline-variant overflow-y-auto">
             {isLoading ? (
-              <p className="py-8 text-center text-sm text-gray-400">Loading…</p>
+              <p className="py-8 text-center text-sm text-on-surface-variant">Loading…</p>
             ) : notifications.length === 0 ? (
-              <p className="py-8 text-center text-sm text-gray-400">No notifications</p>
+              <p className="py-8 text-center text-sm text-on-surface-variant">No notifications</p>
             ) : (
               notifications.map((n) => {
                 const Icon = TYPE_ICON[n.type] ?? MessageSquare;
@@ -100,20 +100,20 @@ export function NotificationBell() {
                     onClick={() => {
                       if (!n.isRead) markRead.mutate(n.id);
                     }}
-                    className={`flex cursor-pointer gap-3 px-4 py-3 transition-colors hover:bg-gray-50 ${!n.isRead ? 'bg-blue-50/40' : ''}`}
+                    className={`flex cursor-pointer gap-3 px-4 py-3 transition-colors hover:bg-surface-container-low ${!n.isRead ? 'bg-primary-container/40' : ''}`}
                   >
-                    <span className="mt-0.5 flex-shrink-0 rounded-md bg-gray-100 p-1">
-                      <Icon className="h-4 w-4 text-gray-600" />
+                    <span className="mt-0.5 flex-shrink-0 rounded-md bg-surface-container-high p-1">
+                      <Icon className="h-4 w-4 text-on-surface-variant" />
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <p className={`truncate text-sm ${!n.isRead ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+                        <p className={`truncate text-sm ${!n.isRead ? 'font-semibold text-on-surface' : 'font-medium text-on-surface'}`}>
                           {n.title}
                         </p>
-                        {!n.isRead ? <span className="h-2 w-2 flex-shrink-0 rounded-full bg-blue-500" /> : null}
+                        {!n.isRead ? <span className="h-2 w-2 flex-shrink-0 rounded-full bg-primary-container0" /> : null}
                       </div>
-                      <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">{n.body}</p>
-                      <p className="mt-1 text-[11px] text-gray-400">{timeAgo(n.createdAt)}</p>
+                      <p className="mt-0.5 line-clamp-2 text-xs text-on-surface-variant">{n.body}</p>
+                      <p className="mt-1 text-[11px] text-on-surface-variant">{timeAgo(n.createdAt)}</p>
                     </div>
                   </div>
                 );
@@ -121,10 +121,10 @@ export function NotificationBell() {
             )}
           </div>
 
-          <div className="border-t border-gray-100 bg-gray-50 px-4 py-2">
+          <div className="border-t border-outline-variant bg-surface-container-low px-4 py-2">
             <a
               href="/notifications"
-              className="block w-full py-1 text-center text-xs font-medium text-blue-600 hover:underline"
+              className="block w-full py-1 text-center text-xs font-medium text-primary hover:underline"
             >
               View all notifications
             </a>

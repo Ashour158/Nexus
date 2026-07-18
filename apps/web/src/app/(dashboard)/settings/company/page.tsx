@@ -35,14 +35,14 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-slate-600">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-on-surface-variant">{label}</span>
       {children}
     </label>
   );
 }
 
 const inputClass =
-  'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#137fec] disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500';
+  'w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant';
 
 export default function CompanyProfilePage() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
@@ -105,7 +105,7 @@ export default function CompanyProfilePage() {
   if (!canView) {
     return (
       <div className="p-6">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="rounded-lg border border-warning/30 bg-warning-container px-4 py-3 text-sm text-on-warning-container">
           You do not have permission to view the company profile (requires settings:read).
         </div>
       </div>
@@ -115,12 +115,12 @@ export default function CompanyProfilePage() {
   return (
     <div className="max-w-3xl p-6">
       <div className="mb-6 flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-[#137fec]">
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-container text-[#4f46e5]">
           <Building2 className="h-5 w-5" />
         </span>
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Company Profile</h1>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <h1 className="text-xl font-bold text-on-surface">Company Profile</h1>
+          <p className="mt-0.5 text-sm text-on-surface-variant">
             Your organization&apos;s identity, contact details, and localization.
           </p>
         </div>
@@ -130,8 +130,8 @@ export default function CompanyProfilePage() {
         <div
           className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
             banner.kind === 'ok'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-              : 'border-red-200 bg-red-50 text-red-900'
+              ? 'border-success/30 bg-success-container text-on-success-container'
+              : 'border-error/30 bg-error-container text-on-error-container'
           }`}
         >
           {banner.text}
@@ -139,29 +139,29 @@ export default function CompanyProfilePage() {
       ) : null}
 
       {isError ? (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+        <div className="mb-4 rounded-lg border border-error/30 bg-error-container px-4 py-3 text-sm text-on-error-container">
           Failed to load company: {error instanceof Error ? error.message : 'Unknown error'}
         </div>
       ) : null}
 
       {isLoading ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+        <div className="rounded-xl border border-outline-variant bg-surface p-8 text-center text-sm text-on-surface-variant">
           Loading company profile…
         </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-6">
           <fieldset disabled={!canEdit} className="space-y-6">
-            <section className="rounded-xl border border-slate-200 bg-white p-5">
+            <section className="rounded-xl border border-outline-variant bg-surface p-5">
               <div className="mb-4 flex items-center gap-4">
                 {form.logoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={form.logoUrl}
                     alt="Company logo"
-                    className="h-14 w-14 rounded-lg border border-slate-200 object-contain"
+                    className="h-14 w-14 rounded-lg border border-outline-variant object-contain"
                   />
                 ) : (
-                  <span className="flex h-14 w-14 items-center justify-center rounded-lg border border-dashed border-slate-300 text-slate-400">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-lg border border-dashed border-outline-variant text-on-surface-variant">
                     <Building2 className="h-6 w-6" />
                   </span>
                 )}
@@ -240,8 +240,8 @@ export default function CompanyProfilePage() {
               </div>
             </section>
 
-            <section className="rounded-xl border border-slate-200 bg-white p-5">
-              <h2 className="mb-4 text-sm font-semibold text-slate-900">Address</h2>
+            <section className="rounded-xl border border-outline-variant bg-surface p-5">
+              <h2 className="mb-4 text-sm font-semibold text-on-surface">Address</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <Field label="Street">
@@ -283,8 +283,8 @@ export default function CompanyProfilePage() {
               </div>
             </section>
 
-            <section className="rounded-xl border border-slate-200 bg-white p-5">
-              <h2 className="mb-4 text-sm font-semibold text-slate-900">Localization</h2>
+            <section className="rounded-xl border border-outline-variant bg-surface p-5">
+              <h2 className="mb-4 text-sm font-semibold text-on-surface">Localization</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Timezone">
                   <input
@@ -308,12 +308,12 @@ export default function CompanyProfilePage() {
 
           {canEdit ? (
             <div className="flex items-center justify-end gap-3">
-              <Button type="submit" isLoading={upsert.isPending} className="bg-[#137fec] hover:bg-[#0f6fd4]">
+              <Button type="submit" isLoading={upsert.isPending} className="bg-[#4f46e5] hover:bg-[#0f6fd4]">
                 Save changes
               </Button>
             </div>
           ) : (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-on-surface-variant">
               You have read-only access. Editing requires the settings:update permission.
             </p>
           )}

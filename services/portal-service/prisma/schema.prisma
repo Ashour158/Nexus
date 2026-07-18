@@ -24,6 +24,144 @@ model PortalToken {
   @@unique([id, tenantId])
 }
 
+// A logged-in customer/partner portal user (B9), scoped to exactly one Account.
+// Distinct from the magic-link PortalToken flow: a PortalUser authenticates
+// with email + password and then sees ONLY their own account's quotes, orders,
+// invoices and tickets. passwordHash is a scrypt digest (see lib/portal-auth).
+//
+// External-user lifecycle (Zoho-parity invitations): a tenant admin invites an
+// external contact/partner (status = INVITED, inviteToken issued, passwordHash
+// null). The recipient accepts via the invite token (status → ACTIVE). Setting
+// an actual credential is intentionally OUT OF SCOPE here — it is a documented
+// hook: until a credential flow populates passwordHash, login stays blocked
+// (verifyPassword against a null hash fails), so an accepted-but-uncredentialed
+// user cannot sign in. An admin can also provision an ACTIVE user directly with
+// a password (the original path). portalRole is `customer` | `partner`.
+model PortalUser {
+  id           String           @id @default(cuid())
+  tenantId     String
+  accountId    String
+  contactId    String?
+  email        String
+  name         String?
+  passwordHash String?
+  portalRole   String           @default("customer") // customer | partner
+  status       PortalUserStatus @default(ACTIVE)
+  isActive     Boolean          @default(true)
+  inviteToken  String?          @unique
+  inviteExpiresAt DateTime?
+  invitedBy    String?
+  acceptedAt   DateTime?
+  lastLoginAt  DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@unique([tenantId, email])
+  @@index([tenantId, accountId])
+  @@index([inviteToken])
+  @@unique([id, tenantId])
+}
+
+enum PortalUserStatus {
+  INVITED
+  ACTIVE
+  DISABLED
+}
+
+// Explicit record-level visibility grant for a portal identity (Zoho "share").
+// A grant targets EITHER a single portalUserId OR a whole accountId (all users
+// of that account — used for partner/account-level sharing). recordType is
+// `case` | `quote` | `invoice` | `document`; permission is VIEW or COMMENT.
+// This is what `GET /portal/me/records` reads, and what the portal read
+// surfaces are filtered against (a portal user only ever sees explicitly shared
+// records plus the cases they themselves opened).
+model PortalShare {
+  id           String                @id @default(cuid())
+  tenantId     String
+  portalUserId String?
+  accountId    String?
+  recordType   String // case | quote | invoice | document
+  recordId     String
+  permission   PortalSharePermission @default(VIEW)
+  createdBy    String
+  createdAt    DateTime              @default(now())
+
+  @@index([tenantId, portalUserId])
+  @@index([tenantId, accountId])
+  @@index([tenantId, recordType, recordId])
+  @@unique([id, tenantId])
+}
+
+enum PortalSharePermission {
+  VIEW
+  COMMENT
+}
+
+// A case/ticket opened by an external portal user (self-service). This is the
+// portal-side source of truth for tracking; on submit we ALSO emit a domain
+// event (portal.case.submitted) that the ticket/CRM services consume, and make
+// a best-effort proxy call to ticket-service to materialize the ticket in the
+// internal lifecycle. `externalTicketId` is populated once materialized.
+model PortalCase {
+  id               String              @id @default(cuid())
+  tenantId         String
+  portalUserId     String
+  accountId        String
+  contactId        String?
+  subject          String
+  description      String
+  priority         String              @default("MEDIUM")
+  status           String              @default("OPEN")
+  externalTicketId String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  comments PortalCaseComment[]
+
+  @@index([tenantId, portalUserId])
+  @@index([tenantId, accountId])
+  @@unique([id, tenantId])
+}
+
+// A reply/comment an external portal user adds to their own case.
+model PortalCaseComment {
+  id           String     @id @default(cuid())
+  tenantId     String
+  caseId       String
+  portalUserId String
+  authorName   String?
+  body         String
+  createdAt    DateTime   @default(now())
+
+  case PortalCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, caseId])
+}
+
+// A deal registration submitted by a `partner` portal user (deal-registration
+// style). Persisted portal-side and surfaced to the CRM as a lead/deal referral
+// via a domain event (portal.deal.registered on the leads topic). `externalLeadId`
+// is populated once the CRM materializes the referral.
+model PortalDealRegistration {
+  id             String   @id @default(cuid())
+  tenantId       String
+  portalUserId   String
+  accountId      String
+  dealName       String
+  customerName   String
+  estimatedValue Float?
+  currency       String?
+  notes          String?
+  status         String   @default("REGISTERED")
+  externalLeadId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId, portalUserId])
+  @@index([tenantId, accountId])
+  @@unique([id, tenantId])
+}
+
 model PortalBranding {
   id           String   @id @default(cuid())
   tenantId     String   @unique

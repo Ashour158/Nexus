@@ -1,5 +1,5 @@
 import type { NexusKafkaEvent } from '@nexus/shared-types';
-import { NotFoundError } from '@nexus/service-utils';
+import { NotFoundError, ValidationError } from '@nexus/service-utils';
 import type { PrismaClient } from '../../../../node_modules/.prisma/integration-client/index.js';
 import type { IntegrationPrisma } from '../prisma.js';
 import type { createFieldCrypto } from '../lib/crypto.js';
@@ -59,6 +59,20 @@ export function createWebhooksService(deps: {
     return randomBytes(32).toString('hex');
   }
 
+  /** Enforce https-only subscriber URLs at write time (defence-in-depth on top
+   * of the delivery-time SSRF/private-IP block). Throws ValidationError. */
+  function assertHttpsUrl(targetUrl: string): void {
+    let parsed: URL;
+    try {
+      parsed = new URL(targetUrl);
+    } catch {
+      throw new ValidationError('targetUrl must be a valid URL');
+    }
+    if (parsed.protocol !== 'https:') {
+      throw new ValidationError('targetUrl must use https');
+    }
+  }
+
   async function scheduleRetry(
     id: string,
     attempt: number,
@@ -70,7 +84,8 @@ export function createWebhooksService(deps: {
       await raw.webhookDelivery.update({
         where: { id },
         data: {
-          status: 'FAILED',
+          // Retry budget exhausted — terminal DEAD (distinct from a single-shot FAILED).
+          status: 'DEAD',
           httpStatus: httpStatus || null,
           responseBody: responseBody.slice(0, 8000),
           attemptCount: attempt,
@@ -135,6 +150,7 @@ export function createWebhooksService(deps: {
         headers: {
           'Content-Type': 'application/json',
           'X-Nexus-Event': row.eventType,
+          'X-Nexus-Delivery': row.id,
           'X-Nexus-Signature': `sha256=${sig}`,
         },
         body,
@@ -170,6 +186,7 @@ export function createWebhooksService(deps: {
     },
 
     async createSubscription(input: CreateWebhookSubscriptionInput) {
+      assertHttpsUrl(input.targetUrl);
       const plain = newSigningSecret();
       const enc = crypto.encrypt(plain);
       const tid = alsStore.get('tenantId') as string;
@@ -187,6 +204,7 @@ export function createWebhooksService(deps: {
     },
 
     async updateSubscription(id: string, input: UpdateWebhookSubscriptionInput) {
+      if (input.targetUrl !== undefined) assertHttpsUrl(input.targetUrl);
       const cur = await prisma.webhookSubscription.findFirst({ where: { id } });
       if (!cur) throw new NotFoundError('WebhookSubscription', id);
       const row = await prisma.webhookSubscription.update({

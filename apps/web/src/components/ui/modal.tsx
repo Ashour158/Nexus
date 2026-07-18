@@ -63,17 +63,17 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-on-surface/40 p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div
         ref={containerRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
-        className={`max-h-[90vh] w-full overflow-y-auto rounded-2xl bg-white shadow-xl ${SIZE_CLASSES[size]}`}
+        className={`max-h-[90vh] w-full overflow-y-auto rounded-2xl bg-surface shadow-xl ${SIZE_CLASSES[size]}`}
       >
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-          <h2 id="modal-title" className="text-lg font-semibold text-gray-900">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600" aria-label="Close modal">
+        <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
+          <h2 id="modal-title" className="text-lg font-semibold text-on-surface">{title}</h2>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-on-surface-variant transition hover:bg-surface-container-high hover:text-on-surface-variant" aria-label="Close modal">
             <X className="h-5 w-5" />
           </button>
         </div>

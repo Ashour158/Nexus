@@ -6,10 +6,12 @@ import type {
   UpdateContactInput,
 } from '@nexus/validation';
 import { NexusProducer, TOPICS } from '@nexus/kafka';
+import { computeBlindIndex } from '@nexus/security';
 import { Prisma } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { Contact, Deal } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { CrmPrisma } from '../prisma.js';
 import { toPaginatedResult } from '@nexus/shared-types';
+import { cachedListRead } from '../lib/read-cache.js';
 import {
   recordFieldChanges,
   recordCreateSnapshot,
@@ -90,23 +92,32 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
       const orderBy: Prisma.ContactOrderByWithRelationInput = {
         [sortField]: pagination.sortDir,
       };
-      const [total, rows] = await Promise.all([
-        prisma.contact.count({ where }),
-        prisma.contact.findMany({
-          where,
-          skip: (pagination.page - 1) * pagination.limit,
-          take: pagination.limit,
-          orderBy,
-        }),
-      ]);
-      const masked = (await maskFieldPermissions(
-        prisma,
-        tenantId,
+      // RR-H13: cache-aside; key folds tenant + filters + pagination + ownership
+      // scope + roles so RBAC-scoped / field-masked results never leak.
+      return cachedListRead(
         'contact',
-        rows as unknown as Record<string, unknown>[],
-        access?.roles
-      )) as unknown as Contact[];
-      return toPaginatedResult(masked, total, pagination.page, pagination.limit);
+        tenantId,
+        { filters, pagination, ownership: access?.ownershipWhere ?? null, roles: access?.roles ?? null },
+        async () => {
+          const [total, rows] = await Promise.all([
+            prisma.contact.count({ where }),
+            prisma.contact.findMany({
+              where,
+              skip: (pagination.page - 1) * pagination.limit,
+              take: pagination.limit,
+              orderBy,
+            }),
+          ]);
+          const masked = (await maskFieldPermissions(
+            prisma,
+            tenantId,
+            'contact',
+            rows as unknown as Record<string, unknown>[],
+            access?.roles
+          )) as unknown as Contact[];
+          return toPaginatedResult(masked, total, pagination.page, pagination.limit);
+        }
+      );
     },
 
     async getContactById(tenantId: string, id: string, access?: ReadAccessContext): Promise<Contact & { emails: unknown[]; addresses: unknown[] }> {
@@ -130,9 +141,14 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
         where: { id: data.accountId, tenantId },
       });
       if (!account) throw new NotFoundError('Account', data.accountId);
+      // Dedup on the deterministic blind index, not the raw email: when field
+      // encryption is on, `email` is stored as randomized ciphertext, so a
+      // plaintext match would never hit. `emailHash` is deterministic in BOTH
+      // modes (encryption on/off), so it is the reliable uniqueness key.
+      const emailHash = data.email ? computeBlindIndex(data.email) : null;
       if (data.email) {
         const existing = await prisma.contact.findFirst({
-          where: { email: data.email, tenantId },
+          where: { emailHash, tenantId },
         });
         if (existing) throw new ConflictError('Contact', 'email');
       }
@@ -154,6 +170,7 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
           firstName: data.firstName,
           lastName: data.lastName,
           email: data.email ?? null,
+          emailHash,
           phone: data.phone ?? null,
           mobile: data.mobile ?? null,
           jobTitle: data.jobTitle ?? null,
@@ -230,9 +247,13 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
         });
         if (!account) throw new NotFoundError('Account', data.accountId);
       }
+      // Recompute the blind index when the email is part of the patch, and dedup
+      // against it (never against the possibly-encrypted raw `email` column).
+      const nextEmailHash =
+        data.email !== undefined ? (data.email ? computeBlindIndex(data.email) : null) : undefined;
       if (data.email && data.email !== existing.email) {
         const dup = await prisma.contact.findFirst({
-          where: { email: data.email, tenantId, NOT: { id } },
+          where: { emailHash: nextEmailHash, tenantId, NOT: { id } },
         });
         if (dup) throw new ConflictError('Contact', 'email');
       }
@@ -293,6 +314,13 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
         roles
       );
       const safeUpdate = permResult.update as Prisma.ContactUpdateInput;
+
+      // Keep the blind index in lockstep with the (possibly permission-stripped)
+      // email write: only persist emailHash if `email` actually survived to the
+      // update, so the index can never drift from the stored value.
+      if (nextEmailHash !== undefined && 'email' in (safeUpdate as Record<string, unknown>)) {
+        (safeUpdate as Record<string, unknown>).emailHash = nextEmailHash;
+      }
 
       // Validation rules run against the post-write record (existing + patch).
       await enforceValidationRules(
@@ -384,10 +412,18 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
     },
 
     /** Soft-deletes by setting `deletedAt`. */
-    async deleteContact(tenantId: string, id: string): Promise<void> {
+    async deleteContact(
+      tenantId: string,
+      id: string,
+      deletedBy?: string,
+      deletedByName?: string
+    ): Promise<void> {
       const existing = await loadOrThrow(tenantId, id);
       if (existing.deletedAt) return;
-      await prisma.contact.update({ where: { id }, data: { deletedAt: new Date(), isActive: false } });
+      await prisma.contact.update({
+        where: { id },
+        data: { deletedAt: new Date(), isActive: false, deletedBy: deletedBy ?? null, deletedByName: deletedByName ?? null },
+      });
       await recordSingleChange(
         prisma,
         tenantId,
@@ -415,7 +451,7 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
     async restoreContact(tenantId: string, id: string): Promise<Contact> {
       const result = await prisma.contact.updateMany({
         where: { id, tenantId, deletedAt: { not: null } },
-        data: { deletedAt: null, isActive: true },
+        data: { deletedAt: null, isActive: true, deletedBy: null, deletedByName: null },
       });
       if (result.count === 0) throw new NotFoundError('Contact', id);
       const restored = await prisma.contact.findFirstOrThrow({ where: { id, tenantId } });

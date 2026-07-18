@@ -97,8 +97,48 @@ export async function startTriggerConsumer(
   consumer.on('quote.sent', onEvent);
   consumer.on('quote.accepted', onEvent);
   consumer.on('quote.rejected', onEvent);
+  consumer.on('contact.created', onEvent);
+  consumer.on('contact.updated', onEvent);
+  consumer.on('contact.archived', onEvent);
+  consumer.on('contact.merged', onEvent);
+  consumer.on('contact.restored', onEvent);
+  consumer.on('account.created', onEvent);
+  consumer.on('account.updated', onEvent);
+  consumer.on('account.archived', onEvent);
+  consumer.on('account.merged', onEvent);
+  consumer.on('account.restored', onEvent);
   consumer.on('approval.request.approved', onEvent);
   consumer.on('approval.request.rejected', onEvent);
+
+  // Custom-button RUN_WORKFLOW action: metadata-service emits
+  // `custom_button.workflow.trigger` on the workflows topic when a CustomButton
+  // with actionType RUN_WORKFLOW is executed. Unlike the event-keyed triggers
+  // above (which match every active workflow whose `trigger` equals the event
+  // type), this targets ONE specific workflow by the `workflowId` carried in the
+  // payload, so it bypasses the trigger-match lookup and starts that workflow
+  // directly — reusing the same createExecution → runExecution path.
+  const onCustomButtonWorkflowTrigger = async (event: {
+    type: string;
+    tenantId: string;
+    payload: Record<string, unknown>;
+  }) => {
+    const workflowId = event.payload.workflowId;
+    if (typeof workflowId !== 'string' || workflowId.length === 0) return;
+    const wf = await prisma.workflowTemplate.findFirst({
+      where: { id: workflowId, tenantId: event.tenantId, isActive: true },
+      select: { id: true },
+    });
+    // Unknown / cross-tenant / inactive workflow id — ack and drop.
+    if (!wf) return;
+    const execution = await executions.createExecution(
+      event.tenantId,
+      wf.id,
+      event.type,
+      event.payload
+    );
+    await executions.runExecution(execution.id);
+  };
+  consumer.on('custom_button.workflow.trigger', onCustomButtonWorkflowTrigger);
 
   await consumer.subscribe([
     TOPICS.DEALS,

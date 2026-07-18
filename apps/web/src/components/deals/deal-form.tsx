@@ -362,7 +362,7 @@ export function DealForm({
         <div
           role="alert"
           data-testid="deal-form-reference-error"
-          className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm text-amber-700 dark:text-amber-400"
+          className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-sm text-warning dark:text-warning"
         >
           Failed to load: {referenceErrors.join(', ')}. Some fields may be
           empty — please retry or refresh.
@@ -632,11 +632,11 @@ export function DealForm({
               render={({ field }) => (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-500">Select one or more contacts</span>
+                    <span className="text-xs text-on-surface-variant">Select one or more contacts</span>
                     <button
                       type="button"
                       onClick={() => setShowQuickCreate(true)}
-                      className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+                      className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary"
                     >
                       <UserPlus className="h-4 w-4" /> New contact
                     </button>

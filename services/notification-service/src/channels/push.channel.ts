@@ -1,17 +1,29 @@
 /**
  * Push channel — sends a push notification via Firebase Cloud Messaging (FCM)
- * legacy HTTP API using global `fetch` (no SDK dependency). It is fully
- * env-gated: when `FCM_SERVER_KEY` is not set (and no `WEB_PUSH_ENDPOINT`
- * override is provided) the channel becomes a guarded no-op that logs
- * "push not configured" and returns cleanly. It NEVER throws — a send failure
- * is caught and logged so a consumer is never blocked by push delivery.
+ * HTTP v1 API using global `fetch` (no SDK dependency).
  *
- * `WEB_PUSH_ENDPOINT` / `WEB_PUSH_KEY` allow pointing at an alternative
- * FCM-style relay (e.g. a self-hosted web-push gateway) that accepts the same
- * `{ to, notification, data }` JSON body with an `Authorization: key=...`
- * header. When only `WEB_PUSH_*` are set, they take precedence over the
- * default FCM endpoint.
+ * RR-H6: the legacy `POST /fcm/send` endpoint with an `Authorization: key=...`
+ * server key was retired by Google and now rejects every request, so the channel
+ * is migrated to the v1 API:
+ *
+ *   POST https://fcm.googleapis.com/v1/projects/{FCM_PROJECT_ID}/messages:send
+ *   Authorization: Bearer <OAuth2 access token>
+ *
+ * The bearer is minted from a Google service account (client_email +
+ * private_key) via the JWT-bearer grant — we sign the assertion with Node's
+ * built-in `crypto` (RS256) and exchange it at the Google OAuth2 token endpoint,
+ * so no extra dependency (google-auth-library) is required. Tokens are cached
+ * in-process until shortly before expiry.
+ *
+ * The channel is fully env-gated. When any of `FCM_PROJECT_ID` /
+ * `FCM_CLIENT_EMAIL` / `FCM_PRIVATE_KEY` is unset the channel becomes a guarded
+ * no-op that logs "push not configured" and returns cleanly; `isConfigured()`
+ * then reports `false` so `/health/channels` is truthful. A genuine send failure
+ * (network / non-2xx) throws so the consumer retries / DLQs (RR-H5); the
+ * unconfigured no-op and the "no device token" guard return early and never throw.
  */
+
+import { createSign } from 'node:crypto';
 
 export interface PushEnvelope {
   /** Device registration token / subscription id. */
@@ -25,7 +37,7 @@ export interface PushEnvelope {
 }
 
 export interface PushChannel {
-  /** Whether FCM / web-push is configured. When false, `send` is a logged no-op that never throws. */
+  /** Whether FCM v1 is configured. When false, `send` is a logged no-op that never throws. */
   isConfigured(): boolean;
   send(envelope: PushEnvelope): Promise<void>;
 }
@@ -36,31 +48,102 @@ type Logger = {
   error: (...args: unknown[]) => void;
 };
 
-const DEFAULT_FCM_ENDPOINT = 'https://fcm.googleapis.com/fcm/send';
+const OAUTH_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
+const JWT_GRANT = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
+const SEND_TIMEOUT_MS = 10_000;
+
+function base64url(input: string | Buffer): string {
+  return Buffer.from(input).toString('base64url');
+}
+
+async function timedFetch(
+  url: string,
+  init: Parameters<typeof fetch>[1]
+): Promise<{ ok: boolean; status: number; text: () => Promise<string>; json: () => Promise<unknown> }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
+  return (await fetch(url, { ...init, signal: controller.signal }).finally(() =>
+    clearTimeout(timer)
+  )) as unknown as {
+    ok: boolean;
+    status: number;
+    text: () => Promise<string>;
+    json: () => Promise<unknown>;
+  };
+}
+
+/**
+ * Mints (and caches) a Google OAuth2 access token for the FCM scope using the
+ * service-account JWT-bearer grant. The returned token is cached in the closure
+ * and refreshed ~2 minutes before it expires.
+ */
+function createTokenProvider(clientEmail: string, privateKey: string) {
+  let cached: { token: string; expiresAt: number } | null = null;
+
+  return async function getAccessToken(): Promise<string> {
+    const now = Math.floor(Date.now() / 1000);
+    if (cached && cached.expiresAt - 120 > now) {
+      return cached.token;
+    }
+    const header = { alg: 'RS256', typ: 'JWT' };
+    const claims = {
+      iss: clientEmail,
+      scope: FCM_SCOPE,
+      aud: OAUTH_TOKEN_URL,
+      iat: now,
+      exp: now + 3600,
+    };
+    const signingInput = `${base64url(JSON.stringify(header))}.${base64url(
+      JSON.stringify(claims)
+    )}`;
+    const signature = createSign('RSA-SHA256').update(signingInput).sign(privateKey);
+    const assertion = `${signingInput}.${base64url(signature)}`;
+
+    const res = await timedFetch(OAUTH_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: JWT_GRANT, assertion }).toString(),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new Error(`FCM OAuth token request failed with status ${res.status}: ${detail}`);
+    }
+    const json = (await res.json()) as { access_token?: string; expires_in?: number };
+    if (!json.access_token) {
+      throw new Error('FCM OAuth token response missing access_token');
+    }
+    cached = {
+      token: json.access_token,
+      expiresAt: now + (json.expires_in ?? 3600),
+    };
+    return cached.token;
+  };
+}
 
 export function createPushChannel(log: Logger): PushChannel {
-  const webPushEndpoint = process.env.WEB_PUSH_ENDPOINT?.trim();
-  const webPushKey = process.env.WEB_PUSH_KEY?.trim();
-  const fcmServerKey = process.env.FCM_SERVER_KEY?.trim();
+  const projectId = process.env.FCM_PROJECT_ID?.trim();
+  const clientEmail = process.env.FCM_CLIENT_EMAIL?.trim();
+  // Private keys stored in env commonly carry literal "\n" sequences; normalise
+  // them back to real newlines so the PEM parses.
+  const privateKey = process.env.FCM_PRIVATE_KEY?.replace(/\\n/g, '\n').trim();
 
-  // WEB_PUSH_* takes precedence when supplied; otherwise fall back to FCM.
-  const endpoint = webPushEndpoint || DEFAULT_FCM_ENDPOINT;
-  const serverKey = webPushKey || fcmServerKey;
-
-  if (!serverKey) {
+  if (!projectId || !clientEmail || !privateKey) {
     log.warn(
-      'FCM_SERVER_KEY / WEB_PUSH_KEY not configured — push not configured; push channel will skip sending.'
+      'FCM_PROJECT_ID / FCM_CLIENT_EMAIL / FCM_PRIVATE_KEY not fully configured — push not configured; push channel will skip sending.'
     );
     return {
       isConfigured: () => false,
       async send(envelope) {
-        log.info(
-          { to: envelope.to },
-          '[push-channel] skipped (push not configured)'
-        );
+        log.info({ to: envelope.to }, '[push-channel] skipped (push not configured)');
       },
     };
   }
+
+  const endpoint = `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(
+    projectId
+  )}/messages:send`;
+  const getAccessToken = createTokenProvider(clientEmail, privateKey);
 
   return {
     isConfigured: () => true,
@@ -70,44 +153,34 @@ export function createPushChannel(log: Logger): PushChannel {
         return;
       }
       try {
-        const payload = {
-          to: envelope.to,
-          notification: {
-            title: envelope.title,
-            body: envelope.body,
-          },
-          data: {
-            ...(envelope.actionUrl ? { actionUrl: envelope.actionUrl } : {}),
-            ...(envelope.data ?? {}),
-          },
+        const token = await getAccessToken();
+        // FCM v1 requires all `data` values to be strings.
+        const data: Record<string, string> = {
+          ...(envelope.actionUrl ? { actionUrl: envelope.actionUrl } : {}),
+          ...(envelope.data ?? {}),
         };
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 10_000);
-        const res = (await fetch(endpoint, {
+        const message: Record<string, unknown> = {
+          token: envelope.to,
+          notification: { title: envelope.title, body: envelope.body },
+          ...(Object.keys(data).length > 0 ? { data } : {}),
+        };
+        const res = await timedFetch(endpoint, {
           method: 'POST',
           headers: {
-            Authorization: `key=${serverKey}`,
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-        }).finally(() => clearTimeout(timer))) as unknown as {
-          ok: boolean;
-          status: number;
-          text: () => Promise<string>;
-        };
+          body: JSON.stringify({ message }),
+        });
         if (!res.ok) {
           const detail = await res.text().catch(() => '');
-          log.error(
-            { to: envelope.to, status: res.status, detail },
-            'push send failed'
-          );
-          // NOT-05: propagate a real delivery failure so the consumer retries / DLQs.
+          log.error({ to: envelope.to, status: res.status, detail }, 'push send failed');
+          // RR-H5: propagate a real delivery failure so the consumer retries / DLQs.
           throw new Error(`push send failed with status ${res.status}`);
         }
         log.info({ to: envelope.to }, 'push sent');
       } catch (err) {
-        // NOT-05: rethrow genuine send errors. The unconfigured no-op and the
+        // RR-H5: rethrow genuine send errors. The unconfigured no-op and the
         // "no device token" guard above return early and never reach here, so
         // neither is treated as a delivery failure.
         log.error({ err, to: envelope.to }, 'push send failed');

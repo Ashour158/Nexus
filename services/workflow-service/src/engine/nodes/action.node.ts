@@ -1,6 +1,24 @@
 import { withResilience } from '@nexus/service-utils';
 import type { ExecutionContext, NodeResult, WorkflowNode } from '../types.js';
 
+/**
+ * Non-2xx HTTP responses from an action target are surfaced as a thrown
+ * `ActionHttpError` carrying the status code, so:
+ *   - `withResilience` can decide retryability by status (5xx/429 → retry,
+ *     4xx → fail fast — retrying a client error never succeeds), and
+ *   - the run-status logic (executeRule / the graph executor) marks the run
+ *     FAILED/PARTIAL instead of silently logging a 4xx/5xx as SUCCESS (RR-C2).
+ */
+export class ActionHttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string
+  ) {
+    super(message);
+    this.name = 'ActionHttpError';
+  }
+}
+
 export async function handleActionNode(
   node: WorkflowNode,
   context: ExecutionContext
@@ -10,13 +28,26 @@ export async function handleActionNode(
     method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
     body?: Record<string, unknown>;
     headers?: Record<string, string>;
+    // Trusted internal calls (create-activity/set-field/assign → CRM etc.). For
+    // these, a missing/blocked URL is a CONFIG error, not a security event, so we
+    // fail LOUD (throw → run FAILED, error recorded) instead of a silent skip
+    // that masks the misconfiguration as SUCCESS (the CRM_SERVICE_URL no-op bug).
+    internal?: boolean;
   };
-  if (!cfg.url) return { output: { skipped: true, reason: 'missing_url' } };
+  if (!cfg.url) {
+    if (cfg.internal) {
+      throw new ActionHttpError(500, 'Internal action misconfigured: target URL is empty (check the peer *_SERVICE_URL env var)');
+    }
+    return { output: { skipped: true, reason: 'missing_url' } };
+  }
 
   // SSRF protection: block internal/private addresses and non-HTTP(S) protocols
   const parsedUrl = new URL(cfg.url);
   const blockedProtocols = ['file:', 'ftp:', 'gopher:', 'mailto:', 'data:', 'javascript:', 'vbscript:'];
   if (blockedProtocols.includes(parsedUrl.protocol)) {
+    if (cfg.internal) {
+      throw new ActionHttpError(500, `Internal action misconfigured: blocked protocol ${parsedUrl.protocol}`);
+    }
     return { output: { skipped: true, reason: 'blocked_protocol' } };
   }
   const hostname = parsedUrl.hostname;
@@ -43,15 +74,46 @@ export async function handleActionNode(
     hostname.startsWith('192.168.') ||
     hostname.startsWith('169.254.');
   if (isPrivate) {
+    if (cfg.internal) {
+      throw new ActionHttpError(
+        500,
+        `Internal action misconfigured: target resolved to a private/loopback host (${hostname}) — the peer *_SERVICE_URL is unset, so it fell back to localhost`
+      );
+    }
     return { output: { skipped: true, reason: 'private_url_blocked' } };
   }
 
   const method = cfg.method ?? 'POST';
   const body = cfg.body ?? context.triggerPayload;
 
-  const res = await withResilience(
-    () =>
-      fetch(cfg.url!, {
+  // Dry-run (AU-3): the full request is resolved above (URL, method, body, SSRF
+  // checks) but we return the plan instead of issuing the fetch. Any secret in
+  // the headers (e.g. x-service-token) is redacted so `/test` output is safe to
+  // surface in the admin UI.
+  if (context.simulate) {
+    const safeHeaders: Record<string, string> = {};
+    for (const [k, v] of Object.entries(cfg.headers ?? {})) {
+      safeHeaders[k] = /token|authorization|secret|key/i.test(k) ? '***redacted***' : v;
+    }
+    return {
+      output: {
+        simulated: true,
+        request: {
+          url: cfg.url,
+          method,
+          headers: safeHeaders,
+          body: method === 'GET' ? undefined : body,
+        },
+      },
+    };
+  }
+
+  // The fetch + response-status check live INSIDE the resilience callback so a
+  // non-2xx response counts as a failed attempt: 5xx/429 is retried, and the
+  // final failure propagates as a throw (never resolves as success — RR-C2).
+  const result = await withResilience(
+    async () => {
+      const res = await fetch(cfg.url!, {
         method,
         headers: {
           'content-type': 'application/json',
@@ -59,14 +121,30 @@ export async function handleActionNode(
           ...(cfg.headers ?? {}),
         },
         body: method === 'GET' ? undefined : JSON.stringify(body),
-      }),
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        throw new ActionHttpError(
+          res.status,
+          `Action ${method} ${parsedUrl.host}${parsedUrl.pathname} failed: ${res.status} ${text.slice(0, 500)}`
+        );
+      }
+      return { status: res.status, body: text.slice(0, 5000) };
+    },
     {
       timeoutMs: 10000,
       maxRetries: 3,
+      // Retry transient failures (5xx/429/network/timeout); fail fast on 4xx —
+      // a rejected/invalid request never succeeds on retry.
+      retryable: (err: unknown) => {
+        if (err instanceof ActionHttpError) return err.status >= 500 || err.status === 429;
+        if (err instanceof Error) return /fetch|network|timeout|ECONNRESET|ETIMEDOUT|abort/i.test(err.message);
+        return false;
+      },
       circuitBreaker: { failureThreshold: 5, resetTimeoutMs: 30000 },
+      circuitBreakerName: `workflow-action:${parsedUrl.host}`,
     }
   );
 
-  const text = await res.text();
-  return { output: { status: res.status, body: text.slice(0, 5000) } };
+  return { output: result };
 }

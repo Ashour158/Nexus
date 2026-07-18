@@ -148,6 +148,9 @@ model DealForecastState {
   amount    Decimal  @default(0) @db.Decimal(18, 2)
   // commit | best_case | pipeline | won | lost
   category  String   @default("pipeline")
+  // Deal stage token (stageName / stageId) carried by the event, used to
+  // re-resolve the forecast category via the tenant's ForecastCategoryMap.
+  stage     String   @default("")
   // Stage probability (0-100) carried by the deal event when present.
   probability Int    @default(0)
   // Calibrated AI win-probability (0.0-1.0) carried by the deal event, if any.
@@ -213,6 +216,62 @@ model ForecastDealEntry {
   @@unique([tenantId, period, dealId])
   @@index([tenantId, period, ownerId])
   @@unique([id, tenantId])
+}
+
+// ─── Quotas (per-user / per-team, per-period) ────────────────────────────────
+//
+// First-class quota target for one owner (a user or a team) for a single period
+// key — "2026-Q3" (quarterly) or "2026-07" (monthly). This complements the older
+// QuotaPlan/QuotaTarget (year+quarter plan) with a flat, period-string model that
+// supports team-level targets and monthly cadence, and is the source of truth for
+// the `/api/v1/forecast` attainment calculation.
+model Quota {
+  id           String         @id @default(cuid())
+  tenantId     String
+  ownerType    QuotaOwnerType @default(USER)
+  ownerId      String
+  period       String
+  targetAmount Decimal        @db.Decimal(18, 2)
+  currency     String         @default("USD")
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@unique([tenantId, ownerType, ownerId, period])
+  @@index([tenantId, period])
+  @@index([tenantId, ownerId])
+  @@unique([id, tenantId])
+}
+
+enum QuotaOwnerType {
+  USER
+  TEAM
+}
+
+// ─── Deal-stage → forecast-category mapping (per tenant, deterministic) ───────
+//
+// Maps a deal stage (by stageName or stageId token) to a forecast category. When
+// a tenant has no row for a given stage, the roll-up falls back to a deterministic
+// default (stage-name heuristic, then stage probability). Configurable via
+// `/api/v1/forecast/category-map`.
+model ForecastCategoryMap {
+  id        String               @id @default(cuid())
+  tenantId  String
+  stage     String
+  category  ForecastCategoryKind
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@unique([tenantId, stage])
+  @@index([tenantId])
+  @@unique([id, tenantId])
+}
+
+enum ForecastCategoryKind {
+  COMMIT
+  BEST_CASE
+  PIPELINE
+  OMITTED
+  CLOSED
 }
 
 model OutboxMessage {

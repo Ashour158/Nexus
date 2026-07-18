@@ -58,32 +58,32 @@ export function ProductLineItems() {
   const total = subtotal - discountTotal + tax;
 
   return (
-    <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+    <section className="space-y-3 rounded-xl border border-outline-variant bg-surface p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="font-semibold text-slate-900">Product line items</h3>
-        <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="rounded border border-slate-300 px-2 py-1 text-sm">
+        <h3 className="font-semibold text-on-surface">Product line items</h3>
+        <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="rounded border border-outline-variant px-2 py-1 text-sm">
           <option>USD</option>
           <option>EUR</option>
           <option>AED</option>
         </select>
       </div>
 
-      <div className="space-y-2 rounded-lg border border-slate-200 p-3">
+      <div className="space-y-2 rounded-lg border border-outline-variant p-3">
         <input
           type="text"
           placeholder="Search products..."
           value={productSearch}
           onChange={(e) => setProductSearch(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+          className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:border-primary"
         />
         {productSearch.length > 0 ? (
-          <div className="max-h-44 overflow-auto rounded border border-slate-200">
+          <div className="max-h-44 overflow-auto rounded border border-outline-variant">
             {(productResults?.products ?? productResults?.data ?? []).map((p: Product) => (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => addLineItem(p)}
-                className="w-full px-3 py-2 text-start text-sm hover:bg-gray-50"
+                className="w-full px-3 py-2 text-start text-sm hover:bg-surface-container-low"
               >
                 {p.name} - {p.currency} {p.price}
               </button>
@@ -94,7 +94,7 @@ export function ProductLineItems() {
 
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
-          <thead className="text-start text-xs uppercase tracking-wide text-slate-500">
+          <thead className="text-start text-xs uppercase tracking-wide text-on-surface-variant">
             <tr>
               <th className="px-2 py-2">Product</th>
               <th className="px-2 py-2">Qty</th>
@@ -105,7 +105,7 @@ export function ProductLineItems() {
           </thead>
           <tbody>
             {items.map((item, idx) => (
-              <tr key={item.id} className="border-t border-slate-100">
+              <tr key={item.id} className="border-t border-outline-variant">
                 <td className="px-2 py-2">{item.productName}</td>
                 <td className="px-2 py-2">
                   <input
@@ -117,7 +117,7 @@ export function ProductLineItems() {
                         prev.map((row, i) => (i === idx ? { ...row, qty: Number(e.target.value || 1) } : row))
                       )
                     }
-                    className="w-20 rounded border border-slate-300 px-2 py-1"
+                    className="w-20 rounded border border-outline-variant px-2 py-1"
                   />
                 </td>
                 <td className="px-2 py-2">
@@ -131,7 +131,7 @@ export function ProductLineItems() {
                         )
                       )
                     }
-                    className="w-28 rounded border border-slate-300 px-2 py-1"
+                    className="w-28 rounded border border-outline-variant px-2 py-1"
                   />
                 </td>
                 <td className="px-2 py-2">
@@ -145,7 +145,7 @@ export function ProductLineItems() {
                         )
                       )
                     }
-                    className="w-20 rounded border border-slate-300 px-2 py-1"
+                    className="w-20 rounded border border-outline-variant px-2 py-1"
                   />
                 </td>
                 <td className="px-2 py-2">
@@ -157,7 +157,7 @@ export function ProductLineItems() {
         </table>
       </div>
 
-      <div className="rounded bg-slate-50 p-3 text-sm">
+      <div className="rounded bg-surface-container-low p-3 text-sm">
         <p>Subtotal: {currency} {subtotal.toFixed(2)}</p>
         <p>Discount total: {currency} {discountTotal.toFixed(2)}</p>
         <p>Tax: {currency} {tax.toFixed(2)}</p>

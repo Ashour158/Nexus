@@ -1,7 +1,19 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import type { JwtPayload } from '@nexus/shared-types';
 import { PERMISSIONS, requirePermission, ValidationError } from '@nexus/service-utils';
 import type { CrmPrisma } from '../prisma.js';
+
+const CreateCustomFieldSchema = z.object({
+  entityType: z.string().min(1).max(40),
+  name: z.string().min(1).max(120),
+  apiKey: z.string().max(120).optional(),
+  fieldType: z.string().min(1).max(40),
+  options: z.unknown().optional(),
+  required: z.boolean().optional(),
+  showOnCard: z.boolean().optional(),
+  position: z.number().optional(),
+});
 
 /**
  * Custom field DEFINITIONS for built-in entities (account/contact/deal/lead) —
@@ -44,19 +56,11 @@ export async function registerCustomFieldsRoutes(app: FastifyInstance, prisma: C
     { preHandler: requirePermission(PERMISSIONS.SETTINGS.UPDATE) },
     async (req, reply) => {
       const jwt = (req as { user: JwtPayload }).user;
-      const b = (req.body ?? {}) as {
-        entityType?: string;
-        name?: string;
-        apiKey?: string;
-        fieldType?: string;
-        options?: unknown;
-        required?: boolean;
-        showOnCard?: boolean;
-        position?: number;
-      };
-      if (!b.entityType || !b.name || !b.fieldType) {
-        throw new ValidationError('entityType, name and fieldType are required');
+      const parsed = CreateCustomFieldSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        throw new ValidationError('Invalid body', parsed.error.flatten());
       }
+      const b = parsed.data;
       const apiKey = (b.apiKey || b.name)
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '_')

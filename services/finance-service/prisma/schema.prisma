@@ -115,9 +115,16 @@ model Account {
   tenantId      String
   tier          String   @default("SMB")
   annualRevenue Decimal? @db.Decimal(18, 2)
+  /// Jurisdiction hints for CPQ tax resolution (denormalized from CRM). When
+  /// set, the pricing engine resolves the TaxRate by the account's tax zone
+  /// (taxZoneId) or billing country (joined to TaxZone.country) instead of the
+  /// single tenant-default rate.
+  taxZoneId     String?
+  country       String?
   updatedAt     DateTime @updatedAt
 
   @@index([tenantId])
+  @@index([tenantId, country])
   @@unique([id, tenantId])
 }
 
@@ -252,6 +259,32 @@ model QuoteApprovalTier {
   updatedAt          DateTime @updatedAt
 
   @@index([tenantId, isActive])
+  @@unique([id, tenantId])
+}
+
+/// B2 — Approval matrix for quotes, beyond the single discount gate. A rule
+/// matches on a JSON `condition` (any of: `discountPctGt`, `marginPctLt`,
+/// `amountGt`, `currency`) evaluated on submit-for-approval. Matching rules
+/// contribute an approval step; `approverChain` (ordered role/user list) or the
+/// single `approverRole` names who signs off. `level` orders the chain so the
+/// quote's `requiredApprovalLevel` = count of matched steps. Money math for the
+/// margin/discount evaluation stays in decimal.js in the use-case.
+model ApprovalMatrixRule {
+  id            String   @id @default(cuid())
+  tenantId      String
+  object        String   @default("quote")
+  name          String
+  level         Int      @default(1)
+  /// e.g. { "discountPctGt": 15 } or { "marginPctLt": 20, "amountGt": 50000 }.
+  condition     Json     @default("{}")
+  /// Ordered approver steps (role names or user ids). Falls back to approverRole.
+  approverChain Json     @default("[]")
+  approverRole  String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId, object, isActive])
   @@unique([id, tenantId])
 }
 
@@ -399,6 +432,7 @@ model SalesOrder {
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
   invoices              Invoice[]
+  fulfillments          OrderFulfillment[]
 
   @@unique([tenantId, orderNumber])
   @@index([tenantId, accountId])
@@ -416,6 +450,42 @@ enum SalesOrderStatus {
   FULFILLED
   CANCELLED
   CLOSED
+}
+
+// ─── Sales-Order fulfillment / delivery status (B1) ─────────────────────────
+// CRM-level delivery tracking only (partial + %-delivered). Explicitly NOT a
+// warehouse/bin/WMS system: `deliveredQtyByLine` is a JSON map of the order's
+// line identifier → delivered quantity so the use-case can derive
+// `percentDelivered`. `percentBilled` is derived separately from the invoices
+// linked to the order (Invoice.orderId). Each fulfillment is one delivery event
+// against the order; the order's own status advances as fulfillments progress.
+model OrderFulfillment {
+  id                 String                 @id @default(cuid())
+  tenantId           String
+  orderId            String
+  order              SalesOrder             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status             OrderFulfillmentStatus @default(PENDING)
+  /// { [lineId|productId]: deliveredQty } — additive per delivery event.
+  deliveredQtyByLine Json                   @default("{}")
+  reference          String?
+  carrier            String?
+  trackingNumber     String?
+  notes              String?
+  deliveredAt        DateTime?
+  createdById        String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([tenantId, orderId])
+  @@index([tenantId, status])
+  @@unique([id, tenantId])
+}
+
+enum OrderFulfillmentStatus {
+  PENDING
+  PARTIAL
+  FULFILLED
+  CANCELLED
 }
 
 // ─── Contracts & Subscriptions ──────────────────────────────────────────────
@@ -1182,4 +1252,159 @@ model CpqTransitionLedger {
   @@index([tenantId, entity, entityId], map: "cpq_transition_ledger_entity_idx")
   @@index([tenantId, correlationId], map: "cpq_transition_ledger_correlation_idx")
   @@index([tenantId, sourceEventId], map: "cpq_transition_ledger_source_event_idx")
+}
+
+// ─── Product Configurator + Guided Selling (structured configuration) ─────────
+// Additive to the existing catalog / quote model. A `ConfigurableProduct` wraps
+// an existing `Product` (by `productId`, plain String link — the same
+// no-FK convention used by QuoteLine / PriceBookEntry) with option groups,
+// selectable options, and constraint rules. The configurator resolver
+// (src/services/configurator.ts) enforces the rules and materializes the base
+// product + selected options into a quote's real line items. Guided Selling adds
+// a questionnaire → recommended products/config layer on top.
+
+model ConfigurableProduct {
+  id           String        @id @default(cuid())
+  tenantId     String
+  /// Links to the existing Product this configuration wraps (Product.id).
+  productId    String
+  name         String
+  description  String?
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  optionGroups OptionGroup[]
+  rules        ConfigRule[]
+
+  @@index([tenantId])
+  @@index([tenantId, productId])
+  @@index([tenantId, isActive])
+  @@unique([id, tenantId])
+}
+
+model OptionGroup {
+  id                    String              @id @default(cuid())
+  tenantId              String
+  configurableProductId String
+  configurableProduct   ConfigurableProduct @relation(fields: [configurableProductId], references: [id], onDelete: Cascade)
+  name                  String
+  /// Minimum number of options a buyer must pick from this group.
+  minSelect             Int                 @default(0)
+  /// Maximum number of options that may be picked; <= 0 means unbounded.
+  maxSelect             Int                 @default(0)
+  required              Boolean             @default(false)
+  sortOrder             Int                 @default(0)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  options               ProductOption[]
+
+  @@index([tenantId, configurableProductId])
+  @@unique([id, tenantId])
+}
+
+model ProductOption {
+  id            String      @id @default(cuid())
+  tenantId      String
+  optionGroupId String
+  optionGroup   OptionGroup @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
+  name          String
+  sku           String?
+  /// Price added (or subtracted) to the base product when this option is chosen.
+  priceDelta    Decimal     @default(0) @db.Decimal(18, 2)
+  isDefault     Boolean     @default(false)
+  sortOrder     Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([tenantId, optionGroupId])
+  @@unique([id, tenantId])
+}
+
+enum ConfigRuleType {
+  REQUIRES
+  EXCLUDES
+  AUTO_ADD
+  PRICE_ADJUST
+}
+
+model ConfigRule {
+  id                    String              @id @default(cuid())
+  tenantId              String
+  configurableProductId String
+  configurableProduct   ConfigurableProduct @relation(fields: [configurableProductId], references: [id], onDelete: Cascade)
+  name                  String
+  type                  ConfigRuleType
+  /// The option whose selection triggers this rule.
+  whenOptionId          String
+  /// The target option (REQUIRES / EXCLUDES / AUTO_ADD). Null for PRICE_ADJUST.
+  thenOptionId          String?
+  /// Price delta applied when `type = PRICE_ADJUST` and whenOption is selected.
+  adjustment            Decimal?            @db.Decimal(18, 2)
+  isActive              Boolean             @default(true)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@index([tenantId, configurableProductId])
+  @@index([tenantId, configurableProductId, isActive])
+  @@unique([id, tenantId])
+}
+
+enum GuidedAnswerType {
+  SINGLE
+  MULTI
+  BOOLEAN
+  NUMBER
+}
+
+model GuidedSellingFlow {
+  id        String                  @id @default(cuid())
+  tenantId  String
+  name      String
+  module    String                  @default("quote")
+  isActive  Boolean                 @default(true)
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+  questions GuidedSellingQuestion[]
+  rules     GuidedSellingRule[]
+
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+  @@unique([id, tenantId])
+}
+
+model GuidedSellingQuestion {
+  id         String            @id @default(cuid())
+  tenantId   String
+  flowId     String
+  flow       GuidedSellingFlow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  prompt     String
+  answerType GuidedAnswerType  @default(SINGLE)
+  /// Choice list for SINGLE / MULTI questions (array of { value, label }).
+  options    Json?
+  sortOrder  Int               @default(0)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([tenantId, flowId])
+  @@unique([id, tenantId])
+}
+
+model GuidedSellingRule {
+  id                   String            @id @default(cuid())
+  tenantId             String
+  flowId               String
+  flow                 GuidedSellingFlow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  name                 String
+  /// Map of answers → match spec, e.g. { "q1": "yes", "seats": { "gte": 10 } }.
+  conditions           Json              @default("{}")
+  recommendedProductIds String[]         @default([])
+  recommendedOptionIds  String[]         @default([])
+  weight               Int               @default(1)
+  isActive             Boolean           @default(true)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  @@index([tenantId, flowId])
+  @@index([tenantId, flowId, isActive])
+  @@unique([id, tenantId])
 }

@@ -14,13 +14,13 @@ import {
 } from '@/hooks/use-orders';
 
 const STATUS_STYLES: Record<string, string> = {
-  DRAFT: 'bg-slate-100 text-slate-600',
-  PENDING_APPROVAL: 'bg-amber-100 text-amber-700',
-  CONFIRMED: 'bg-blue-100 text-blue-700',
-  FULFILLING: 'bg-indigo-100 text-indigo-700',
-  FULFILLED: 'bg-emerald-100 text-emerald-700',
-  CANCELLED: 'bg-red-100 text-red-700 line-through',
-  CLOSED: 'bg-slate-100 text-slate-400',
+  DRAFT: 'bg-surface-container-high text-on-surface-variant',
+  PENDING_APPROVAL: 'bg-warning-container text-warning',
+  CONFIRMED: 'bg-primary-container text-primary',
+  FULFILLING: 'bg-primary-container text-primary',
+  FULFILLED: 'bg-success-container text-success',
+  CANCELLED: 'bg-error-container text-error line-through',
+  CLOSED: 'bg-surface-container-high text-on-surface-variant',
 };
 
 // Invoicing an order only makes sense once it is committed.
@@ -54,14 +54,14 @@ export default function OrderDetailPage(): JSX.Element {
 
   return (
     <main className="space-y-4 p-4">
-      <Link href="/orders" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
+      <Link href="/orders" className="inline-flex items-center gap-1 text-sm text-on-surface-variant hover:text-on-surface">
         <ArrowLeft className="h-4 w-4" /> Back to orders
       </Link>
 
       {orderQuery.isLoading ? (
         <CardSkeleton />
       ) : orderQuery.isError || !order ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-red-600">
+        <div className="rounded-lg border border-outline-variant bg-surface p-8 text-center text-sm text-error">
           Could not load this order.
         </div>
       ) : (
@@ -69,12 +69,12 @@ export default function OrderDetailPage(): JSX.Element {
           <header className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-xl font-semibold text-slate-900">{order.name}</h1>
+                <h1 className="text-xl font-semibold text-on-surface">{order.name}</h1>
                 <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[order.status] ?? ''}`}>
                   {order.status.replace('_', ' ')}
                 </span>
               </div>
-              <p className="mt-1 font-mono text-xs text-slate-500">
+              <p className="mt-1 font-mono text-xs text-on-surface-variant">
                 {order.orderNumber} · {formatDate(order.createdAt)}
               </p>
             </div>
@@ -93,10 +93,10 @@ export default function OrderDetailPage(): JSX.Element {
                 Create Invoice
               </Button>
               {!INVOICEABLE.has(order.status) && (
-                <span className="text-xs text-slate-400">Invoiceable once confirmed</span>
+                <span className="text-xs text-on-surface-variant">Invoiceable once confirmed</span>
               )}
               {createdInvoiceId && (
-                <Link href={`/invoices/${createdInvoiceId}`} className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline">
+                <Link href={`/invoices/${createdInvoiceId}`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
                   <FileText className="h-3.5 w-3.5" /> View invoice
                 </Link>
               )}
@@ -116,24 +116,24 @@ export default function OrderDetailPage(): JSX.Element {
                 <Link
                   key={link.label}
                   href={link.href}
-                  className="rounded-lg border border-slate-200 bg-white p-3 hover:border-slate-300"
+                  className="rounded-lg border border-outline-variant bg-surface p-3 hover:border-outline-variant"
                 >
-                  <p className="text-xs uppercase tracking-wide text-slate-400">{link.label}</p>
-                  <p className="mt-1 truncate font-mono text-xs text-slate-700">{link.value}</p>
+                  <p className="text-xs uppercase tracking-wide text-on-surface-variant">{link.label}</p>
+                  <p className="mt-1 truncate font-mono text-xs text-on-surface">{link.value}</p>
                 </Link>
               ))}
           </section>
 
           {/* Line items */}
-          <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <div className="border-b border-slate-100 px-4 py-3">
-              <h2 className="text-sm font-semibold text-slate-900">Line items</h2>
+          <section className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
+            <div className="border-b border-outline-variant px-4 py-3">
+              <h2 className="text-sm font-semibold text-on-surface">Line items</h2>
             </div>
             {order.lineItems.length === 0 ? (
-              <div className="p-6 text-center text-sm text-slate-500">No line items on this order.</div>
+              <div className="p-6 text-center text-sm text-on-surface-variant">No line items on this order.</div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                <thead className="bg-surface-container-low text-left text-xs uppercase tracking-wide text-on-surface-variant">
                   <tr>
                     <th className="px-4 py-2">Item</th>
                     <th className="px-4 py-2 text-right">Qty</th>
@@ -141,15 +141,15 @@ export default function OrderDetailPage(): JSX.Element {
                     <th className="px-4 py-2 text-right">Total</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-outline-variant">
                   {order.lineItems.map((item, i) => (
                     <tr key={item.id ?? i}>
-                      <td className="px-4 py-2 text-slate-700">{lineLabel(item, i)}</td>
-                      <td className="px-4 py-2 text-right text-slate-600">{item.quantity ?? '—'}</td>
-                      <td className="px-4 py-2 text-right text-slate-600">
+                      <td className="px-4 py-2 text-on-surface">{lineLabel(item, i)}</td>
+                      <td className="px-4 py-2 text-right text-on-surface-variant">{item.quantity ?? '—'}</td>
+                      <td className="px-4 py-2 text-right text-on-surface-variant">
                         {item.unitPrice != null ? formatCurrency(item.unitPrice, order.currency) : '—'}
                       </td>
-                      <td className="px-4 py-2 text-right font-medium text-slate-900">
+                      <td className="px-4 py-2 text-right font-medium text-on-surface">
                         {item.total != null ? formatCurrency(item.total, order.currency) : '—'}
                       </td>
                     </tr>
@@ -160,11 +160,11 @@ export default function OrderDetailPage(): JSX.Element {
           </section>
 
           {/* Totals */}
-          <section className="ml-auto w-full max-w-xs space-y-1 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+          <section className="ml-auto w-full max-w-xs space-y-1 rounded-lg border border-outline-variant bg-surface p-4 text-sm">
             <Row label="Subtotal" value={formatCurrency(order.subtotal, order.currency)} />
             <Row label="Discount" value={`- ${formatCurrency(order.discountAmount, order.currency)}`} />
             <Row label="Tax" value={formatCurrency(order.taxAmount, order.currency)} />
-            <div className="mt-2 border-t border-slate-200 pt-2">
+            <div className="mt-2 border-t border-outline-variant pt-2">
               <Row label="Total" value={formatCurrency(order.total, order.currency)} bold />
             </div>
           </section>
@@ -177,8 +177,8 @@ export default function OrderDetailPage(): JSX.Element {
 function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
     <div className="flex items-center justify-between">
-      <span className={bold ? 'font-semibold text-slate-900' : 'text-slate-500'}>{label}</span>
-      <span className={bold ? 'text-base font-bold text-slate-900' : 'text-slate-700'}>{value}</span>
+      <span className={bold ? 'font-semibold text-on-surface' : 'text-on-surface-variant'}>{label}</span>
+      <span className={bold ? 'text-base font-bold text-on-surface' : 'text-on-surface'}>{value}</span>
     </div>
   );
 }

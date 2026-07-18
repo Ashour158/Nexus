@@ -78,7 +78,7 @@ export function CreateTicketModal({ open, onClose, navigateOnCreate = true }: Cr
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className={labelClass} style={labelStyle} htmlFor="ticket-subject">
-            Subject <span className="text-rose-500">*</span>
+            Subject <span className="text-error">*</span>
           </label>
           <input
             id="ticket-subject"

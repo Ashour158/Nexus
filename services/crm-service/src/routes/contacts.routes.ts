@@ -22,6 +22,10 @@ import { getFieldHistory } from '../lib/field-history.js';
 import { uploadToStorage } from '../lib/storage.js';
 import { createCustomerRecordsUseCase } from '../use-cases/customer-records.use-case.js';
 import { buildReadAccessContext } from '../lib/access-context.js';
+import { interceptForReview } from '../lib/review-process.js';
+import { guardRecordWrite, partitionWritableRecords } from '../lib/record-write-guard.js';
+import { canAccessRecord, filterReadableRecords, isSharingConfigured } from '../lib/sharing.js';
+import { withIdempotency } from '../lib/idempotency.js';
 import type { EngineContext } from '@nexus/domain-core';
 
 const ContactDealsPaginationQuery = PaginationSchema.pick({ page: true, limit: true });
@@ -73,7 +77,7 @@ export async function registerContactsRoutes(
         create: (tenantId, data) => contacts.createContact(tenantId, data as never),
         get: (tenantId, id) => contacts.getContactById(tenantId, id) as Promise<Record<string, unknown>>,
         update: (tenantId, id, updates, userId, userName, roles) => contacts.updateContact(tenantId, id, updates as never, userId, userName, roles),
-        archive: (tenantId, id) => contacts.deleteContact(tenantId, id),
+        archive: (tenantId, id, deletedBy, deletedByName) => contacts.deleteContact(tenantId, id, deletedBy, deletedByName),
         restore: (tenantId, id) => contacts.restoreContact(tenantId, id),
       },
       account: {
@@ -136,7 +140,15 @@ export async function registerContactsRoutes(
             sortBy: q.sortBy,
             sortDir: q.sortDir,
           }, access);
-          return reply.send({ success: true, data: result });
+          // Record-level sharing (opt-in): drop rows the caller cannot read.
+          const filtered = await filterReadableRecords(
+            prisma,
+            jwt.tenantId,
+            jwt,
+            'contact',
+            result.data as unknown as Record<string, unknown>[]
+          );
+          return reply.send({ success: true, data: { ...result, data: filtered } });
         }
       );
 
@@ -166,11 +178,14 @@ export async function registerContactsRoutes(
             throw new ValidationError('Invalid body', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
-          const contact = await customerRecords.create(engineContextFromJwt(request.id, jwt), {
-            entityType: 'contact',
-            data: parsed.data as Record<string, unknown>,
+          const { statusCode, body } = await withIdempotency(prisma, request, jwt.tenantId, async () => {
+            const contact = await customerRecords.create(engineContextFromJwt(request.id, jwt), {
+              entityType: 'contact',
+              data: parsed.data as Record<string, unknown>,
+            });
+            return { statusCode: 201, body: { success: true, data: contact } };
           });
-          return reply.code(201).send({ success: true, data: contact });
+          return reply.code(statusCode).send(body);
         }
       );
 
@@ -403,12 +418,16 @@ export async function registerContactsRoutes(
         async (request, reply) => {
           const body = ContactMassUpdateSchema.parse(request.body);
           const jwt = request.user as JwtPayload;
-          const data = await customerRecords.massUpdate(engineContextFromJwt(request.id, jwt), {
-            entityType: 'contact',
-            ids: body.ids,
-            data: body.data,
-          });
-          return reply.send({ success: true, data });
+          // Data-governance guard (opt-in): skip locked/sharing-restricted records.
+          const { allowed, skipped } = await partitionWritableRecords(prisma, jwt, 'contact', body.ids, request.headers.authorization);
+          const data = allowed.length
+            ? await customerRecords.massUpdate(engineContextFromJwt(request.id, jwt), {
+                entityType: 'contact',
+                ids: allowed,
+                data: body.data,
+              })
+            : { count: 0 };
+          return reply.send({ success: true, data: { ...data, skipped } });
         }
       );
 
@@ -418,11 +437,15 @@ export async function registerContactsRoutes(
         async (request, reply) => {
           const body = MassIdsSchema.parse(request.body);
           const jwt = request.user as JwtPayload;
-          const data = await customerRecords.massArchive(engineContextFromJwt(request.id, jwt), {
-            entityType: 'contact',
-            ids: body.ids,
-          });
-          return reply.send({ success: true, data });
+          // Data-governance guard (opt-in): skip locked/sharing-restricted records.
+          const { allowed, skipped } = await partitionWritableRecords(prisma, jwt, 'contact', body.ids, request.headers.authorization);
+          const data = allowed.length
+            ? await customerRecords.massArchive(engineContextFromJwt(request.id, jwt), {
+                entityType: 'contact',
+                ids: allowed,
+              })
+            : { count: 0 };
+          return reply.send({ success: true, data: { ...data, skipped } });
         }
       );
 
@@ -434,6 +457,13 @@ export async function registerContactsRoutes(
           const jwt = request.user as JwtPayload;
           const access = await buildReadAccessContext(jwt, 'contact', request.headers.authorization);
           const contact = await contacts.getContactById(jwt.tenantId, id, access);
+          // Record-level sharing (opt-in): deny read if not accessible.
+          if (contact && (await isSharingConfigured(prisma, jwt.tenantId, 'contact'))) {
+            const allowed = await canAccessRecord(prisma, jwt.tenantId, jwt, 'contact', contact as unknown as Record<string, unknown>, 'read');
+            if (!allowed) {
+              return reply.code(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'You do not have read access to this record', requestId: request.id } });
+            }
+          }
           return reply.send({ success: true, data: contact });
         }
       );
@@ -448,6 +478,23 @@ export async function registerContactsRoutes(
             throw new ValidationError('Invalid body', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
+          // Data-governance guard (opt-in): record lock (423) → sharing write (403).
+          const guard = await guardRecordWrite(prisma, jwt, 'contact', id, request.headers.authorization);
+          if (!guard.ok) {
+            return reply.code(guard.status).send({ success: false, error: { code: guard.code, message: guard.message, requestId: request.id } });
+          }
+          // Maker-checker: if a review process gates any edited field, divert the
+          // whole change into a PendingChange and return 202 instead of writing.
+          const review = await interceptForReview(prisma, {
+            tenantId: jwt.tenantId,
+            module: 'contact',
+            recordId: id,
+            changes: parsed.data as Record<string, unknown>,
+            submittedById: jwt.sub,
+          });
+          if (review) {
+            return reply.code(202).send({ success: true, pendingChangeId: review.pendingChangeId, requiresReview: true });
+          }
           const contact = await customerRecords.update(engineContextFromJwt(request.id, jwt), {
             entityType: 'contact',
             id,
@@ -483,6 +530,11 @@ export async function registerContactsRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
+          // Data-governance guard (opt-in): record lock (423) → sharing write (403).
+          const guard = await guardRecordWrite(prisma, jwt, 'contact', id, request.headers.authorization);
+          if (!guard.ok) {
+            return reply.code(guard.status).send({ success: false, error: { code: guard.code, message: guard.message, requestId: request.id } });
+          }
           const data = await customerRecords.archive(engineContextFromJwt(request.id, jwt), { entityType: 'contact', id });
           return reply.send({ success: true, data });
         }
@@ -494,6 +546,11 @@ export async function registerContactsRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
+          // Data-governance guard (opt-in): record lock (423) → sharing write (403).
+          const guard = await guardRecordWrite(prisma, jwt, 'contact', id, request.headers.authorization);
+          if (!guard.ok) {
+            return reply.code(guard.status).send({ success: false, error: { code: guard.code, message: guard.message, requestId: request.id } });
+          }
           const contact = await customerRecords.restore(engineContextFromJwt(request.id, jwt), { entityType: 'contact', id });
           return reply.send({ success: true, data: contact });
         }

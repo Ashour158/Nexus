@@ -15,6 +15,11 @@ model Plan {
   description   String?
   amount        Decimal        @db.Decimal(18, 2)
   currency      String         @default("USD")
+  // Tenant/plan default tax rate as a PERCENT (e.g. 15.0000 = 15%) applied to
+  // renewal + trial-conversion invoices. NULL/0 → falls back to
+  // BILLING_DEFAULT_TAX_RATE_PERCENT env, then 0. finance-service owns the
+  // canonical multi-zone tax calc; this is the billing-side default rate.
+  taxRate       Decimal?       @db.Decimal(9, 4)
   interval      String         @default("MONTHLY")
   trialDays     Int            @default(0)
   features      Json           @default("[]")

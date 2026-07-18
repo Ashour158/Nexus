@@ -10,6 +10,16 @@ const BodySchema = z.object({
   columns: z.array(z.string()).optional(),
 });
 
+// New generic export: module lives in the body and a `format` (csv|json) is
+// selectable. `filter` is accepted as an alias for `filters`.
+const GenericBodySchema = z.object({
+  module: z.string().min(1),
+  filter: z.record(z.unknown()).optional(),
+  filters: z.record(z.unknown()).optional(),
+  columns: z.array(z.string()).optional(),
+  format: z.enum(['csv', 'json']).default('csv'),
+});
+
 export async function registerExportRoutes(app: FastifyInstance, prisma: DataPrisma) {
   const service = createExportService(prisma);
 
@@ -28,5 +38,23 @@ export async function registerExportRoutes(app: FastifyInstance, prisma: DataPri
       .header('Content-Type', 'text/csv')
       .header('Content-Disposition', `attachment; filename="${module}-export.csv"`);
     return reply.send(csv);
+  });
+
+  app.post('/api/v1/export', { preHandler: requirePermission(PERMISSIONS.DATA.EXPORT) }, async (request, reply) => {
+    const body = GenericBodySchema.parse(request.body);
+    const user = (request as any).user as { tenantId: string };
+    const result = await service.exportData(
+      user.tenantId,
+      body.module,
+      body.filter ?? body.filters,
+      body.columns,
+      body.format,
+      request.headers.authorization
+    );
+    const ext = result.format === 'json' ? 'json' : 'csv';
+    reply
+      .header('Content-Type', result.contentType)
+      .header('Content-Disposition', `attachment; filename="${body.module}-export.${ext}"`);
+    return reply.send(result.payload);
   });
 }

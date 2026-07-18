@@ -24,9 +24,9 @@ import {
 } from '@/hooks/use-command-center';
 
 const STATUS_STYLES: Record<JourneyStatus, string> = {
-  DRAFT: 'bg-slate-100 text-slate-600',
-  ACTIVE: 'bg-emerald-100 text-emerald-700',
-  ARCHIVED: 'bg-amber-100 text-amber-700',
+  DRAFT: 'bg-surface-container-high text-on-surface-variant',
+  ACTIVE: 'bg-success-container text-success',
+  ARCHIVED: 'bg-warning-container text-warning',
 };
 
 export default function CommandCenterPage() {
@@ -97,10 +97,10 @@ export default function CommandCenterPage() {
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-on-surface">
             <Compass className="h-6 w-6 text-brand-600" /> Command Center
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-on-surface-variant">
             Design lifecycle journeys with entry triggers, ordered steps, and enrollments.
           </p>
         </div>
@@ -112,9 +112,9 @@ export default function CommandCenterPage() {
       ) : !journeys || journeys.length === 0 ? (
         <EmptyState icon="🧭" title="No journeys yet" description="Create a journey to automate a lifecycle." cta={{ label: 'New journey', onClick: () => setOpen(true) }} />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-outline-variant bg-surface-container-low text-left text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
                 <th className="px-4 py-3">Journey</th>
                 <th className="px-4 py-3">Entity</th>
@@ -123,34 +123,34 @@ export default function CommandCenterPage() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-outline-variant">
               {journeys.map((j) => (
-                <tr key={j.id} className="hover:bg-slate-50">
+                <tr key={j.id} className="hover:bg-surface-container-low">
                   <td className="px-4 py-3">
-                    <Link href={`/command-center/${j.id}`} className="font-medium text-slate-900 hover:text-brand-700">{j.name}</Link>
-                    {j.description && <p className="mt-0.5 text-xs text-slate-500">{j.description}</p>}
+                    <Link href={`/command-center/${j.id}`} className="font-medium text-on-surface hover:text-brand-700">{j.name}</Link>
+                    {j.description && <p className="mt-0.5 text-xs text-on-surface-variant">{j.description}</p>}
                   </td>
-                  <td className="px-4 py-3 capitalize text-slate-600">{j.entityType}</td>
+                  <td className="px-4 py-3 capitalize text-on-surface-variant">{j.entityType}</td>
                   <td className="px-4 py-3">
                     <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${STATUS_STYLES[j.status]}`}>{j.status}</span>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{j.steps.length}</td>
+                  <td className="px-4 py-3 text-on-surface-variant">{j.steps.length}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
                       {j.status !== 'ACTIVE' && (
-                        <button type="button" onClick={() => handleActivate(j.id)} className="rounded p-1.5 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600" aria-label="Activate">
+                        <button type="button" onClick={() => handleActivate(j.id)} className="rounded p-1.5 text-on-surface-variant hover:bg-success-container hover:text-success" aria-label="Activate">
                           <Play className="h-4 w-4" />
                         </button>
                       )}
                       {j.status !== 'ARCHIVED' && (
-                        <button type="button" onClick={() => handleArchive(j.id)} className="rounded p-1.5 text-slate-400 hover:bg-amber-50 hover:text-amber-600" aria-label="Archive">
+                        <button type="button" onClick={() => handleArchive(j.id)} className="rounded p-1.5 text-on-surface-variant hover:bg-warning-container hover:text-warning" aria-label="Archive">
                           <Archive className="h-4 w-4" />
                         </button>
                       )}
-                      <Link href={`/command-center/${j.id}`} className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Open editor">
+                      <Link href={`/command-center/${j.id}`} className="rounded p-1.5 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface" aria-label="Open editor">
                         <ArrowRight className="h-4 w-4" />
                       </Link>
-                      <button type="button" onClick={() => handleDelete(j.id, j.name)} className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label="Delete">
+                      <button type="button" onClick={() => handleDelete(j.id, j.name)} className="rounded p-1.5 text-on-surface-variant hover:bg-error-container hover:text-error" aria-label="Delete">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
@@ -165,11 +165,11 @@ export default function CommandCenterPage() {
       <Modal open={open} onClose={() => setOpen(false)} title="New journey" size="md">
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Name</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface">Name</label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Onboarding" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Entity type</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface">Entity type</label>
             <Select value={form.entityType} onChange={(e) => setForm({ ...form, entityType: e.target.value as JourneyEntityType })}>
               {JOURNEY_ENTITY_TYPES.map((t) => (
                 <option key={t} value={t} className="capitalize">{t}</option>
@@ -177,7 +177,7 @@ export default function CommandCenterPage() {
             </Select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface">Description</label>
             <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} />
           </div>
           <div className="flex justify-end gap-2 pt-2">

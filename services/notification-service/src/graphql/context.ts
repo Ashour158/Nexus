@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../../../../node_modules/.prisma/notification-client/index.js';
 import DataLoader from 'dataloader';
 
 export interface GraphQLContext {

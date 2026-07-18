@@ -86,7 +86,7 @@ export default function CadencesPage() {
         title="Cadence Sequences"
         description="Govern outbound lead and contact sequences with pause/resume controls, enrollment visibility, and service-owned execution state."
         badges={
-          <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
+          <span className="rounded-lg bg-surface-container-high px-3 py-2 text-xs font-semibold text-on-surface-variant">
             Reply and meeting exits enabled
           </span>
         }
@@ -103,12 +103,12 @@ export default function CadencesPage() {
             <button
               type="button"
               onClick={() => void qc.invalidateQueries({ queryKey: ['cadences'] })}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 text-sm font-bold text-on-surface-variant hover:bg-surface-container-low"
             >
               <RefreshCw className="h-4 w-4" />
               Refresh
             </button>
-            <Link href="/cadences/enroll" className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#137fec] px-4 text-sm font-bold text-white hover:bg-[#005baf]">
+            <Link href="/cadences/enroll" className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#4f46e5] px-4 text-sm font-bold text-white hover:bg-[#4f46e5]">
               <Send className="h-4 w-4" />
               Quick enroll
             </Link>
@@ -122,18 +122,18 @@ export default function CadencesPage() {
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Cadence name"
-            className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+            className="h-11 rounded-lg border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface outline-none focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
           />
           <input
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             placeholder="Description"
-            className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+            className="h-11 rounded-lg border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface outline-none focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
           />
           <select
             value={objectType}
             onChange={(event) => setObjectType(event.target.value as 'CONTACT' | 'LEAD')}
-            className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            className="h-11 rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
           >
             <option value="CONTACT">Contacts</option>
             <option value="LEAD">Leads</option>
@@ -142,7 +142,7 @@ export default function CadencesPage() {
             type="button"
             onClick={() => create.mutate()}
             disabled={!name.trim() || create.isPending}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#137fec] px-4 text-sm font-bold text-white hover:bg-[#005baf] disabled:opacity-50"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#4f46e5] px-4 text-sm font-bold text-white hover:bg-[#4f46e5] disabled:opacity-50"
           >
             <Plus className="h-4 w-4" />
             {create.isPending ? 'Creating...' : 'Create'}
@@ -158,8 +158,8 @@ export default function CadencesPage() {
             onClick={() => setFilter(item)}
             className={`rounded-lg px-4 py-2 text-sm font-bold transition ${
               filter === item
-                ? 'bg-[#137fec] text-white shadow-sm'
-                : 'border border-slate-200 bg-white text-slate-600 hover:bg-blue-50 hover:text-[#005baf]'
+                ? 'bg-[#4f46e5] text-white shadow-sm'
+                : 'border border-outline-variant bg-surface text-on-surface-variant hover:bg-primary-container hover:text-[#4f46e5]'
             }`}
           >
             {item === 'ALL' ? 'All cadences' : item === 'CONTACT' ? 'Contacts' : 'Leads'}
@@ -170,7 +170,7 @@ export default function CadencesPage() {
       <CRMCard title="Sequence Registry" description="Cadence state is controlled here; enrollment execution remains with the cadence service." padded={false}>
         <CRMTableShell className="rounded-none border-0 shadow-none">
           <table className="w-full min-w-[820px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500">
+            <thead className="bg-surface-container-low text-xs font-bold uppercase tracking-wider text-on-surface-variant">
               <tr>
                 <th className="px-5 py-3">Name</th>
                 <th className="px-5 py-3">Type</th>
@@ -180,20 +180,20 @@ export default function CadencesPage() {
                 <th className="px-5 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-outline-variant">
               {filteredRows.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50">
+                <tr key={row.id} className="hover:bg-surface-container-low">
                   <td className="px-5 py-4">
-                    <Link href={`/cadences/${row.id}`} className="font-bold text-slate-950 hover:text-[#005baf]">
+                    <Link href={`/cadences/${row.id}`} className="font-bold text-on-surface hover:text-[#4f46e5]">
                       {row.name}
                     </Link>
-                    {row.description ? <p className="mt-1 text-xs text-slate-500">{row.description}</p> : null}
+                    {row.description ? <p className="mt-1 text-xs text-on-surface-variant">{row.description}</p> : null}
                   </td>
                   <td className="px-5 py-4">
                     <CRMStatusBadge tone={row.objectType === 'LEAD' ? 'amber' : 'blue'}>{row.objectType}</CRMStatusBadge>
                   </td>
-                  <td className="px-5 py-4 text-slate-600">{row.stepCount ?? 0}</td>
-                  <td className="px-5 py-4 text-slate-600">{row.enrollmentCount ?? 0}</td>
+                  <td className="px-5 py-4 text-on-surface-variant">{row.stepCount ?? 0}</td>
+                  <td className="px-5 py-4 text-on-surface-variant">{row.enrollmentCount ?? 0}</td>
                   <td className="px-5 py-4">
                     <CRMStatusBadge tone={row.isActive ? 'emerald' : 'slate'}>{row.isActive ? 'Active' : 'Paused'}</CRMStatusBadge>
                   </td>
@@ -202,7 +202,7 @@ export default function CadencesPage() {
                       <button
                         type="button"
                         onClick={() => toggle.mutate({ id: row.id, isActive: !row.isActive })}
-                        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                        className="inline-flex items-center gap-2 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-xs font-bold text-on-surface hover:bg-surface-container-low"
                       >
                         <PauseCircle className="h-4 w-4" />
                         {row.isActive ? 'Pause' : 'Resume'}
@@ -210,7 +210,7 @@ export default function CadencesPage() {
                       <button
                         type="button"
                         onClick={() => remove.mutate(row.id)}
-                        className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50"
+                        className="rounded-lg border border-error/30 bg-surface px-3 py-2 text-xs font-bold text-error hover:bg-error-container"
                       >
                         Delete
                       </button>

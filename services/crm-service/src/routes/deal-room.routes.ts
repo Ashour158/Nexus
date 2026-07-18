@@ -1,9 +1,25 @@
 import { randomBytes } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import type { Prisma } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { JwtPayload } from '@nexus/shared-types';
-import { PERMISSIONS, requirePermission } from '@nexus/service-utils';
+import { PERMISSIONS, requirePermission, ValidationError } from '@nexus/service-utils';
 import type { CrmPrisma } from '../prisma.js';
+
+const UpdateDealRoomSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  isPublished: z.boolean().optional(),
+  buyerEmails: z.array(z.string()).optional(),
+});
+
+const CreateMutualActionItemSchema = z.object({
+  title: z.string().min(1).max(300),
+  description: z.string().optional(),
+  owner: z.enum(['rep', 'buyer']),
+  ownerName: z.string().optional(),
+  dueDate: z.string().optional(),
+  position: z.number().optional(),
+});
 
 function newRoomSlug(): string {
   return randomBytes(16).toString('hex');
@@ -87,11 +103,11 @@ export async function registerDealRoomRoutes(app: FastifyInstance, prisma: CrmPr
         async (request, reply) => {
           const jwt = request.user as JwtPayload;
           const { dealId } = request.params as { dealId: string };
-          const body = request.body as {
-            title?: string;
-            isPublished?: boolean;
-            buyerEmails?: string[];
-          };
+          const parsedBody = UpdateDealRoomSchema.safeParse(request.body);
+          if (!parsedBody.success) {
+            throw new ValidationError('Invalid body', parsedBody.error.flatten());
+          }
+          const body = parsedBody.data;
 
           const room = await prisma.dealRoom.findFirst({
             where: { dealId, tenantId: jwt.tenantId },
@@ -118,23 +134,17 @@ export async function registerDealRoomRoutes(app: FastifyInstance, prisma: CrmPr
         async (request, reply) => {
           const jwt = request.user as JwtPayload;
           const { dealId } = request.params as { dealId: string };
-          const body = request.body as {
-            title: string;
-            description?: string;
-            owner: 'rep' | 'buyer';
-            ownerName?: string;
-            dueDate?: string;
-            position?: number;
-          };
+          const parsedBody = CreateMutualActionItemSchema.safeParse(request.body);
+          if (!parsedBody.success) {
+            throw new ValidationError('Invalid body', parsedBody.error.flatten());
+          }
+          const body = parsedBody.data;
 
           const room = await prisma.dealRoom.findFirst({
             where: { dealId, tenantId: jwt.tenantId },
             select: { id: true },
           });
           if (!room) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Deal room not found', requestId: request.id } });
-          if (body.owner !== 'rep' && body.owner !== 'buyer') {
-            return reply.code(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'owner must be rep or buyer', requestId: request.id } });
-          }
 
           const item = await prisma.mutualActionItem.create({
             data: {

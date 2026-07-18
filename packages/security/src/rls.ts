@@ -10,7 +10,24 @@
  *   });
  */
 
-import type { PrismaClient } from '@prisma/client';
+/**
+ * Minimal structural type for the Prisma surface this module actually uses.
+ *
+ * Deliberately NOT `import type { PrismaClient } from '@prisma/client'`: every
+ * service in this monorepo generates its client to its own output path
+ * (`node_modules/.prisma/<service>-client`), so the bare `@prisma/client`
+ * package has no generated `default.d.ts` and exports no `PrismaClient` type.
+ * That import therefore never resolved — it failed the ROOT typecheck, which
+ * failed the root build, which is why CI could not gate anything.
+ *
+ * A structural type is also the right coupling for a shared package: it accepts
+ * ANY service's generated client instead of privileging one that doesn't exist.
+ */
+interface PrismaClientLike {
+  $use(
+    middleware: (params: any, next: (params: any) => Promise<unknown>) => Promise<unknown>
+  ): void;
+}
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 export interface RlsContext {
@@ -41,7 +58,7 @@ export function runWithRls<T>(ctx: RlsContext, fn: () => Promise<T>): Promise<T>
 }
 
 /** Prisma middleware that injects RLS WHERE clauses for tenant isolation. */
-export function withRls(prisma: PrismaClient): void {
+export function withRls(prisma: PrismaClientLike): void {
 
   prisma.$use(async (params: any, next: (params: any) => Promise<unknown>) => {
     const rls = getRlsContext();

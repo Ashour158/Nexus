@@ -1,0 +1,290 @@
+# =============================================================================
+# CD — Build, Push & Deploy   (.github/workflows/cd.yml)
+# =============================================================================
+# Self-contained, registry-agnostic Continuous Delivery pipeline:
+#   preflight (guard)  ->  build-push (Docker images)  ->  deploy (SSH to droplet)
+#
+# This COMPLEMENTS the existing workflows; it does not replace them:
+#   * ci.yml            builds+pushes images to GHCR on push to `main` and runs gates.
+#   * deploy.yml        manual SSH deploy that PULLS already-built images.
+#   * deploy-staging.yml auto SSH deploy to staging after CI succeeds on `main`.
+#   * deploy-argocd.yml  GitOps deploy path.
+# Use THIS workflow when you want a single manual "build these images AND deploy
+# them" action, or an opt-in push-to-`production` release. It targets the
+# dedicated `production` branch ONLY, so it never collides with the triggers above.
+#
+# -----------------------------------------------------------------------------
+# REQUIRED GitHub configuration
+#   Settings -> Secrets and variables -> Actions  (Secrets, unless noted)
+# -----------------------------------------------------------------------------
+# REQUIRED (deploy no-ops safely if any of these three is missing):
+#   SSH_HOST         Droplet hostname or IP to deploy to.
+#   SSH_USER         SSH username on the droplet.
+#   SSH_KEY          Private SSH key (PEM) for SSH_USER. Whole key, incl. header/footer.
+#
+# OPTIONAL (sensible defaults shown):
+#   SSH_PORT         SSH port.                         Default: 22
+#   REGISTRY         Container registry host.          Default: ghcr.io
+#   REGISTRY_USER    Registry username.                Default: ${{ github.actor }}
+#   REGISTRY_TOKEN   Registry password/token (needs    Default: ${{ secrets.GITHUB_TOKEN }}
+#                    push scope; for GHCR the built-in  (GITHUB_TOKEN works for GHCR only)
+#                    GITHUB_TOKEN is sufficient).
+#   GHCR_OWNER (var) Image namespace/owner. MUST match  Default: ${{ github.repository_owner }}
+#                    docker-compose.prod.yml's
+#                    ghcr.io/${GHCR_OWNER}/nexus-*.
+#   DEPLOY_PATH      Path to the compose project on the Default: /opt/nexus
+#                    droplet.
+#   APP_URL          Public app URL (used for the       Default: (blank)
+#                    GitHub deployment status link).
+#
+# NOTE: none of the above are hardcoded — they are referenced via
+# secrets.*/vars.* only. Set them in GitHub before relying on this workflow.
+# =============================================================================
+
+name: CD — Build & Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options: [production, staging]
+      image_tag:
+        description: 'Image tag to build & deploy (default: commit SHA)'
+        required: false
+        default: ''
+        type: string
+      skip_migrations:
+        description: 'Skip prisma migrate deploy'
+        required: false
+        default: false
+        type: boolean
+  push:
+    # Opt-in release branch. `main` is intentionally NOT here so this does not
+    # collide with ci.yml (image build) or deploy-staging.yml (auto staging).
+    branches: [production]
+
+concurrency:
+  group: cd-${{ github.event.inputs.environment || 'production' }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+  REGISTRY: ${{ secrets.REGISTRY || 'ghcr.io' }}
+  IMAGE_OWNER: ${{ vars.GHCR_OWNER || github.repository_owner }}
+  IMAGE_TAG: ${{ github.event.inputs.image_tag || github.sha }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Guard: verify the required deploy secrets exist. If not, everything
+  # downstream is skipped and the workflow still finishes GREEN (safe no-op),
+  # so forks / unconfigured repos never fail on CD.
+  # ---------------------------------------------------------------------------
+  preflight:
+    name: Preflight — check deploy config
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          if [ -n "$SSH_HOST" ] && [ -n "$SSH_USER" ] && [ -n "$SSH_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Deploy secrets present — CD will build and deploy."
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=CD skipped::SSH_HOST/SSH_USER/SSH_KEY are not all set. Building nothing and skipping deploy (safe no-op)."
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Build & push all service + web images to the configured registry.
+  # Mirrors ci.yml's image matrix so tags line up with docker-compose.prod.yml.
+  # ---------------------------------------------------------------------------
+  build-push:
+    name: Build & Push (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: preflight
+    if: needs.preflight.outputs.configured == 'true'
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { context: apps/web, image: web }
+          - { context: services/auth-service, image: auth-service }
+          - { context: services/crm-service, image: crm-service }
+          - { context: services/finance-service, image: finance-service }
+          - { context: services/notification-service, image: notification-service }
+          - { context: services/realtime-service, image: realtime-service }
+          - { context: services/search-service, image: search-service }
+          - { context: services/workflow-service, image: workflow-service }
+          - { context: services/integration-service, image: integration-service }
+          - { context: services/blueprint-service, image: blueprint-service }
+          - { context: services/approval-service, image: approval-service }
+          - { context: services/data-service, image: data-service }
+          - { context: services/document-service, image: document-service }
+          - { context: services/chatbot-service, image: chatbot-service }
+          - { context: services/cadence-service, image: cadence-service }
+          - { context: services/territory-service, image: territory-service }
+          - { context: services/planning-service, image: planning-service }
+          - { context: services/reporting-service, image: reporting-service }
+          - { context: services/portal-service, image: portal-service }
+          - { context: services/knowledge-service, image: knowledge-service }
+          - { context: services/incentive-service, image: incentive-service }
+          - { context: services/graphql-gateway, image: graphql-gateway }
+          - { context: services/comm-service, image: comm-service }
+          - { context: services/storage-service, image: storage-service }
+          - { context: services/email-sync-service, image: email-sync-service }
+          - { context: services/analytics-service, image: analytics-service }
+          - { context: services/metadata-service, image: metadata-service }
+          - { context: services/audit-consumer, image: audit-consumer }
+          - { context: services/outbox-relay, image: outbox-relay }
+          - { context: services/router-coprocessor, image: router-coprocessor }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USER || github.actor }}
+          password: ${{ secrets.REGISTRY_TOKEN || secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./${{ matrix.context }}/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/nexus-${{ matrix.image }}:${{ env.IMAGE_TAG }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/nexus-${{ matrix.image }}:latest
+          cache-from: type=gha,scope=cd-${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=cd-${{ matrix.image }}
+
+  # ---------------------------------------------------------------------------
+  # Deploy: SSH to the droplet, pull the images we just pushed, run migrations,
+  # and bring the stack up with docker-compose.prod.yml.
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment || 'production' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [preflight, build-push]
+    if: needs.preflight.outputs.configured == 'true'
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create deployment
+        id: deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const d = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha,
+              environment: '${{ github.event.inputs.environment || "production" }}',
+              auto_merge: false,
+              required_contexts: [],
+            });
+            return d.data.id;
+
+      - name: Deploy via SSH
+        id: ssh_deploy
+        uses: appleboy/ssh-action@v1
+        env:
+          DEPLOY_IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          DEPLOY_OWNER: ${{ env.IMAGE_OWNER }}
+          DEPLOY_REGISTRY: ${{ env.REGISTRY }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/nexus' }}
+          DEPLOY_SKIP_MIGRATIONS: ${{ github.event.inputs.skip_migrations || 'false' }}
+          # Optional: log the droplet into the registry so it can pull private images.
+          DEPLOY_REGISTRY_USER: ${{ secrets.REGISTRY_USER || github.actor }}
+          DEPLOY_REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          envs: DEPLOY_IMAGE_TAG,DEPLOY_OWNER,DEPLOY_REGISTRY,DEPLOY_PATH,DEPLOY_SKIP_MIGRATIONS,DEPLOY_REGISTRY_USER,DEPLOY_REGISTRY_TOKEN
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd "$DEPLOY_PATH"
+
+            # docker-compose.prod.yml resolves images from these two vars.
+            export IMAGE_TAG="$DEPLOY_IMAGE_TAG"
+            export GHCR_OWNER="$DEPLOY_OWNER"
+            case "$IMAGE_TAG" in *[!A-Za-z0-9._-]*) echo "invalid image tag: $IMAGE_TAG"; exit 1;; esac
+
+            # Log the host into the registry only if a token was provided.
+            if [ -n "${DEPLOY_REGISTRY_TOKEN:-}" ]; then
+              echo "$DEPLOY_REGISTRY_TOKEN" | docker login "$DEPLOY_REGISTRY" -u "$DEPLOY_REGISTRY_USER" --password-stdin
+            fi
+
+            echo "Pulling images ($DEPLOY_REGISTRY/$GHCR_OWNER/nexus-*:$IMAGE_TAG)..."
+            docker compose -f docker-compose.prod.yml pull
+
+            if [ "$DEPLOY_SKIP_MIGRATIONS" != "true" ]; then
+              echo "Running prisma migrate deploy..."
+              MODE=deploy bash scripts/migrate-all.sh
+            else
+              echo "Skipping migrations (user request)."
+            fi
+
+            echo "Starting services..."
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans --wait
+
+            echo "Pruning old images..."
+            docker system prune -f --filter "until=24h" || true
+
+      - name: Smoke test
+        id: smoke_test
+        if: always() && steps.ssh_deploy.outcome == 'success'
+        uses: appleboy/ssh-action@v1
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/nexus' }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          envs: DEPLOY_PATH
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd "$DEPLOY_PATH"
+            bash scripts/health-check.sh || {
+              echo "❌ Smoke tests failed — rolling back..."
+              bash scripts/rollback.sh || { echo "❌ Rollback failed." >&2; exit 1; }
+              exit 1
+            }
+            echo "✅ Smoke tests passed."
+
+      - name: Update deployment status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.result }},
+              state,
+              environment_url: '${{ secrets.APP_URL }}',
+            });

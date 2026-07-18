@@ -113,7 +113,7 @@ type ValidationRule = {
   message: string;
 };
 
-const ownerColors = ['bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700', 'bg-orange-100 text-orange-700'];
+const ownerColors = ['bg-primary-container text-primary', 'bg-tertiary-container text-tertiary', 'bg-warning-container text-warning'];
 
 export default function ContactsPage(): ReactElement {
   const hasPermission = useAuthStore((s) => s.hasPermission);
@@ -357,40 +357,40 @@ export default function ContactsPage(): ReactElement {
           label="Total Contacts"
           value={stats.total.toLocaleString()}
           note={`${stats.newThisWeek} added this week`}
-          icon={<Users className="h-5 w-5 text-blue-500" />}
+          icon={<Users className="h-5 w-5 text-primary" />}
         />
         <KpiCard
           label="Active Contacts"
           value={stats.active.toLocaleString()}
           note="Ready for sales engagement"
-          icon={<TrendingUp className="h-5 w-5 text-green-500" />}
+          icon={<TrendingUp className="h-5 w-5 text-success" />}
         />
         <KpiCard
           label="Email Coverage"
           value={`${stats.withEmail}`}
           note="Reachable contact records"
-          icon={<Mail className="h-5 w-5 text-orange-500" />}
+          icon={<Mail className="h-5 w-5 text-warning" />}
         />
         <KpiCard
           label="Consent Rate"
           value={`${stats.consentRate}%`}
           note="GDPR consent captured"
-          icon={<ShieldCheck className="h-5 w-5 text-purple-500" />}
+          icon={<ShieldCheck className="h-5 w-5 text-tertiary" />}
         />
       </section>
 
       <section className="grid grid-cols-12 gap-6">
-        <div className="col-span-12 rounded-xl border border-[#e7edf3] bg-white p-6 lg:col-span-8">
+        <div className="col-span-12 rounded-xl border border-[#e7edf3] bg-surface p-6 lg:col-span-8">
           <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-[22px] font-bold tracking-tight text-slate-900">Contacts Command Center</h1>
-              <p className="text-sm text-slate-500">Clean customer relationships, owners, consent, and outreach readiness.</p>
+              <h1 className="text-[22px] font-bold tracking-tight text-on-surface">Contacts Command Center</h1>
+              <p className="text-sm text-on-surface-variant">Clean customer relationships, owners, consent, and outreach readiness.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setImportOpen(true)}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-800 px-4 py-2 text-sm font-bold text-slate-800 transition hover:bg-slate-50"
+                className="inline-flex items-center gap-2 rounded-lg border border-outline-variant px-4 py-2 text-sm font-bold text-on-surface transition hover:bg-surface-container-low"
               >
                 <Upload className="h-4 w-4" />
                 Import
@@ -412,7 +412,7 @@ export default function ContactsPage(): ReactElement {
                 <button
                   type="button"
                   onClick={openCreate}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#137fec] px-4 py-2 text-sm font-bold text-white transition active:scale-95"
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#4f46e5] px-4 py-2 text-sm font-bold text-white transition active:scale-95"
                 >
                   <Plus className="h-4 w-4" />
                   Create New Contact
@@ -423,65 +423,65 @@ export default function ContactsPage(): ReactElement {
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center px-4">
-              <div className="absolute top-1/4 w-full border-b border-slate-100" />
-              <div className="absolute top-2/4 w-full border-b border-slate-100" />
-              <div className="absolute top-3/4 w-full border-b border-slate-100" />
+              <div className="absolute top-1/4 w-full border-b border-outline-variant" />
+              <div className="absolute top-2/4 w-full border-b border-outline-variant" />
+              <div className="absolute top-3/4 w-full border-b border-outline-variant" />
             </div>
             <div className="relative z-10 flex h-64 items-end justify-between gap-4 px-4">
               {[
-                { label: 'Jan', value: 44, tone: 'bg-blue-100' },
-                { label: 'Feb', value: 58, tone: 'bg-blue-200' },
-                { label: 'Mar', value: 72, tone: 'bg-blue-300' },
-                { label: 'Apr', value: 88, tone: 'bg-[#137fec]' },
-                { label: 'May', value: 69, tone: 'bg-blue-300' },
-                { label: 'Jun', value: 80, tone: 'bg-blue-400' },
+                { label: 'Jan', value: 44, tone: 'bg-primary-container' },
+                { label: 'Feb', value: 58, tone: 'bg-primary-container' },
+                { label: 'Mar', value: 72, tone: 'bg-primary-container' },
+                { label: 'Apr', value: 88, tone: 'bg-[#4f46e5]' },
+                { label: 'May', value: 69, tone: 'bg-primary-container' },
+                { label: 'Jun', value: 80, tone: 'bg-primary' },
               ].map((bar) => (
                 <div key={bar.label} className="group flex flex-1 flex-col items-center gap-2">
                   <div
                     className={cn('w-12 rounded-t-lg transition-all group-hover:brightness-95', bar.tone)}
                     style={{ height: `${Math.round(bar.value * 2.3)}px` }}
                   />
-                  <span className="text-xs font-medium text-slate-400">{bar.label}</span>
+                  <span className="text-xs font-medium text-on-surface-variant">{bar.label}</span>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        <div className="col-span-12 rounded-xl border border-[#e7edf3] bg-white p-6 lg:col-span-4">
-          <h2 className="mb-6 text-lg font-bold text-slate-900">Regional Breakdown</h2>
+        <div className="col-span-12 rounded-xl border border-[#e7edf3] bg-surface p-6 lg:col-span-4">
+          <h2 className="mb-6 text-lg font-bold text-on-surface">Regional Breakdown</h2>
           <div className="space-y-6">
             {(countryBreakdown.length > 0 ? countryBreakdown : [{ label: 'No data', value: 0, pct: 0 }]).map((row, index) => (
               <div key={row.label} className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="font-medium text-slate-700">{row.label}</span>
-                  <span className="text-slate-500">{row.pct}%</span>
+                  <span className="font-medium text-on-surface">{row.label}</span>
+                  <span className="text-on-surface-variant">{row.pct}%</span>
                 </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-surface-container-high">
                   <div
-                    className={cn('h-full', ['bg-blue-600', 'bg-blue-400', 'bg-blue-300', 'bg-blue-100'][index % 4])}
+                    className={cn('h-full', ['bg-primary', 'bg-primary', 'bg-primary-container', 'bg-primary-container'][index % 4])}
                     style={{ width: `${row.pct}%` }}
                   />
                 </div>
               </div>
             ))}
           </div>
-          <div className="mt-8 border-t border-slate-100 pt-6">
-            <Link href="/accounts/map" className="block text-center text-sm font-bold text-[#005baf] hover:underline">
+          <div className="mt-8 border-t border-outline-variant pt-6">
+            <Link href="/accounts/map" className="block text-center text-sm font-bold text-[#4f46e5] hover:underline">
               View Detailed Map
             </Link>
           </div>
         </div>
 
-        <div className="col-span-12 overflow-hidden rounded-xl border border-[#e7edf3] bg-white">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 px-6 py-4">
+        <div className="col-span-12 overflow-hidden rounded-xl border border-[#e7edf3] bg-surface">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-outline-variant px-6 py-4">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Recent High-Value Contacts</h2>
-              <p className="text-sm text-slate-500">Decision makers and active stakeholders across open accounts.</p>
+              <h2 className="text-lg font-bold text-on-surface">Recent High-Value Contacts</h2>
+              <p className="text-sm text-on-surface-variant">Decision makers and active stakeholders across open accounts.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
                 <input
                   type="search"
                   value={search}
@@ -489,17 +489,18 @@ export default function ContactsPage(): ReactElement {
                     setPage(1);
                     setSearch(event.target.value);
                   }}
-                  className="h-10 w-64 rounded-lg border-0 bg-slate-100 pl-10 pr-4 text-sm focus:ring-2 focus:ring-blue-500"
+                  className="h-10 w-64 rounded-lg border-0 bg-surface-container-high pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary"
                   placeholder="Search contacts..."
                 />
               </div>
               <select
                 value={ownerId}
+                aria-label="Filter by owner"
                 onChange={(event) => {
                   setPage(1);
                   setOwnerId(event.target.value);
                 }}
-                className="h-10 rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500"
+                className="h-10 rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary"
               >
                 <option value="">All owners</option>
                 {users.map((user) => (
@@ -508,8 +509,9 @@ export default function ContactsPage(): ReactElement {
               </select>
               <select
                 value={sortBy}
+                aria-label="Sort contacts"
                 onChange={(event) => setSortBy(event.target.value as ContactListFilters['sortBy'])}
-                className="h-10 rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500"
+                className="h-10 rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary"
               >
                 <option value="createdAt">Newest</option>
                 <option value="firstName">First name</option>
@@ -522,24 +524,25 @@ export default function ContactsPage(): ReactElement {
           {contactsQuery.isLoading ? (
             <TableSkeleton rows={8} cols={6} />
           ) : contactsQuery.isError ? (
-            <div className="p-8 text-sm text-red-600">
+            <div className="p-8 text-sm text-error">
               Failed to load contacts.
             </div>
           ) : contacts.length === 0 ? (
             <div className="p-10 text-center">
-              <Users className="mx-auto h-8 w-8 text-slate-300" />
-              <h3 className="mt-3 text-sm font-bold text-slate-900">No contacts found</h3>
-              <p className="mt-1 text-sm text-slate-500">Adjust the filters or create a new contact.</p>
+              <Users className="mx-auto h-8 w-8 text-outline" />
+              <h3 className="mt-3 text-sm font-bold text-on-surface">No contacts found</h3>
+              <p className="mt-1 text-sm text-on-surface-variant">Adjust the filters or create a new contact.</p>
             </div>
           ) : (
-            <table className="w-full">
-              <thead className="border-b border-slate-100 bg-slate-50">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px]">
+              <thead className="border-b border-outline-variant bg-surface-container-low">
                 <tr>
                   <th className="px-6 py-3 text-left w-8">
                     <input
                       type="checkbox"
                       aria-label="Select all"
-                      className="rounded border-slate-300"
+                      className="rounded border-outline-variant"
                       checked={contacts.length > 0 && selectedIds.length === contacts.length}
                       ref={(el) => {
                         if (el) el.indeterminate = selectedIds.length > 0 && selectedIds.length < contacts.length;
@@ -547,22 +550,22 @@ export default function ContactsPage(): ReactElement {
                       onChange={(e) => setSelectedIds(e.target.checked ? contacts.map((c) => c.id) : [])}
                     />
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Customer</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Role</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Owner</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Contact</th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">Created</th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">Action</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Customer</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Role</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Owner</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Contact</th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Created</th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-outline-variant">
                 {contacts.map((contact, index) => (
-                  <tr key={contact.id} className="transition-colors hover:bg-slate-50">
+                  <tr key={contact.id} className="transition-colors hover:bg-surface-container-low">
                     <td className="px-6 py-4">
                       <input
                         type="checkbox"
                         aria-label={`Select ${contact.firstName} ${contact.lastName}`}
-                        className="rounded border-slate-300"
+                        className="rounded border-outline-variant"
                         checked={selectedIds.includes(contact.id)}
                         onChange={(e) =>
                           setSelectedIds((prev) =>
@@ -577,38 +580,38 @@ export default function ContactsPage(): ReactElement {
                           {initials(contact)}
                         </div>
                         <div>
-                          <Link href={`/contacts/${contact.id}`} className="text-sm font-semibold text-slate-900 hover:text-[#005baf]">
+                          <Link href={`/contacts/${contact.id}`} className="text-sm font-semibold text-on-surface hover:text-[#4f46e5]">
                             {contact.firstName} {contact.lastName}
                           </Link>
-                          <p className="text-xs text-slate-500">{contact.accountId ? accountMap.get(contact.accountId) ?? contact.accountId : 'Unassigned account'}</p>
+                          <p className="text-xs text-on-surface-variant">{contact.accountId ? accountMap.get(contact.accountId) ?? contact.accountId : 'Unassigned account'}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="rounded bg-blue-100 px-2 py-1 text-[10px] font-bold uppercase text-blue-700">
+                      <span className="rounded bg-primary-container px-2 py-1 text-[10px] font-bold uppercase text-primary">
                         {contact.jobTitle ?? 'Stakeholder'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[10px] font-bold text-white">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-inverse-surface text-[10px] font-bold text-white">
                           {(ownerMap.get(contact.ownerId) ?? 'NX').slice(0, 2).toUpperCase()}
                         </div>
-                        <span className="text-sm text-slate-600">{ownerMap.get(contact.ownerId) ?? contact.ownerId}</span>
+                        <span className="text-sm text-on-surface-variant">{ownerMap.get(contact.ownerId) ?? contact.ownerId}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="space-y-1 text-sm text-slate-600">
-                        <p className="flex items-center gap-2"><Mail className="h-3.5 w-3.5 text-slate-400" />{contact.email ?? 'No email'}</p>
-                        <p className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-slate-400" />{contact.phone ?? 'No phone'}</p>
+                      <div className="space-y-1 text-sm text-on-surface-variant">
+                        <p className="flex items-center gap-2"><Mail className="h-3.5 w-3.5 text-on-surface-variant" />{contact.email ?? 'No email'}</p>
+                        <p className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-on-surface-variant" />{contact.phone ?? 'No phone'}</p>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right text-sm font-medium text-slate-600">{formatDate(contact.createdAt)}</td>
+                    <td className="px-6 py-4 text-right text-sm font-medium text-on-surface-variant">{formatDate(contact.createdAt)}</td>
                     <td className="px-6 py-4 text-right">
                       <button
                         type="button"
                         onClick={() => setActive(contact)}
-                        className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-[#005baf]"
+                        className="rounded-lg p-1.5 text-on-surface-variant transition hover:bg-surface-container-high hover:text-[#4f46e5]"
                       >
                         <MoreVertical className="h-5 w-5" />
                       </button>
@@ -617,15 +620,16 @@ export default function ContactsPage(): ReactElement {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
 
           {contactsQuery.data ? (
-            <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3 text-xs text-slate-500">
+            <div className="flex items-center justify-between border-t border-outline-variant px-6 py-3 text-xs text-on-surface-variant">
               <span>Page {contactsQuery.data.page} of {contactsQuery.data.totalPages} - {contactsQuery.data.total} total</span>
               <div className="flex gap-1">
                 <button
                   type="button"
-                  className="rounded border border-slate-200 px-3 py-1.5 font-semibold disabled:opacity-40"
+                  className="rounded border border-outline-variant px-3 py-1.5 font-semibold disabled:opacity-40"
                   disabled={!contactsQuery.data.hasPrevPage}
                   onClick={() => setPage((current) => Math.max(1, current - 1))}
                 >
@@ -633,7 +637,7 @@ export default function ContactsPage(): ReactElement {
                 </button>
                 <button
                   type="button"
-                  className="rounded border border-slate-200 px-3 py-1.5 font-semibold disabled:opacity-40"
+                  className="rounded border border-outline-variant px-3 py-1.5 font-semibold disabled:opacity-40"
                   disabled={!contactsQuery.data.hasNextPage}
                   onClick={() => setPage((current) => current + 1)}
                 >
@@ -701,13 +705,13 @@ function KpiCard({
   icon: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-[#e7edf3] bg-white p-6">
+    <div className="flex flex-col gap-2 rounded-xl border border-[#e7edf3] bg-surface p-6">
       <div className="flex items-start justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">{label}</span>
         {icon}
       </div>
-      <p className="text-2xl font-bold text-slate-900">{value}</p>
-      <p className="text-xs font-medium text-slate-500">{note}</p>
+      <p className="text-2xl font-bold text-on-surface">{value}</p>
+      <p className="text-xs font-medium text-on-surface-variant">{note}</p>
     </div>
   );
 }
@@ -733,21 +737,21 @@ function ContactPanel({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex">
-      <button type="button" aria-label="Close" className="flex-1 bg-slate-900/40" onClick={onClose} />
-      <aside className="flex w-full max-w-md flex-col bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+      <button type="button" aria-label="Close" className="flex-1 bg-inverse-surface/40" onClick={onClose} />
+      <aside className="flex w-full max-w-md flex-col bg-surface shadow-xl">
+        <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">{contact.firstName} {contact.lastName}</h2>
-            <p className="text-sm text-slate-500">{contact.jobTitle ?? 'Stakeholder'}</p>
+            <h2 className="text-lg font-bold text-on-surface">{contact.firstName} {contact.lastName}</h2>
+            <p className="text-sm text-on-surface-variant">{contact.jobTitle ?? 'Stakeholder'}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-on-surface-variant hover:bg-surface-container-high">
             <X className="h-5 w-5" />
           </button>
         </div>
         <div className="flex-1 space-y-4 overflow-y-auto p-6 text-sm">
-          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+          <div className="rounded-xl border border-outline-variant bg-surface-container-low p-4">
             <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl bg-white text-lg font-bold text-blue-700 ring-1 ring-slate-200">
+              <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl bg-surface text-lg font-bold text-primary ring-1 ring-outline-variant">
                 {customString(contact, 'photoUrl') ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={customString(contact, 'photoUrl')} alt="" className="h-full w-full object-cover" />
@@ -756,9 +760,9 @@ function ContactPanel({
                 )}
               </div>
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-blue-600">{customString(contact, 'lifecycleStage') || 'Relationship'}</p>
-                <h3 className="text-base font-bold text-slate-950">{account}</h3>
-                <p className="text-xs text-slate-500">{[contact.department, contact.city, contact.country].filter(Boolean).join(' - ') || 'Profile enrichment pending'}</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-primary">{customString(contact, 'lifecycleStage') || 'Relationship'}</p>
+                <h3 className="text-base font-bold text-on-surface">{account}</h3>
+                <p className="text-xs text-on-surface-variant">{[contact.department, contact.city, contact.country].filter(Boolean).join(' - ') || 'Profile enrichment pending'}</p>
               </div>
             </div>
           </div>
@@ -806,14 +810,14 @@ function ContactPanel({
             }))}
           />
         </div>
-        <div className="flex gap-2 border-t border-slate-100 p-4">
+        <div className="flex gap-2 border-t border-outline-variant p-4">
           {canUpdate ? (
-            <button type="button" onClick={onEdit} className="flex-1 rounded-lg bg-[#137fec] px-4 py-2 text-sm font-bold text-white">
+            <button type="button" onClick={onEdit} className="flex-1 rounded-lg bg-[#4f46e5] px-4 py-2 text-sm font-bold text-white">
               Edit
             </button>
           ) : null}
           {canDelete ? (
-            <button type="button" onClick={onDelete} className="rounded-lg border border-red-200 px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50">
+            <button type="button" onClick={onDelete} className="rounded-lg border border-error/30 px-4 py-2 text-sm font-bold text-error hover:bg-error-container">
               Delete
             </button>
           ) : null}
@@ -825,11 +829,11 @@ function ContactPanel({
 
 function DetailRow({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-slate-100 p-3">
-      <span className="mt-0.5 text-slate-400">{icon}</span>
+    <div className="flex items-start gap-3 rounded-lg border border-outline-variant p-3">
+      <span className="mt-0.5 text-on-surface-variant">{icon}</span>
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</p>
-        <p className="text-sm font-medium text-slate-800">{value}</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">{label}</p>
+        <p className="text-sm font-medium text-on-surface">{value}</p>
       </div>
     </div>
   );
@@ -838,11 +842,11 @@ function DetailRow({ icon, label, value }: { icon: ReactNode; label: string; val
 function TagList({ title, values }: { title: string; values: string[] }) {
   if (values.length === 0) return null;
   return (
-    <div className="rounded-lg border border-slate-100 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</p>
+    <div className="rounded-lg border border-outline-variant p-3">
+      <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">{title}</p>
       <div className="mt-2 flex flex-wrap gap-2">
         {values.map((value) => (
-          <span key={value} className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">
+          <span key={value} className="inline-flex items-center gap-1 rounded bg-primary-container px-2 py-1 text-xs font-bold text-primary">
             <Tag className="h-3 w-3" />
             {value}
           </span>
@@ -864,19 +868,19 @@ function PanelList({
   empty: string;
 }) {
   return (
-    <div className="rounded-lg border border-slate-100 p-3">
-      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+    <div className="rounded-lg border border-outline-variant p-3">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
         {icon}
         {title}
       </div>
       <div className="mt-3 space-y-2">
         {rows.length === 0 ? (
-          <p className="text-xs text-slate-500">{empty}</p>
+          <p className="text-xs text-on-surface-variant">{empty}</p>
         ) : (
           rows.map((row) => (
-            <div key={row.id} className="rounded-lg bg-slate-50 px-3 py-2">
-              <p className="font-semibold text-slate-800">{row.title}</p>
-              <p className="text-xs text-slate-500">{row.meta}</p>
+            <div key={row.id} className="rounded-lg bg-surface-container-low px-3 py-2">
+              <p className="font-semibold text-on-surface">{row.title}</p>
+              <p className="text-xs text-on-surface-variant">{row.meta}</p>
             </div>
           ))
         )}
@@ -910,16 +914,16 @@ function ContactFormPanel({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex">
-      <button type="button" aria-label="Close" className="flex-1 bg-slate-900/40" onClick={onClose} />
-      <form onSubmit={onSubmit} className="flex w-full max-w-md flex-col bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-900">{mode === 'edit' ? 'Edit contact' : 'New contact'}</h2>
-          <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
+      <button type="button" aria-label="Close" className="flex-1 bg-inverse-surface/40" onClick={onClose} />
+      <form onSubmit={onSubmit} className="flex w-full max-w-md flex-col bg-surface shadow-xl">
+        <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
+          <h2 className="text-lg font-bold text-on-surface">{mode === 'edit' ? 'Edit contact' : 'New contact'}</h2>
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-on-surface-variant hover:bg-surface-container-high">
             <X className="h-5 w-5" />
           </button>
         </div>
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
-          <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-700">
+          <div className="rounded-lg border border-primary/30 bg-primary-container px-4 py-3 text-xs leading-5 text-primary">
             Account linking is enforced through the low-code validation policy. Admins can change required fields under
             Settings / Validation Rules.
           </div>
@@ -936,19 +940,19 @@ function ContactFormPanel({
             options={accounts.map((account) => ({ value: account.id, label: account.name }))}
           />
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Owner</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Owner</span>
             <select
               required={requiredFields.has('ownerId')}
               value={draft.ownerId}
               onChange={(event) => onDraftChange({ ...draft, ownerId: event.target.value })}
-              className="mt-1 h-10 w-full rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500"
+              className="mt-1 h-10 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary"
             >
               <option value="">Select owner</option>
               {users.map((user) => (
                 <option key={user.id} value={user.id}>{user.firstName} {user.lastName}</option>
               ))}
             </select>
-            {fieldErrors.ownerId ? <p className="mt-1 text-xs text-red-500">{fieldErrors.ownerId}</p> : null}
+            {fieldErrors.ownerId ? <p className="mt-1 text-xs text-error">{fieldErrors.ownerId}</p> : null}
           </label>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Email" type="email" value={draft.email} error={fieldErrors.email} onChange={(value) => onDraftChange({ ...draft, email: value })} required={requiredFields.has('email')} />
@@ -983,17 +987,17 @@ function ContactFormPanel({
             <Field label="Product tags" value={draft.productTags} error={fieldErrors.productTags} onChange={(value) => onDraftChange({ ...draft, productTags: value })} />
             <Field label="Industry tags" value={draft.industryTags} error={fieldErrors.industryTags} onChange={(value) => onDraftChange({ ...draft, industryTags: value })} />
           </div>
-          <div className="grid gap-2 rounded-lg border border-slate-100 p-3 text-sm">
+          <div className="grid gap-2 rounded-lg border border-outline-variant p-3 text-sm">
             <CheckboxField label="Consent captured" checked={draft.gdprConsent} onChange={(value) => onDraftChange({ ...draft, gdprConsent: value })} />
             <CheckboxField label="Do not email" checked={draft.doNotEmail} onChange={(value) => onDraftChange({ ...draft, doNotEmail: value })} />
             <CheckboxField label="Do not call" checked={draft.doNotCall} onChange={(value) => onDraftChange({ ...draft, doNotCall: value })} />
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-100 p-4">
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+        <div className="flex justify-end gap-2 border-t border-outline-variant p-4">
+          <button type="button" onClick={onClose} className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-bold text-on-surface hover:bg-surface-container-low">
             Cancel
           </button>
-          <button type="submit" disabled={isSaving} className="rounded-lg bg-[#137fec] px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
+          <button type="submit" disabled={isSaving} className="rounded-lg bg-[#4f46e5] px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
             {isSaving ? 'Saving...' : mode === 'edit' ? 'Save' : 'Create'}
           </button>
         </div>
@@ -1021,10 +1025,10 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+      <span className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
         {icon}
         {label}
-        {required ? <span className="text-blue-600">*</span> : null}
+        {required ? <span className="text-primary">*</span> : null}
       </span>
       <input
         type={type}
@@ -1032,11 +1036,11 @@ function Field({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
-          'mt-1 h-10 w-full rounded-lg border text-sm focus:border-blue-500 focus:ring-blue-500',
-          error ? 'border-red-400' : 'border-slate-200'
+          'mt-1 h-10 w-full rounded-lg border text-sm focus:border-primary focus:ring-primary',
+          error ? 'border-error' : 'border-outline-variant'
         )}
       />
-      {error ? <p className="mt-1 text-xs text-red-500">{error}</p> : null}
+      {error ? <p className="mt-1 text-xs text-error">{error}</p> : null}
     </label>
   );
 }
@@ -1058,17 +1062,17 @@ function SelectField({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+      <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
         {label}
-        {required ? <span className="ml-1 text-blue-600">*</span> : null}
+        {required ? <span className="ml-1 text-primary">*</span> : null}
       </span>
       <select
         required={required}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
-          'mt-1 h-10 w-full rounded-lg border text-sm focus:border-blue-500 focus:ring-blue-500',
-          error ? 'border-red-400' : 'border-slate-200'
+          'mt-1 h-10 w-full rounded-lg border text-sm focus:border-primary focus:ring-primary',
+          error ? 'border-error' : 'border-outline-variant'
         )}
       >
         <option value="">Select {label.toLowerCase()}</option>
@@ -1078,7 +1082,7 @@ function SelectField({
           </option>
         ))}
       </select>
-      {error ? <p className="mt-1 text-xs text-red-500">{error}</p> : null}
+      {error ? <p className="mt-1 text-xs text-error">{error}</p> : null}
     </label>
   );
 }
@@ -1109,9 +1113,9 @@ function PhotoUpload({
   }
 
   return (
-    <div className="rounded-lg border border-slate-100 bg-white p-3">
+    <div className="rounded-lg border border-outline-variant bg-surface p-3">
       <div className="flex items-center gap-3">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-slate-400 ring-1 ring-slate-200">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container-high text-on-surface-variant ring-1 ring-outline-variant">
           {value ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={value} alt="" className="h-full w-full object-cover" />
@@ -1120,10 +1124,10 @@ function PhotoUpload({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Profile photo</p>
-          <p className="mt-0.5 text-xs text-slate-400">Upload JPG, PNG, or WebP. Stored with the contact preview.</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Profile photo</p>
+          <p className="mt-0.5 text-xs text-on-surface-variant">Upload JPG, PNG, or WebP. Stored with the contact preview.</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <label className="inline-flex h-9 cursor-pointer items-center rounded-lg bg-[#137fec] px-3 text-xs font-bold text-white hover:bg-blue-700">
+            <label className="inline-flex h-9 cursor-pointer items-center rounded-lg bg-[#4f46e5] px-3 text-xs font-bold text-white hover:bg-primary">
               Upload image
               <input
                 type="file"
@@ -1136,7 +1140,7 @@ function PhotoUpload({
               <button
                 type="button"
                 onClick={() => onChange('')}
-                className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                className="h-9 rounded-lg border border-outline-variant px-3 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low"
               >
                 Remove
               </button>
@@ -1144,7 +1148,7 @@ function PhotoUpload({
           </div>
         </div>
       </div>
-      {error ? <p className="mt-2 text-xs text-red-500">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs text-error">{error}</p> : null}
     </div>
   );
 }
@@ -1159,13 +1163,13 @@ function CheckboxField({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex items-center justify-between gap-4 rounded bg-slate-50 px-3 py-2">
-      <span className="font-medium text-slate-700">{label}</span>
+    <label className="flex items-center justify-between gap-4 rounded bg-surface-container-low px-3 py-2">
+      <span className="font-medium text-on-surface">{label}</span>
       <input
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+        className="rounded border-outline-variant text-primary focus:ring-primary"
       />
     </label>
   );

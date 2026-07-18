@@ -94,22 +94,22 @@ export default function ModuleConfigPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-      <Link href="/settings/modules" className="mb-4 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900">
+      <Link href="/settings/modules" className="mb-4 inline-flex items-center gap-2 text-sm text-on-surface-variant hover:text-on-surface">
         <ArrowLeft className="h-4 w-4" /> Back to modules
       </Link>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-on-surface">
             <span>{module.icon ?? '📦'}</span> {module.pluralLabel}
           </h1>
-          <p className="mt-1 font-mono text-xs text-slate-500">{module.apiName}</p>
+          <p className="mt-1 font-mono text-xs text-on-surface-variant">{module.apiName}</p>
         </div>
         <Link href={`/modules/${module.apiName}`}>
           <Button variant="secondary">View records</Button>
         </Link>
       </div>
 
-      <div className="mb-4 flex gap-1 border-b border-slate-200">
+      <div className="mb-4 flex gap-1 border-b border-outline-variant">
         {(['fields', 'layout'] as const).map((t) => (
           <button
             key={t}
@@ -117,7 +117,7 @@ export default function ModuleConfigPage() {
             onClick={() => setTab(t)}
             className={cn(
               '-mb-px border-b-2 px-4 py-2 text-sm font-medium capitalize',
-              tab === t ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-800'
+              tab === t ? 'border-outline text-on-surface' : 'border-transparent text-on-surface-variant hover:text-on-surface'
             )}
           >
             {t === 'layout' ? 'Canvas layout' : 'Fields'}
@@ -258,9 +258,9 @@ function FieldManager({ moduleId, fields, loading }: { moduleId: string; fields:
       ) : fields.length === 0 ? (
         <EmptyState icon="🏷️" title="No fields yet" description="Add fields to define this module's data model." cta={{ label: 'Add field', onClick: openCreate }} />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-outline-variant bg-surface-container-low text-left text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
                 <th className="px-3 py-2">Order</th>
                 <th className="px-3 py-2">Label</th>
@@ -270,31 +270,31 @@ function FieldManager({ moduleId, fields, loading }: { moduleId: string; fields:
                 <th className="px-3 py-2 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-outline-variant">
               {fields.map((field, i) => (
-                <tr key={field.id} className="hover:bg-slate-50">
+                <tr key={field.id} className="hover:bg-surface-container-low">
                   <td className="px-3 py-2">
                     <div className="flex flex-col">
-                      <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="text-slate-400 hover:text-slate-700 disabled:opacity-30" aria-label="Move up">
+                      <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="text-on-surface-variant hover:text-on-surface disabled:opacity-30" aria-label="Move up">
                         <ArrowUp className="h-3.5 w-3.5" />
                       </button>
-                      <button type="button" onClick={() => move(i, 1)} disabled={i === fields.length - 1} className="text-slate-400 hover:text-slate-700 disabled:opacity-30" aria-label="Move down">
+                      <button type="button" onClick={() => move(i, 1)} disabled={i === fields.length - 1} className="text-on-surface-variant hover:text-on-surface disabled:opacity-30" aria-label="Move down">
                         <ArrowDown className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </td>
-                  <td className="px-3 py-2 font-medium text-slate-900">{field.label}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-slate-600">{field.apiName}</td>
-                  <td className="px-3 py-2"><span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700">{field.type}</span></td>
-                  <td className="px-3 py-2 text-xs text-slate-500">
+                  <td className="px-3 py-2 font-medium text-on-surface">{field.label}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-on-surface-variant">{field.apiName}</td>
+                  <td className="px-3 py-2"><span className="rounded bg-surface-container-high px-1.5 py-0.5 text-xs text-on-surface">{field.type}</span></td>
+                  <td className="px-3 py-2 text-xs text-on-surface-variant">
                     {[field.required && 'required', field.unique && 'unique'].filter(Boolean).join(', ') || '—'}
                   </td>
                   <td className="px-3 py-2 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button type="button" onClick={() => openEdit(field)} className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Edit field">
+                      <button type="button" onClick={() => openEdit(field)} className="rounded p-1.5 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface" aria-label="Edit field">
                         <Pencil className="h-4 w-4" />
                       </button>
-                      <button type="button" onClick={() => remove(field)} className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label="Delete field">
+                      <button type="button" onClick={() => remove(field)} className="rounded p-1.5 text-on-surface-variant hover:bg-error-container hover:text-error" aria-label="Delete field">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
@@ -310,16 +310,16 @@ function FieldManager({ moduleId, fields, loading }: { moduleId: string; fields:
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Label</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface">Label</label>
               <Input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value, apiName: editing ? form.apiName : slugify(e.target.value) })} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">API name</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface">API name</label>
               <Input value={form.apiName} disabled={Boolean(editing)} onChange={(e) => setForm({ ...form, apiName: slugify(e.target.value) })} className="font-mono" />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Type</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface">Type</label>
             <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as FieldType })}>
               {FIELD_TYPES.map((t) => (
                 <option key={t} value={t}>{t}</option>
@@ -329,18 +329,18 @@ function FieldManager({ moduleId, fields, loading }: { moduleId: string; fields:
 
           {HAS_OPTIONS(form.type) && (
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Options (comma separated)</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface">Options (comma separated)</label>
               <Input value={form.options} onChange={(e) => setForm({ ...form, options: e.target.value })} placeholder="Option A, Option B" />
             </div>
           )}
 
           {form.type === 'FORMULA' && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <label className="mb-1 block text-sm font-medium text-slate-700">Formula</label>
+            <div className="rounded-lg border border-outline-variant bg-surface-container-low p-3">
+              <label className="mb-1 block text-sm font-medium text-on-surface">Formula</label>
               <Textarea value={form.formula} onChange={(e) => setForm({ ...form, formula: e.target.value })} rows={2} placeholder="budget - spent" className="font-mono" />
               <div className="mt-3 grid grid-cols-[1fr_auto] items-end gap-2">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-500">Sample record (JSON)</label>
+                  <label className="mb-1 block text-xs font-medium text-on-surface-variant">Sample record (JSON)</label>
                   <Input value={formulaSample} onChange={(e) => setFormulaSample(e.target.value)} className="font-mono text-xs" placeholder='{"budget":100,"spent":40}' />
                 </div>
                 <Button variant="secondary" size="sm" onClick={runFormulaPreview}>
@@ -356,11 +356,11 @@ function FieldManager({ moduleId, fields, loading }: { moduleId: string; fields:
           )}
 
           <div className="flex gap-6">
-            <label className="flex items-center gap-2 text-sm text-slate-700">
+            <label className="flex items-center gap-2 text-sm text-on-surface">
               <input type="checkbox" checked={form.required} onChange={(e) => setForm({ ...form, required: e.target.checked })} />
               Required
             </label>
-            <label className="flex items-center gap-2 text-sm text-slate-700">
+            <label className="flex items-center gap-2 text-sm text-on-surface">
               <input type="checkbox" checked={form.unique} onChange={(e) => setForm({ ...form, unique: e.target.checked })} />
               Unique
             </label>
@@ -433,7 +433,7 @@ function LayoutEditor({ moduleId, fields }: { moduleId: string; fields: CustomFi
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="flex items-center gap-2 text-sm text-slate-500">
+        <p className="flex items-center gap-2 text-sm text-on-surface-variant">
           <LayoutGrid className="h-4 w-4" /> Arrange fields into sections and columns for the record form.
         </p>
         <div className="flex gap-2">
@@ -447,7 +447,7 @@ function LayoutEditor({ moduleId, fields }: { moduleId: string; fields: CustomFi
       </div>
 
       {unassigned.length > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+        <div className="rounded-lg border border-warning/30 bg-warning-container p-3 text-xs text-on-warning-container">
           Unassigned fields: {unassigned.map((f) => f.label).join(', ')}
         </div>
       )}
@@ -457,10 +457,10 @@ function LayoutEditor({ moduleId, fields }: { moduleId: string; fields: CustomFi
       ) : (
         <div className="space-y-4">
           {workingSections.map((section, i) => (
-            <div key={i} className="rounded-xl border border-slate-200 bg-white p-4">
+            <div key={i} className="rounded-xl border border-outline-variant bg-surface p-4">
               <div className="mb-3 flex flex-wrap items-center gap-3">
                 <Input value={section.title} onChange={(e) => updateSection(i, { title: e.target.value })} className="max-w-xs" />
-                <label className="flex items-center gap-2 text-xs text-slate-500">
+                <label className="flex items-center gap-2 text-xs text-on-surface-variant">
                   Columns
                   <Select value={String(section.columns)} onChange={(e) => updateSection(i, { columns: Number(e.target.value) })} className="w-20">
                     <option value="1">1</option>
@@ -468,15 +468,15 @@ function LayoutEditor({ moduleId, fields }: { moduleId: string; fields: CustomFi
                     <option value="3">3</option>
                   </Select>
                 </label>
-                <button type="button" onClick={() => removeSection(i)} className="ml-auto rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label="Remove section">
+                <button type="button" onClick={() => removeSection(i)} className="ml-auto rounded p-1.5 text-on-surface-variant hover:bg-error-container hover:text-error" aria-label="Remove section">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
                 {section.fields.map((apiName) => (
-                  <span key={apiName} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700">
+                  <span key={apiName} className="inline-flex items-center gap-1 rounded-full border border-outline-variant bg-surface-container-low px-2.5 py-1 text-xs text-on-surface">
                     {labelFor(apiName)}
-                    <button type="button" onClick={() => removeFieldFromSection(i, apiName)} className="text-slate-400 hover:text-red-600" aria-label={`Remove ${labelFor(apiName)}`}>×</button>
+                    <button type="button" onClick={() => removeFieldFromSection(i, apiName)} className="text-on-surface-variant hover:text-error" aria-label={`Remove ${labelFor(apiName)}`}>×</button>
                   </span>
                 ))}
                 {unassigned.length > 0 && (

@@ -74,6 +74,58 @@ model StageTransitionRule {
   @@unique([id, tenantId])
 }
 
+/// Zoho-Blueprint-parity transition definition. A named edge between two
+/// PlaybookStages carrying Before / During / After semantics plus optional SLA.
+model BlueprintTransition {
+  id               String   @id @default(cuid())
+  tenantId         String
+  playbookId       String
+  name             String
+  fromStageId      String
+  toStageId        String
+  /// { criteria: Rule[], allowedRoles: string[] } — who may run it + entry gate.
+  beforeConditions Json     @default("{}")
+  /// { mandatoryFields: string[], mandatoryActions: {id,label}[], checklist: {id,label,required?}[], message?: string }
+  duringConfig     Json     @default("{}")
+  /// { fieldUpdates: {field,value}[], alerts: {userId?,roles?,title,body}[], tasks: {subject,ownerId?,dueInHours?}[], functions: {name,payload?}[] }
+  afterActions     Json     @default("{}")
+  /// Minutes the record may sit in `toStageId` before the SLA is breached.
+  slaMinutes       Int?
+  /// { notifyUserIds?: string[], notifyRoles?: string[], reassignTo?: string, message?: string, alerts?: {...}[] }
+  escalationConfig Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([playbookId])
+  @@index([playbookId, fromStageId])
+  @@unique([id, tenantId])
+}
+
+/// Live position of a record (any module) inside a playbook, plus its transition
+/// history and the SLA clock for the stage it currently occupies.
+model BlueprintRecordState {
+  id              String    @id @default(cuid())
+  tenantId        String
+  module          String
+  recordId        String
+  playbookId      String
+  currentStageId  String
+  /// Append-only array of { fromStageId, toStageId, transitionId, byUserId, at, data }.
+  history         Json      @default("[]")
+  slaTransitionId String?
+  slaDueAt        DateTime?
+  slaBreached     Boolean   @default(false)
+  slaBreachedAt   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([tenantId, module, recordId])
+  @@unique([id, tenantId])
+  @@index([tenantId])
+  @@index([slaBreached, slaDueAt])
+}
+
 model OutboxMessage {
   id             String   @id @default(cuid())
   topic          String

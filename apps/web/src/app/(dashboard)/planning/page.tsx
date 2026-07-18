@@ -35,16 +35,16 @@ export default function PlanningPage() {
   return (
     <div className="p-6">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Sales Planning & Quotas</h1>
+        <h1 className="text-2xl font-bold text-on-surface">Sales Planning & Quotas</h1>
         <input
           type="month"
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          className="rounded-lg border border-outline-variant px-3 py-2 text-sm"
           value={period}
           onChange={(e) => setPeriod(e.target.value)}
         />
       </div>
       {loading ? (
-        <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-gray-100" />)}</div>
+        <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-surface-container-high" />)}</div>
       ) : quotas.length === 0 ? (
         <EmptyState
           icon="🎯"
@@ -56,15 +56,15 @@ export default function PlanningPage() {
           {quotas.map((q) => {
             const pct = q.targetAmount > 0 ? Math.min(100, Math.round((q.achievedAmount / q.targetAmount) * 100)) : 0;
             return (
-              <div key={q.id} className="rounded-xl border border-gray-200 bg-white p-4">
+              <div key={q.id} className="rounded-xl border border-outline-variant bg-surface p-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="font-medium text-gray-900">{q.repName}</span>
-                  <span className={`text-sm font-bold ${pct >= 100 ? 'text-green-600' : pct >= 70 ? 'text-amber-600' : 'text-red-600'}`}>{pct}%</span>
+                  <span className="font-medium text-on-surface">{q.repName}</span>
+                  <span className={`text-sm font-bold ${pct >= 100 ? 'text-success' : pct >= 70 ? 'text-warning' : 'text-error'}`}>{pct}%</span>
                 </div>
-                <div className="mb-2 h-2 overflow-hidden rounded-full bg-gray-100">
-                  <div className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-green-500' : pct >= 70 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${pct}%` }} />
+                <div className="mb-2 h-2 overflow-hidden rounded-full bg-surface-container-high">
+                  <div className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-success' : pct >= 70 ? 'bg-warning' : 'bg-error'}`} style={{ width: `${pct}%` }} />
                 </div>
-                <div className="flex justify-between text-xs text-gray-500">
+                <div className="flex justify-between text-xs text-on-surface-variant">
                   <span>Achieved: {fmt(q.achievedAmount, q.currency)}</span>
                   <span>Target: {fmt(q.targetAmount, q.currency)}</span>
                 </div>

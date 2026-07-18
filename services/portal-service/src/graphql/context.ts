@@ -1,5 +1,10 @@
-import type { PrismaClient } from '@prisma/client';
+import type { PortalPrisma } from '../prisma.js';
 import DataLoader from 'dataloader';
+
+// The portal Prisma client is generated to a custom output path (see prisma.ts),
+// so the default `@prisma/client` package exports no PrismaClient here — use the
+// service-local PortalPrisma type instead.
+type PrismaClient = PortalPrisma;
 
 export interface GraphQLContext {
   prisma: PrismaClient;

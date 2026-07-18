@@ -41,18 +41,18 @@ export function OnboardingChecklist() {
   if (isLoading || dismissed || state?.completed) return null;
 
   return (
-    <div className="mb-6 overflow-hidden rounded-xl border border-blue-200 bg-white shadow-sm">
+    <div className="mb-6 overflow-hidden rounded-xl border border-primary/40 bg-surface shadow-sm">
       <div
-        className="flex cursor-pointer items-center justify-between px-5 py-4 transition-colors hover:bg-blue-50/30"
+        className="flex cursor-pointer items-center justify-between px-5 py-4 transition-colors hover:bg-primary-container/30"
         onClick={() => setCollapsed((c) => !c)}
       >
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
             {progress}%
           </div>
           <div>
-            <p className="text-sm font-semibold text-gray-900">Get started with NEXUS</p>
-            <p className="text-xs text-gray-500">
+            <p className="text-sm font-semibold text-on-surface">Get started with NEXUS</p>
+            <p className="text-xs text-on-surface-variant">
               {completedCount} of {ITEMS.length} steps completed
             </p>
           </div>
@@ -61,58 +61,58 @@ export function OnboardingChecklist() {
           <Link
             href="/onboarding"
             onClick={(e) => e.stopPropagation()}
-            className="hidden rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 sm:inline-block"
+            className="hidden rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary sm:inline-block"
           >
             {completedCount > 0 ? 'Resume setup' : 'Start setup'}
           </Link>
           {collapsed ? (
-            <ChevronDown className="h-4 w-4 text-gray-400" />
+            <ChevronDown className="h-4 w-4 text-on-surface-variant" />
           ) : (
-            <ChevronUp className="h-4 w-4 text-gray-400" />
+            <ChevronUp className="h-4 w-4 text-on-surface-variant" />
           )}
           <button
             onClick={(e) => {
               e.stopPropagation();
               setDismissed(true);
             }}
-            className="rounded-md p-1 transition-colors hover:bg-gray-100"
+            className="rounded-md p-1 transition-colors hover:bg-surface-container-high"
             aria-label="Dismiss checklist"
           >
-            <X className="h-4 w-4 text-gray-400" />
+            <X className="h-4 w-4 text-on-surface-variant" />
           </button>
         </div>
       </div>
 
-      <div className="h-1 bg-gray-100">
-        <div className="h-full bg-blue-600 transition-all duration-500" style={{ width: `${progress}%` }} />
+      <div className="h-1 bg-surface-container-high">
+        <div className="h-full bg-primary transition-all duration-500" style={{ width: `${progress}%` }} />
       </div>
 
       {!collapsed ? (
-        <div className="divide-y divide-gray-50">
+        <div className="divide-y divide-outline-variant">
           {ITEMS.map((item) => {
             const done = !!steps[item.id];
             return (
               <Link
                 key={item.id}
                 href="/onboarding"
-                className="flex items-start gap-3 px-5 py-3 transition-colors hover:bg-gray-50"
+                className="flex items-start gap-3 px-5 py-3 transition-colors hover:bg-surface-container-low"
               >
                 <span className="mt-0.5 flex-shrink-0">
                   {done ? (
-                    <CheckCircle2 className="h-5 w-5 text-blue-600" />
+                    <CheckCircle2 className="h-5 w-5 text-primary" />
                   ) : (
-                    <Circle className="h-5 w-5 text-gray-300" />
+                    <Circle className="h-5 w-5 text-outline" />
                   )}
                 </span>
                 <div className="min-w-0 flex-1">
                   <span
                     className={`text-sm font-medium ${
-                      done ? 'text-gray-400 line-through' : 'text-gray-900'
+                      done ? 'text-on-surface-variant line-through' : 'text-on-surface'
                     }`}
                   >
                     {item.label}
                   </span>
-                  <p className="mt-0.5 text-xs text-gray-500">{item.description}</p>
+                  <p className="mt-0.5 text-xs text-on-surface-variant">{item.description}</p>
                 </div>
               </Link>
             );
@@ -120,7 +120,7 @@ export function OnboardingChecklist() {
           <div className="px-5 py-3">
             <button
               onClick={() => setDismissed(true)}
-              className="text-xs text-gray-400 hover:text-gray-500"
+              className="text-xs text-on-surface-variant hover:text-on-surface-variant"
             >
               Skip for now
             </button>

@@ -24,8 +24,8 @@ export function SecretReveal({ secret }: { secret: string }) {
   };
 
   return (
-    <div className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
-      <div className="flex items-start gap-2 text-amber-800">
+    <div className="space-y-2 rounded-lg border border-warning/40 bg-warning-container p-3">
+      <div className="flex items-start gap-2 text-on-warning-container">
         <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
         <p className="text-xs font-medium">
           Save this signing secret now — it is shown only once and cannot be
@@ -33,7 +33,7 @@ export function SecretReveal({ secret }: { secret: string }) {
         </p>
       </div>
       <div className="flex items-center gap-2">
-        <code className="flex-1 truncate rounded border border-amber-200 bg-white px-2 py-1.5 font-mono text-xs text-slate-800">
+        <code className="flex-1 truncate rounded border border-warning/30 bg-surface px-2 py-1.5 font-mono text-xs text-on-surface">
           {visible ? secret : '•'.repeat(Math.min(secret.length, 40))}
         </code>
         <Button

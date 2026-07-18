@@ -70,6 +70,8 @@ export async function registerActivitiesRoutes(
             contactId: q.contactId,
             leadId: q.leadId,
             accountId: q.accountId,
+            entityType: q.entityType,
+            entityId: q.entityId,
             ownerId: q.ownerId,
             type: q.type,
             status: q.status,

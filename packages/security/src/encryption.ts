@@ -2,7 +2,7 @@
  * Field-Level Encryption — AES-256-GCM for sensitive PII fields.
  */
 
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHmac, randomBytes, scryptSync } from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
@@ -45,6 +45,33 @@ export function decryptField(fieldName: string, encrypted: EncryptedField, maste
   decipher.setAuthTag(authTag);
   const decrypted = Buffer.concat([decipher.update(Buffer.from(encrypted.ciphertext, 'base64')), decipher.final()]);
   return decrypted.toString('utf-8');
+}
+
+/**
+ * Deterministic keyed **blind index** for an encrypted/PII value.
+ *
+ * Field encryption is randomized (fresh salt + IV per write), so ciphertext can
+ * never be used for equality lookups or a DB unique constraint. A blind index is
+ * a deterministic keyed HMAC of the *normalized* plaintext — equal inputs always
+ * hash to the same digest — so it can back both application-level dedup
+ * (`findFirst({ where: { emailHash } })`) and a DB `@@unique([tenantId, emailHash])`
+ * while the plaintext itself stays encrypted at rest.
+ *
+ * Normalization: trimmed + lowercased, so `" Foo@Bar.com "` and `"foo@bar.com"`
+ * collide as intended for email dedup.
+ *
+ * Key precedence: explicit `key` arg → `BLIND_INDEX_KEY` → `ENCRYPTION_MASTER_KEY`
+ * → a fixed dev fallback. The fallback keeps dedup deterministic even when
+ * encryption is OFF (no master key configured); it carries no confidentiality
+ * value, but in that mode nothing is encrypted anyway.
+ */
+export function computeBlindIndex(value: string, key?: string): string {
+  const k =
+    key ??
+    process.env.BLIND_INDEX_KEY ??
+    process.env.ENCRYPTION_MASTER_KEY ??
+    'nexus-blind-index-default-key';
+  return createHmac('sha256', k).update(value.trim().toLowerCase()).digest('hex');
 }
 
 export interface EncryptedFieldConfig {
@@ -93,7 +120,17 @@ export function withFieldEncryption(
 
     const result = await next(params);
 
-    if (['findUnique', 'findFirst', 'findMany'].includes(params.action as string) && result) {
+    // Decrypt on reads AND on write return values (create/update/upsert). Without
+    // decrypting writes, the record returned to the API — and any Kafka/outbox
+    // event built from it — would carry ciphertext instead of plaintext PII.
+    // `createMany`/`updateMany` return a `{ count }` batch payload with no
+    // record fields, so they are intentionally excluded (nothing to decrypt).
+    if (
+      ['findUnique', 'findFirst', 'findMany', 'create', 'update', 'upsert'].includes(
+        params.action as string
+      ) &&
+      result
+    ) {
       const decrypt = (record: Record<string, unknown>) => {
         for (const field of fields) {
           const val = record[field];

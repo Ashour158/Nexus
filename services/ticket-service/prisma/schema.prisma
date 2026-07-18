@@ -32,6 +32,12 @@ enum TicketChannel {
   API
 }
 
+enum SupportLevel {
+  BASIC
+  STANDARD
+  PREMIUM
+}
+
 model Ticket {
   id                 String          @id @default(cuid())
   tenantId           String
@@ -48,12 +54,16 @@ model Ticket {
   assigneeId         String?
   teamId             String?
   slaPolicyId        String?
+  entitlementId      String?
+  supportLevel       SupportLevel?
   firstResponseDueAt DateTime?
   resolutionDueAt    DateTime?
   firstRespondedAt   DateTime?
   resolvedAt         DateTime?
   closedAt           DateTime?
   slaBreached        Boolean         @default(false)
+  firstResponseBreached Boolean      @default(false)
+  resolutionBreached Boolean         @default(false)
   reopenCount        Int             @default(0)
   tags               String[]
   customFields       Json            @default("{}")
@@ -70,6 +80,9 @@ model Ticket {
   @@index([tenantId, assigneeId])
   @@index([tenantId, accountId])
   @@index([tenantId, number])
+  // Cross-tenant SLA breach sweep: unbreached, still-open tickets past a due date.
+  @@index([slaBreached, firstResponseDueAt])
+  @@index([slaBreached, resolutionDueAt])
 }
 
 model TicketComment {
@@ -103,6 +116,9 @@ model SlaPolicy {
   tenantId          String
   name              String
   priority          TicketPriority?
+  /// Optional entitlement tier this policy targets; a ticket's resolved
+  /// supportLevel narrows policy selection (tier+priority beats priority-only).
+  supportLevel      SupportLevel?
   firstResponseMins Int
   resolutionMins    Int
   businessHoursOnly Boolean        @default(false)
@@ -112,6 +128,27 @@ model SlaPolicy {
   updatedAt         DateTime       @updatedAt
 
   @@index([tenantId, active])
+  @@unique([id, tenantId])
+}
+
+/// Support entitlement / service contract for an account. Drives whether an
+/// account is covered for support and (via supportLevel) which SLA policy a
+/// ticket picks up. `remainingUnits` supports prepaid support-incident packs.
+model Entitlement {
+  id             String       @id @default(cuid())
+  tenantId       String
+  accountId      String
+  name           String
+  supportLevel   SupportLevel @default(STANDARD)
+  startAt        DateTime     @default(now())
+  endAt          DateTime?
+  remainingUnits Int?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([tenantId, accountId])
+  @@index([tenantId, isActive])
   @@unique([id, tenantId])
 }
 

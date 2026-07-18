@@ -27,7 +27,10 @@ export type CustomFieldType =
   | 'PHONE'
   | 'CURRENCY'
   | 'FORMULA'
-  | 'LOOKUP';
+  | 'LOOKUP'
+  | 'MULTILOOKUP'
+  | 'SUBFORM'
+  | 'ROLLUP';
 
 export const CUSTOM_FIELD_TYPES: readonly CustomFieldType[] = [
   'TEXT',
@@ -42,6 +45,10 @@ export const CUSTOM_FIELD_TYPES: readonly CustomFieldType[] = [
   'CURRENCY',
   'FORMULA',
   'LOOKUP',
+  // Advanced Zoho-parity types:
+  'MULTILOOKUP', // array of related record ids
+  'SUBFORM', // array of child line-item rows
+  'ROLLUP', // read-only aggregate (computed, never accepted from input)
 ] as const;
 
 /** Minimal shape of a CustomModuleField needed for validation. */
@@ -108,7 +115,8 @@ export function validateCustomRecord(
 
   for (const field of fields) {
     const type = String(field.type || '').toUpperCase();
-    if (type === 'FORMULA') continue; // computed, never accepted from input
+    // Computed / read-only field types are never accepted from client input.
+    if (type === 'FORMULA' || type === 'ROLLUP') continue;
 
     const present = Object.prototype.hasOwnProperty.call(input, field.apiName);
     const raw = present ? input[field.apiName] : undefined;
@@ -192,6 +200,21 @@ export function validateCustomRecord(
           });
         } else {
           coerced[field.apiName] = arr;
+        }
+        break;
+      }
+      case 'MULTILOOKUP': {
+        // Array of related record ids (strings). Coerce a scalar to a one-item list.
+        const arr = Array.isArray(raw) ? raw.map((x) => String(x)) : [String(raw)];
+        coerced[field.apiName] = arr;
+        break;
+      }
+      case 'SUBFORM': {
+        // Repeating child rows: accept an array of row objects; drop non-objects.
+        if (Array.isArray(raw)) {
+          coerced[field.apiName] = raw.filter((row) => row && typeof row === 'object' && !Array.isArray(row));
+        } else {
+          issues.push({ field: field.apiName, message: `${field.label || field.apiName} must be a list of rows.` });
         }
         break;
       }

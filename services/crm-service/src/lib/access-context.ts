@@ -42,7 +42,7 @@ export async function buildReadAccessContext(
 
   let teamMemberIds: string[] | undefined;
   if (scope === 'team') {
-    teamMemberIds = await resolveTeamMemberIds(jwt.sub, token);
+    teamMemberIds = await resolveTeamMemberIds(jwt.sub, token, jwt.tenantId);
   }
 
   const ownershipWhere = applyOwnershipScope(scope, {

@@ -20,6 +20,7 @@
         "@nexus/shared-types": "workspace:*",
         "@nexus/validation": "workspace:*",
         "@prisma/client": "5.22.0",
+        "cron-parser": "4.9.0",
         "decimal.js": "^10.4.3",
         "dotenv": "^16.4.5",
         "fastify": "^4.28.1",

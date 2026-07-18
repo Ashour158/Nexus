@@ -30,18 +30,20 @@ interface DealConsumerDeps {
 }
 
 /**
- * Best-effort SMS + push + WhatsApp fan-out. Each channel is already a guarded
- * no-op when unconfigured; this helper additionally isolates any unexpected
- * failure so one channel can never block the other or the consumer. WhatsApp
- * reuses the recipient's phone number and is only attempted when the channel is
- * configured.
+ * SMS + push + WhatsApp fan-out. Each channel is a guarded no-op when its
+ * provider is unconfigured (see the *.channel.ts files) and is additionally
+ * skipped here when the recipient has opted the channel out (NOT-11) or has no
+ * phone / device token. Preference lookups are fail-open so a check error never
+ * drops a send.
  *
- * Per-channel opt-out (NOT-11) is enforced here: each channel is checked against
- * the recipient's preferences and skipped when disabled. Preference lookups are
- * fail-open (see preferences.service.ts) so a check error never drops a send.
+ * RR-H5: a GENUINE delivery failure (network / non-2xx) throws out of the
+ * channel and is deliberately NOT swallowed here — `Promise.all` re-raises it so
+ * the NexusConsumer retries and, on exhaustion, DLQs the event. The idempotent
+ * in-app write (RR-H4) makes that re-run safe. Only "not configured" / "opted
+ * out" / "no address" are treated as clean no-ops.
  */
 async function fanOutSmsPush(
-  deps: Pick<DealConsumerDeps, 'sms' | 'push' | 'whatsapp' | 'prefs' | 'log'>,
+  deps: Pick<DealConsumerDeps, 'sms' | 'push' | 'whatsapp' | 'prefs'>,
   recipient: { tenantId: string; userId: string; phone?: string; deviceToken?: string },
   msg: { title: string; body: string; actionUrl?: string }
 ): Promise<void> {
@@ -51,26 +53,20 @@ async function fanOutSmsPush(
     deps.prefs.isChannelEnabled(tenantId, userId, 'PUSH'),
     deps.prefs.isChannelEnabled(tenantId, userId, 'WHATSAPP'),
   ]);
-  await Promise.allSettled([
+  await Promise.all([
     recipient.phone && smsOn
-      ? deps.sms
-          .send({ to: recipient.phone, body: `${msg.title}: ${msg.body}` })
-          .catch((err) => deps.log.error({ err }, 'sms fan-out failed'))
+      ? deps.sms.send({ to: recipient.phone, body: `${msg.title}: ${msg.body}` })
       : Promise.resolve(),
     recipient.deviceToken && pushOn
-      ? deps.push
-          .send({
-            to: recipient.deviceToken,
-            title: msg.title,
-            body: msg.body,
-            actionUrl: msg.actionUrl,
-          })
-          .catch((err) => deps.log.error({ err }, 'push fan-out failed'))
+      ? deps.push.send({
+          to: recipient.deviceToken,
+          title: msg.title,
+          body: msg.body,
+          actionUrl: msg.actionUrl,
+        })
       : Promise.resolve(),
     recipient.phone && whatsappOn && deps.whatsapp.isConfigured()
-      ? deps.whatsapp
-          .send({ to: recipient.phone, body: `${msg.title}: ${msg.body}` })
-          .catch((err) => deps.log.error({ err }, 'whatsapp fan-out failed'))
+      ? deps.whatsapp.send({ to: recipient.phone, body: `${msg.title}: ${msg.body}` })
       : Promise.resolve(),
   ]);
 }
@@ -171,7 +167,7 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
   // required fields so a malformed event can never throw and stall the loop. The
   // NexusConsumer dedupes by eventId so a reassignment is announced once.
   consumer.on('deal.assigned', async (event) => {
-    const evt = event as { tenantId: string; payload?: unknown };
+    const evt = event as { tenantId: string; eventId?: string; payload?: unknown };
     const payload = (evt.payload ?? {}) as DealAssignedPayload;
     if (!payload.dealId || !payload.newOwnerId) return;
     const dealLabel = payload.dealName ? `"${payload.dealName}"` : payload.dealId;
@@ -179,6 +175,7 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
     const body = `You are now the owner of deal ${dealLabel}.`;
     const actionUrl = `/deals/${payload.dealId}`;
     await deps.inApp.send({
+      eventId: evt.eventId,
       tenantId: evt.tenantId,
       userId: payload.newOwnerId,
       type: 'DEAL_ASSIGNED',
@@ -212,6 +209,7 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
     const title = '🎉 Deal won';
     const body = `Congrats! You closed deal ${payload.dealId} for ${payload.amount} ${payload.currency ?? 'USD'}.`;
     await deps.inApp.send({
+      eventId: event.eventId,
       tenantId: event.tenantId,
       userId: payload.ownerId,
       type: 'deal.won',
@@ -240,6 +238,7 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
     const title = 'Deal lost';
     const body = `Deal ${payload.dealId} was marked lost${payload.reason ? ` (${payload.reason})` : ''}.`;
     await deps.inApp.send({
+      eventId: event.eventId,
       tenantId: event.tenantId,
       userId: payload.ownerId,
       type: 'deal.lost',
@@ -280,6 +279,7 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
         const title = '⏰ Deal is stalling';
         const body = `Deal ${payload.dealId} has been in stage for ${daysInStage} days (limit ${rottenDays}). Time to nudge it.`;
         await deps.inApp.send({
+          eventId: event.eventId,
           tenantId: event.tenantId,
           userId: payload.ownerId,
           type: 'deal.rotten',
@@ -307,7 +307,7 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
   consumer.on('deal.rotten', async (event) => {
     // `deal.rotten` is not in the shared NexusKafkaEvent union, so we read the
     // event shape generically. The handler is only dispatched for this type.
-    const evt = event as { tenantId: string; payload?: unknown };
+    const evt = event as { tenantId: string; eventId?: string; payload?: unknown };
     const payload = (evt.payload ?? {}) as DealRottenPayload;
     if (!payload.dealId || !payload.ownerId) return;
     const idleDays = payload.idleDays;
@@ -321,6 +321,7 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
     const title = '⏰ Deal has gone rotten';
     const body = `Deal ${payload.dealId} ${idlePhrase}${limitPhrase}. Time to follow up.`;
     await deps.inApp.send({
+      eventId: evt.eventId,
       tenantId: evt.tenantId,
       userId: payload.ownerId,
       type: 'DEAL_ROTTEN',
@@ -358,7 +359,7 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
   consumer.on('deal.at_risk', async (event) => {
     // `deal.at_risk` is not in the shared NexusKafkaEvent union, so we read the
     // event shape generically. The handler is only dispatched for this type.
-    const evt = event as { tenantId: string; payload?: unknown };
+    const evt = event as { tenantId: string; eventId?: string; payload?: unknown };
     const payload = (evt.payload ?? {}) as DealAtRiskPayload;
     if (!payload.dealId || !payload.ownerId) return;
     const reasons = Array.isArray(payload.reasons) ? payload.reasons : [];
@@ -375,6 +376,7 @@ export async function startDealConsumer(deps: DealConsumerDeps): Promise<NexusCo
     const title = '⚠️ Deal at risk';
     const body = `Deal ${payload.dealId} is at risk. ${why}`;
     await deps.inApp.send({
+      eventId: evt.eventId,
       tenantId: evt.tenantId,
       userId: payload.ownerId,
       type: 'DEAL_AT_RISK',

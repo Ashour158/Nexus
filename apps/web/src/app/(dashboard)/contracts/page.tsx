@@ -26,12 +26,12 @@ interface Contract {
 }
 
 const statusStyles: Record<Contract['status'], string> = {
-  DRAFT: 'bg-slate-100 text-slate-700',
-  PENDING_SIGNATURE: 'bg-blue-100 text-blue-700',
-  ACTIVE: 'bg-emerald-100 text-emerald-700',
-  EXPIRED: 'bg-slate-100 text-slate-500',
-  TERMINATED: 'bg-red-100 text-red-700',
-  RENEWED: 'bg-purple-100 text-purple-700',
+  DRAFT: 'bg-surface-container-high text-on-surface',
+  PENDING_SIGNATURE: 'bg-primary-container text-primary',
+  ACTIVE: 'bg-success-container text-success',
+  EXPIRED: 'bg-surface-container-high text-on-surface-variant',
+  TERMINATED: 'bg-error-container text-error',
+  RENEWED: 'bg-tertiary-container text-tertiary',
 };
 
 interface Paginated<T> {
@@ -120,13 +120,13 @@ export default function ContractsPage(): JSX.Element {
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Contracts</h1>
-          <p className="text-sm text-slate-500">Track lifecycle and signatures for customer contracts.</p>
+          <p className="text-sm text-on-surface-variant">Track lifecycle and signatures for customer contracts.</p>
         </div>
         <ExportButton module="contracts" />
       </header>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 font-medium text-slate-900">Create contract</h2>
+      <section className="rounded-lg border border-outline-variant bg-surface p-4">
+        <h2 className="mb-3 font-medium text-on-surface">Create contract</h2>
         <div className="grid gap-3 md:grid-cols-3">
           <Input placeholder="Title" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
           <Input placeholder="Account ID" value={form.accountId} onChange={(e) => setForm((p) => ({ ...p, accountId: e.target.value }))} />
@@ -142,18 +142,18 @@ export default function ContractsPage(): JSX.Element {
       </section>
 
       <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="rounded-lg border border-slate-200 bg-white p-4"><p className="text-xs uppercase text-slate-500">Active Contracts</p><p className="text-2xl font-bold text-slate-900">{activeContracts.length}</p></div>
-        <div className="rounded-lg border border-slate-200 bg-white p-4"><p className="text-xs uppercase text-slate-500">Total Value</p><p className="text-2xl font-bold text-emerald-700">{formatCurrency(totalValue)}</p></div>
-        <div className="rounded-lg border border-slate-200 bg-white p-4"><p className="text-xs uppercase text-slate-500">Expiring Soon</p><p className="text-2xl font-bold text-orange-600">{expiringSoon}</p></div>
+        <div className="rounded-lg border border-outline-variant bg-surface p-4"><p className="text-xs uppercase text-on-surface-variant">Active Contracts</p><p className="text-2xl font-bold text-on-surface">{activeContracts.length}</p></div>
+        <div className="rounded-lg border border-outline-variant bg-surface p-4"><p className="text-xs uppercase text-on-surface-variant">Total Value</p><p className="text-2xl font-bold text-success">{formatCurrency(totalValue)}</p></div>
+        <div className="rounded-lg border border-outline-variant bg-surface p-4"><p className="text-xs uppercase text-on-surface-variant">Expiring Soon</p><p className="text-2xl font-bold text-warning">{expiringSoon}</p></div>
       </section>
 
       <div className="flex flex-wrap gap-2">
         {['ALL', 'DRAFT', 'PENDING_SIGNATURE', 'ACTIVE', 'EXPIRED', 'TERMINATED', 'RENEWED'].map((value) => (
-          <button key={value} type="button" onClick={() => setStatus(value as 'ALL' | Contract['status'])} className={`rounded-full px-3 py-1 text-xs font-medium ${status === value ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{value}</button>
+          <button key={value} type="button" onClick={() => setStatus(value as 'ALL' | Contract['status'])} className={`rounded-full px-3 py-1 text-xs font-medium ${status === value ? 'bg-inverse-surface text-white' : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'}`}>{value}</button>
         ))}
       </div>
 
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <section className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
         {query.isLoading ? (
           <div className="space-y-2 p-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10" />)}</div>
         ) : contracts.length === 0 ? (
@@ -168,10 +168,10 @@ export default function ContractsPage(): JSX.Element {
           />
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-start text-xs uppercase text-slate-500">
+            <thead className="bg-surface-container-low text-start text-xs uppercase text-on-surface-variant">
               <tr><th className="px-3 py-2">Title</th><th>Account</th><th>Status</th><th>Value</th><th>Start Date</th><th>End Date</th><th className="pe-3 text-end">Actions</th></tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-outline-variant">
               {contracts.map((contract) => (
                 <tr key={contract.id}>
                   <td className="px-3 py-2 font-medium">{contract.name}</td>

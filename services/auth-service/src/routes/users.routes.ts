@@ -208,6 +208,29 @@ export async function registerUsersRoutes(
           return reply.send({ success: true, data: { id, deactivated: true } });
         }
       );
+
+      r.post(
+        '/users/:id/reset-password',
+        { preHandler: requirePermission(PERMISSIONS.USERS.UPDATE) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const { temporaryPassword } = await users.adminResetPassword(jwt.tenantId, id, jwt.sub);
+          await prisma.auditLog.create({
+            data: {
+              tenantId: jwt.tenantId,
+              userId: jwt.sub,
+              action: 'UPDATE',
+              resource: 'User',
+              resourceId: id,
+              newValue: { passwordReset: true } as object,
+              ipAddress: request.ip,
+              userAgent: request.headers['user-agent'],
+            },
+          });
+          return reply.send({ success: true, data: { id, temporaryPassword } });
+        }
+      );
     },
     { prefix: '/api/v1' }
   );

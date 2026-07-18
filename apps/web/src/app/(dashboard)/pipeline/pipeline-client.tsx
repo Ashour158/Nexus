@@ -47,7 +47,7 @@ export function PipelineClient() {
 
   if (!canRead) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
+      <div className="rounded-xl border border-warning/30 bg-warning-container p-6 text-sm text-on-warning-container">
         You do not have permission to view pipelines.
       </div>
     );
@@ -59,7 +59,7 @@ export function PipelineClient() {
 
   if (pipelinesQuery.isError) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+      <div className="rounded-xl border border-error/30 bg-error-container p-6 text-sm text-on-error-container">
         Failed to load pipelines.
       </div>
     );
@@ -67,7 +67,7 @@ export function PipelineClient() {
 
   if (pipelines.length === 0) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white">
+      <div className="rounded-xl border border-outline-variant bg-surface">
         <EmptyState icon="" title="No pipelines" description="Create a pipeline to get started." />
       </div>
     );
@@ -77,26 +77,26 @@ export function PipelineClient() {
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
         <SummaryCard
-          icon={<Layers3 className="h-5 w-5 text-blue-600" />}
+          icon={<Layers3 className="h-5 w-5 text-primary" />}
           label="Pipelines"
           value={pipelines.length}
           detail="Active sales paths under governance"
         />
         <SummaryCard
-          icon={<Target className="h-5 w-5 text-emerald-600" />}
+          icon={<Target className="h-5 w-5 text-success" />}
           label="Avg probability"
           value={`${averageProbability}%`}
           detail="Weighted by configured stages"
         />
         <SummaryCard
-          icon={<TimerReset className="h-5 w-5 text-amber-600" />}
+          icon={<TimerReset className="h-5 w-5 text-warning" />}
           label="Rotten threshold"
           value={`${averageRottenDays}d`}
           detail="Average stale-deal trigger window"
         />
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex flex-wrap gap-2 rounded-xl border border-outline-variant bg-surface p-3 shadow-card">
         {pipelines.map((pipeline) => (
           <button
             key={pipeline.id}
@@ -105,13 +105,13 @@ export function PipelineClient() {
             className={cn(
               'rounded-lg px-4 py-2 text-sm font-medium transition',
               resolvedPipelineId === pipeline.id
-                ? 'bg-slate-900 text-white'
-                : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                ? 'bg-primary text-on-primary'
+                : 'border border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container-high'
             )}
           >
             {pipeline.name}
             {pipeline.isDefault ? (
-              <span className="ml-1.5 rounded bg-slate-700 px-1.5 py-0.5 text-[10px] text-white">
+              <span className="ml-1.5 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
                 Default
               </span>
             ) : null}
@@ -119,15 +119,15 @@ export function PipelineClient() {
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+      <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-card">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant px-5 py-4">
           <div>
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Stages</h2>
-            <p className="mt-1 text-xs text-slate-400">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-on-surface-variant">Stages</h2>
+            <p className="mt-1 text-xs text-on-surface-variant">
               Stage changes drive deal probability, automation triggers, and forecast calculations.
             </p>
           </div>
-          <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+          <span className="rounded-lg bg-surface-container-high px-3 py-1 text-xs font-semibold text-on-surface-variant">
             {stages.length} stages
           </span>
         </div>
@@ -141,19 +141,19 @@ export function PipelineClient() {
         ) : stages.length === 0 ? (
           <EmptyState icon="" title="No stages" description="This pipeline has no stages yet." />
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-outline-variant">
             {stages.map((stage, index) => (
               <div
                 key={stage.id}
-                className="flex flex-col gap-4 p-5 transition hover:bg-slate-50 sm:flex-row sm:items-center"
+                className="flex flex-col gap-4 p-5 transition hover:bg-surface-container-low sm:flex-row sm:items-center"
               >
                 <div
-                  className="h-10 w-10 shrink-0 rounded-lg border border-white shadow-sm"
+                  className="h-10 w-10 shrink-0 rounded-lg shadow-sm ring-1 ring-outline-variant"
                   style={{ backgroundColor: stage.color }}
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-slate-950">{stage.name}</p>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="text-sm font-semibold text-on-surface">{stage.name}</p>
+                  <p className="mt-1 text-xs text-on-surface-variant">
                     Order {stage.order} - Probability {stage.probability}% - Rotten {stage.rottenDays}d
                   </p>
                 </div>
@@ -162,7 +162,7 @@ export function PipelineClient() {
                     type="button"
                     disabled={index === 0 || updateStage.isPending}
                     onClick={() => moveStage(stage.id, 'up')}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-xs font-semibold text-on-surface-variant hover:bg-surface-container-high disabled:opacity-40"
                   >
                     <ArrowUp className="h-3.5 w-3.5" />
                     Up
@@ -171,7 +171,7 @@ export function PipelineClient() {
                     type="button"
                     disabled={index === stages.length - 1 || updateStage.isPending}
                     onClick={() => moveStage(stage.id, 'down')}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-xs font-semibold text-on-surface-variant hover:bg-surface-container-high disabled:opacity-40"
                   >
                     <ArrowDown className="h-3.5 w-3.5" />
                     Down
@@ -194,14 +194,14 @@ function PipelineLoadingBlock() {
         <Skeleton className="h-32 rounded-xl" />
         <Skeleton className="h-32 rounded-xl" />
       </div>
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-card">
         <div className="flex flex-wrap gap-2">
           <Skeleton className="h-10 w-40 rounded-lg" />
           <Skeleton className="h-10 w-32 rounded-lg" />
         </div>
       </div>
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-5 py-4">
+      <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-card">
+        <div className="border-b border-outline-variant px-5 py-4">
           <Skeleton className="h-4 w-24" />
           <Skeleton className="mt-2 h-3 w-80" />
         </div>
@@ -227,13 +227,13 @@ function SummaryCard({
   detail: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-outline-variant bg-surface p-5 shadow-card">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">{label}</p>
         {icon}
       </div>
-      <p className="mt-3 text-3xl font-bold text-slate-950">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{detail}</p>
+      <p className="mt-3 text-3xl font-bold text-on-surface">{value}</p>
+      <p className="mt-1 text-xs text-on-surface-variant">{detail}</p>
     </div>
   );
 }

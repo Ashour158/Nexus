@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useConfirm } from '@/hooks/use-confirm';
 import Link from 'next/link';
 import type { Stage } from '@nexus/shared-types';
-import { LayoutGrid, List, Trash2 } from 'lucide-react';
+import { Columns3, LayoutGrid, List, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import { PipelineBoard } from '@/components/deals/pipeline-board';
+import { KanbanBoard } from '@/components/deals/KanbanBoard';
 import { ExportButton } from '@/components/export/ExportButton';
 import { ImportButton } from '@/components/export/ImportButton';
 import { EmptyState as SharedEmptyState } from '@/components/ui/EmptyState';
@@ -17,9 +18,10 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Avatar } from '@/components/ui/avatar';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { usePipelines, useStages } from '@/hooks/use-pipelines';
-import { useDeals, useDeleteDeal, useUpdateDeal } from '@/hooks/use-deals';
+import { useDeals, useDeleteDeal, useUpdateDeal, usePipelineDeals, useMoveDeal } from '@/hooks/use-deals';
 import { useUsers } from '@/hooks/use-users';
 import { usePipelineStore } from '@/stores/pipeline.store';
+import { useAuthStore } from '@/stores/auth.store';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { useColumnVisibility } from '@/components/ui/column-chooser';
@@ -34,7 +36,7 @@ const statusLabelMap: Record<string, string> = {
 
 export default function DealsPage() {
   const { confirm, ConfirmDialog } = useConfirm();
-  const [view, setView] = useState<'pipeline' | 'list'>('pipeline');
+  const [view, setView] = useState<'pipeline' | 'board' | 'list'>('pipeline');
   const [stageFilter, setStageFilter] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('');
   const [search, setSearch] = useState('');
@@ -100,6 +102,14 @@ export default function DealsPage() {
 
   const deleteMutation = useDeleteDeal();
   const updateDeal = useUpdateDeal();
+  const moveDeal = useMoveDeal();
+
+  // Board (Kanban) data — shares the pipeline deals query key with the Pipeline
+  // view, so switching between them is deduped (no extra fetch).
+  const boardDealsQuery = usePipelineDeals(resolvedPipelineId ?? '');
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const isDevPreview = process.env.NODE_ENV === 'development';
+  const canMoveDeals = isDevPreview || hasPermission('deals:update') || hasPermission('deals:*');
 
   const toggleSelection = (id: string, checked: boolean) => {
     setSelectedIds((prev) => {
@@ -148,7 +158,7 @@ export default function DealsPage() {
               onClick={() => setView('pipeline')}
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
-                view === 'pipeline' ? 'bg-primary-light text-primary' : 'text-gray-500 hover:text-gray-700'
+                view === 'pipeline' ? 'bg-primary-light text-primary' : 'text-on-surface-variant hover:text-on-surface'
               )}
               aria-pressed={view === 'pipeline'}
             >
@@ -156,10 +166,21 @@ export default function DealsPage() {
             </button>
             <button
               type="button"
+              onClick={() => setView('board')}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
+                view === 'board' ? 'bg-primary-light text-primary' : 'text-on-surface-variant hover:text-on-surface'
+              )}
+              aria-pressed={view === 'board'}
+            >
+              <Columns3 className="h-4 w-4" /> Board
+            </button>
+            <button
+              type="button"
               onClick={() => setView('list')}
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
-                view === 'list' ? 'bg-primary-light text-primary' : 'text-gray-500 hover:text-gray-700'
+                view === 'list' ? 'bg-primary-light text-primary' : 'text-on-surface-variant hover:text-on-surface'
               )}
               aria-pressed={view === 'list'}
             >
@@ -245,7 +266,7 @@ export default function DealsPage() {
                 header: 'Company',
                 cell: (row) => (
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gray-100 text-[10px] font-bold text-gray-500 dark:bg-slate-800 dark:text-slate-400">
+                    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-container-high text-[10px] font-bold text-on-surface-variant dark:bg-surface-container-high dark:text-on-surface-variant">
                       {(row as unknown as Record<string, string>)['accountName']?.[0] ?? 'C'}
                     </span>
                     <span style={{ color: 'var(--text-secondary)' }}>{(row as unknown as Record<string, string>)['accountName'] ?? '—'}</span>
@@ -359,7 +380,7 @@ export default function DealsPage() {
                       setSelectedIds(new Set());
                     }
                   }}
-                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-error hover:bg-error-container "
                 >
                   <Trash2 className="h-3.5 w-3.5" /> Delete
                 </button>
@@ -368,7 +389,7 @@ export default function DealsPage() {
                   onClick={() => {
                     setSelectedIds(new Set());
                   }}
-                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-800"
+                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-highest"
                 >
                   Clear
                 </button>
@@ -392,6 +413,46 @@ export default function DealsPage() {
             }}
           />
         </div>
+      ) : view === 'board' ? (
+        <>
+          {isLoading || boardDealsQuery.isLoading ? (
+            <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--border-color)' }}>
+              <TableSkeleton rows={6} cols={5} />
+            </div>
+          ) : pipelinesQuery.isError ? (
+            <ErrorBanner message="Failed to load pipelines. Try again." />
+          ) : !resolvedPipelineId ? (
+            <SharedEmptyState
+              icon="🧭"
+              title="No pipelines configured yet"
+              description="Ask an administrator to create a pipeline in Settings."
+            />
+          ) : stagesQuery.isError ? (
+            <ErrorBanner message="Failed to load stages for this pipeline." />
+          ) : stages.length === 0 ? (
+            <SharedEmptyState
+              icon="🧱"
+              title="This pipeline has no stages yet"
+              description="Add stages in pipeline settings to start tracking deals."
+            />
+          ) : boardDealsQuery.isError ? (
+            <ErrorBanner message="Failed to load deals for this board." />
+          ) : (boardDealsQuery.data?.data.length ?? 0) === 0 ? (
+            <SharedEmptyState
+              icon="🗂️"
+              title="No deals in this pipeline yet"
+              description="Create a deal to see it on the board."
+            />
+          ) : (
+            <KanbanBoard
+              stages={stages}
+              deals={boardDealsQuery.data?.data ?? []}
+              owners={owners}
+              canMove={canMoveDeals}
+              onMove={(dealId, stageId) => moveDeal.mutate({ id: dealId, stageId })}
+            />
+          )}
+        </>
       ) : (
         <>
           {isLoading ? (
@@ -446,7 +507,7 @@ function FilterChip({
         'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition',
         active
           ? 'border-primary bg-primary-light text-primary'
-          : 'border-[var(--border-color)] text-gray-500 hover:text-gray-700'
+          : 'border-[var(--border-color)] text-on-surface-variant hover:text-on-surface'
       )}
     >
       {children}
@@ -458,7 +519,7 @@ function ErrorBanner({ message }: { message: string }) {
   return (
     <div
       role="alert"
-      className="rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
+      className="rounded-md border border-error/40 bg-error-container p-4 text-sm text-on-error-container "
     >
       {message}
     </div>

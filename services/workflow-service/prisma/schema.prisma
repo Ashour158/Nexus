@@ -264,10 +264,26 @@ model AutomationRule {
   description  String?
   module       String              // lead | contact | account | deal | quote | ticket | campaign | invoice | ...
   triggerEvent String              // e.g. 'deal.created', 'deal.stage_changed', 'ticket.sla.breached'
+  // Trigger classification (Zoho Workflow-Rule parity, WF-DEPTH):
+  //   record_action → fire on the domain event (default, existing behaviour)
+  //   field_update  → fire only when triggerConfig.fieldUpdate matched (a field
+  //                   changed to/from a value on an update event)
+  //   date_time     → do NOT fire instantly; (re)schedule the rule's actions
+  //                   relative to a date field on the record (see dateTriggers)
+  //   scheduled     → authored as a delayed-action-first rule (still gated by the
+  //                   trigger event; scheduledActions carry the delayed work)
+  triggerType  String              @default("record_action")
+  // Extra trigger config keyed by triggerType, e.g.
+  //   field_update → { fieldUpdate: { field, from?, to? } }
+  triggerConfig Json               @default("{}")
   // [{ field, operator, value }] — AND-combined, evaluated against the event payload
   conditions   Json                @default("[]")
   // [{ type, config }] — type ∈ engine action types (SEND_NOTIFICATION/CREATE_TASK/…)
   actions      Json                @default("[]")
+  // Time-delayed actions (WF-DEPTH): [{ delay: { value, unit }, action: { type, config } }]
+  // Each fires `delay` after the trigger via a ScheduledAutomationAction, re-checked
+  // against the rule criteria at fire time.
+  scheduledActions Json            @default("[]")
   isActive     Boolean             @default(true)
   runCount     Int                 @default(0)
   lastRunAt    DateTime?
@@ -275,10 +291,99 @@ model AutomationRule {
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
   runs         AutomationRuleRun[]
+  versions     AutomationRuleVersion[]
+  scheduled    ScheduledAutomationAction[]
+  dateTriggers DateBasedTrigger[]
 
   @@index([tenantId, module, triggerEvent])
   @@index([tenantId, isActive])
   @@unique([id, tenantId])
+}
+
+// A single time-delayed / date-relative action queued for future execution
+// (WF-DEPTH). Produced by an automation rule's `scheduledActions` (delay after a
+// trigger) or by a `DateBasedTrigger` (relative to a record date field). A poller
+// (`startScheduledActionPoller`) picks up rows whose `runAt` is due, RE-CHECKS the
+// owning rule's criteria against the captured payload snapshot, and — if still
+// matching — executes the action through the SAME engine node handlers as an
+// instant action. If the rule is gone/inactive or no longer matches, the row is
+// CANCELLED instead of fired.
+model ScheduledAutomationAction {
+  id        String         @id @default(cuid())
+  tenantId  String
+  ruleId    String
+  rule      AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  // The CRM record this action targets (resolved from the trigger payload).
+  entityId  String
+  module    String
+  // Source domain-event id that scheduled this action (traceability).
+  eventId   String
+  // 'delay' (rule.scheduledActions) | 'date' (DateBasedTrigger).
+  origin    String         @default("delay")
+  // Stable idempotency key so the same (event,action) is never double-queued and a
+  // date trigger re-schedules (updates runAt) rather than duplicating on re-fire.
+  dedupeKey String         @unique
+  // When the action becomes due.
+  runAt     DateTime
+  // { type, config } — one automation action (same shape as rule.actions[i]).
+  action    Json
+  // Snapshot of the trigger payload — used both to re-check the rule criteria at
+  // fire time and as the execution context payload.
+  payload   Json           @default("{}")
+  status    String         @default("PENDING") // PENDING | FIRING | DONE | CANCELLED | FAILED
+  error     String?
+  firedAt   DateTime?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([status, runAt])
+  @@index([tenantId, ruleId])
+  @@index([tenantId, module, entityId])
+}
+
+// Date/time trigger definition (WF-DEPTH): "fire N units before/after a date
+// field on the record", e.g. "3 days before Deal.expectedCloseDate". When a
+// record event for `module` carries `dateField`, the automation service computes
+// the fire time and (re)schedules the owning rule's actions as
+// ScheduledAutomationAction rows. Stored as child rows of a rule so the visual
+// builder can author several date anchors per rule.
+model DateBasedTrigger {
+  id        String         @id @default(cuid())
+  tenantId  String
+  ruleId    String
+  rule      AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  module    String
+  dateField String         // payload field holding the anchor date (e.g. 'expectedCloseDate')
+  offset    Int            @default(0)      // magnitude, in `unit`s
+  unit      String         @default("days") // minutes | hours | days
+  direction String         @default("before") // before | after
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([tenantId, ruleId])
+  @@index([tenantId, module, isActive])
+}
+
+// Immutable snapshot of a rule's authored state (conditions + actions + meta),
+// written on every create/update/rollback. Powers version history + rollback
+// (AU-3): a mis-authored edit can be reverted to any prior committed state.
+model AutomationRuleVersion {
+  id        String         @id @default(cuid())
+  tenantId  String
+  ruleId    String
+  rule      AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  version   Int            // monotonic per rule, starting at 1
+  // { name, description, module, triggerEvent, conditions, actions, isActive }
+  snapshot  Json
+  // Free-text note: 'create' | 'update' | 'rollback:<n>' | 'pre-rollback'
+  reason    String?
+  createdBy String
+  createdAt DateTime       @default(now())
+
+  @@unique([ruleId, version])
+  @@index([tenantId, ruleId])
+  @@index([ruleId, version])
 }
 
 model AutomationRuleRun {
@@ -357,4 +462,180 @@ model SlaBreach {
   @@index([tenantId, status])
   @@index([slaId, entityId])
   @@unique([id, tenantId])
+}
+
+// ─── Escalation Rules (Zoho "Escalation Rules" — time-based, tiered) ─────────
+//
+// A tiered, time-based escalation ladder for a module. When a record needs
+// watching (e.g. an unanswered case / an unattended high-value deal), an
+// EscalationInstance is opened; a poller walks it up the `tiers` ladder, firing
+// each tier's action at its `afterMinutes` mark (measured from `startedAt`).
+// Resolving the instance (record replied / closed) stops the ladder.
+model EscalationRule {
+  id                String               @id @default(cuid())
+  tenantId          String
+  module            String               // deal | lead | ticket | activity | ...
+  name              String
+  // Optional [{ field, operator, value }] filter — advisory metadata used when an
+  // instance is opened (the caller/consumer decides eligibility). AND-combined.
+  criteria          Json?
+  // Ordered ladder: [{ afterMinutes, action: NOTIFY|REASSIGN|SET_FIELD|CREATE_TASK,
+  //                    target, params }]. `afterMinutes` is measured from startedAt.
+  tiers             Json                 @default("[]")
+  // When true, tier fire times are shifted into the next business-hours window.
+  businessHoursOnly Boolean              @default(false)
+  isActive          Boolean              @default(true)
+  createdBy         String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  instances         EscalationInstance[]
+
+  @@index([tenantId, module, isActive])
+  @@unique([id, tenantId])
+}
+
+// A single record's progress up an EscalationRule ladder. `nextFireAt` is the due
+// time of `currentTier`; the poller fires it, advances the tier, and marks
+// COMPLETED after the last tier. RESOLVED = stopped early (record replied/closed).
+model EscalationInstance {
+  id          String         @id @default(cuid())
+  tenantId    String
+  ruleId      String
+  rule        EscalationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  module      String
+  recordId    String
+  // Snapshot of the record used to resolve action targets/fields at fire time.
+  recordData  Json           @default("{}")
+  startedAt   DateTime       @default(now())
+  currentTier Int            @default(0)
+  nextFireAt  DateTime
+  resolvedAt  DateTime?
+  status      String         @default("ACTIVE") // ACTIVE | RESOLVED | COMPLETED
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([status, nextFireAt])
+  @@index([tenantId, module, recordId])
+  @@index([tenantId, ruleId])
+  @@unique([id, tenantId])
+}
+
+// ─── Scoring Rules Engine (configurable record scoring) ─────────────────────
+//
+// Admin-configured scoring for leads/deals/contacts/accounts. Each rule carries
+// conditions with positive/negative points; the engine sums the points of matched
+// conditions into a RecordScore. Recomputed on demand or automatically when a
+// relevant record event arrives.
+model ScoringRule {
+  id         String   @id @default(cuid())
+  tenantId   String
+  module     String   // lead | deal | contact | account
+  name       String
+  // [{ field, operator, value, points }] — each matched condition adds `points`
+  // (may be negative). Uses the same operator set as automation-rule conditions.
+  conditions Json     @default("[]")
+  isActive   Boolean  @default(true)
+  createdBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([tenantId, module, isActive])
+  @@unique([id, tenantId])
+}
+
+// Materialised score for a single record (one row per tenant+module+record).
+model RecordScore {
+  id        String   @id @default(cuid())
+  tenantId  String
+  module    String
+  recordId  String
+  score     Int      @default(0)
+  // [{ ruleId, ruleName, field, operator, value, points }] — the matched
+  // conditions that contributed to `score`.
+  breakdown Json     @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, module, recordId])
+  @@index([tenantId, module])
+}
+
+// ─── Threshold / Big-Deal Alerts ────────────────────────────────────────────
+//
+// Fire a notification to roles/users when a record field crosses a threshold
+// (e.g. Deal.amount >= 100000). Evaluated on record events; deduped so it fires
+// once per crossing (see ThresholdAlertState) rather than on every subsequent
+// event while the record remains over the line.
+model ThresholdAlert {
+  id          String               @id @default(cuid())
+  tenantId    String
+  module      String
+  name        String
+  field       String
+  operator    String               // eq | neq | gt | gte | lt | lte | contains | ...
+  value       Json
+  notifyRoles String[]             @default([])
+  notifyUsers String[]             @default([])
+  isActive    Boolean              @default(true)
+  createdBy   String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  states      ThresholdAlertState[]
+
+  @@index([tenantId, module, isActive])
+  @@unique([id, tenantId])
+}
+
+// Last-known crossing state per (alert, record) — the fired-marker that makes a
+// threshold alert fire once per crossing (edge-triggered), not on every event.
+model ThresholdAlertState {
+  id         String         @id @default(cuid())
+  tenantId   String
+  alertId    String
+  alert      ThresholdAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  recordId   String
+  crossed    Boolean        @default(false)
+  lastFiredAt DateTime?
+  updatedAt  DateTime       @updatedAt
+
+  @@unique([alertId, recordId])
+  @@index([tenantId, alertId])
+}
+
+// WF-OPS (Phase-4): dead-letter replay surface. When the automation consumer
+// exhausts its retries on a transient failure, the ORIGINAL event is parked on
+// `<topic>.dlq`. The DLQ consumer persists each parked message here so an admin
+// can inspect it and replay the original envelope back onto its source topic.
+//
+// `payload` holds the FULL original event envelope (eventId/correlationId/source/
+// timestamp/version/causation preserved) — republished verbatim via
+// NexusProducer.publishBatch so downstream consumers process it identically.
+// `dedupeKey` = `<originalTopic>:<partition>:<offset>` makes persistence
+// idempotent: re-consuming the same parked message (consumer restart / handler
+// retry) upserts the same row instead of creating duplicates.
+model DeadLetterEvent {
+  id         String           @id @default(cuid())
+  tenantId   String
+  topic      String           // original (source) topic the event replays onto
+  eventType  String
+  eventId    String?          // envelope eventId (for cross-referencing / ops search)
+  payload    Json             // full original event envelope — republished verbatim
+  headers    Json?            // original kafka message headers (string map)
+  error      String
+  attempts   Int              @default(0)
+  status     DeadLetterStatus @default(PENDING)
+  dedupeKey  String           // <originalTopic>:<partition>:<offset> — dedup identity
+  createdAt  DateTime         @default(now())
+  replayedAt DateTime?
+
+  @@unique([tenantId, dedupeKey])
+  @@index([tenantId, status])
+  @@index([tenantId, topic, status])
+  @@index([tenantId, createdAt])
+}
+
+enum DeadLetterStatus {
+  PENDING
+  REPLAYED
+  DISCARDED
 }

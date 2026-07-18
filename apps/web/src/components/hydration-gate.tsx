@@ -24,8 +24,8 @@ export function HydrationGate({ children }: { children: ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
-          <span className="text-sm text-slate-500">Loading…</span>
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-outline-variant border-t-primary" />
+          <span className="text-sm text-on-surface-variant">Loading…</span>
         </div>
       </div>
     );

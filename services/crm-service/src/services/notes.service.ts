@@ -16,6 +16,8 @@ export interface NoteListFilters {
   contactId?: string;
   leadId?: string;
   accountId?: string;
+  entityType?: string;
+  entityId?: string;
   isPinned?: boolean;
   authorId?: string;
 }
@@ -26,6 +28,8 @@ export interface CreateNoteData {
   contactId?: string;
   leadId?: string;
   accountId?: string;
+  entityType?: string;
+  entityId?: string;
   isPinned?: boolean;
   authorId: string;
   mentions?: string[];
@@ -48,6 +52,8 @@ function buildNoteWhere(
   if (f.contactId) where.contactId = f.contactId;
   if (f.leadId) where.leadId = f.leadId;
   if (f.accountId) where.accountId = f.accountId;
+  if (f.entityType) where.entityType = f.entityType;
+  if (f.entityId) where.entityId = f.entityId;
   if (typeof f.isPinned === 'boolean') where.isPinned = f.isPinned;
   if (f.authorId) where.authorId = f.authorId;
   return where;
@@ -129,12 +135,13 @@ export function createNotesService(prisma: CrmPrisma) {
     },
 
     async createNote(tenantId: string, data: CreateNoteData): Promise<Note> {
+      const hasPolymorphic = Boolean(data.entityType && data.entityId);
       const hasParent = Boolean(
         data.dealId || data.contactId || data.leadId || data.accountId
       );
-      if (!hasParent) {
+      if (!hasParent && !hasPolymorphic) {
         throw new BusinessRuleError(
-          'Note must reference at least one of deal/contact/lead/account'
+          'Note must reference a deal/contact/lead/account or an entityType+entityId'
         );
       }
 
@@ -157,6 +164,8 @@ export function createNotesService(prisma: CrmPrisma) {
           contactId: data.contactId ?? null,
           leadId: data.leadId ?? null,
           accountId: data.accountId ?? null,
+          entityType: data.entityType ?? null,
+          entityId: data.entityId ?? null,
           mentions: data.mentions ?? [],
         },
       });

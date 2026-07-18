@@ -47,6 +47,10 @@ export function ImportButton({ module, onImported }: ImportButtonProps) {
         className="hidden"
         type="file"
         accept=".csv,text/csv,application/json"
+        // Visually hidden and driven by the button below; still needs an accessible
+        // name so axe's `label` rule passes and screen readers announce the picker.
+        aria-label="Import file (CSV or JSON)"
+        tabIndex={-1}
         onChange={(event) => {
           const file = event.target.files?.[0];
           if (file) void importFile(file);
@@ -56,7 +60,7 @@ export function ImportButton({ module, onImported }: ImportButtonProps) {
         type="button"
         disabled={loading}
         onClick={() => inputRef.current?.click()}
-        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 rounded-md border border-outline-variant bg-surface px-3 py-1.5 text-sm text-on-surface hover:bg-surface-container-low disabled:opacity-50"
       >
         <Upload className="h-3.5 w-3.5" />
         {loading ? 'Importing...' : 'Import'}

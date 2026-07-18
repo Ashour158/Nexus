@@ -58,7 +58,7 @@ export default function DealEditPage() {
   if (!canUpdate) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
+        <div className="rounded-lg border border-warning/30 bg-warning-container p-6 text-sm text-on-warning-container">
           You do not have permission to edit deals.
         </div>
       </div>
@@ -104,7 +104,7 @@ export default function DealEditPage() {
   if (dealQuery.isError || !deal) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+        <div className="rounded-lg border border-error/30 bg-error-container p-6 text-sm text-error">
           Failed to load deal.
         </div>
       </div>
@@ -114,47 +114,47 @@ export default function DealEditPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">Edit Deal</h1>
+        <h1 className="text-2xl font-bold text-on-surface">Edit Deal</h1>
         <Button variant="secondary" onClick={() => router.push(`/deals/${dealId}`)}>
           Cancel
         </Button>
       </div>
 
-      <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6">
+      <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-outline-variant bg-surface p-6">
         <div>
-          <label className="block text-xs font-medium text-slate-600">Name</label>
+          <label className="block text-xs font-medium text-on-surface-variant">Name</label>
           <Input value={name} onChange={(e) => setName(e.target.value)} required className="mt-1" />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-slate-600">Amount</label>
+            <label className="block text-xs font-medium text-on-surface-variant">Amount</label>
             <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600">Currency</label>
+            <label className="block text-xs font-medium text-on-surface-variant">Currency</label>
             <Input value={currency} onChange={(e) => setCurrency(e.target.value)} className="mt-1" maxLength={3} />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-slate-600">Probability (%)</label>
+            <label className="block text-xs font-medium text-on-surface-variant">Probability (%)</label>
             <Input type="number" min={0} max={100} value={probability} onChange={(e) => setProbability(e.target.value)} className="mt-1" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600">Expected Close Date</label>
+            <label className="block text-xs font-medium text-on-surface-variant">Expected Close Date</label>
             <Input type="date" value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} className="mt-1" />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-slate-600">Status</label>
+            <label className="block text-xs font-medium text-on-surface-variant">Status</label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm"
+              className="mt-1 h-9 w-full rounded-md border border-outline-variant bg-surface px-2 text-sm"
             >
               <option value="OPEN">Open</option>
               <option value="WON">Won</option>
@@ -163,11 +163,11 @@ export default function DealEditPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600">Forecast Category</label>
+            <label className="block text-xs font-medium text-on-surface-variant">Forecast Category</label>
             <select
               value={forecastCategory}
               onChange={(e) => setForecastCategory(e.target.value)}
-              className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm"
+              className="mt-1 h-9 w-full rounded-md border border-outline-variant bg-surface px-2 text-sm"
             >
               <option value="PIPELINE">Pipeline</option>
               <option value="BEST_CASE">Best Case</option>
@@ -180,7 +180,7 @@ export default function DealEditPage() {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-slate-600">Pipeline</label>
+            <label className="block text-xs font-medium text-on-surface-variant">Pipeline</label>
             <select
               value={pipelineId}
               onChange={(e) => {
@@ -190,7 +190,7 @@ export default function DealEditPage() {
                 // stale stageId can't be submitted against the new pipeline.
                 setStageId('');
               }}
-              className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm"
+              className="mt-1 h-9 w-full rounded-md border border-outline-variant bg-surface px-2 text-sm"
             >
               {pipelines.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -200,11 +200,11 @@ export default function DealEditPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600">Stage</label>
+            <label className="block text-xs font-medium text-on-surface-variant">Stage</label>
             <select
               value={stageId}
               onChange={(e) => setStageId(e.target.value)}
-              className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm"
+              className="mt-1 h-9 w-full rounded-md border border-outline-variant bg-surface px-2 text-sm"
             >
               {stages.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -216,11 +216,11 @@ export default function DealEditPage() {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-slate-600">Owner</label>
+          <label className="block text-xs font-medium text-on-surface-variant">Owner</label>
           <select
             value={ownerId}
             onChange={(e) => setOwnerId(e.target.value)}
-            className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm"
+            className="mt-1 h-9 w-full rounded-md border border-outline-variant bg-surface px-2 text-sm"
           >
             {owners.map((u) => (
               <option key={u.id} value={u.id}>

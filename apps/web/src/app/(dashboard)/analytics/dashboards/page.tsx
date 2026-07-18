@@ -28,22 +28,22 @@ export default function DashboardsListPage(): ReactElement {
     <main className="space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Dashboards</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-on-surface">Dashboards</h1>
+          <p className="text-sm text-on-surface-variant">
             Build your own analytics with custom widgets, charts, and filters.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Link
             href="/analytics/reports/builder"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 py-2 text-sm font-semibold text-on-surface hover:bg-surface-container-low"
           >
             <BarChart3 className="h-4 w-4" />
             Report builder
           </Link>
           <button
             onClick={() => setShowCreate(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary"
           >
             <Plus className="h-4 w-4" />
             New dashboard
@@ -52,11 +52,11 @@ export default function DashboardsListPage(): ReactElement {
       </header>
 
       {isLoading ? (
-        <div className="rounded-xl border border-slate-100 bg-white p-10 text-center text-sm text-slate-500">
+        <div className="rounded-xl border border-outline-variant bg-surface p-10 text-center text-sm text-on-surface-variant">
           Loading dashboards…
         </div>
       ) : error ? (
-        <div className="rounded-xl border border-rose-100 bg-rose-50 p-8 text-sm text-rose-700">
+        <div className="rounded-xl border border-error/30 bg-error-container p-8 text-sm text-error">
           Failed to load dashboards. {(error as Error).message}
         </div>
       ) : !dashboards?.length ? (
@@ -66,20 +66,20 @@ export default function DashboardsListPage(): ReactElement {
           {dashboards.map((dashboard) => (
             <div
               key={dashboard.id}
-              className="group relative flex flex-col rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition hover:border-blue-200 hover:shadow"
+              className="group relative flex flex-col rounded-xl border border-outline-variant bg-surface p-5 shadow-sm transition hover:border-primary/40 hover:shadow"
             >
               <Link href={`/analytics/dashboards/${dashboard.id}`} className="flex-1">
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary-container text-primary">
                   <LayoutGrid className="h-5 w-5" />
                 </div>
-                <h3 className="text-base font-bold text-slate-900">{dashboard.name}</h3>
+                <h3 className="text-base font-bold text-on-surface">{dashboard.name}</h3>
                 {dashboard.description && (
-                  <p className="mt-1 line-clamp-2 text-sm text-slate-500">{dashboard.description}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-on-surface-variant">{dashboard.description}</p>
                 )}
-                <div className="mt-3 flex items-center gap-3 text-xs text-slate-400">
+                <div className="mt-3 flex items-center gap-3 text-xs text-on-surface-variant">
                   <span>{dashboard.widgets?.length ?? 0} widgets</span>
                   {dashboard.shared && (
-                    <span className="inline-flex items-center gap-1 text-emerald-600">
+                    <span className="inline-flex items-center gap-1 text-success">
                       <Share2 className="h-3 w-3" /> Shared
                     </span>
                   )}
@@ -89,7 +89,7 @@ export default function DashboardsListPage(): ReactElement {
                 onClick={() => {
                   if (confirm(`Delete "${dashboard.name}"?`)) deleteDashboard.mutate(dashboard.id);
                 }}
-                className="absolute right-3 top-3 rounded-md p-1.5 text-slate-300 opacity-0 transition hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100"
+                className="absolute right-3 top-3 rounded-md p-1.5 text-outline opacity-0 transition hover:bg-error-container hover:text-error group-hover:opacity-100"
                 title="Delete dashboard"
               >
                 <Trash2 className="h-4 w-4" />
@@ -100,43 +100,43 @@ export default function DashboardsListPage(): ReactElement {
       )}
 
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
-            <header className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <h2 className="text-lg font-bold text-slate-900">New dashboard</h2>
-              <button onClick={() => setShowCreate(false)} className="text-slate-400 hover:text-slate-700">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-surface shadow-xl">
+            <header className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
+              <h2 className="text-lg font-bold text-on-surface">New dashboard</h2>
+              <button onClick={() => setShowCreate(false)} className="text-on-surface-variant hover:text-on-surface">
                 <X className="h-5 w-5" />
               </button>
             </header>
             <div className="space-y-4 p-6">
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Name</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Name</span>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   autoFocus
                   placeholder="e.g. Q3 Sales Review"
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  className="rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:border-primary"
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Description</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Description</span>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  className="rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none focus:border-primary"
                 />
               </label>
-              <label className="flex items-center gap-2 text-sm text-slate-700">
+              <label className="flex items-center gap-2 text-sm text-on-surface">
                 <input type="checkbox" checked={shared} onChange={(e) => setShared(e.target.checked)} />
                 Share with my team
               </label>
             </div>
-            <footer className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
+            <footer className="flex items-center justify-end gap-3 border-t border-outline-variant px-6 py-4">
               <button
                 onClick={() => setShowCreate(false)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low"
               >
                 Cancel
               </button>
@@ -144,7 +144,7 @@ export default function DashboardsListPage(): ReactElement {
                 onClick={handleCreate}
                 disabled={!name.trim() || createDashboard.isPending}
                 className={cn(
-                  'rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700',
+                  'rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary',
                   (!name.trim() || createDashboard.isPending) && 'opacity-50'
                 )}
               >
@@ -160,18 +160,18 @@ export default function DashboardsListPage(): ReactElement {
 
 function EmptyState({ onCreate }: { onCreate: () => void }): ReactElement {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white p-12 text-center">
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant bg-surface p-12 text-center">
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary-container text-primary">
         <LayoutGrid className="h-7 w-7" />
       </div>
-      <h3 className="text-lg font-bold text-slate-900">No dashboards yet</h3>
-      <p className="mt-1 max-w-sm text-sm text-slate-500">
+      <h3 className="text-lg font-bold text-on-surface">No dashboards yet</h3>
+      <p className="mt-1 max-w-sm text-sm text-on-surface-variant">
         Create a dashboard and add your own widgets — pick a dataset, choose measures and
         dimensions, and render it as a chart.
       </p>
       <button
         onClick={onCreate}
-        className="mt-5 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+        className="mt-5 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary"
       >
         <Plus className="h-4 w-4" />
         New dashboard

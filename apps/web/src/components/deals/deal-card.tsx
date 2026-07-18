@@ -12,7 +12,11 @@ import { useQuickUpdateDeal } from '@/hooks/use-deals';
 function DataQualityBadge({ score }: { score?: number | null }) {
   if (score == null) return null;
   const color =
-    score >= 80 ? 'bg-green-100 text-green-700' : score >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700';
+    score >= 80
+      ? 'bg-success-container text-on-success-container'
+      : score >= 50
+        ? 'bg-warning-container text-on-warning-container'
+        : 'bg-error-container text-on-error-container';
   return (
     <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${color}`} title="Data Quality Score">
       {score}%
@@ -89,10 +93,10 @@ export function DealCard({
       onClick={() => onClick?.(deal)}
       data-testid="deal-card"
       className={cn(
-        'group relative select-none rounded-md border border-border bg-background p-3 shadow-sm transition-shadow',
-        'hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary',
+        'group relative select-none rounded-lg border border-outline-variant bg-surface p-3 shadow-card transition-all',
+        'hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-elevated focus:outline-none focus:ring-2 focus:ring-primary',
         disabled ? 'cursor-pointer' : 'cursor-grab',
-        lifted && 'cursor-grabbing shadow-lg ring-2 ring-primary/50'
+        lifted && 'rotate-2 cursor-grabbing shadow-modal ring-2 ring-primary/50'
       )}
     >
       {canQuickEdit ? (
@@ -134,7 +138,7 @@ export function DealCard({
 
       {deal.isRenewal ? (
         <div className="mt-1">
-          <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">
+          <span className="rounded-full bg-tertiary-container px-1.5 py-0.5 text-[10px] font-medium text-on-tertiary-container">
             Renewal
           </span>
         </div>
@@ -239,7 +243,7 @@ function QuickEditCard({ deal, onDone }: { deal: Deal; onDone: () => void }): JS
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node)) save();
       }}
-      className="rounded-md border border-primary/50 bg-background p-3 shadow-md ring-2 ring-primary/30"
+      className="rounded-lg border border-primary/50 bg-surface p-3 shadow-elevated ring-2 ring-primary/30"
     >
       <div className="mb-2 flex items-center justify-between">
         <span className="line-clamp-1 text-xs font-medium text-foreground">{deal.name}</span>
@@ -250,7 +254,7 @@ function QuickEditCard({ deal, onDone }: { deal: Deal; onDone: () => void }): JS
             aria-label="Save"
             onPointerDown={stop}
             onClick={save}
-            className="rounded p-1 text-emerald-600 hover:bg-emerald-50"
+            className="rounded p-1 text-success hover:bg-success-container"
           >
             <Check className="h-3.5 w-3.5" />
           </button>

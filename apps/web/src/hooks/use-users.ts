@@ -114,3 +114,16 @@ export function useDeactivateUser() {
     onSuccess: () => qc.invalidateQueries({ queryKey: userKeys.all }),
   });
 }
+
+/**
+ * Admin-triggered password reset. Returns a one-time temporary password for the
+ * admin to convey to the user (they must change it on next login).
+ */
+export function useResetUserPassword() {
+  const qc = useQueryClient();
+  return useMutation<{ id: string; temporaryPassword: string }, Error, string>({
+    mutationFn: (id) =>
+      apiClients.auth.post<{ id: string; temporaryPassword: string }>(`/users/${id}/reset-password`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: userKeys.all }),
+  });
+}

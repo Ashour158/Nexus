@@ -7,6 +7,9 @@ import fastifyMultipart from '@fastify/multipart';
 import fastifyRateLimit from '@fastify/rate-limit';
 import { fastifyRequestContext } from '@fastify/request-context';
 import { createRedisClient } from './redis.js';
+import { registerSwagger, isSwaggerEnabled } from './swagger.js';
+import { ValidationError } from './errors.js';
+import { flattenValidationError } from './validation.js';
 import pino from 'pino';
 import * as Sentry from '@sentry/node';
 import { type KeyObject } from 'node:crypto';
@@ -81,6 +84,10 @@ function isInternalServiceRoute(url: string, headers: Record<string, unknown> | 
 function isPublicRoute(url: string, method: string): boolean {
   const path = pathOnly(url);
   if (path.startsWith('/health') || path.startsWith('/metrics') || path.startsWith('/ready')) {
+    return true;
+  }
+  /** OpenAPI docs (RR-H17) — swagger-ui + generated document, no JWT. */
+  if (path === '/openapi.json' || path === '/docs' || path.startsWith('/docs/')) {
     return true;
   }
   /** Public comm-service email open/click tracking (no JWT on pixel / webhook). */
@@ -241,23 +248,34 @@ export async function createService(config: ServiceConfig): Promise<FastifyInsta
       // and marking the container unhealthy (→ restart loops under an orchestrator).
       allowList: (req: any) => {
         const path = pathOnly(req.url);
-        return path.startsWith('/health') || path.startsWith('/metrics') || path.startsWith('/ready');
+        if (path.startsWith('/health') || path.startsWith('/metrics') || path.startsWith('/ready')) return true;
+        // `/auth/login` is unauthenticated, so it can't be keyed per-user — it falls
+        // back to per-IP. Behind the single-IP web BFF, every user's login shares one
+        // bucket, so a login wave (mass onboarding, or the Monday-morning peak) trips
+        // the limit and legitimate logins are rejected. Login already has its own
+        // per-EMAIL brute-force control (login-throttle: lockout after repeated
+        // failures) + uniform errors, so the generic IP limiter is the wrong tool
+        // here and is removed for login. All other routes stay limited.
+        return path.endsWith('/auth/login');
       },
       keyGenerator: (req: any) => {
-        const tenantId = req.headers['x-tenant-id'] as string | undefined;
-        // Extract user sub from JWT payload (no signature verification needed for bucketing)
-        let userId: string | undefined;
+        // Bucket per authenticated (tenant, user) so one busy tenant can't starve
+        // the rest. BOTH ids come from the JWT payload — NOT the `x-tenant-id`
+        // header. The header is absent on any direct API client and (critically)
+        // the web BFF proxies every user through one server IP, so a header-gated
+        // key collapses the whole deployment into a single IP bucket. The JWT is
+        // present on every authenticated request and already carries tenantId+sub.
         const auth = req.headers.authorization as string | undefined;
         if (auth?.startsWith('Bearer ')) {
           try {
             const payload = JSON.parse(Buffer.from(auth.split('.')[1], 'base64url').toString());
-            userId = payload.sub;
-          } catch { /* ignore malformed JWT */ }
+            if (payload.tenantId && payload.sub) return `${payload.tenantId}:${payload.sub}`;
+            if (payload.sub) return `u:${payload.sub}`;
+          } catch { /* ignore malformed JWT — fall through to IP */ }
         }
-        // Per-tenant per-user bucket when identifiable; fallback to IP
-        if (tenantId && userId) return `${tenantId}:${userId}`;
-        if (tenantId) return `${tenantId}:${req.ip}`;
-        return req.ip;
+        // Unauthenticated (login, refresh, public scheduling) → per-IP.
+        const headerTenant = req.headers['x-tenant-id'] as string | undefined;
+        return headerTenant ? `${headerTenant}:${req.ip}` : req.ip;
       },
       errorResponseBuilder: (_req: any, context: any) => ({
         success: false,
@@ -298,11 +316,30 @@ export async function createService(config: ServiceConfig): Promise<FastifyInsta
 
   app.addHook('preHandler', async (request, reply) => {
     const path = pathOnly(request.url);
-    if (isPublicRoute(path, request.method)) return;
     // Internal service-to-service routes self-verify `x-service-token` in-route;
     // bypass the end-user JWT preHandler ONLY when a matching token is present.
-    // Without the token this falls through to JWT verification below.
-    if (isInternalServiceRoute(path, request.headers as Record<string, unknown>)) return;
+    // This runs BEFORE the isPublicRoute check so it also covers internal routes
+    // that isPublicRoute lists (e.g. /internal/reporting|outbox|codes) — those
+    // touch tenant-scoped Prisma and would otherwise throw under fail-closed.
+    if (isInternalServiceRoute(path, request.headers as Record<string, unknown>)) {
+      // These routes skip the JWT tenant-seeding below, so seed tenant context
+      // from the `x-tenant-id` header the internal caller sends (e.g. workflow
+      // automation nodes, reporting clients). Without this, tenant-scoped Prisma
+      // ops in an internal route throw under fail-closed enforcement (RR-H2).
+      // Routes that also read tenantId from the body still work; this makes the
+      // ALS path consistent. A request without a matching x-service-token does
+      // NOT enter here (isInternalServiceRoute → false) and falls through to the
+      // isPublicRoute / JWT handling below, preserving prior behavior.
+      const tenantHeader = request.headers['x-tenant-id'];
+      if (typeof tenantHeader === 'string' && tenantHeader.length > 0) {
+        (request.requestContext as { set: (key: string, value: string) => void }).set(
+          'tenantId',
+          tenantHeader
+        );
+      }
+      return;
+    }
+    if (isPublicRoute(path, request.method)) return;
     if (config.publicPrefixes?.some((prefix) => path.startsWith(prefix))) return;
 
     try {
@@ -322,6 +359,40 @@ export async function createService(config: ServiceConfig): Promise<FastifyInsta
       });
     }
   });
+
+  // RR-H18 — uniform validation. A zod-aware validator compiler so any route
+  // that declares a zod schema (`{ schema: { body: zodSchema } }`) validates
+  // through the same path, and failures surface as ValidationError → 422 +
+  // flatten() via `globalErrorHandler`. Non-zod (JSON) schemas pass through
+  // unchanged. No route currently declares a route-level schema, so this is
+  // inert for existing traffic and additive for future zod route schemas.
+  app.setValidatorCompiler(({ schema }: { schema: unknown }) => {
+    const s = schema as { safeParse?: (d: unknown) => { success: boolean; data?: unknown; error?: unknown } };
+    if (typeof s?.safeParse !== 'function') {
+      return (data: unknown) => ({ value: data });
+    }
+    return (data: unknown) => {
+      const result = s.safeParse!(data);
+      if (result.success) return { value: result.data };
+      // Returning a NexusError (422) so the shared error handler renders the
+      // standard envelope with flatten() details.
+      return {
+        error: new ValidationError(
+          'Validation failed',
+          flattenValidationError(result.error)
+        ) as unknown as Error,
+      };
+    };
+  });
+  app.setSchemaErrorFormatter((errors) => {
+    return new ValidationError('Validation failed', flattenValidationError(errors)) as unknown as Error;
+  });
+
+  // RR-H17 — mount OpenAPI docs (`/docs`) + document (`/openapi.json`) unless
+  // ENABLE_SWAGGER=false. Safe-default; never throws a service down.
+  if (isSwaggerEnabled()) {
+    await registerSwagger(app as unknown as FastifyInstance, { name: config.name });
+  }
 
   return app as unknown as FastifyInstance<RawServerDefault>;
 }

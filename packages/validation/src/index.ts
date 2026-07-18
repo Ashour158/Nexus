@@ -92,6 +92,10 @@ export const CreateDealSchema = z.object({
   currency: z.string().length(3).default('USD'),
   probability: z.number().int().min(0).max(100).optional(),
   expectedCloseDate: z.string().datetime().optional(),
+  // Optional manual override; otherwise auto-derived from the stage on create.
+  forecastCategory: z
+    .enum(['PIPELINE', 'BEST_CASE', 'COMMIT', 'CLOSED', 'OMITTED'])
+    .optional(),
   source: z.string().optional(),
   campaignId: z.string().cuid().optional(),
   contactIds: z.array(z.string().cuid()).default([]),
@@ -686,6 +690,45 @@ const ActivityStatusEnum = z.enum([
 
 const ActivityPriorityEnum = z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']);
 
+/**
+ * Non-CRM "money object" entity types that Activities / Notes can attach to via
+ * the polymorphic `entityType`+`entityId` pair (A1). Native CRM parents
+ * (deal/contact/lead/account) keep using their typed id fields.
+ */
+export const TimelineEntityTypeEnum = z.enum([
+  'QUOTE',
+  'INVOICE',
+  'ORDER',
+  'CONTRACT',
+  'CAMPAIGN',
+]);
+export type TimelineEntityType = z.infer<typeof TimelineEntityTypeEnum>;
+
+/** Native + money entity types accepted by the unified timeline endpoint. */
+export const TimelineLookupEntityTypeEnum = z.enum([
+  'DEAL',
+  'CONTACT',
+  'LEAD',
+  'ACCOUNT',
+  'QUOTE',
+  'INVOICE',
+  'ORDER',
+  'CONTRACT',
+  'CAMPAIGN',
+]);
+export type TimelineLookupEntityType = z.infer<
+  typeof TimelineLookupEntityTypeEnum
+>;
+
+// Task/Meeting first-class fields (B5), shared by create/update.
+const ActivitySchedulingFields = {
+  location: z.string().max(500).optional(),
+  videoLink: z.string().url().max(2000).optional(),
+  recurrence: z.string().max(1000).optional(),
+  attendees: z.array(z.string().max(320)).max(500).optional(),
+  reminderMinutes: z.number().int().min(0).max(43_200).optional(),
+};
+
 export const CreateActivitySchema = z
   .object({
     type: ActivityTypeEnum,
@@ -701,14 +744,22 @@ export const CreateActivitySchema = z
     contactId: z.string().cuid().optional(),
     leadId: z.string().cuid().optional(),
     accountId: z.string().cuid().optional(),
+    entityType: TimelineEntityTypeEnum.optional(),
+    entityId: z.string().min(1).max(64).optional(),
+    ...ActivitySchedulingFields,
     customFields: z.record(z.unknown()).default({}),
+  })
+  .refine((v) => (v.entityType ? Boolean(v.entityId) : true), {
+    message: 'entityId is required when entityType is set',
+    path: ['entityId'],
   })
   .refine(
     (v) =>
       Boolean(v.dealId) ||
       Boolean(v.contactId) ||
       Boolean(v.leadId) ||
-      Boolean(v.accountId),
+      Boolean(v.accountId) ||
+      (Boolean(v.entityType) && Boolean(v.entityId)),
     { message: 'Activity must be linked to at least one entity' }
   );
 
@@ -727,6 +778,11 @@ export const UpdateActivitySchema = z.object({
   contactId: z.string().cuid().nullable().optional(),
   leadId: z.string().cuid().nullable().optional(),
   accountId: z.string().cuid().nullable().optional(),
+  location: z.string().max(500).nullable().optional(),
+  videoLink: z.string().url().max(2000).nullable().optional(),
+  recurrence: z.string().max(1000).nullable().optional(),
+  attendees: z.array(z.string().max(320)).max(500).optional(),
+  reminderMinutes: z.number().int().min(0).max(43_200).nullable().optional(),
   customFields: z.record(z.unknown()).optional(),
 });
 
@@ -743,6 +799,8 @@ export const ActivityListQuerySchema = PaginationSchema.extend({
   contactId: z.string().cuid().optional(),
   leadId: z.string().cuid().optional(),
   accountId: z.string().cuid().optional(),
+  entityType: TimelineEntityTypeEnum.optional(),
+  entityId: z.string().min(1).max(64).optional(),
   ownerId: z.string().cuid().optional(),
   type: ActivityTypeEnum.optional(),
   status: ActivityStatusEnum.optional(),
@@ -772,15 +830,22 @@ export const CreateNoteSchema = z
     contactId: z.string().cuid().optional(),
     leadId: z.string().cuid().optional(),
     accountId: z.string().cuid().optional(),
+    entityType: TimelineEntityTypeEnum.optional(),
+    entityId: z.string().min(1).max(64).optional(),
     isPinned: z.boolean().default(false),
     mentions: z.array(z.string().cuid()).default([]),
+  })
+  .refine((v) => (v.entityType ? Boolean(v.entityId) : true), {
+    message: 'entityId is required when entityType is set',
+    path: ['entityId'],
   })
   .refine(
     (v) =>
       Boolean(v.dealId) ||
       Boolean(v.contactId) ||
       Boolean(v.leadId) ||
-      Boolean(v.accountId),
+      Boolean(v.accountId) ||
+      (Boolean(v.entityType) && Boolean(v.entityId)),
     { message: 'Note must reference at least one entity' }
   );
 
@@ -795,9 +860,18 @@ export const NoteListQuerySchema = PaginationSchema.extend({
   contactId: z.string().cuid().optional(),
   leadId: z.string().cuid().optional(),
   accountId: z.string().cuid().optional(),
+  entityType: TimelineEntityTypeEnum.optional(),
+  entityId: z.string().min(1).max(64).optional(),
   authorId: z.string().cuid().optional(),
   isPinned: z.coerce.boolean().optional(),
 });
+
+/** Query for the unified timeline endpoint (GET /api/v1/timeline). */
+export const TimelineQuerySchema = PaginationSchema.extend({
+  entityType: TimelineLookupEntityTypeEnum,
+  entityId: z.string().min(1).max(64),
+});
+export type TimelineQuery = z.infer<typeof TimelineQuerySchema>;
 
 export type CreateNoteInput = z.infer<typeof CreateNoteSchema>;
 export type UpdateNoteInput = z.infer<typeof UpdateNoteSchema>;
@@ -1038,6 +1112,70 @@ export type UpdateTagInput = z.infer<typeof UpdateTagSchema>;
 
 // ─── CRM / Custom Field ─ Section 33 ────────────────────────────────────────
 
+// ─── Advanced custom-field configs (Zoho-parity engine) ──────────────────────
+// Type-specific configuration carried in `CustomFieldDefinition.config` (JSON).
+// Each sub-schema is optional at the object level; field-integrity.ts enforces
+// which keys are required for a given fieldType. Kept permissive (passthrough)
+// so the low-code UI can round-trip forward-compatible extra keys.
+
+/** Aggregation function for ROLLUP_SUMMARY fields. */
+export const RollupFunctionSchema = z.enum(['COUNT', 'SUM', 'MIN', 'MAX', 'AVG']);
+export type RollupFunction = z.infer<typeof RollupFunctionSchema>;
+
+/** Rollup-summary config: aggregate a child/related set into this field. */
+export const RollupConfigSchema = z.object({
+  function: RollupFunctionSchema,
+  // Related module/entity whose records are aggregated (apiName).
+  childModule: z.string().min(1).max(120),
+  // Field on the child record to aggregate. Required for SUM/MIN/MAX/AVG.
+  childField: z.string().max(120).optional(),
+  // Lookup field on the child that links back to the parent record.
+  linkField: z.string().min(1).max(120),
+  // Optional simple equality filter applied to child rows before aggregating.
+  filter: z.record(z.unknown()).optional(),
+});
+export type RollupConfigInput = z.infer<typeof RollupConfigSchema>;
+
+/** One field definition inside a SUBFORM (repeating line-item grid). */
+export const SubformFieldSchema = z.object({
+  apiName: z.string().min(1).max(120),
+  label: z.string().min(1).max(120),
+  type: z.string().min(1).max(40),
+  required: z.boolean().optional(),
+  options: z.array(z.unknown()).optional(),
+  defaultValue: z.unknown().optional(),
+});
+export type SubformFieldInput = z.infer<typeof SubformFieldSchema>;
+
+/** Subform config: embedded repeating child-record grid. */
+export const SubformConfigSchema = z.object({
+  fields: z.array(SubformFieldSchema).min(1),
+  minRows: z.number().int().min(0).optional(),
+  maxRows: z.number().int().min(1).optional(),
+});
+export type SubformConfigInput = z.infer<typeof SubformConfigSchema>;
+
+/** Type-specific config for an advanced custom field. Passthrough-tolerant. */
+export const CustomFieldConfigSchema = z
+  .object({
+    // LOOKUP / MULTI_LOOKUP
+    lookupModule: z.string().min(1).max(120).optional(),
+    displayField: z.string().max(120).optional(),
+    // MULTI_LOOKUP
+    junctionModule: z.string().max(120).optional(),
+    maxSelections: z.number().int().min(1).optional(),
+    // SUBFORM
+    subform: SubformConfigSchema.optional(),
+    // ROLLUP_SUMMARY
+    rollup: RollupConfigSchema.optional(),
+    // DEPENDENT_PICKLIST (controlling/parent field apiKey)
+    controllingField: z.string().max(120).optional(),
+    // GLOBAL SET reference (shared picklist)
+    globalSetId: z.string().min(1).optional(),
+  })
+  .passthrough();
+export type CustomFieldConfigInput = z.infer<typeof CustomFieldConfigSchema>;
+
 export const CreateCustomFieldSchema = z.object({
   tenantId: z.string().min(1).optional(),
   entityType: z.string().min(1).max(40),
@@ -1048,12 +1186,45 @@ export const CreateCustomFieldSchema = z.object({
   required: z.boolean().default(false),
   showOnCard: z.boolean().default(false),
   position: z.number().int().min(0).default(0),
+  // Advanced field-type configuration (lookup/rollup/subform/dependent/etc.).
+  config: CustomFieldConfigSchema.optional(),
+  // Shortcut reference to a shared GlobalPicklistSet (also mirrored in config).
+  globalSetId: z.string().min(1).nullish(),
 });
 
 export const UpdateCustomFieldSchema = CreateCustomFieldSchema.partial().omit({ tenantId: true, entityType: true });
 
 export type CreateCustomFieldInput = z.infer<typeof CreateCustomFieldSchema>;
 export type UpdateCustomFieldInput = z.infer<typeof UpdateCustomFieldSchema>;
+
+/** Body for POST /custom-fields/:id/rollup/recompute — supply the child rows
+ *  (or pre-extracted numeric values) the aggregate is computed from. */
+export const RollupRecomputeSchema = z.object({
+  rows: z.array(z.record(z.unknown())).optional(),
+  values: z.array(z.number()).optional(),
+});
+export type RollupRecomputeInput = z.infer<typeof RollupRecomputeSchema>;
+
+// ─── Global picklist sets (tenant-level shared option lists) ──────────────────
+export const GlobalPicklistOptionSchema = z.union([
+  z.string().min(1),
+  z
+    .object({
+      value: z.string().min(1),
+      label: z.string().optional(),
+    })
+    .passthrough(),
+]);
+
+export const CreateGlobalPicklistSetSchema = z.object({
+  name: z.string().min(1).max(120),
+  options: z.array(GlobalPicklistOptionSchema).default([]),
+  isActive: z.boolean().optional(),
+});
+export const UpdateGlobalPicklistSetSchema = CreateGlobalPicklistSetSchema.partial();
+
+export type CreateGlobalPicklistSetInput = z.infer<typeof CreateGlobalPicklistSetSchema>;
+export type UpdateGlobalPicklistSetInput = z.infer<typeof UpdateGlobalPicklistSetSchema>;
 
 // ─── Reusable Address — Section 33 ───────────────────────────────────────────
 

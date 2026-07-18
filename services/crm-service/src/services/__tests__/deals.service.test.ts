@@ -368,7 +368,9 @@ describe('moveDealToStage', () => {
       expect.objectContaining({
         amount: 100000,
         name: 'Acme Expansion',
-      })
+      }),
+      // BL-2: destination-stage terminal flag drives fail-closed behaviour on outage.
+      expect.objectContaining({ toStageIsTerminal: expect.any(Boolean) })
     );
   });
 

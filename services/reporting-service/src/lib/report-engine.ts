@@ -299,17 +299,21 @@ function applyFiltersInMemory(
   );
 }
 
+/**
+ * Serialize one CSV cell. Neutralizes spreadsheet formula injection by prefixing
+ * a single quote to any value that begins with =, +, -, @, tab or CR (the
+ * characters Excel/Sheets treat as the start of a formula), then applies
+ * standard RFC-4180 quoting for embedded commas/quotes/newlines.
+ */
+export function csvCell(val: unknown): string {
+  if (val === null || val === undefined) return '';
+  let str = String(val);
+  if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
+  return /[",\n\r]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
 export async function exportToCsv(rows: Record<string, unknown>[], columns: string[]): Promise<string> {
-  const header = columns.join(',');
-  const lines = rows.map((row) =>
-    columns
-      .map((col) => {
-        const val = row[col];
-        if (val === null || val === undefined) return '';
-        const str = String(val);
-        return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
-      })
-      .join(',')
-  );
+  const header = columns.map((c) => csvCell(c)).join(',');
+  const lines = rows.map((row) => columns.map((col) => csvCell(row[col])).join(','));
   return [header, ...lines].join('\n');
 }

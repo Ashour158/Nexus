@@ -99,6 +99,65 @@ export function evaluateTerritory<T extends EvalTerritory>(
 }
 
 /**
+ * Match a criteria-JSON object (as used by `AssignmentRule`, B6) against a
+ * record. Each key of `criteria` maps to either a scalar (record value must
+ * equal it, string-compared) or an array (record value must be one of the
+ * array entries). ALL keys must be satisfied (logical AND). An empty criteria
+ * object matches everything (a catch-all rule at its priority). Fail-open:
+ * comparison is stringified so numbers/enums compare cleanly and nothing throws.
+ */
+export function criteriaMatches(
+  criteria: Record<string, unknown>,
+  record: Record<string, unknown>
+): boolean {
+  for (const [key, expected] of Object.entries(criteria)) {
+    const actual = record[key];
+    if (Array.isArray(expected)) {
+      if (expected.length === 0) continue; // empty list ⇒ no constraint on this key
+      const ok = expected.some((e) => String(e) === String(actual ?? ''));
+      if (!ok) return false;
+    } else if (expected !== null && typeof expected === 'object') {
+      // Nested object criteria are not supported; treat as non-matching so a
+      // mis-configured rule never silently captures every record.
+      return false;
+    } else {
+      if (String(expected ?? '') !== String(actual ?? '')) return false;
+    }
+  }
+  return true;
+}
+
+/** An assignment rule as seen by the criteria evaluator (subset of the model). */
+export interface EvalAssignmentRule {
+  id: string;
+  territoryId: string;
+  entityType: string;
+  criteria: Record<string, unknown>;
+  ownerId?: string | null;
+  queue?: string | null;
+  priority: number;
+}
+
+/**
+ * Pick the highest-priority active assignment rule whose criteria matches the
+ * record and whose entityType applies ('any' matches all). `rules` need not be
+ * pre-sorted — a shallow copy is sorted by priority descending. Returns null
+ * when nothing matches.
+ */
+export function matchAssignmentRule<T extends EvalAssignmentRule>(
+  rules: readonly T[],
+  entityType: string,
+  record: Record<string, unknown>
+): T | null {
+  const ordered = [...rules].sort((a, b) => b.priority - a.priority);
+  for (const rule of ordered) {
+    if (rule.entityType !== 'any' && rule.entityType !== entityType) continue;
+    if (criteriaMatches(rule.criteria ?? {}, record)) return rule;
+  }
+  return null;
+}
+
+/**
  * Pick the winning territory for a record. First matching rule-set by priority
  * wins; if none match, the highest-priority `isDefault` territory is used.
  * `territories` need not be pre-sorted — this sorts a shallow copy by priority

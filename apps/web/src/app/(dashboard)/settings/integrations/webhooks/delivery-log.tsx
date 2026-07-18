@@ -65,19 +65,19 @@ function DeliveryDetailDialog({
           <div className="mt-4 space-y-4 text-sm">
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <span className="text-slate-500">Event</span>
+                <span className="text-on-surface-variant">Event</span>
                 <p className="font-medium">{detail.data.eventType}</p>
               </div>
               <div>
-                <span className="text-slate-500">HTTP status</span>
+                <span className="text-on-surface-variant">HTTP status</span>
                 <p className="font-medium">{detail.data.httpStatus ?? '—'}</p>
               </div>
               <div>
-                <span className="text-slate-500">Attempts</span>
+                <span className="text-on-surface-variant">Attempts</span>
                 <p className="font-medium">{detail.data.attemptCount}</p>
               </div>
               <div>
-                <span className="text-slate-500">Delivered</span>
+                <span className="text-on-surface-variant">Delivered</span>
                 <p className="font-medium">
                   {detail.data.deliveredAt
                     ? formatDateTime(detail.data.deliveredAt)
@@ -87,18 +87,18 @@ function DeliveryDetailDialog({
             </div>
 
             <div>
-              <p className="mb-1 text-xs font-semibold text-slate-500">Payload</p>
-              <pre className="max-h-52 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-xs">
+              <p className="mb-1 text-xs font-semibold text-on-surface-variant">Payload</p>
+              <pre className="max-h-52 overflow-auto rounded-md border border-outline-variant bg-surface-container-low p-3 text-xs">
                 {JSON.stringify(detail.data.payload ?? {}, null, 2)}
               </pre>
             </div>
 
             {detail.data.responseBody != null ? (
               <div>
-                <p className="mb-1 text-xs font-semibold text-slate-500">
+                <p className="mb-1 text-xs font-semibold text-on-surface-variant">
                   Response body
                 </p>
-                <pre className="max-h-52 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-xs">
+                <pre className="max-h-52 overflow-auto rounded-md border border-outline-variant bg-surface-container-low p-3 text-xs">
                   {detail.data.responseBody}
                 </pre>
               </div>
@@ -124,9 +124,9 @@ export function DeliveryLog({
   const rows = deliveries.data ?? [];
 
   return (
-    <div className="border-t border-slate-100 bg-slate-50/60 p-4">
+    <div className="border-t border-outline-variant bg-surface-container-low/60 p-4">
       <div className="mb-2 flex items-center justify-between">
-        <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
           Delivery log
         </h4>
         <Button
@@ -153,13 +153,13 @@ export function DeliveryLog({
           cta={{ label: 'Retry', onClick: () => deliveries.refetch() }}
         />
       ) : rows.length === 0 ? (
-        <p className="py-4 text-center text-xs text-slate-500">
+        <p className="py-4 text-center text-xs text-on-surface-variant">
           No deliveries recorded yet.
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
-            <thead className="text-left uppercase text-slate-400">
+            <thead className="text-left uppercase text-on-surface-variant">
               <tr>
                 <th className="px-2 py-1.5">Event</th>
                 <th className="px-2 py-1.5">Status</th>
@@ -170,10 +170,10 @@ export function DeliveryLog({
                 <th className="px-2 py-1.5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-outline-variant">
               {rows.map((d) => (
                 <tr key={d.id}>
-                  <td className="px-2 py-1.5 font-medium text-slate-700">
+                  <td className="px-2 py-1.5 font-medium text-on-surface">
                     {d.eventType}
                   </td>
                   <td className="px-2 py-1.5">

@@ -94,7 +94,7 @@ export function DynamicRecordForm({
     switch (field.type) {
       case 'BOOLEAN':
         control = (
-          <label className="flex items-center gap-2 text-sm text-slate-700">
+          <label className="flex items-center gap-2 text-sm text-on-surface">
             <input
               type="checkbox"
               checked={Boolean(value)}
@@ -134,7 +134,7 @@ export function DynamicRecordForm({
         break;
       case 'FORMULA':
         control = (
-          <Input value={formulaResults[apiName] ?? '(computed)'} readOnly disabled className="bg-slate-50 font-mono" />
+          <Input value={formulaResults[apiName] ?? '(computed)'} readOnly disabled className="bg-surface-container-low font-mono" />
         );
         break;
       case 'NUMBER':
@@ -168,13 +168,13 @@ export function DynamicRecordForm({
     return (
       <div key={apiName}>
         {field.type !== 'BOOLEAN' && (
-          <label className="mb-1 block text-sm font-medium text-slate-700">
+          <label className="mb-1 block text-sm font-medium text-on-surface">
             {field.label}
-            {field.required && <span className="ml-0.5 text-red-500">*</span>}
+            {field.required && <span className="ml-0.5 text-error">*</span>}
           </label>
         )}
         {control}
-        {issue && <p className="mt-1 text-xs text-red-600">{issue}</p>}
+        {issue && <p className="mt-1 text-xs text-error">{issue}</p>}
       </div>
     );
   };
@@ -189,7 +189,7 @@ export function DynamicRecordForm({
     >
       {sections.map((section, i) => (
         <div key={i}>
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{section.title}</h3>
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-on-surface-variant">{section.title}</h3>
           <div
             className="grid gap-4"
             style={{ gridTemplateColumns: `repeat(${Math.max(1, section.columns)}, minmax(0, 1fr))` }}
@@ -198,7 +198,7 @@ export function DynamicRecordForm({
           </div>
         </div>
       ))}
-      <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+      <div className="flex justify-end gap-2 border-t border-outline-variant pt-4">
         {onCancel && (
           <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
         )}

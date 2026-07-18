@@ -1,6 +1,7 @@
 import type { CrmPrisma } from '../prisma.js';
 import { ValidationError } from '@nexus/service-utils';
 import { validateRecord } from './validation-rules.js';
+import { governanceFailClosed, GovernanceUnavailableError } from './governance-mode.js';
 
 /**
  * Additive, FAIL-SAFE write guards for the authoritative CRM write paths.
@@ -37,6 +38,7 @@ export async function enforceValidationRules(
   try {
     result = await validateRecord(prisma, tenantId, objectType, record);
   } catch (err) {
+    if (governanceFailClosed()) throw new GovernanceUnavailableError('validation-rules');
     // Evaluation failure must NEVER block a save. Fail-open + log.
     // eslint-disable-next-line no-console
     console.warn(
@@ -73,16 +75,21 @@ export function mergeForValidation(
 /**
  * FieldPermission-aware write filtering.
  *
- * When FieldPermission rows exist for (tenant, objectType, field), a write to
- * that field is only allowed if the caller holds at least one of the field's
- * `allowedRoles`. Fields the caller may not write are STRIPPED from the update
- * payload (never cause a hard failure), so the rest of the save proceeds.
+ * Field-Level Security is DEFAULT-ALLOW and evaluated per the caller's roles:
+ * for a given (tenant, module, field), we look only at the FieldPermission rows
+ * whose `roleName` is one of the caller's roles. A field is editable if ANY such
+ * row has `canEdit: true` (most-permissive-role-wins); it is blocked only when
+ * matching rows exist AND all of them set `canEdit: false`. Fields the caller
+ * may not write are STRIPPED from the update payload (never a hard failure), so
+ * the rest of the save proceeds.
  *
  * FAIL-OPEN contract:
  *  - `roles` undefined  → no role context supplied → no restriction (return input untouched).
- *  - No FieldPermission rows for the objectType → no restriction.
+ *  - No FieldPermission rows matching the caller's roles → no restriction.
  *  - Any error during lookup/evaluation → no restriction (log + return input untouched).
  *  - A field with NO matching FieldPermission row is always allowed.
+ *
+ * `objectType` is the canonical module key ('account' | 'contact' | 'deal' | 'lead').
  *
  * @returns the (possibly reduced) set of update keys that are permitted, plus
  *          the list of stripped field names for optional logging.
@@ -98,35 +105,31 @@ export async function applyFieldPermissions<T extends Record<string, unknown>>(
   if (roles === undefined) return { update, stripped: [] };
 
   try {
-    const perms = await prisma.fieldPermission.findMany({
-      where: { tenantId, objectType },
-      select: { fieldName: true, allowedRoles: true },
-    });
-
-    // No rows => no restriction (fail-open).
-    if (perms.length === 0) return { update, stripped: [] };
-
     const roleSet = new Set(roles);
     // Admin roles are never restricted by field permissions.
     if (roleSet.has('ADMIN') || roleSet.has('SUPER_ADMIN')) {
       return { update, stripped: [] };
     }
 
-    const permByField = new Map<string, string[]>();
+    const perms = await prisma.fieldPermission.findMany({
+      where: { tenantId, module: objectType, roleName: { in: roles } },
+      select: { field: true, canEdit: true },
+    });
+
+    // No rows matching the caller's roles => no restriction (fail-open).
+    if (perms.length === 0) return { update, stripped: [] };
+
+    // A field is editable if ANY matching role row allows it.
+    const editableByField = new Map<string, boolean>();
     for (const p of perms) {
-      const allowed = Array.isArray(p.allowedRoles)
-        ? (p.allowedRoles as unknown[]).filter((x): x is string => typeof x === 'string')
-        : [];
-      permByField.set(p.fieldName, allowed);
+      editableByField.set(p.field, (editableByField.get(p.field) ?? false) || p.canEdit);
     }
 
     const next = { ...update } as T;
     const stripped: string[] = [];
     for (const field of Object.keys(update)) {
-      const allowed = permByField.get(field);
-      if (!allowed) continue; // no rule for this field => allowed
-      const permitted = allowed.some((r) => roleSet.has(r));
-      if (!permitted) {
+      if (!editableByField.has(field)) continue; // no rule for this field => allowed
+      if (!editableByField.get(field)) {
         delete (next as Record<string, unknown>)[field];
         stripped.push(field);
       }
@@ -140,6 +143,7 @@ export async function applyFieldPermissions<T extends Record<string, unknown>>(
     }
     return { update: next, stripped };
   } catch (err) {
+    if (governanceFailClosed()) throw new GovernanceUnavailableError('field-permissions');
     // Any failure => fail-open (behave as if no permissions configured).
     // eslint-disable-next-line no-console
     console.warn(
@@ -154,17 +158,19 @@ export async function applyFieldPermissions<T extends Record<string, unknown>>(
  * FieldPermission-aware READ masking — the read-path mirror of
  * {@link applyFieldPermissions}.
  *
- * When FieldPermission rows exist for (tenant, objectType, field), a field is
- * only readable by a caller holding at least one of the field's `allowedRoles`.
- * Fields the caller may not read are OMITTED from the returned object (their
- * values never reach the client). Objects are shallow-cloned; the input is not
- * mutated. Relation/nested objects are left as-is (only top-level scalar keys
- * matching a FieldPermission row are considered).
+ * Field-Level Security is DEFAULT-ALLOW and evaluated per the caller's roles:
+ * for a given (tenant, module, field), we look only at the FieldPermission rows
+ * whose `roleName` is one of the caller's roles. A field is readable if ANY such
+ * row has `canRead: true` (most-permissive-role-wins); it is masked only when
+ * matching rows exist AND all of them set `canRead: false`. Masked fields are
+ * OMITTED from the returned object (their values never reach the client).
+ * Objects are shallow-cloned; the input is not mutated. Relation/nested objects
+ * are left as-is (only top-level scalar keys matching a row are considered).
  *
  * FAIL-OPEN contract (mirrors the write path, but errs toward NOT blanking the
  * UI — a masking outage should degrade to showing data, not to an empty screen):
  *  - `roles` undefined  → no role context → no masking (return input untouched).
- *  - No FieldPermission rows for the objectType → no masking.
+ *  - No FieldPermission rows matching the caller's roles → no masking.
  *  - ADMIN / SUPER_ADMIN callers are never masked.
  *  - Any error during lookup/evaluation → no masking (log a warning + return input).
  *  - A field with NO matching FieldPermission row is always readable.
@@ -198,21 +204,22 @@ export async function maskFieldPermissions<T extends Record<string, unknown>>(
     }
 
     const perms = await prisma.fieldPermission.findMany({
-      where: { tenantId, objectType },
-      select: { fieldName: true, allowedRoles: true },
+      where: { tenantId, module: objectType, roleName: { in: roles } },
+      select: { field: true, canRead: true },
     });
 
-    // No rows => no restriction (fail-open).
+    // No rows matching the caller's roles => no restriction (fail-open).
     if (perms.length === 0) return records;
 
-    // Precompute the set of top-level fields the caller may NOT read.
-    const blockedFields = new Set<string>();
+    // A field is readable if ANY matching role row allows it; blocked only when
+    // matching rows exist and every one of them denies read.
+    const readableByField = new Map<string, boolean>();
     for (const p of perms) {
-      const allowed = Array.isArray(p.allowedRoles)
-        ? (p.allowedRoles as unknown[]).filter((x): x is string => typeof x === 'string')
-        : [];
-      const permitted = allowed.some((r) => roleSet.has(r));
-      if (!permitted) blockedFields.add(p.fieldName);
+      readableByField.set(p.field, (readableByField.get(p.field) ?? false) || p.canRead);
+    }
+    const blockedFields = new Set<string>();
+    for (const [field, readable] of readableByField) {
+      if (!readable) blockedFields.add(field);
     }
 
     if (blockedFields.size === 0) return records;
@@ -227,6 +234,7 @@ export async function maskFieldPermissions<T extends Record<string, unknown>>(
 
     return (isArray ? masked : masked[0]) as T | T[];
   } catch (err) {
+    if (governanceFailClosed()) throw new GovernanceUnavailableError('field-read-masking');
     // Any failure => fail-open (behave as if no permissions configured). We log
     // so masking outages are visible, but we DO NOT blank the UI.
     // eslint-disable-next-line no-console
@@ -235,5 +243,55 @@ export async function maskFieldPermissions<T extends Record<string, unknown>>(
       err
     );
     return records;
+  }
+}
+
+/**
+ * Returns the set of field names the caller may NOT read for `objectType`,
+ * using the exact same DEFAULT-ALLOW, most-permissive-role-wins evaluation as
+ * {@link maskFieldPermissions}. This is the companion helper for surfaces that
+ * present field-keyed data (e.g. the field-change history timeline) and need to
+ * FILTER by field name rather than delete keys off an object.
+ *
+ * FAIL-OPEN contract (identical to the read-mask):
+ *  - `roles` undefined            → empty set (no restriction).
+ *  - ADMIN / SUPER_ADMIN callers  → empty set.
+ *  - No matching FieldPermission rows → empty set.
+ *  - Any lookup/eval error        → empty set (never hide history on our own bug).
+ */
+export async function getReadBlockedFields(
+  prisma: CrmPrisma,
+  tenantId: string,
+  objectType: string,
+  roles: string[] | undefined
+): Promise<Set<string>> {
+  const blocked = new Set<string>();
+  if (roles === undefined) return blocked;
+  try {
+    const roleSet = new Set(roles);
+    if (roleSet.has('ADMIN') || roleSet.has('SUPER_ADMIN')) return blocked;
+
+    const perms = await prisma.fieldPermission.findMany({
+      where: { tenantId, module: objectType, roleName: { in: roles } },
+      select: { field: true, canRead: true },
+    });
+    if (perms.length === 0) return blocked;
+
+    const readableByField = new Map<string, boolean>();
+    for (const p of perms) {
+      readableByField.set(p.field, (readableByField.get(p.field) ?? false) || p.canRead);
+    }
+    for (const [field, readable] of readableByField) {
+      if (!readable) blocked.add(field);
+    }
+    return blocked;
+  } catch (err) {
+    if (governanceFailClosed()) throw new GovernanceUnavailableError('field-read-masking');
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[write-guards] read-blocked-fields eval failed for ${objectType}; returning none (fail-open)`,
+      err
+    );
+    return blocked;
   }
 }

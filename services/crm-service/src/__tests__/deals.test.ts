@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../../../node_modules/.prisma/crm-client/index.js';
 import { buildServer } from '../server.js';
 
 const prisma = new PrismaClient({

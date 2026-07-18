@@ -7,6 +7,8 @@
  * perform I/O — the caller is responsible for the DB-level uniqueness check.
  */
 
+import { checkFieldConfig } from './field-config.js';
+
 /** Field types the platform can render + store. Unknown types are rejected. */
 export const ALLOWED_FIELD_TYPES = [
   'text',
@@ -23,6 +25,10 @@ export const ALLOWED_FIELD_TYPES = [
   'picklist',
   'multipicklist',
   'lookup',
+  // Advanced Zoho-parity types (config carried in CustomFieldDefinition.config):
+  'multilookup', // references many records in another module
+  'subform', // repeating child line-item grid
+  'rollup', // read-only aggregate of a related set (ROLLUP_SUMMARY)
   'user',
 ] as const;
 
@@ -65,6 +71,8 @@ export type FieldDefinitionCandidate = {
   fieldType?: unknown;
   name?: unknown;
   options?: unknown;
+  config?: unknown;
+  globalSetId?: unknown;
 };
 
 /**
@@ -109,13 +117,43 @@ export function checkFieldDefinition(
   // Picklist-family fields should carry at least one option (only checked when
   // options are being supplied, so a later PATCH can add them).
   const effectiveType = typeof candidate.fieldType === 'string' ? candidate.fieldType : undefined;
+  // A picklist backed by a GlobalPicklistSet (or a dependent picklist that
+  // resolves its options from a controlling field) is allowed to have no inline
+  // options, so only enforce the "at least one option" rule for standalone
+  // picklists that supply an (empty) options array and no globalSet reference.
+  const gsRef =
+    (typeof candidate.globalSetId === 'string' && candidate.globalSetId.length > 0) ||
+    (candidate.config !== null &&
+      typeof candidate.config === 'object' &&
+      typeof (candidate.config as Record<string, unknown>).globalSetId === 'string');
   if (
     (effectiveType === 'picklist' || effectiveType === 'multipicklist') &&
+    !gsRef &&
     candidate.options !== undefined &&
     Array.isArray(candidate.options) &&
     candidate.options.length === 0
   ) {
     issues.push({ field: 'options', message: 'picklist fields must define at least one option.' });
+  }
+
+  // Advanced type-specific config (lookup/multilookup/subform/rollup) + global
+  // set references. Only run when the type is known and a config is relevant.
+  if (effectiveType !== undefined) {
+    if (
+      candidate.config !== undefined ||
+      candidate.globalSetId !== undefined ||
+      effectiveType === 'lookup' ||
+      effectiveType === 'multilookup' ||
+      effectiveType === 'subform' ||
+      effectiveType === 'rollup'
+    ) {
+      const configIssues = checkFieldConfig(
+        effectiveType,
+        candidate.config,
+        typeof candidate.globalSetId === 'string' ? candidate.globalSetId : null
+      );
+      issues.push(...configIssues);
+    }
   }
 
   return issues;

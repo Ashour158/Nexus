@@ -10,8 +10,8 @@ export default function NewDealPage() {
   return (
     <main className="mx-auto max-w-3xl px-6 py-8">
       <header className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">New deal</h1>
-        <p className="text-sm text-slate-600">
+        <h1 className="text-2xl font-bold text-on-surface">New deal</h1>
+        <p className="text-sm text-on-surface-variant">
           Fill in the required fields and choose a pipeline stage.
         </p>
       </header>

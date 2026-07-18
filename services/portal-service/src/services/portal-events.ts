@@ -60,3 +60,122 @@ export async function emitPortalEngagement(
     console.warn('[portal-service] emitPortalEngagement failed (ignored):', err);
   }
 }
+
+/**
+ * Domain event emitted when an external portal user submits a self-service
+ * case/ticket. Published to `TOPICS.ACTIVITIES` (type `portal.case.submitted`)
+ * so the internal CRM timeline reflects it and any consumer (ticket/automation)
+ * can react. Fully fail-open — a broker outage must never break case submission.
+ */
+export async function emitPortalCaseSubmitted(
+  producer: NexusProducer | null | undefined,
+  input: {
+    tenantId: string;
+    caseId: string;
+    accountId: string;
+    contactId?: string | null;
+    portalUserId: string;
+    subject: string;
+    priority: string;
+    externalTicketId?: string | null;
+  }
+): Promise<void> {
+  if (!producer) return;
+  try {
+    await producer.publish(TOPICS.ACTIVITIES, {
+      type: 'portal.case.submitted',
+      tenantId: input.tenantId,
+      payload: {
+        source: 'portal',
+        action: 'case.submitted',
+        subject: `Portal case submitted: ${input.subject}`,
+        caseId: input.caseId,
+        accountId: input.accountId,
+        contactId: input.contactId ?? null,
+        portalUserId: input.portalUserId,
+        priority: input.priority,
+        externalTicketId: input.externalTicketId ?? null,
+        relatedEntityType: 'CASE',
+        relatedEntityId: input.caseId,
+        occurredAt: new Date().toISOString(),
+      },
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[portal-service] emitPortalCaseSubmitted failed (ignored):', err);
+  }
+}
+
+/**
+ * Domain event emitted when an external portal user replies on their own case.
+ * Published to `TOPICS.ACTIVITIES` (type `portal.case.commented`). Fail-open.
+ */
+export async function emitPortalCaseComment(
+  producer: NexusProducer | null | undefined,
+  input: { tenantId: string; caseId: string; portalUserId: string; commentId: string }
+): Promise<void> {
+  if (!producer) return;
+  try {
+    await producer.publish(TOPICS.ACTIVITIES, {
+      type: 'portal.case.commented',
+      tenantId: input.tenantId,
+      payload: {
+        source: 'portal',
+        action: 'case.commented',
+        subject: 'Portal case reply',
+        caseId: input.caseId,
+        commentId: input.commentId,
+        portalUserId: input.portalUserId,
+        relatedEntityType: 'CASE',
+        relatedEntityId: input.caseId,
+        occurredAt: new Date().toISOString(),
+      },
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[portal-service] emitPortalCaseComment failed (ignored):', err);
+  }
+}
+
+/**
+ * Domain event emitted when a `partner` portal user registers a deal. Published
+ * to `TOPICS.LEADS` (type `portal.deal.registered`) so the CRM/lead service can
+ * materialize it as a lead/deal referral (deal-registration style). Fail-open.
+ */
+export async function emitPartnerDealRegistered(
+  producer: NexusProducer | null | undefined,
+  input: {
+    tenantId: string;
+    registrationId: string;
+    accountId: string;
+    portalUserId: string;
+    dealName: string;
+    customerName: string;
+    estimatedValue?: number | null;
+    currency?: string | null;
+  }
+): Promise<void> {
+  if (!producer) return;
+  try {
+    await producer.publish(TOPICS.LEADS, {
+      type: 'portal.deal.registered',
+      tenantId: input.tenantId,
+      payload: {
+        source: 'portal.partner',
+        action: 'deal.registered',
+        subject: `Partner deal registration: ${input.dealName}`,
+        registrationId: input.registrationId,
+        accountId: input.accountId,
+        partnerPortalUserId: input.portalUserId,
+        dealName: input.dealName,
+        customerName: input.customerName,
+        estimatedValue: input.estimatedValue ?? null,
+        currency: input.currency ?? null,
+        occurredAt: new Date().toISOString(),
+      },
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[portal-service] emitPartnerDealRegistered failed (ignored):', err);
+  }
+}

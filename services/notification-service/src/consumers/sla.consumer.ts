@@ -93,7 +93,7 @@ export async function startSlaConsumer(deps: SlaConsumerDeps): Promise<NexusCons
   const consumer = new NexusConsumer('notification-service.sla');
 
   consumer.on('sla.breached', async (event) => {
-    const evt = event as { tenantId: string; payload?: unknown };
+    const evt = event as { tenantId: string; eventId?: string; payload?: unknown };
     const payload = (evt.payload ?? {}) as SlaBreachedPayload;
     // Without an owner there is no one to notify — skip cleanly.
     if (!payload.ownerId || !payload.entityId) return;
@@ -104,6 +104,7 @@ export async function startSlaConsumer(deps: SlaConsumerDeps): Promise<NexusCons
     const body = `${slaName} was breached on ${entityType} ${entityId}. It needs attention.`;
     const actionUrl = `/${entityType}s/${entityId}`;
     await deps.inApp.send({
+      eventId: evt.eventId,
       tenantId: evt.tenantId,
       userId: payload.ownerId,
       type: 'SLA_BREACHED',

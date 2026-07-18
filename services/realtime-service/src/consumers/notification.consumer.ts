@@ -1,9 +1,11 @@
 import type { Server } from 'socket.io';
 import { NexusConsumer, TOPICS } from '@nexus/kafka';
 import { userRoom } from '../socket/rooms.js';
+import { buildEnvelope, emitEnvelope } from '../socket/envelope.js';
 
 interface NotificationPayload {
   userId?: string;
+  notificationId?: string;
   unreadCount?: number;
 }
 
@@ -18,7 +20,12 @@ export async function startNotificationConsumer(io: Server): Promise<NexusConsum
   // WebSocket-only mode — silently disabling every realtime Kafka consumer.
   consumer.on('notification.created', async (event) => {
     const payload = event.payload as unknown as NotificationPayload;
+    // Canonical envelope stream for generic `subscribe({ module: 'notifications' })`
+    // clients. Dropped when the event carries no tenantId.
+    emitEnvelope(io, buildEnvelope('notifications', event, payload.notificationId));
     if (!payload.userId) return;
+    // Legacy per-user channels the web client listens on — shapes preserved
+    // exactly (raw payload; `{ count }`) so existing handlers keep working.
     io.to(userRoom(payload.userId)).emit('notification:new', event.payload);
     if (typeof payload.unreadCount === 'number') {
       io.to(userRoom(payload.userId)).emit('notification:unread_count', {

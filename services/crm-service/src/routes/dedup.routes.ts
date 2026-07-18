@@ -48,31 +48,70 @@ export async function registerDedupRoutes(
         }),
       ]);
 
-      const enriched = await Promise.all(groups.map(async (group: any) => {
-        const recordData = await Promise.all(group.records.map(async (rec: any) => {
-          let data: Record<string, unknown> | null = null;
-          if (group.entityType === 'contact') {
-            data = await p.contact.findUnique({
-              where: { id: rec.recordId },
+      // Batch-load every referenced record per entityType in ONE findMany each
+      // (previously a findUnique per record per group — an N+1). Build id→record
+      // maps and stitch the enriched view together in memory.
+      const contactIds: string[] = [];
+      const accountIds: string[] = [];
+      const dealIds: string[] = [];
+      for (const group of groups) {
+        for (const rec of group.records) {
+          if (group.entityType === 'contact') contactIds.push(rec.recordId);
+          else if (group.entityType === 'account') accountIds.push(rec.recordId);
+          else if (group.entityType === 'deal') dealIds.push(rec.recordId);
+        }
+      }
+
+      const [contacts, accounts, deals] = await Promise.all([
+        contactIds.length
+          ? p.contact.findMany({
+              where: { id: { in: contactIds } },
               select: {
                 id: true, firstName: true, lastName: true, email: true,
                 phone: true, jobTitle: true, accountId: true, ownerId: true,
                 customFields: true, tags: true, createdAt: true,
               },
-            });
-          } else if (group.entityType === 'account') {
-            data = await p.account.findUnique({
-              where: { id: rec.recordId },
+            })
+          : [],
+        accountIds.length
+          ? p.account.findMany({
+              where: { id: { in: accountIds } },
               select: {
                 id: true, name: true, email: true, phone: true,
                 website: true, industry: true, country: true, city: true,
                 customFields: true, tags: true, createdAt: true,
               },
-            });
-          }
-          return { ...rec, data };
-        }));
-        return { ...group, records: recordData };
+            })
+          : [],
+        dealIds.length
+          ? p.deal.findMany({
+              where: { id: { in: dealIds } },
+              select: {
+                id: true, name: true, amount: true, currency: true,
+                accountId: true, ownerId: true, pipelineId: true, stageId: true,
+                status: true, expectedCloseDate: true, createdAt: true,
+              },
+            })
+          : [],
+      ]);
+
+      const contactMap = new Map(contacts.map((c: { id: string }) => [c.id, c]));
+      const accountMap = new Map(accounts.map((a: { id: string }) => [a.id, a]));
+      const dealMap = new Map(deals.map((d: { id: string }) => [d.id, d]));
+
+      const enriched = groups.map((group: any) => ({
+        ...group,
+        records: group.records.map((rec: any) => ({
+          ...rec,
+          data:
+            group.entityType === 'contact'
+              ? contactMap.get(rec.recordId) ?? null
+              : group.entityType === 'account'
+                ? accountMap.get(rec.recordId) ?? null
+                : group.entityType === 'deal'
+                  ? dealMap.get(rec.recordId) ?? null
+                  : null,
+        })),
       }));
 
       return reply.send({ success: true, data: { total, groups: enriched } });
@@ -107,7 +146,9 @@ export async function registerDedupRoutes(
       const result =
         group.entityType === 'account'
           ? await dedupService.mergeAccounts(tenantId, id, masterId, fieldSelections, userId)
-          : await dedupService.mergeContacts(tenantId, id, masterId, fieldSelections, userId);
+          : group.entityType === 'deal'
+            ? await dedupService.mergeDealsByGroup(tenantId, id, masterId, fieldSelections, userId)
+            : await dedupService.mergeContacts(tenantId, id, masterId, fieldSelections, userId);
       return reply.send({ success: true, data: result });
     });
 
@@ -128,12 +169,13 @@ export async function registerDedupRoutes(
     r.get('/dedup/stats', async (req, reply) => {
       const { tenantId } = (req as any).user as { tenantId: string };
       const p = prisma as any;
-      const [pendingContacts, pendingAccounts, mergedTotal] = await Promise.all([
+      const [pendingContacts, pendingAccounts, pendingDeals, mergedTotal] = await Promise.all([
         p.duplicateGroup.count({ where: { tenantId, entityType: 'contact', status: 'pending' } }),
         p.duplicateGroup.count({ where: { tenantId, entityType: 'account', status: 'pending' } }),
+        p.duplicateGroup.count({ where: { tenantId, entityType: 'deal', status: 'pending' } }),
         p.duplicateGroup.count({ where: { tenantId, status: 'merged' } }),
       ]);
-      return reply.send({ success: true, data: { pendingContacts, pendingAccounts, mergedTotal } });
+      return reply.send({ success: true, data: { pendingContacts, pendingAccounts, pendingDeals, mergedTotal } });
     });
   }, { prefix: '/api/v1' });
 }

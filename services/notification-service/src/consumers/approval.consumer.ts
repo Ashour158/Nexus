@@ -49,13 +49,16 @@ export async function startApprovalConsumer(deps: ApprovalConsumerDeps): Promise
   const consumer = new NexusConsumer('notification-service.approvals');
 
   consumer.on('approval.request.created', async (event) => {
-    const evt = event as { tenantId: string; payload?: unknown };
+    const evt = event as { tenantId: string; eventId?: string; payload?: unknown };
     const payload = (evt.payload ?? {}) as ApprovalCreatedPayload;
     const approvers = Array.from(new Set((payload.approverIds ?? []).filter(Boolean)));
     if (approvers.length === 0) return;
     const module = payload.module ?? 'record';
     for (const userId of approvers) {
+      // dedupKey = eventId:userId:type keeps each approver's row distinct while
+      // still collapsing a retry / replay of this same event (RR-H4).
       await deps.inApp.send({
+        eventId: evt.eventId,
         tenantId: evt.tenantId,
         userId,
         type: 'APPROVAL_REQUEST',
@@ -70,11 +73,12 @@ export async function startApprovalConsumer(deps: ApprovalConsumerDeps): Promise
   });
 
   consumer.on('approval.request.escalated', async (event) => {
-    const evt = event as { tenantId: string; payload?: unknown };
+    const evt = event as { tenantId: string; eventId?: string; payload?: unknown };
     const payload = (evt.payload ?? {}) as ApprovalEscalatedPayload;
     const target = payload.escalatedTo ?? payload.approverId;
     if (!target) return;
     await deps.inApp.send({
+      eventId: evt.eventId,
       tenantId: evt.tenantId,
       userId: target,
       type: 'APPROVAL_REQUEST',
@@ -96,13 +100,14 @@ export async function startApprovalConsumer(deps: ApprovalConsumerDeps): Promise
     event: unknown,
     outcome: 'approved' | 'rejected'
   ): Promise<void> => {
-    const evt = event as { tenantId: string; payload?: unknown };
+    const evt = event as { tenantId: string; eventId?: string; payload?: unknown };
     const payload = (evt.payload ?? {}) as ApprovalDecisionPayload;
     const requester = payload.requestedBy;
     if (!requester) return;
     const module = payload.module ?? 'record';
     const approved = outcome === 'approved';
     await deps.inApp.send({
+      eventId: evt.eventId,
       tenantId: evt.tenantId,
       userId: requester,
       type: approved ? 'APPROVAL_APPROVED' : 'APPROVAL_REJECTED',

@@ -33,6 +33,10 @@ interface NormalizedDealEvent {
   probability: number;
   /** Calibrated AI win-probability (0.0-1.0) when the event carries it, else null. */
   aiWinProbability: number | null;
+  /** Deal stage token (stageName / stageId) for ForecastCategoryMap resolution. */
+  stage: string;
+  /** True for `deal.won` / `deal.lost` — a terminal category the map must not override. */
+  terminal: boolean;
 }
 
 /**
@@ -109,6 +113,9 @@ export function normalizeDealEvent(
   const aiRaw = Number(payload.aiWinProbability);
   const aiWinProbability =
     Number.isFinite(aiRaw) && aiRaw >= 0 && aiRaw <= 1 ? aiRaw : null;
+  const stage = String(
+    payload.stageName ?? payload.newStageId ?? payload.stageId ?? payload.stage ?? ''
+  );
   return {
     tenantId,
     dealId,
@@ -119,10 +126,21 @@ export function normalizeDealEvent(
     category: categoryForEvent(type, payload),
     probability,
     aiWinProbability,
+    stage,
+    terminal: type === 'deal.won' || type === 'deal.lost',
   };
 }
 
-export function createForecastRollupService(prisma: PlanningPrisma) {
+/** Optional per-tenant stage → internal-category resolver (ForecastCategoryMap). */
+export interface CategoryResolver {
+  resolveInternal: (tenantId: string, stage: string) => Promise<ForecastCategory | null>;
+}
+
+export function createForecastRollupService(
+  prisma: PlanningPrisma,
+  opts: { categoryResolver?: CategoryResolver } = {}
+) {
+  const categoryResolver = opts.categoryResolver;
   /**
    * Recompute and upsert the ForecastAggregate for one owner+period from the
    * current DealForecastState rows. Called after every deal-state write so the
@@ -210,6 +228,131 @@ export function createForecastRollupService(prisma: PlanningPrisma) {
     });
   }
 
+  const INTERNAL_TO_PUBLIC: Record<ForecastCategory, 'COMMIT' | 'BEST_CASE' | 'PIPELINE' | 'OMITTED' | 'CLOSED'> = {
+    commit: 'COMMIT',
+    best_case: 'BEST_CASE',
+    pipeline: 'PIPELINE',
+    lost: 'OMITTED',
+    won: 'CLOSED',
+  };
+
+  /**
+   * Per-category amount + count breakdown for a scope (one owner, a set of
+   * subordinate owners, or the whole tenant when `ownerIds` is undefined),
+   * computed directly from the per-deal DealForecastState rows so counts and the
+   * OMITTED bucket are exact. All amounts are already in the tenant base currency
+   * (converted at ingest time).
+   */
+  async function computeScopeForecast(
+    tenantId: string,
+    period: string,
+    ownerIds?: string[]
+  ): Promise<{
+    forecast: {
+      categories: Record<string, { amount: string; count: number }>;
+      committedTotal: string;
+      bestCaseTotal: string;
+      pipelineTotal: string;
+      weightedPipeline: string;
+      aiWeightedPipeline: string;
+      openDealCount: number;
+      wonDealCount: number;
+      ownerCount: number;
+    };
+    closedWon: Decimal;
+  }> {
+    const states = await prisma.dealForecastState.findMany({
+      where: { tenantId, period, ...(ownerIds ? { ownerId: { in: ownerIds } } : {}) },
+    });
+    const cat: Record<'COMMIT' | 'BEST_CASE' | 'PIPELINE' | 'OMITTED' | 'CLOSED', { amount: Decimal; count: number }> = {
+      COMMIT: { amount: new Decimal(0), count: 0 },
+      BEST_CASE: { amount: new Decimal(0), count: 0 },
+      PIPELINE: { amount: new Decimal(0), count: 0 },
+      OMITTED: { amount: new Decimal(0), count: 0 },
+      CLOSED: { amount: new Decimal(0), count: 0 },
+    };
+    let weighted = new Decimal(0);
+    let aiWeighted = new Decimal(0);
+    const owners = new Set<string>();
+    for (const s of states) {
+      owners.add(s.ownerId);
+      const amt = new Decimal(s.amount.toString());
+      const key = INTERNAL_TO_PUBLIC[s.category as ForecastCategory] ?? 'PIPELINE';
+      cat[key].amount = cat[key].amount.plus(amt);
+      cat[key].count += 1;
+      const isOpen = s.category === 'commit' || s.category === 'best_case' || s.category === 'pipeline';
+      if (isOpen) {
+        const prob = new Decimal(s.probability ?? 0).div(100);
+        weighted = weighted.plus(amt.mul(prob));
+        const ai = s.aiWinProbability != null ? new Decimal(s.aiWinProbability) : prob;
+        aiWeighted = aiWeighted.plus(amt.mul(ai));
+      }
+    }
+    const commit = cat.COMMIT.amount;
+    const best = cat.BEST_CASE.amount;
+    const pipe = cat.PIPELINE.amount;
+    return {
+      forecast: {
+        categories: {
+          COMMIT: { amount: cat.COMMIT.amount.toFixed(2), count: cat.COMMIT.count },
+          BEST_CASE: { amount: cat.BEST_CASE.amount.toFixed(2), count: cat.BEST_CASE.count },
+          PIPELINE: { amount: cat.PIPELINE.amount.toFixed(2), count: cat.PIPELINE.count },
+          OMITTED: { amount: cat.OMITTED.amount.toFixed(2), count: cat.OMITTED.count },
+          CLOSED: { amount: cat.CLOSED.amount.toFixed(2), count: cat.CLOSED.count },
+        },
+        // commit ⊆ best_case ⊆ pipeline containment, matching the rest of the surface.
+        committedTotal: commit.toFixed(2),
+        bestCaseTotal: commit.plus(best).toFixed(2),
+        pipelineTotal: commit.plus(best).plus(pipe).toFixed(2),
+        weightedPipeline: weighted.toFixed(2),
+        aiWeightedPipeline: aiWeighted.toFixed(2),
+        openDealCount: cat.COMMIT.count + cat.BEST_CASE.count + cat.PIPELINE.count,
+        wonDealCount: cat.CLOSED.count,
+        ownerCount: owners.size,
+      },
+      closedWon: cat.CLOSED.amount,
+    };
+  }
+
+  /** Resolve one owner's quota target for a period: new Quota model first, then legacy QuotaPlan/Target. */
+  async function resolveOwnerQuota(
+    tenantId: string,
+    ownerId: string,
+    period: string
+  ): Promise<{ target: Decimal; currency: string; source: 'quota' | 'plan' | 'none' }> {
+    const q = await prisma.quota.findFirst({
+      where: { tenantId, ownerType: 'USER', ownerId, period },
+    });
+    if (q) return { target: new Decimal(q.targetAmount.toString()), currency: q.currency, source: 'quota' };
+    const match = /^(\d{4})(?:-Q([1-4]))?$/.exec(period);
+    const year = match ? Number(match[1]) : new Date().getUTCFullYear();
+    const quarter = match && match[2] ? Number(match[2]) : undefined;
+    const plan = await prisma.quotaPlan.findFirst({
+      where: { tenantId, year, quarter: quarter ?? null, isActive: true, targets: { some: { ownerId } } },
+      include: { targets: { where: { ownerId } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    const t = plan?.targets[0];
+    if (t) return { target: new Decimal(t.targetValue.toString()), currency: t.currency, source: 'plan' };
+    return { target: new Decimal(0), currency: 'USD', source: 'none' };
+  }
+
+  /** Sum quota targets over a set of owners for a period (used for manager/team roll-up). */
+  async function sumQuotas(
+    tenantId: string,
+    ownerIds: string[],
+    period: string
+  ): Promise<{ target: Decimal; currency: string }> {
+    let target = new Decimal(0);
+    let currency = 'USD';
+    for (const id of ownerIds) {
+      const q = await resolveOwnerQuota(tenantId, id, period);
+      target = target.plus(q.target);
+      if (q.source !== 'none') currency = q.currency;
+    }
+    return { target, currency };
+  }
+
   return {
     recomputeAggregate,
 
@@ -224,6 +367,20 @@ export function createForecastRollupService(prisma: PlanningPrisma) {
       const prev = await prisma.dealForecastState.findFirst({
         where: { tenantId: evt.tenantId, dealId: evt.dealId },
       });
+
+      // Resolve the forecast category. `deal.won`/`deal.lost` are terminal and
+      // never re-mapped. For open deals, the tenant's ForecastCategoryMap (by
+      // stage) is authoritative when configured; otherwise we keep the provisional
+      // category (explicit deal forecastCategory / probability bucket).
+      let category = evt.category;
+      if (!evt.terminal && evt.stage && categoryResolver) {
+        try {
+          const mapped = await categoryResolver.resolveInternal(evt.tenantId, evt.stage);
+          if (mapped) category = mapped;
+        } catch {
+          /* fail-open: keep provisional category */
+        }
+      }
 
       // Convert the native amount into the tenant base currency BEFORE storing,
       // so DealForecastState (and every aggregate summed from it) is expressed
@@ -245,7 +402,8 @@ export function createForecastRollupService(prisma: PlanningPrisma) {
           ownerId: evt.ownerId,
           period: evt.period,
           amount: baseAmountStr,
-          category: evt.category,
+          category,
+          stage: evt.stage,
           probability: evt.probability,
           aiWinProbability: evt.aiWinProbability,
         },
@@ -255,7 +413,8 @@ export function createForecastRollupService(prisma: PlanningPrisma) {
           ownerId: evt.ownerId,
           period: evt.period,
           amount: baseAmountStr,
-          category: evt.category,
+          category,
+          stage: evt.stage,
           probability: evt.probability,
           aiWinProbability: evt.aiWinProbability,
         },
@@ -354,6 +513,87 @@ export function createForecastRollupService(prisma: PlanningPrisma) {
         gapToQuota: Decimal.max(quota.minus(closedWon), 0).toFixed(2),
         currency: target?.currency ?? 'USD',
         wonDealCount: agg?.wonDealCount ?? 0,
+      };
+    },
+
+    /**
+     * Consolidated forecast for a period: per-category amount + count, weighted /
+     * AI-weighted pipeline, quota + attainment % (closed-won vs quota) for the
+     * owner (or the whole team when `ownerId` is omitted), and an optional manager
+     * roll-up summed over the manager's subtree (`subtreeOwnerIds`, self +
+     * subordinates resolved from the org chart by the caller).
+     *
+     * Everything is tenant-scoped and expressed in the tenant base currency.
+     */
+    async getForecast(
+      tenantId: string,
+      period: string,
+      ownerId?: string,
+      subtreeOwnerIds?: string[]
+    ) {
+      const scopeIds = ownerId ? [ownerId] : undefined;
+      const own = await computeScopeForecast(tenantId, period, scopeIds);
+
+      // Quota + attainment for the primary scope.
+      let quotaTarget: Decimal;
+      let quotaCurrency: string;
+      let quotaSource: 'quota' | 'plan' | 'none' | 'team';
+      if (ownerId) {
+        const q = await resolveOwnerQuota(tenantId, ownerId, period);
+        quotaTarget = q.target;
+        quotaCurrency = q.currency;
+        quotaSource = q.source;
+      } else {
+        // Team-wide: sum every configured Quota (USER) for the period.
+        const rows = await prisma.quota.findMany({
+          where: { tenantId, ownerType: 'USER', period },
+        });
+        quotaTarget = rows.reduce((s, r) => s.plus(new Decimal(r.targetAmount.toString())), new Decimal(0));
+        quotaCurrency = rows[0]?.currency ?? 'USD';
+        quotaSource = 'team';
+      }
+      const closedWon = own.closedWon;
+      const attainmentPct = quotaTarget.gt(0) ? closedWon.div(quotaTarget).mul(100) : new Decimal(0);
+
+      // Manager roll-up over subordinates (only when a real subtree is present).
+      let managerRollup: {
+        ownerIds: string[];
+        subordinateCount: number;
+        forecast: Awaited<ReturnType<typeof computeScopeForecast>>['forecast'];
+        quota: { target: string; currency: string };
+        attainment: { closedWon: string; attainmentPct: string; gapToQuota: string };
+      } | null = null;
+      if (ownerId && subtreeOwnerIds && subtreeOwnerIds.length > 1) {
+        const team = await computeScopeForecast(tenantId, period, subtreeOwnerIds);
+        const teamQuota = await sumQuotas(tenantId, subtreeOwnerIds, period);
+        const teamPct = teamQuota.target.gt(0)
+          ? team.closedWon.div(teamQuota.target).mul(100)
+          : new Decimal(0);
+        managerRollup = {
+          ownerIds: subtreeOwnerIds,
+          subordinateCount: subtreeOwnerIds.length - 1,
+          forecast: team.forecast,
+          quota: { target: teamQuota.target.toFixed(2), currency: teamQuota.currency },
+          attainment: {
+            closedWon: team.closedWon.toFixed(2),
+            attainmentPct: teamPct.toFixed(2),
+            gapToQuota: Decimal.max(teamQuota.target.minus(team.closedWon), 0).toFixed(2),
+          },
+        };
+      }
+
+      return {
+        period,
+        ownerId: ownerId ?? null,
+        scope: ownerId ? 'owner' : 'team',
+        forecast: own.forecast,
+        quota: { target: quotaTarget.toFixed(2), currency: quotaCurrency, source: quotaSource },
+        attainment: {
+          closedWon: closedWon.toFixed(2),
+          attainmentPct: attainmentPct.toFixed(2),
+          gapToQuota: Decimal.max(quotaTarget.minus(closedWon), 0).toFixed(2),
+        },
+        managerRollup,
       };
     },
 

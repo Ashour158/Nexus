@@ -1,5 +1,30 @@
 import type { ClickHouseClient } from '@clickhouse/client';
 
+/**
+ * Compute a half-open `[from, toExclusive)` UTC range for a full year or a
+ * specific quarter.
+ *
+ * We deliberately return an EXCLUSIVE upper bound — the first instant of the
+ * NEXT period — instead of naming the period's last day. The previous code built
+ * the upper bound as `${year}-${endMonth}-31`, which yields non-existent dates
+ * for 30-day quarter-end months (June 31 for Q2, Sept 31 for Q3). ClickHouse's
+ * parser clamps those unpredictably, so Q2/Q3 revenue was silently mis-counted at
+ * the boundary. By never naming a last day and comparing `occurred_at < toExclusive`,
+ * no row is lost or double-counted at a period boundary.
+ */
+function periodRange(year: number, quarter?: number): { from: string; toExclusive: string } {
+  const startMonth = quarter ? (quarter - 1) * 3 + 1 : 1; // 1-based first month
+  const span = quarter ? 3 : 12; // number of months in the period
+  const endExclusiveAbs = startMonth + span; // 1-based month index, may exceed 12
+  const toYear = year + Math.floor((endExclusiveAbs - 1) / 12);
+  const toMonth = ((endExclusiveAbs - 1) % 12) + 1;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return {
+    from: `${year}-${pad(startMonth)}-01T00:00:00Z`,
+    toExclusive: `${toYear}-${pad(toMonth)}-01T00:00:00Z`,
+  };
+}
+
 export function createRevenueAnalyticsService(client: ClickHouseClient) {
   return {
     async getRevenueSummary(
@@ -12,10 +37,7 @@ export function createRevenueAnalyticsService(client: ClickHouseClient) {
       winRate: number;
       avgSalePrice: number;
     }> {
-      const startMonth = period.quarter ? (period.quarter - 1) * 3 + 1 : 1;
-      const endMonth = period.quarter ? startMonth + 2 : 12;
-      const from = `${period.year}-${String(startMonth).padStart(2, '0')}-01T00:00:00Z`;
-      const to = `${period.year}-${String(endMonth).padStart(2, '0')}-31T23:59:59Z`;
+      const { from, toExclusive } = periodRange(period.year, period.quarter);
       const res = await client.query({
         query: `
           SELECT
@@ -25,10 +47,10 @@ export function createRevenueAnalyticsService(client: ClickHouseClient) {
           FROM deal_events
           WHERE tenant_id = {tenantId:String}
             AND occurred_at >= parseDateTime64BestEffort({from:String})
-            AND occurred_at <= parseDateTime64BestEffort({to:String})
+            AND occurred_at < parseDateTime64BestEffort({toExclusive:String})
         `,
         format: 'JSONEachRow',
-        query_params: { tenantId, from, to },
+        query_params: { tenantId, from, toExclusive },
       });
       const row = ((await res.json()) as Array<Record<string, string | number>>)[0] ?? {};
       const wonDeals = Number(row.wonDeals ?? 0);
@@ -48,10 +70,7 @@ export function createRevenueAnalyticsService(client: ClickHouseClient) {
       tenantId: string,
       period: { year: number; quarter?: number }
     ): Promise<Array<{ ownerId: string; totalRevenue: number; wonDeals: number; winRate: number }>> {
-      const startMonth = period.quarter ? (period.quarter - 1) * 3 + 1 : 1;
-      const endMonth = period.quarter ? startMonth + 2 : 12;
-      const from = `${period.year}-${String(startMonth).padStart(2, '0')}-01T00:00:00Z`;
-      const to = `${period.year}-${String(endMonth).padStart(2, '0')}-31T23:59:59Z`;
+      const { from, toExclusive } = periodRange(period.year, period.quarter);
       const res = await client.query({
         query: `
           SELECT
@@ -62,12 +81,12 @@ export function createRevenueAnalyticsService(client: ClickHouseClient) {
           FROM deal_events
           WHERE tenant_id = {tenantId:String}
             AND occurred_at >= parseDateTime64BestEffort({from:String})
-            AND occurred_at <= parseDateTime64BestEffort({to:String})
+            AND occurred_at < parseDateTime64BestEffort({toExclusive:String})
           GROUP BY owner_id
           ORDER BY totalRevenue DESC
         `,
         format: 'JSONEachRow',
-        query_params: { tenantId, from, to },
+        query_params: { tenantId, from, toExclusive },
       });
       const rows = (await res.json()) as Array<Record<string, string | number>>;
       return rows.map((r) => {

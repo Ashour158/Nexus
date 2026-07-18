@@ -34,12 +34,12 @@ const eventIcons: Record<FeedEvent['type'], LucideIcon> = {
 };
 
 const eventColors: Record<FeedEvent['type'], string> = {
-  deal_moved: 'text-blue-600 bg-blue-50',
-  contact_created: 'text-emerald-600 bg-emerald-50',
-  email_sent: 'text-slate-600 bg-slate-50',
-  deal_won: 'text-emerald-600 bg-emerald-50',
+  deal_moved: 'text-primary bg-primary-container',
+  contact_created: 'text-success bg-success-container',
+  email_sent: 'text-on-surface-variant bg-surface-container-low',
+  deal_won: 'text-success bg-success-container',
   task_completed: 'text-primary bg-primary-light',
-  alert: 'text-amber-600 bg-amber-50',
+  alert: 'text-warning bg-warning-container',
 };
 
 export function EventFeed({ events, className, maxHeight = 320 }: EventFeedProps) {

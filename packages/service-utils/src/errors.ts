@@ -1,5 +1,6 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import * as Sentry from '@sentry/node';
+import { flattenValidationError } from './validation.js';
 
 export class NexusError extends Error {
   constructor(
@@ -67,7 +68,7 @@ export function globalErrorHandler(
   const isZodError =
     (error as { name?: string }).name === 'ZodError' &&
     Array.isArray((error as { issues?: unknown }).issues);
-  // ZodError is malformed client input (→ 400), never a server fault; skip Sentry.
+  // ZodError is malformed client input (→ 422), never a server fault; skip Sentry.
   if (!isZodError && (!error.statusCode || error.statusCode >= 500)) {
     Sentry.captureException(error, {
       extra: {
@@ -97,15 +98,17 @@ export function globalErrorHandler(
   // handler (as opposed to Fastify schema validation, handled via
   // `error.validation` below). Detected by shape rather than `instanceof` so it
   // survives multiple zod copies hoisted under pnpm. Malformed client input is a
-  // 400 — NOT a 500 — and must not be reported to Sentry as a server error.
+  // 422 — NOT a 500 — and must not be reported to Sentry as a server error.
   const zodIssues = (error as { name?: string; issues?: unknown }).issues;
   if ((error as { name?: string }).name === 'ZodError' && Array.isArray(zodIssues)) {
-    reply.code(400).send({
+    // RR-H18: schema-validation failures are ALWAYS 422 (was 400 here) with a
+    // uniform `details = flatten()` shape, matching the ValidationError branch.
+    reply.code(422).send({
       success: false,
       error: {
         code: 'VALIDATION_ERROR',
         message: 'Validation failed',
-        details: zodIssues,
+        details: flattenValidationError(error),
         requestId: request.id,
       },
     });
@@ -137,11 +140,46 @@ export function globalErrorHandler(
   }
 
   if (error.validation) {
+    // RR-H18: Fastify schema-validation failures — 422 with the SAME
+    // `details` shape as raw-ZodError and ValidationError paths. `error.validation`
+    // or an AJV error array; expose it directly as `details`.
     reply.code(422).send({
       success: false,
       error: {
         code: 'VALIDATION_ERROR',
         message: 'Validation failed',
+        details: error.validation,
+        requestId: request.id,
+      },
+    });
+    return;
+  }
+
+  // Rate-limit rejections must return 429 so clients back off instead of treating a
+  // throttle as a server fault. @fastify/rate-limit's error reaches here WITHOUT a
+  // usable statusCode, so detect it by code/message too (not just statusCode).
+  const rlCode = (error as { code?: string }).code;
+  const isRateLimit =
+    (error as { statusCode?: number }).statusCode === 429 ||
+    rlCode === 'FST_ERR_RATE_LIMIT' ||
+    /rate ?limit/i.test(error.message || '');
+  if (isRateLimit) {
+    reply.code(429).send({
+      success: false,
+      error: { code: 'RATE_LIMITED', message: error.message || 'Rate limit exceeded', requestId: request.id },
+    });
+    return;
+  }
+
+  // Other framework/plugin errors that already carry a 4xx status must NOT be
+  // flattened to 500 either — return the real status with a stable code.
+  const sc = (error as { statusCode?: number }).statusCode;
+  if (typeof sc === 'number' && sc >= 400 && sc < 500) {
+    reply.code(sc).send({
+      success: false,
+      error: {
+        code: (error as { code?: string }).code ?? (sc === 429 ? 'RATE_LIMITED' : 'REQUEST_REJECTED'),
+        message: error.message || 'Request rejected',
         requestId: request.id,
       },
     });

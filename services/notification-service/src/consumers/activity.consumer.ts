@@ -31,6 +31,7 @@ export async function startActivityConsumer(
     if (!needsReminder) return;
     const overdue = dueMs !== null && dueMs < now;
     await deps.inApp.send({
+      eventId: event.eventId,
       tenantId: event.tenantId,
       userId: payload.ownerId,
       type: overdue ? 'activity.overdue' : 'activity.upcoming',
@@ -49,6 +50,7 @@ export async function startActivityConsumer(
     if (event.type !== 'activity.completed') return;
     const { payload } = event;
     await deps.inApp.send({
+      eventId: event.eventId,
       tenantId: event.tenantId,
       userId: payload.ownerId,
       type: 'activity.completed',

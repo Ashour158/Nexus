@@ -40,7 +40,7 @@ export default function KnowledgeArticlePage() {
   if (!canRead) {
     return (
       <main className="p-6">
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="rounded-xl border border-warning/30 bg-warning-container p-4 text-sm text-on-warning-container">
           You do not have permission to view knowledge base articles.
         </div>
       </main>
@@ -50,7 +50,7 @@ export default function KnowledgeArticlePage() {
   if (articleQuery.isLoading) {
     return (
       <main className="grid gap-4 p-4 lg:grid-cols-12">
-        <article className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 lg:col-span-8">
+        <article className="space-y-4 rounded-xl border border-outline-variant bg-surface p-4 lg:col-span-8">
           <TableSkeleton rows={6} cols={1} />
         </article>
       </main>
@@ -60,7 +60,7 @@ export default function KnowledgeArticlePage() {
   if (!article) {
     return (
       <main className="p-6">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-xl border border-error/30 bg-error-container p-4 text-sm text-error">
           Article not found.
         </div>
         <Link href="/knowledge" className="mt-2 inline-block text-sm underline">
@@ -92,11 +92,11 @@ export default function KnowledgeArticlePage() {
 
   return (
     <main className="grid gap-4 p-4 lg:grid-cols-12">
-      <article className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 lg:col-span-8">
+      <article className="space-y-4 rounded-xl border border-outline-variant bg-surface p-4 lg:col-span-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-sm text-slate-500">
-              <Link href="/knowledge" className="hover:text-slate-800">
+            <div className="text-sm text-on-surface-variant">
+              <Link href="/knowledge" className="hover:text-on-surface">
                 Knowledge Base
               </Link>
               <span> / </span>
@@ -106,12 +106,12 @@ export default function KnowledgeArticlePage() {
               <input
                 value={editForm.title}
                 onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-xl font-bold text-slate-900"
+                className="mt-1 w-full rounded border border-outline-variant px-3 py-2 text-xl font-bold text-on-surface"
               />
             ) : (
-              <h1 className="mt-1 text-2xl font-bold text-slate-900">{art.title}</h1>
+              <h1 className="mt-1 text-2xl font-bold text-on-surface">{art.title}</h1>
             )}
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-on-surface-variant">
               Author: {article.authorId ?? 'N/A'} · Last updated:{' '}
               {article.updatedAt ? new Date(article.updatedAt).toLocaleDateString() : '—'}
             </p>
@@ -189,10 +189,10 @@ export default function KnowledgeArticlePage() {
             value={editForm.body}
             onChange={(e) => setEditForm((f) => ({ ...f, body: e.target.value }))}
             rows={20}
-            className="w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
+            className="w-full rounded border border-outline-variant px-3 py-2 text-sm font-mono"
           />
         ) : (
-          <div className="prose prose-gray max-w-none rounded bg-slate-50 p-4">
+          <div className="prose prose-gray max-w-none rounded bg-surface-container-low p-4">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{art.body ?? ''}</ReactMarkdown>
           </div>
         )}
@@ -200,7 +200,7 @@ export default function KnowledgeArticlePage() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => navigator.clipboard.writeText(window.location.href)}
-            className="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
+            className="rounded border border-outline-variant px-3 py-2 text-sm hover:bg-surface-container-low"
           >
             Copy link
           </button>
@@ -212,7 +212,7 @@ export default function KnowledgeArticlePage() {
                 .then(() => notify.success('Copied to clipboard'))
                 .catch(() => notify.error('Could not copy'));
             }}
-            className="flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm text-blue-600 hover:text-blue-700 hover:bg-slate-50"
+            className="flex items-center gap-2 rounded border border-outline-variant px-3 py-2 text-sm text-primary hover:text-primary hover:bg-surface-container-low"
           >
             <Copy className="h-4 w-4" /> Use in email
           </button>
@@ -223,7 +223,7 @@ export default function KnowledgeArticlePage() {
             {art.tags.map((tag) => (
               <span
                 key={tag}
-                className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700"
+                className="rounded-full bg-surface-container-high px-2 py-0.5 text-xs font-medium text-on-surface"
               >
                 {tag}
               </span>
@@ -234,9 +234,9 @@ export default function KnowledgeArticlePage() {
 
       {ConfirmDialog}
       <aside className="space-y-4 lg:col-span-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Related articles</h2>
-          <p className="mt-2 text-xs text-slate-500">Related articles will appear here.</p>
+        <div className="rounded-xl border border-outline-variant bg-surface p-4">
+          <h2 className="text-sm font-semibold text-on-surface">Related articles</h2>
+          <p className="mt-2 text-xs text-on-surface-variant">Related articles will appear here.</p>
         </div>
       </aside>
     </main>

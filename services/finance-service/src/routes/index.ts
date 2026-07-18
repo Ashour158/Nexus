@@ -22,6 +22,11 @@ import { registerDiscountRequestRoutes } from './discount-requests.routes.js';
 import { registerQuoteDocumentRoutes } from './quote-documents.routes.js';
 import { registerCpqTransitionRoutes } from './cpq-transitions.routes.js';
 import { registerInternalOperationsRoutes } from './internal-operations.routes.js';
+import { registerInternalSearchSourceRoutes } from './internal-search-source.routes.js';
+import { registerMoneyTimelineRoutes } from './money-timeline.routes.js';
+import { registerInternalPortalRoutes } from './internal-portal.routes.js';
+import { registerConfiguratorRoutes } from './configurator.routes.js';
+import { registerGuidedSellingRoutes } from './guided-selling.routes.js';
 
 /**
  * Registers every finance HTTP route under `/api/v1`.
@@ -40,6 +45,7 @@ export async function registerAllRoutes(
   await registerQuoteDocumentRoutes(app, prisma, producer);
   await registerCpqTransitionRoutes(app, prisma, producer);
   await registerInternalOperationsRoutes(app, prisma, producer);
+  await registerInternalSearchSourceRoutes(app, prisma);
   await registerOrdersRoutes(app, prisma, producer);
   await registerCommissionRoutes(app, prisma, producer);
   await registerCurrencyRoutes(app, prisma);
@@ -52,4 +58,8 @@ export async function registerAllRoutes(
   await registerQuoteAutomationRoutes(app, prisma);
   await registerDealRoomsRoutes(app, prisma);
   await registerZatcaRoutes(app, prisma);
+  await registerMoneyTimelineRoutes(app, prisma);
+  await registerInternalPortalRoutes(app, prisma, producer);
+  await registerConfiguratorRoutes(app, prisma);
+  await registerGuidedSellingRoutes(app, prisma);
 }

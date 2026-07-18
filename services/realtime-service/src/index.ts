@@ -11,6 +11,7 @@ import { registerDealSocketHandlers } from './socket/handlers/deal.handler.js';
 import { registerContactSocketHandlers } from './socket/handlers/contact.handler.js';
 import { registerNotificationSocketHandlers } from './socket/handlers/notification.handler.js';
 import { registerPresenceSocketHandlers } from './socket/handlers/presence.handler.js';
+import { registerSubscriptionHandlers } from './socket/handlers/subscription.handler.js';
 import { tenantRoom, userRoom } from './socket/rooms.js';
 import { addPresence, removePresence } from './socket/presence.js';
 import { startDealConsumer } from './consumers/deal.consumer.js';
@@ -85,6 +86,7 @@ io.on('connection', (socket) => {
   registerContactSocketHandlers(socket);
   registerNotificationSocketHandlers(socket);
   registerPresenceSocketHandlers(socket);
+  registerSubscriptionHandlers(socket);
 
   // Presence tracking (fail-open): track this socket and broadcast join to the
   // tenant only when the user transitions offline→online (first socket).

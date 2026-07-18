@@ -4,47 +4,38 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------------------
+ * Legacy CSS variables. Older components read these directly (via inline
+ * styles or `var(--…)`); they now resolve to the Stitch Indigo/M3 palette and
+ * flip in dark mode so those components recolor without edits.
+ * ------------------------------------------------------------------------- */
 :root {
-  --background: 250 250 251;
-  --foreground: 15 23 42;
-  --bg-primary: var(--color-surface);
-  --bg-secondary: #f9f9ff;
-  --bg-tertiary: #f1f3fd;
-  --text-primary: var(--color-text-primary);
-  --text-secondary: var(--color-text-secondary);
-  --text-muted: #717785;
-  --border-color: #e7edf3;
-  --border-strong: #c1c6d5;
-  --accent: #005baf;
-  --accent-hover: #004689;
-  --accent-light: #eef6ff;
-  --success: var(--color-success);
-  --warning: var(--color-warning);
-  --danger: var(--color-danger);
-  --sidebar-bg: #ffffff;
-  --sidebar-text: #475569;
-  --sidebar-active: #005baf;
-  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --background: 247 248 252;
+  --foreground: 27 27 36;
+  --bg-primary: rgb(var(--md-surface));
+  --bg-secondary: rgb(var(--md-surface-container-low));
+  --bg-tertiary: rgb(var(--md-surface-container));
+  --text-primary: rgb(var(--md-on-surface));
+  --text-secondary: rgb(var(--md-on-surface-variant));
+  --text-muted: rgb(var(--md-outline));
+  --border-color: rgb(var(--md-outline-variant));
+  --border-strong: rgb(var(--md-outline));
+  --accent: rgb(var(--md-primary));
+  --accent-hover: var(--color-primary-dark);
+  --accent-light: rgb(var(--md-primary-container));
+  --success: rgb(var(--md-success));
+  --warning: rgb(var(--md-warning));
+  --danger: rgb(var(--md-error));
+  --sidebar-bg: rgb(var(--md-surface));
+  --sidebar-text: rgb(var(--md-on-surface-variant));
+  --sidebar-active: rgb(var(--md-primary));
+  --card-shadow: 0 1px 3px rgb(15 23 42 / 0.06);
 }
 
 .dark {
-  --bg-primary: var(--color-surface);
-  --bg-secondary: var(--color-background);
-  --bg-tertiary: #334155;
-  --text-primary: var(--color-text-primary);
-  --text-secondary: var(--color-text-secondary);
-  --text-muted: #64748b;
-  --border-color: #334155;
-  --border-strong: #475569;
-  --accent: #6366f1;
-  --accent-hover: #818cf8;
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger: #f87171;
-  --sidebar-bg: #0f172a;
-  --sidebar-text: #e2e8f0;
-  --sidebar-active: #6366f1;
-  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --background: 11 11 18;
+  --foreground: 229 225 233;
+  --card-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
 }
 
 .flex-row-rtl {
@@ -61,14 +52,54 @@ body {
 }
 
 body {
-  background: rgb(var(--background));
-  color: rgb(var(--foreground));
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-  font-family: Inter, var(--font-family), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: rgb(var(--md-background));
+  color: rgb(var(--md-on-surface));
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'tnum';
+  font-family: var(--font-family), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 *:focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid rgb(var(--md-primary));
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Component utilities — the Stitch design language expressed as reusable
+ * classes. `@layer components` so Tailwind utilities can still override them.
+ * ------------------------------------------------------------------------- */
+@layer components {
+  /* Glassy elevated card used on dashboards & side rails. */
+  .glass-card {
+    @apply rounded-xl border border-outline-variant bg-surface/90 shadow-card backdrop-blur-sm;
+  }
+
+  /* Standard content card (Level 1 elevation). */
+  .surface-card {
+    @apply rounded-xl border border-outline-variant bg-surface shadow-card;
+  }
+
+  /* Pill-shaped status badge base. */
+  .pill {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold;
+  }
+}
+
+/* Themed scrollbars keep long data tables/side rails on-brand. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--md-outline-variant)) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--md-outline-variant));
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(var(--md-outline));
 }

@@ -109,20 +109,26 @@ export function createQueueService(prisma: CadencePrisma, producer: NexusProduce
             data: { variant },
           });
         } else if (step.type === 'CALL_TASK' || step.type === 'LINKEDIN_TASK') {
-          await fetch(`${process.env.CRM_SERVICE_URL}/api/v1/activities`, {
+          // Create the task via the CRM internal automation route (service-token
+          // guarded, tenant taken from the body) — this is the supported
+          // service-to-service write path; the plain /api/v1/activities route is
+          // end-user-JWT gated and would 401 for a service caller.
+          await fetch(`${process.env.CRM_SERVICE_URL}/api/v1/internal/automation/activities`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${process.env.INTERNAL_SERVICE_TOKEN ?? ''}`,
+              'x-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '',
+              'x-tenant-id': enrollment.tenantId,
             },
             body: JSON.stringify({
+              tenantId: enrollment.tenantId,
               type: 'TASK',
               subject: step.taskTitle ?? `${step.type} task`,
               ownerId: enrollment.ownerId,
               contactId: enrollment.objectType === 'CONTACT' ? enrollment.objectId : undefined,
               leadId: enrollment.objectType === 'LEAD' ? enrollment.objectId : undefined,
               priority: 'NORMAL',
-              customFields: {},
+              customFields: { source: 'cadence', cadenceId: enrollment.cadenceId, enrollmentId: enrollment.id },
             }),
           }).catch(() => undefined);
         } else if (step.type === 'SMS') {
@@ -153,7 +159,9 @@ export function createQueueService(prisma: CadencePrisma, producer: NexusProduce
             enrollmentId: enrollment.id,
             stepPosition: next.position,
             stepType: next.type,
-            scheduledAt: new Date(Date.now() + (next.delayDays ?? 0) * 24 * 60 * 60 * 1000),
+            scheduledAt: new Date(
+              Date.now() + (next.delayDays ?? 0) * 24 * 60 * 60 * 1000 + (next.delayHours ?? 0) * 60 * 60 * 1000
+            ),
             status: 'PENDING',
           },
         });

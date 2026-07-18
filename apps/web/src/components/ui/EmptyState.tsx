@@ -31,11 +31,11 @@ export function EmptyState({
 
   const iconClass = compact ? 'mb-2 text-3xl' : 'mb-4 text-5xl';
   const titleClass = compact
-    ? 'text-sm font-semibold text-gray-700 dark:text-gray-300'
-    : 'text-base font-semibold text-gray-700 dark:text-gray-200';
+    ? 'text-sm font-semibold text-on-surface'
+    : 'text-base font-semibold text-on-surface';
   const descClass = compact
-    ? 'mt-1 max-w-xs text-xs text-gray-400 dark:text-gray-500'
-    : 'mt-2 max-w-sm text-sm text-gray-400 dark:text-gray-500';
+    ? 'mt-1 max-w-xs text-xs text-on-surface-variant'
+    : 'mt-2 max-w-sm text-sm text-on-surface-variant';
 
   const renderCta = (
     item: NonNullable<EmptyStateProps['cta']>,
@@ -43,8 +43,8 @@ export function EmptyState({
   ) => {
     const cls = `mt-3 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
       primary
-        ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+        ? 'bg-primary text-on-primary hover:opacity-90'
+        : 'bg-surface-container-high text-on-surface hover:bg-surface-container-highest'
     }`;
     if (item.href) return <a href={item.href} className={cls}>{item.label}</a>;
     return (

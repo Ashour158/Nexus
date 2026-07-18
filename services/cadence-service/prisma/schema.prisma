@@ -17,12 +17,18 @@ model CadenceTemplate {
   isActive      Boolean             @default(true)
   exitOnReply   Boolean             @default(true)
   exitOnMeeting Boolean             @default(true)
+  // Optional rule-based auto-enroll trigger (e.g. 'lead.created',
+  // 'contact.created'). When crm-service calls the internal auto-enroll hook
+  // with a matching trigger, entities are enrolled into every active cadence
+  // whose autoEnrollTrigger matches and whose objectType applies.
+  autoEnrollTrigger String?
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
   steps         CadenceStep[]
   enrollments   CadenceEnrollment[]
 
   @@index([tenantId])
+  @@index([tenantId, autoEnrollTrigger, isActive])
   @@unique([id, tenantId])
 }
 
@@ -33,6 +39,9 @@ model CadenceStep {
   position  Int
   type      StepType
   delayDays Int             @default(0)
+  // Additional fine-grained delay on top of delayDays (B11). Total wait before a
+  // step fires = delayDays*24h + delayHours. Additive; existing steps default 0.
+  delayHours Int            @default(0)
   subject   String?
   body      String?
   taskTitle String?

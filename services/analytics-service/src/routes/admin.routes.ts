@@ -66,11 +66,15 @@ export async function registerAdminRoutes(app: FastifyInstance, clickhouse: Clic
           const chDateTime = (iso: string) => new Date(iso).toISOString().replace('T', ' ').replace('Z', '');
 
           if (deals.length > 0) {
+            // Resolve the tenant FX table ONCE, then convert every deal via a
+            // synchronous lookup — instead of awaiting convertToBase per deal
+            // (an N+1 of async hops for up to 5000 rows).
+            const convert = await ratesService.getConverter(tenantId);
             const values = [];
             for (const d of deals) {
               const amount = Number(d.amount ?? 0);
               const currency = String(d.currency ?? 'USD');
-              const { baseAmount, baseCurrency } = await ratesService.convertToBase(tenantId, amount, currency);
+              const { baseAmount, baseCurrency } = convert(amount, currency);
               values.push({
                 tenant_id: tenantId,
                 deal_id: String(d.id),

@@ -17,18 +17,39 @@ import type {
   DealContact,
 } from '../../../../node_modules/.prisma/crm-client/index.js';
 import type { CrmPrisma } from '../prisma.js';
-import { recordFieldChanges } from '../lib/field-history.js';
+import { recordFieldChanges, recordCreateSnapshot } from '../lib/field-history.js';
 import { toPaginatedResult } from '@nexus/shared-types';
 import { updateDealDataQuality } from '../lib/data-quality.js';
 import { computeDealHealth, deriveMeddicGaps } from '../lib/deal-health.engine.js';
 import { scoreDeal } from '../lib/ai/scoring.service.js';
 import { assertValidStageTransition } from '../lib/blueprint-client.js';
+import { cachedListRead } from '../lib/read-cache.js';
+import { assignTerritory, isTerritoryRoutingEnabled } from '../lib/territory-client.js';
 import {
   enforceValidationRules,
   applyFieldPermissions,
   maskFieldPermissions,
   mergeForValidation,
 } from '../lib/write-guards.js';
+
+// ─── Forecast category derivation (B7) ────────────────────────────────────────
+
+/**
+ * Maps a stage win-probability to a forecast category for OPEN deals. Closed
+ * stages are handled separately (won→CLOSED, lost→OMITTED). Thresholds:
+ *   ≥90 → COMMIT · ≥50 → BEST_CASE · else PIPELINE.
+ * A manual override always wins over this derivation.
+ */
+export function deriveForecastCategory(
+  stageProbability: number | null | undefined
+): 'PIPELINE' | 'BEST_CASE' | 'COMMIT' {
+  const p = typeof stageProbability === 'number' && Number.isFinite(stageProbability)
+    ? stageProbability
+    : 0;
+  if (p >= 90) return 'COMMIT';
+  if (p >= 50) return 'BEST_CASE';
+  return 'PIPELINE';
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -299,25 +320,34 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         [sortField]: sortDir,
       };
 
-      const [total, rows] = await Promise.all([
-        prisma.deal.count({ where }),
-        prisma.deal.findMany({
-          where,
-          skip: (page - 1) * limit,
-          take: limit,
-          orderBy,
-        }),
-      ]);
-
-      const masked = (await maskFieldPermissions(
-        prisma,
-        tenantId,
+      // RR-H13: cache-aside. Key folds tenant + filters + pagination + ownership
+      // scope + roles so RBAC-scoped / field-masked results never leak.
+      return cachedListRead(
         'deal',
-        rows as unknown as Record<string, unknown>[],
-        access?.roles
-      )) as unknown as Deal[];
+        tenantId,
+        { filters, pagination, ownership: access?.ownershipWhere ?? null, roles: access?.roles ?? null },
+        async () => {
+          const [total, rows] = await Promise.all([
+            prisma.deal.count({ where }),
+            prisma.deal.findMany({
+              where,
+              skip: (page - 1) * limit,
+              take: limit,
+              orderBy,
+            }),
+          ]);
 
-      return toPaginatedResult(masked, total, page, limit);
+          const masked = (await maskFieldPermissions(
+            prisma,
+            tenantId,
+            'deal',
+            rows as unknown as Record<string, unknown>[],
+            access?.roles
+          )) as unknown as Deal[];
+
+          return toPaginatedResult(masked, total, page, limit);
+        }
+      );
     },
 
     /**
@@ -371,6 +401,16 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
 
       const probability = data.probability ?? stage.probability;
 
+      // B7: forecast category — honor a manual override, else derive from the
+      // destination stage's probability (won/lost stages force CLOSED/OMITTED).
+      const forecastCategory = data.forecastCategory
+        ? data.forecastCategory
+        : stage.isWon
+          ? 'CLOSED'
+          : stage.isLost
+            ? 'OMITTED'
+            : deriveForecastCategory(stage.probability);
+
       // arr = mrr * 12 (and vice-versa) when only one side is supplied. Schema
       // may not expose these on create today; guarded so it works if it does.
       const createRecurring = deriveRecurringRevenue(
@@ -392,6 +432,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           amount: new Prisma.Decimal(data.amount ?? 0),
           currency: data.currency ?? 'USD',
           probability,
+          forecastCategory,
           ...(createRecurring.mrr !== undefined ? { mrr: createRecurring.mrr } : {}),
           ...(createRecurring.arr !== undefined ? { arr: createRecurring.arr } : {}),
           expectedCloseDate: data.expectedCloseDate
@@ -430,10 +471,80 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           currency: created.currency,
           pipelineId: created.pipelineId,
           stageId: created.stageId,
+          // Forecast fields (RR-C4 follow-up): let analytics bucket by close date.
+          expectedCloseDate: created.expectedCloseDate?.toISOString() ?? null,
+          probability: created.probability,
+          // B7: forecast category (PIPELINE|BEST_CASE|COMMIT|CLOSED|OMITTED) so
+          // analytics can group the forecast by category.
+          forecastCategory: created.forecastCategory,
         },
       });
 
+      // ─── External territory-service routing (additive, enrichment-only) ─────
+      // STRICTLY FAIL-OPEN: runs AFTER the row is committed (no open
+      // transaction) and the client swallows every error (returning null +
+      // warn), so a territory-service outage/timeout/non-2xx can NEVER fail or
+      // roll back the deal create. Skipped entirely when TERRITORY_SERVICE_URL is
+      // unset. territoryId is a plain string column (no FK), so persisting an
+      // external territory id always succeeds. Owner is only overridden when the
+      // caller did not explicitly choose one.
+      if (isTerritoryRoutingEnabled()) {
+        const routing = await assignTerritory(tenantId, 'deal', {
+          amount: created.amount != null ? Number(created.amount) : undefined,
+          currency: created.currency,
+          country: account.country ?? undefined,
+          industry: account.industry ?? undefined,
+          source: created.source ?? undefined,
+        });
+        if (routing?.territoryId) {
+          const ownerExplicitlySet = Boolean(data.ownerId);
+          const prevOwnerId = created.ownerId;
+          const nextOwnerId =
+            !ownerExplicitlySet && routing.ownerId ? routing.ownerId : prevOwnerId;
+          try {
+            await prisma.deal.update({
+              where: { id: created.id },
+              data: { territoryId: routing.territoryId, ownerId: nextOwnerId },
+            });
+            created.territoryId = routing.territoryId;
+            created.ownerId = nextOwnerId;
+            if (nextOwnerId !== prevOwnerId) {
+              await producer
+                .publish(TOPICS.DEALS, {
+                  type: 'deal.assigned',
+                  tenantId,
+                  payload: {
+                    dealId: created.id,
+                    tenantId,
+                    newOwnerId: nextOwnerId,
+                    previousOwnerId: prevOwnerId,
+                    dealName: created.name,
+                  },
+                })
+                .catch(() => undefined);
+            }
+          } catch (err) {
+            console.warn(
+              '[territory-client] deal territory persist failed; continuing',
+              err
+            );
+          }
+        }
+      }
+
       updateDealDataQuality(prisma, created.id).catch(() => undefined);
+
+      // Full field-history: initial snapshot on CREATE (oldValue=null per tracked
+      // field). Fail-open inside the helper so history never breaks the create.
+      await recordCreateSnapshot(
+        prisma,
+        tenantId,
+        'deal',
+        created.id,
+        created as unknown as Record<string, unknown>,
+        created.ownerId,
+        'system'
+      );
 
       return created;
     },
@@ -541,6 +652,9 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           currency: created.currency,
           pipelineId: created.pipelineId,
           stageId: created.stageId,
+          expectedCloseDate: created.expectedCloseDate?.toISOString() ?? null,
+          probability: created.probability,
+          forecastCategory: created.forecastCategory,
         },
       });
 
@@ -589,9 +703,10 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
 
       // Blueprint validation when stage actually changes
       if (data.stageId && data.stageId !== existing.stageId) {
-        const [contacts, activities] = await Promise.all([
+        const [contacts, activities, targetStage] = await Promise.all([
           prisma.dealContact.findMany({ where: { dealId: id }, include: { contact: true } }),
           prisma.activity.findMany({ where: { dealId: id, tenantId } }),
+          prisma.stage.findFirst({ where: { id: data.stageId, tenantId }, select: { isWon: true, isLost: true } }),
         ]);
         const safeContacts = contacts ?? [];
         const safeActivities = activities ?? [];
@@ -604,7 +719,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           linkedContacts: safeContacts.map(c => ({ id: c.contactId })),
           completedActivityTypes: safeActivities.filter(a => a.status === 'COMPLETED').map(a => a.type),
           activities: safeActivities.map(a => ({ type: a.type, completed: a.status === 'COMPLETED' })),
-        });
+        }, { toStageIsTerminal: Boolean(targetStage?.isWon || targetStage?.isLost) });
       }
 
       // Terminal-state guard (BL-13): a generic update must not silently change
@@ -767,6 +882,9 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           status: updated.status,
           amount: decimalToNumber(updated.amount),
           currency: updated.currency,
+          expectedCloseDate: updated.expectedCloseDate?.toISOString() ?? null,
+          probability: updated.probability,
+          forecastCategory: updated.forecastCategory,
           changedFields: Object.keys(updateData).filter((field) => field !== 'version'),
         },
       });
@@ -838,7 +956,12 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
      * Soft-deletes the deal by setting `deletedAt`. The row is preserved
      * so relations (activities, notes, quotes) remain intact.
      */
-    async deleteDeal(tenantId: string, id: string): Promise<void> {
+    async deleteDeal(
+      tenantId: string,
+      id: string,
+      deletedBy?: string,
+      deletedByName?: string
+    ): Promise<void> {
       const existing = await loadDealOrThrow(tenantId, id);
       if (existing.deletedAt) {
         return;
@@ -847,6 +970,8 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         where: { id },
         data: {
           deletedAt: new Date(),
+          deletedBy: deletedBy ?? null,
+          deletedByName: deletedByName ?? null,
           version: { increment: 1 },
         },
       });
@@ -865,7 +990,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
     async restoreDeal(tenantId: string, id: string): Promise<Deal> {
       const result = await prisma.deal.updateMany({
         where: { id, tenantId, deletedAt: { not: null } },
-        data: { deletedAt: null },
+        data: { deletedAt: null, deletedBy: null, deletedByName: null },
       });
       if (result.count === 0) throw new NotFoundError('Deal', id);
       const restored = await prisma.deal.findFirstOrThrow({ where: { id, tenantId } });
@@ -928,7 +1053,7 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         linkedContacts: safeContacts.map(c => ({ id: c.contactId })),
         completedActivityTypes: safeActivities.filter(a => a.status === 'COMPLETED').map(a => a.type),
         activities: safeActivities.map(a => ({ type: a.type, completed: a.status === 'COMPLETED' })),
-      });
+      }, { toStageIsTerminal: Boolean(stage.isWon || stage.isLost) });
 
       // BL-05: stage↔status reconciliation. The destination stage's won/lost
       // flags drive the deal status so a card dragged into a Won/Lost column is
@@ -970,11 +1095,15 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         // clear the close side-effects (probability follows the open stage).
         stageData.status = 'OPEN';
         stageData.actualCloseDate = null;
-        stageData.forecastCategory = 'PIPELINE';
+        stageData.forecastCategory = deriveForecastCategory(stage.probability);
         stageData.lostReason = null;
         stageData.lostDetail = null;
         stageData.closeReason = null;
         statusTransition = 'reopen';
+      } else {
+        // B7: ordinary open→open move — re-derive the forecast category from the
+        // destination stage's probability (COMMIT/BEST_CASE/PIPELINE).
+        stageData.forecastCategory = deriveForecastCategory(stage.probability);
       }
 
       const updated = await prisma.deal.update({
@@ -989,10 +1118,24 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           dealId: updated.id,
           previousStageId: existing.stageId,
           newStageId: stage.id,
+          // `stageId`/`accountId`/`pipelineId`/`currency` are the field names every
+          // consumer of the deals topic reads (analytics projects them straight
+          // into deal_events). Publishing only `newStageId` meant the one event
+          // that REPORTS a stage change landed in the read model with a blank
+          // stage_id — and a blank account_id, which also broke any report joined
+          // to accounts. Keep both spellings: `newStageId` is what the
+          // stage-transition consumers already pair with `previousStageId`.
+          stageId: stage.id,
+          accountId: updated.accountId,
+          pipelineId: updated.pipelineId,
+          currency: updated.currency,
           ownerId: updated.ownerId,
           amount: decimalToNumber(updated.amount),
           rottenDays: stage.rottenDays,
           stageChangedAt: new Date().toISOString(),
+          expectedCloseDate: updated.expectedCloseDate?.toISOString() ?? null,
+          probability: updated.probability,
+          forecastCategory: updated.forecastCategory,
         },
       });
 
@@ -1024,8 +1167,15 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
             dealId: updated.id,
             ownerId: updated.ownerId,
             accountId: updated.accountId,
+            // Without stage/pipeline, won deals land in the read model with a
+            // blank stage_id — so win-rate BY STAGE, the whole point of the
+            // measure, has nothing to group on.
+            stageId: updated.stageId,
+            pipelineId: updated.pipelineId,
             amount: decimalToNumber(updated.amount),
             currency: updated.currency,
+            expectedCloseDate: updated.expectedCloseDate?.toISOString() ?? null,
+            probability: updated.probability,
             teamSplits,
           },
         });
@@ -1036,8 +1186,17 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           payload: {
             dealId: updated.id,
             ownerId: updated.ownerId,
+            // deal.lost carried no accountId/currency at all, so "lost deals by
+            // account industry" could never join, and lost value was untotalled
+            // in any non-USD tenant.
+            accountId: updated.accountId,
+            stageId: updated.stageId,
+            pipelineId: updated.pipelineId,
+            currency: updated.currency,
             reason: updated.lostReason ?? 'Moved to lost stage',
             amount: decimalToNumber(updated.amount),
+            expectedCloseDate: updated.expectedCloseDate?.toISOString() ?? null,
+            probability: updated.probability,
           },
         });
       } else if (statusTransition === 'reopen') {
@@ -1157,6 +1316,8 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           ownerId: updated.ownerId,
           reason,
           amount: decimalToNumber(updated.amount),
+          expectedCloseDate: updated.expectedCloseDate?.toISOString() ?? null,
+          probability: updated.probability,
         },
       });
 

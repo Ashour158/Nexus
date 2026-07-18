@@ -11,6 +11,7 @@ import {
   ContractsSummaryProjection,
 } from '../projections/index.js';
 import { ratesService } from '../services/rates.service.js';
+import { chDateTime } from '../lib/ch-datetime.js';
 
 export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<NexusConsumer> {
   const consumer = new NexusConsumer('analytics-service.events');
@@ -67,7 +68,8 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         base_amount: baseAmount,
         base_currency: baseCurrency,
         probability: Number(p.probability ?? 0),
-        occurred_at: event.timestamp,
+        forecast_category: String(p.forecastCategory ?? ''),
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -82,15 +84,26 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         tenant_id: event.tenantId,
         deal_id: String(p.dealId ?? ''),
         owner_id: String(p.ownerId ?? ''),
-        account_id: '',
+        // Was hardcoded '' — presumably written to match a publisher that did not
+        // send it. crm-service now includes accountId/currency on this event, and a
+        // blank account_id here silently dropped every stage-change row out of any
+        // report joined to accounts (they matched no account, so they landed under
+        // a blank industry).
+        account_id: String(p.accountId ?? ''),
         pipeline_id: String(p.pipelineId ?? ''),
         stage_id: String(p.stageId ?? ''),
         event_type: event.type,
+        // amount stays 0 DELIBERATELY. deal_events is append-only and the `deals`
+        // dataset has no baseWhere, so an unfiltered sum(amount) spans every event
+        // type for a deal. Carrying the amount here would inflate every existing
+        // report that doesn't filter on event_type. A stage change moves a deal; it
+        // does not add value. Group by event_type to measure per-stage value.
         amount: 0,
-        currency: 'USD',
+        currency: String(p.currency ?? 'USD'),
         base_amount: 0,
-        base_currency: 'USD',
-        occurred_at: event.timestamp,
+        base_currency: String(p.currency ?? 'USD'),
+        forecast_category: String(p.forecastCategory ?? ''),
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -115,7 +128,8 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         currency: String(p.currency ?? 'USD'),
         base_amount: baseAmount,
         base_currency: baseCurrency,
-        occurred_at: event.timestamp,
+        forecast_category: String(p.forecastCategory ?? 'CLOSED'),
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -139,7 +153,8 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         currency: String(p.currency ?? 'USD'),
         base_amount: baseAmount,
         base_currency: baseCurrency,
-        occurred_at: event.timestamp,
+        forecast_category: String(p.forecastCategory ?? 'CLOSED'),
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -157,7 +172,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         deal_id: String(p.dealId ?? ''),
         activity_type: String(p.type ?? ''),
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -175,7 +190,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         deal_id: String(p.dealId ?? ''),
         activity_type: String(p.type ?? ''),
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -201,7 +216,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         currency: String(p.currency ?? 'USD'),
         base_amount: baseAmount,
         base_currency: baseCurrency,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -209,6 +224,10 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
   };
 
   consumer.on('quote.created', projectQuoteEvent);
+  // Quotes converted from an RFQ announce themselves as `quote.created_from_rfq`,
+  // never as `quote.created`. Since the commercial rules require a quote to
+  // originate from an RFQ, omitting this left quote creation uncounted entirely.
+  consumer.on('quote.created_from_rfq', projectQuoteEvent);
   consumer.on('quote.sent', projectQuoteEvent);
   consumer.on('quote.accepted', projectQuoteEvent);
   consumer.on('quote.rejected', projectQuoteEvent);
@@ -231,7 +250,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         base_amount: baseAmount,
         base_currency: baseCurrency,
         status,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -267,7 +286,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         source: String(p.source ?? ''),
         company: String(p.company ?? ''),
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -276,7 +295,6 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
   consumer.on('lead.captured', projectLeadEvent);
   consumer.on('lead.assigned', projectLeadEvent);
   consumer.on('lead.updated', projectLeadEvent);
-  consumer.on('lead.status_changed', projectLeadEvent);
   consumer.on('lead.converted', projectLeadEvent);
 
   // ── Contacts (nexus.crm.contacts) — raw event stream ───────────────────────
@@ -290,7 +308,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         account_id: String(p.accountId ?? ''),
         owner_id: String(p.ownerId ?? ''),
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -313,7 +331,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         name: String(p.name ?? ''),
         industry: String(p.industry ?? ''),
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -340,15 +358,17 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         currency: String(p.currency ?? 'USD'),
         base_amount: baseAmount,
         base_currency: baseCurrency,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
   };
   consumer.on('order.created', projectOrderEvent);
-  consumer.on('order.created_from_quote', projectOrderEvent);
+  // Orders born from a quote conversion are emitted as `quote.converted_to_order`
+  // (finance commercial-records use-case), not `order.created` — subscribe it so
+  // the order_events read-model captures quote-originated orders.
+  consumer.on('quote.converted_to_order', projectOrderEvent);
   consumer.on('order.updated', projectOrderEvent);
-  consumer.on('order.status_changed', projectOrderEvent);
 
   // ── Tickets (nexus.ticket.events) ──────────────────────────────────────────
   // Best-effort status inference from the event type (payloads carry different
@@ -381,7 +401,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         assignee_id: String(p.assigneeId ?? ''),
         account_id: String(p.accountId ?? ''),
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -408,7 +428,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         owner_id: String(p.ownerId ?? ''),
         budget: Number(p.budget ?? 0),
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -440,15 +460,22 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         base_amount: baseAmount,
         base_currency: baseCurrency,
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
   };
   consumer.on('subscription.created', projectSubscriptionEvent);
-  consumer.on('subscription.updated', projectSubscriptionEvent);
-  consumer.on('subscription.canceled', projectSubscriptionEvent);
   consumer.on('subscription.cancelled', projectSubscriptionEvent);
+  // The rest of the lifecycle billing-service actually emits (all on PAYMENTS).
+  // The projection keys off `event_type`, so these need no special handling —
+  // without them the subscription read-model only ever saw births and deaths,
+  // and no renewal, activation, or dunning signal in between.
+  consumer.on('subscription.activated', projectSubscriptionEvent);
+  consumer.on('subscription.renewed', projectSubscriptionEvent);
+  consumer.on('subscription.past_due', projectSubscriptionEvent);
+  consumer.on('subscription.dunning', projectSubscriptionEvent);
+  consumer.on('subscription.payment_retry', projectSubscriptionEvent);
 
   // ── Commissions (nexus.finance.commissions topic) ──────────────────────────
   const projectCommissionEvent = async (event: NexusKafkaEvent): Promise<void> => {
@@ -469,7 +496,7 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
         base_amount: baseAmount,
         base_currency: baseCurrency,
         event_type: event.type,
-        occurred_at: event.timestamp,
+        occurred_at: chDateTime(event.timestamp),
       }],
       format: 'JSONEachRow',
     });
@@ -477,7 +504,6 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
   consumer.on('commission.calculated', projectCommissionEvent);
   consumer.on('commission.approved', projectCommissionEvent);
   consumer.on('commission.clawback', projectCommissionEvent);
-  consumer.on('commission.paid', projectCommissionEvent);
 
   await consumer.subscribe([
     TOPICS.DEALS,
@@ -485,6 +511,10 @@ export async function startAnalyticsConsumer(client: ClickHouseClient): Promise<
     TOPICS.QUOTES,
     TOPICS.CONTACTS,
     TOPICS.INVOICES,
+    // `invoice.paid` is published to PAYMENTS, not INVOICES. Without this topic
+    // the handler above is unreachable and collected cash — the one number the
+    // whole finance read-model exists to report — never lands.
+    TOPICS.PAYMENTS,
     TOPICS.CONTRACTS,
     TOPICS.LEADS,
     TOPICS.ACCOUNTS,

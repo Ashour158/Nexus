@@ -114,61 +114,121 @@ function pageMeta(body: AnyBody): PageMeta {
   return meta;
 }
 
+export type ExportFormat = 'csv' | 'json';
+
+export interface ExportResult {
+  format: ExportFormat;
+  rowCount: number;
+  /** CSV text or a JSON string, ready to stream or persist. */
+  payload: string;
+  contentType: string;
+}
+
+/**
+ * Page through a module's owning list service and collect every row, tolerating
+ * every known envelope + pagination shape. Shared by the CSV and JSON export
+ * paths and by the scheduled-export poller.
+ */
+async function fetchAllRows(
+  module: string,
+  filters: Record<string, unknown> | undefined,
+  authToken: string | undefined
+): Promise<Record<string, unknown>[]> {
+  const route = resolveRoute(module);
+  const base = route.baseUrl();
+  // List endpoints commonly cap `limit` (crm: >100 → 422), so page at 100.
+  const pageSize = 100;
+  const maxPages = 1000; // safety cap → ≤100k rows, prevents runaway loops
+  let page = 1;
+  let hasMore = true;
+  const rows: Record<string, unknown>[] = [];
+
+  while (hasMore && page <= maxPages) {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('limit', String(pageSize));
+    for (const [k, v] of Object.entries(filters ?? {})) {
+      // Skip empty / sentinel filters — an empty string or 'ALL' forwarded to
+      // a source service's `.enum().optional()` query schema would 422.
+      if (v === undefined || v === null || v === '' || v === 'ALL') continue;
+      params.set(k, String(v));
+    }
+
+    const res = await fetch(`${base}/api/v1/${route.path}?${params.toString()}`, {
+      headers: authHeaders(authToken),
+    });
+    if (!res.ok) {
+      throw new Error(`Export fetch failed for module ${module} (status ${res.status})`);
+    }
+    const body = (await res.json()) as AnyBody;
+    const pageRows = extractRows(body);
+    rows.push(...pageRows);
+
+    // Decide whether another page exists, tolerating varied pagination:
+    // explicit flag → totalPages → total/limit math → else single page.
+    const meta = pageMeta(body);
+    if (typeof meta.hasNextPage === 'boolean') {
+      hasMore = meta.hasNextPage;
+    } else if (typeof meta.totalPages === 'number' && typeof meta.page === 'number') {
+      hasMore = meta.page < meta.totalPages;
+    } else if (typeof meta.total === 'number') {
+      const limit = typeof meta.limit === 'number' ? meta.limit : pageSize;
+      hasMore = page * limit < meta.total;
+    } else {
+      hasMore = false; // unpaginated endpoint returned the full array
+    }
+    // Guard: if the endpoint ignored paging and returned < a full page, stop.
+    if (pageRows.length < pageSize) hasMore = false;
+    page += 1;
+  }
+
+  return rows;
+}
+
 export function createExportService(_prisma: DataPrisma) {
   return {
+    /** Legacy CSV-only entry point (kept for the existing /export/:module route). */
     async exportCsv(
-      _tenantId: string,
+      tenantId: string,
       module: string,
       filters: Record<string, unknown> | undefined,
       columns: string[] | undefined,
       authToken?: string
     ) {
-      const route = resolveRoute(module);
-      const base = route.baseUrl();
-      // List endpoints commonly cap `limit` (crm: >100 → 422), so page at 100.
-      const pageSize = 100;
-      const maxPages = 1000; // safety cap → ≤100k rows, prevents runaway loops
-      let page = 1;
-      let hasMore = true;
-      const rows: Record<string, unknown>[] = [];
+      const result = await this.exportData(tenantId, module, filters, columns, 'csv', authToken);
+      return result.payload;
+    },
 
-      while (hasMore && page <= maxPages) {
-        const params = new URLSearchParams();
-        params.set('page', String(page));
-        params.set('limit', String(pageSize));
-        for (const [k, v] of Object.entries(filters ?? {})) {
-          // Skip empty / sentinel filters — an empty string or 'ALL' forwarded to
-          // a source service's `.enum().optional()` query schema would 422.
-          if (v === undefined || v === null || v === '' || v === 'ALL') continue;
-          params.set(k, String(v));
-        }
+    /**
+     * Export a module's rows in the requested format. `csv` runs through the
+     * injection-safe serializer; `json` emits a pretty-printed array. Returns
+     * the payload plus a row count so scheduled runs can record it.
+     */
+    async exportData(
+      _tenantId: string,
+      module: string,
+      filters: Record<string, unknown> | undefined,
+      columns: string[] | undefined,
+      format: ExportFormat,
+      authToken?: string
+    ): Promise<ExportResult> {
+      const rows = await fetchAllRows(module, filters, authToken);
 
-        const res = await fetch(`${base}/api/v1/${route.path}?${params.toString()}`, {
-          headers: authHeaders(authToken),
-        });
-        if (!res.ok) {
-          throw new Error(`Export fetch failed for module ${module} (status ${res.status})`);
-        }
-        const body = (await res.json()) as AnyBody;
-        const pageRows = extractRows(body);
-        rows.push(...pageRows);
-
-        // Decide whether another page exists, tolerating varied pagination:
-        // explicit flag → totalPages → total/limit math → else single page.
-        const meta = pageMeta(body);
-        if (typeof meta.hasNextPage === 'boolean') {
-          hasMore = meta.hasNextPage;
-        } else if (typeof meta.totalPages === 'number' && typeof meta.page === 'number') {
-          hasMore = meta.page < meta.totalPages;
-        } else if (typeof meta.total === 'number') {
-          const limit = typeof meta.limit === 'number' ? meta.limit : pageSize;
-          hasMore = page * limit < meta.total;
-        } else {
-          hasMore = false; // unpaginated endpoint returned the full array
-        }
-        // Guard: if the endpoint ignored paging and returned < a full page, stop.
-        if (pageRows.length < pageSize) hasMore = false;
-        page += 1;
+      if (format === 'json') {
+        const projected =
+          columns && columns.length > 0
+            ? rows.map((row) => {
+                const out: Record<string, unknown> = {};
+                for (const c of columns) out[c] = row[c];
+                return out;
+              })
+            : rows;
+        return {
+          format: 'json',
+          rowCount: rows.length,
+          payload: JSON.stringify(projected, null, 2),
+          contentType: 'application/json',
+        };
       }
 
       const selectedColumns =
@@ -182,7 +242,12 @@ export function createExportService(_prisma: DataPrisma) {
             );
 
       // serializeCsv handles null/undefined/object coercion and CSV escaping.
-      return serializeCsv(rows, selectedColumns);
+      return {
+        format: 'csv',
+        rowCount: rows.length,
+        payload: serializeCsv(rows, selectedColumns),
+        contentType: 'text/csv',
+      };
     },
   };
 }

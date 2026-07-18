@@ -11,15 +11,32 @@ import {
   createKeycloakRealmUser,
   deleteKeycloakRealmUser,
   setKeycloakRealmUserEnabled,
+  setKeycloakUserPassword,
 } from '../lib/keycloak-admin.js';
 import { toPaginatedResult } from '@nexus/shared-types';
 import { resolveUserPermissions } from '../lib/permissions.js';
+import { hashPassword } from '@nexus/security';
 import { randomBytes } from 'node:crypto';
 
 /** User row with role assignments (Section 31.1 relations). */
 export type UserWithRoles = Prisma.UserGetPayload<{
   include: { userRoles: { include: { role: true } } };
 }>;
+
+/**
+ * Whether invites provision a LOCAL account (temp password + forced change) rather
+ * than a Keycloak realm user. True when Keycloak isn't configured, or explicitly
+ * forced via AUTH_LOCAL_INVITE. Local mode returns the temp password to the caller
+ * (the admin conveys it / it is emailed) — Keycloak mode never exposes a password.
+ */
+function localInviteMode(): boolean {
+  return !process.env.KEYCLOAK_URL || process.env.AUTH_LOCAL_INVITE === 'true';
+}
+
+/** Generate a policy-compliant temporary password (>=12, upper/lower/digit/symbol). */
+function generateTempPassword(): string {
+  return `Nx!${randomBytes(6).toString('base64url')}9aZ`;
+}
 
 /** Filters for `listUsers` (query string subset). */
 export type UserListFilters = {
@@ -101,7 +118,10 @@ export function createUsersService(prisma: AuthPrisma) {
     /**
      * Creates the user in Keycloak (Admin API) and persists to PostgreSQL with roles.
      */
-    async inviteUser(tenantId: string, data: InviteUserInput): Promise<UserWithRoles> {
+    async inviteUser(
+      tenantId: string,
+      data: InviteUserInput
+    ): Promise<UserWithRoles & { temporaryPassword?: string }> {
       const existing = await prisma.user.findFirst({
         where: { tenantId, email: data.email },
       });
@@ -115,6 +135,34 @@ export function createUsersService(prisma: AuthPrisma) {
       });
       if (roleRows.length !== uniqueRoleIds.length) {
         throw new NotFoundError('Role', 'invalid');
+      }
+
+      // LOCAL invite path: no Keycloak. Create the account with a temporary
+      // password and mustChangePassword=true so first login forces a reset.
+      if (localInviteMode()) {
+        const temporaryPassword = generateTempPassword();
+        const passwordHash = await hashPassword(temporaryPassword);
+        const user = await prisma.$transaction((tx) =>
+          tx.user.create({
+            data: {
+              tenantId,
+              email: data.email,
+              firstName: data.firstName,
+              lastName: data.lastName,
+              keycloakId: `local:${tenantId}:${data.email}`,
+              passwordHash,
+              mustChangePassword: true,
+              emailVerified: true,
+              isActive: true,
+              bookingToken: randomBytes(16).toString('hex'),
+              userRoles: {
+                create: uniqueRoleIds.map((roleId) => ({ role: { connect: { id: roleId } } })),
+              },
+            },
+            include: { userRoles: { include: { role: true } } },
+          })
+        );
+        return { ...user, temporaryPassword };
       }
 
       const keycloakId = await createKeycloakRealmUser({
@@ -167,6 +215,46 @@ export function createUsersService(prisma: AuthPrisma) {
         include: { userRoles: { include: { role: true } } },
       });
       return updated;
+    },
+
+    /**
+     * Admin-triggered password reset. Generates a policy-compliant temporary
+     * password, forces a change on next login, and invalidates existing
+     * sessions so the old password stops working immediately. The temp password
+     * is returned to the admin to convey to the user (both local and Keycloak
+     * modes) — matching the invite flow's contract.
+     */
+    async adminResetPassword(
+      tenantId: string,
+      id: string,
+      actorUserId: string
+    ): Promise<{ temporaryPassword: string }> {
+      if (id === actorUserId) {
+        throw new BusinessRuleError('Use "Change password" to reset your own password');
+      }
+      const row = await prisma.user.findFirst({ where: { id, tenantId } });
+      if (!row) {
+        throw new NotFoundError('User', id);
+      }
+      const temporaryPassword = generateTempPassword();
+
+      if (localInviteMode() || row.keycloakId.startsWith('local:')) {
+        const passwordHash = await hashPassword(temporaryPassword);
+        await prisma.$transaction([
+          prisma.user.update({
+            where: { id_tenantId: { id, tenantId } },
+            data: { passwordHash, mustChangePassword: true },
+          }),
+          prisma.session.deleteMany({ where: { userId: id } }),
+        ]);
+        return { temporaryPassword };
+      }
+
+      // Keycloak-managed account: set a temporary password (forces change on
+      // next login) via the Admin API, then drop local sessions.
+      await setKeycloakUserPassword(row.keycloakId, temporaryPassword, true);
+      await prisma.session.deleteMany({ where: { userId: id } });
+      return { temporaryPassword };
     },
 
     /**

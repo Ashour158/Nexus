@@ -1,9 +1,13 @@
 import PostHog from 'posthog-js';
+import { hasNonEssentialConsent } from '@/lib/consent';
 
 export function initPostHog() {
   if (typeof window === 'undefined') return;
   if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) return;
   if (process.env.NODE_ENV !== 'production') return;
+  // Product analytics is non-essential: only start capture once the user has
+  // explicitly accepted (see the cookie-consent banner). Defaults to off.
+  if (!hasNonEssentialConsent()) return;
 
   PostHog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
     api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://app.posthog.com',
@@ -17,12 +21,14 @@ export function initPostHog() {
 export function trackEvent(event: string, properties?: Record<string, unknown>) {
   if (typeof window === 'undefined') return;
   if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) return;
+  if (!hasNonEssentialConsent()) return;
   PostHog.capture(event, properties);
 }
 
 export function identifyUser(userId: string, traits?: Record<string, unknown>) {
   if (typeof window === 'undefined') return;
   if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) return;
+  if (!hasNonEssentialConsent()) return;
   PostHog.identify(userId, traits);
 }
 

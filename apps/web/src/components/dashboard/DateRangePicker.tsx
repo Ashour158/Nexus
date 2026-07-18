@@ -68,7 +68,7 @@ export function DateRangePicker({ value, onChange }: DateRangePickerProps) {
       <select
         value={current.preset}
         onChange={(e) => commit({ ...current, preset: e.target.value as DatePreset })}
-        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+        className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm"
       >
         {PRESETS.map((preset) => (
           <option key={preset.value} value={preset.value}>
@@ -82,13 +82,13 @@ export function DateRangePicker({ value, onChange }: DateRangePickerProps) {
             type="date"
             value={current.from ?? ''}
             onChange={(e) => commit({ ...current, from: e.target.value || undefined })}
-            className="rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm"
+            className="rounded-lg border border-outline-variant bg-surface px-2 py-2 text-sm"
           />
           <input
             type="date"
             value={current.to ?? ''}
             onChange={(e) => commit({ ...current, to: e.target.value || undefined })}
-            className="rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm"
+            className="rounded-lg border border-outline-variant bg-surface px-2 py-2 text-sm"
           />
         </>
       ) : null}

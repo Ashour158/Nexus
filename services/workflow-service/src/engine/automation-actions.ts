@@ -1,4 +1,10 @@
-import type { ExecutionContext, NodeResult, WorkflowNode, WorkflowNodeType } from './types.js';
+import type {
+  ExecutionContext,
+  NodeResult,
+  NotificationProducer,
+  WorkflowNode,
+  WorkflowNodeType,
+} from './types.js';
 import { handleAssignNode } from './nodes/assign.node.js';
 import { handleCreateActivityNode } from './nodes/create-activity.node.js';
 import { handleCreateTaskNode } from './nodes/create-task.node.js';
@@ -96,7 +102,9 @@ export function buildRuleExecutionContext(
   tenantId: string,
   ruleId: string,
   eventId: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  producer?: NotificationProducer,
+  opts?: { simulate?: boolean; causationDepth?: number; rootEventId?: string }
 ): ExecutionContext {
   return {
     tenantId,
@@ -104,5 +112,25 @@ export function buildRuleExecutionContext(
     workflowId: ruleId,
     triggerPayload: payload,
     currentNodeId: null,
+    producer,
+    simulate: opts?.simulate ?? false,
+    causationDepth: opts?.causationDepth ?? 0,
+    rootEventId: opts?.rootEventId ?? eventId,
   };
+}
+
+/**
+ * Simulate a single action (AU-3 dry-run). Delegates to the same node handler as
+ * a live run but with `simulate: true` on the context, so the handler resolves its
+ * target (URL/body/event) and returns a `{ simulated: true, ... }` plan WITHOUT
+ * performing any side effect (no fetch, no publish). This is the exact code path a
+ * live action takes up to the moment of the effect, which is what makes the
+ * preview trustworthy.
+ */
+export async function simulateAutomationAction(
+  action: AutomationAction,
+  context: ExecutionContext,
+  index: number
+): Promise<NodeResult> {
+  return executeAutomationAction(action, { ...context, simulate: true }, index);
 }

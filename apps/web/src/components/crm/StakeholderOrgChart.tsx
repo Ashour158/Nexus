@@ -27,13 +27,13 @@ const ROLES = ['Champion', 'EconomicBuyer', 'Blocker', 'Influencer', 'User', 'Te
 const SENTIMENTS = ['Positive', 'Neutral', 'Negative', 'Unknown'];
 
 const ROLE_COLORS: Record<string, string> = {
-  Champion: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
-  EconomicBuyer: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
-  Blocker: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-  Influencer: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-  User: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
-  TechnicalBuyer: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
-  Coach: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  Champion: 'bg-success-container text-on-success-container ',
+  EconomicBuyer: 'bg-primary-container text-on-primary-container ',
+  Blocker: 'bg-error-container text-on-error-container ',
+  Influencer: 'bg-tertiary-container text-on-tertiary-container ',
+  User: 'bg-surface-container-high text-on-surface dark:bg-surface-container-high dark:text-outline',
+  TechnicalBuyer: 'bg-info-container text-on-info-container ',
+  Coach: 'bg-warning-container text-on-warning-container ',
 };
 
 const SENTIMENT_ICONS: Record<string, string> = {
@@ -117,28 +117,28 @@ export function StakeholderOrgChart({ dealId }: { dealId: string }) {
   const renderNode = (s: Stakeholder, depth = 0): React.ReactNode => (
     <div
       key={s.id}
-      className={`${depth > 0 ? 'ms-6 border-s-2 border-slate-200 ps-4 dark:border-slate-700' : ''} mt-3`}
+      className={`${depth > 0 ? 'ms-6 border-s-2 border-outline-variant ps-4 dark:border-outline-variant' : ''} mt-3`}
     >
-      <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+      <div className="space-y-2 rounded-xl border border-outline-variant bg-surface p-3 dark:border-outline-variant dark:bg-surface">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-container text-sm font-semibold text-primary ">
               {s.contact.firstName[0]}
               {s.contact.lastName[0]}
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              <p className="text-sm font-semibold text-on-surface ">
                 {s.contact.firstName} {s.contact.lastName}
               </p>
               {s.contact.title ? (
-                <p className="text-xs text-slate-500 dark:text-slate-400">{s.contact.title}</p>
+                <p className="text-xs text-on-surface-variant dark:text-on-surface-variant">{s.contact.title}</p>
               ) : null}
             </div>
           </div>
           <button
             type="button"
             onClick={() => removeMutation.mutate(s.id)}
-            className="p-1 text-slate-400 hover:text-red-500"
+            className="p-1 text-on-surface-variant hover:text-error"
           >
             <X className="h-3 w-3" />
           </button>
@@ -146,7 +146,7 @@ export function StakeholderOrgChart({ dealId }: { dealId: string }) {
         <div className="flex flex-wrap items-center gap-1">
           <span
             className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-              ROLE_COLORS[s.role] ?? 'bg-slate-100 text-slate-600'
+              ROLE_COLORS[s.role] ?? 'bg-surface-container-high text-on-surface-variant'
             }`}
           >
             {s.role}
@@ -156,7 +156,7 @@ export function StakeholderOrgChart({ dealId }: { dealId: string }) {
             onChange={(e) =>
               updateMutation.mutate({ id: s.id, data: { sentiment: e.target.value } })
             }
-            className="cursor-pointer border-0 bg-transparent text-xs text-slate-600 dark:text-slate-400"
+            className="cursor-pointer border-0 bg-transparent text-xs text-on-surface-variant dark:text-on-surface-variant"
           >
             {SENTIMENTS.map((sent) => (
               <option key={sent} value={sent}>
@@ -166,7 +166,7 @@ export function StakeholderOrgChart({ dealId }: { dealId: string }) {
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500 dark:text-slate-400">Influence</span>
+          <span className="text-xs text-on-surface-variant dark:text-on-surface-variant">Influence</span>
           <input
             type="range"
             min={0}
@@ -175,9 +175,9 @@ export function StakeholderOrgChart({ dealId }: { dealId: string }) {
             onChange={(e) =>
               updateMutation.mutate({ id: s.id, data: { influence: parseInt(e.target.value, 10) } })
             }
-            className="flex-1 accent-indigo-600"
+            className="flex-1 accent-primary"
           />
-          <span className="w-8 text-end text-xs font-medium text-slate-700 dark:text-slate-300">
+          <span className="w-8 text-end text-xs font-medium text-on-surface dark:text-outline">
             {s.influence}%
           </span>
         </div>
@@ -189,20 +189,20 @@ export function StakeholderOrgChart({ dealId }: { dealId: string }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-slate-900 dark:text-slate-100">
+        <h3 className="font-semibold text-on-surface ">
           Stakeholder Map ({stakeholders.length})
         </h3>
         <button
           type="button"
           onClick={() => setShowAdd(true)}
-          className="flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700"
+          className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-sm text-white hover:bg-primary"
         >
           <Plus className="h-4 w-4" /> Add Stakeholder
         </button>
       </div>
 
       {stakeholders.length === 0 ? (
-        <div className="rounded-xl border-2 border-dashed border-slate-200 py-8 text-center text-slate-400 dark:border-slate-800">
+        <div className="rounded-xl border-2 border-dashed border-outline-variant py-8 text-center text-on-surface-variant dark:border-outline-variant">
           <User className="mx-auto mb-2 h-8 w-8 opacity-40" />
           <p className="text-sm">No stakeholders mapped yet</p>
         </div>
@@ -211,27 +211,27 @@ export function StakeholderOrgChart({ dealId }: { dealId: string }) {
       <div>{roots.map((s) => renderNode(s))}</div>
 
       {showAdd ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-96 space-y-4 rounded-xl bg-white p-6 shadow-2xl dark:bg-slate-900">
-            <h3 className="font-semibold text-slate-900 dark:text-slate-100">Add Stakeholder</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-on-surface/40">
+          <div className="w-96 space-y-4 rounded-xl bg-surface p-6 shadow-2xl dark:bg-surface">
+            <h3 className="font-semibold text-on-surface ">Add Stakeholder</h3>
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-slate-500 dark:text-slate-400">Contact ID</label>
+                <label className="text-xs text-on-surface-variant dark:text-on-surface-variant">Contact ID</label>
                 <input
                   value={newStakeholder.contactId}
                   onChange={(e) =>
                     setNewStakeholder((p) => ({ ...p, contactId: e.target.value }))
                   }
                   placeholder="cuid()"
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  className="mt-1 w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface dark:border-outline-variant dark:bg-surface "
                 />
               </div>
               <div>
-                <label className="text-xs text-slate-500 dark:text-slate-400">Role</label>
+                <label className="text-xs text-on-surface-variant dark:text-on-surface-variant">Role</label>
                 <select
                   value={newStakeholder.role}
                   onChange={(e) => setNewStakeholder((p) => ({ ...p, role: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  className="mt-1 w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface dark:border-outline-variant dark:bg-surface "
                 >
                   {ROLES.map((rl) => (
                     <option key={rl} value={rl}>
@@ -241,7 +241,7 @@ export function StakeholderOrgChart({ dealId }: { dealId: string }) {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-slate-500 dark:text-slate-400">
+                <label className="text-xs text-on-surface-variant dark:text-on-surface-variant">
                   Reports to (stakeholder ID, optional)
                 </label>
                 <select
@@ -249,7 +249,7 @@ export function StakeholderOrgChart({ dealId }: { dealId: string }) {
                   onChange={(e) =>
                     setNewStakeholder((p) => ({ ...p, reportsToId: e.target.value }))
                   }
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  className="mt-1 w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface dark:border-outline-variant dark:bg-surface "
                 >
                   <option value="">None (top level)</option>
                   {stakeholders.map((sx) => (
@@ -264,7 +264,7 @@ export function StakeholderOrgChart({ dealId }: { dealId: string }) {
               <button
                 type="button"
                 onClick={() => setShowAdd(false)}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-300"
+                className="rounded-lg border border-outline-variant px-4 py-2 text-sm text-on-surface dark:border-outline-variant dark:text-outline"
               >
                 Cancel
               </button>
@@ -272,7 +272,7 @@ export function StakeholderOrgChart({ dealId }: { dealId: string }) {
                 type="button"
                 disabled={!newStakeholder.contactId.trim() || addMutation.isPending}
                 onClick={() => addMutation.mutate(newStakeholder)}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-60"
+                className="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary disabled:opacity-60"
               >
                 {addMutation.isPending ? 'Adding…' : 'Add'}
               </button>

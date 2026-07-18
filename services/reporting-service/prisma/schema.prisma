@@ -188,9 +188,38 @@ model BiSavedReport {
   isShared    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  schedules   BiReportSchedule[]
 
   @@index([tenantId, ownerId])
   @@index([tenantId, isShared])
+  @@unique([id, tenantId])
+}
+
+/// Recurring delivery of a BiSavedReport (the modern ReportSpec → ClickHouse
+/// path). Mirrors ReportSchedule, which only ever covered the legacy
+/// SavedReport model — so BI reports, the ones people actually build, had no way
+/// to be subscribed to.
+model BiReportSchedule {
+  id         String        @id @default(cuid())
+  tenantId   String
+  reportId   String
+  report     BiSavedReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  cron       String
+  format     String        @default("csv")
+  recipients String[]
+  subject    String?
+  lastRunAt  DateTime?
+  nextRunAt  DateTime?
+  /// Populated when the last run failed, so a silently-broken subscription is
+  /// visible instead of just never arriving.
+  lastError  String?
+  isActive   Boolean       @default(true)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, isActive, nextRunAt])
+  @@index([isActive, nextRunAt])
   @@unique([id, tenantId])
 }
 
@@ -225,6 +254,60 @@ model BiDashboardWidget {
   updatedAt   DateTime    @updatedAt
 
   @@index([tenantId, dashboardId])
+  @@unique([id, tenantId])
+}
+
+/// Universal annotation — a threaded comment/note attachable to ANY target in
+/// the system: a report, dashboard, widget, a specific data point on a chart, or
+/// any CRM record (deal/account/contact/lead/…). `targetType` is free-form so new
+/// object types are annotatable with no schema change. `anchor` optionally pins
+/// the note to an exact spot (a dimension bucket + measure + series) on a chart.
+model Annotation {
+  id           String       @id @default(cuid())
+  tenantId     String
+  targetType   String
+  targetId     String
+  anchor       Json? // { dimension?, dimensionValue?, measure?, series? } for data-point pins
+  parentId     String?
+  parent       Annotation?  @relation("AnnotationThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies      Annotation[] @relation("AnnotationThread")
+  authorId     String
+  authorName   String?
+  body         String
+  mentions     String[]     @default([])
+  pinned       Boolean      @default(false)
+  resolved     Boolean      @default(false)
+  resolvedAt   DateTime?
+  resolvedById String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([tenantId, targetType, targetId])
+  @@index([tenantId, authorId])
+  @@index([parentId])
+  @@unique([id, tenantId])
+}
+
+/// Universal data link — a typed relationship connecting ANY entity to ANY other
+/// entity across the system (link a report to the deal it explains, a dashboard
+/// to an account, an annotation to a KPI, one record to another). Queryable from
+/// either side; the (from,to,relation) triple is unique per tenant.
+model DataLink {
+  id          String   @id @default(cuid())
+  tenantId    String
+  fromType    String
+  fromId      String
+  toType      String
+  toId        String
+  relation    String   @default("related")
+  label       String?
+  note        String?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, fromType, fromId])
+  @@index([tenantId, toType, toId])
+  @@unique([tenantId, fromType, fromId, toType, toId, relation])
   @@unique([id, tenantId])
 }
 

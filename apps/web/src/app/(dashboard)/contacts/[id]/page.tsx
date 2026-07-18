@@ -39,6 +39,7 @@ import { useUsers } from '@/hooks/use-users';
 import { EnrichmentPanel } from '@/components/crm/EnrichmentPanel';
 import { CustomFieldsSection } from '@/components/crm/CustomFieldsSection';
 import { FieldHistory } from '@/components/crm/FieldHistory';
+import { DynamicRecordLayout } from '@/components/crm/DynamicRecordLayout';
 import { api } from '@/lib/api-client';
 import { formatDate } from '@/lib/format';
 import { cn } from '@/lib/cn';
@@ -169,7 +170,7 @@ export default function ContactDetailPage() {
   if (!canRead) {
     return (
       <div className="px-6 py-8">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
+        <div className="rounded-lg border border-warning/30 bg-warning-container p-6 text-sm text-on-warning-container">
           You do not have permission to view contacts.
         </div>
       </div>
@@ -188,7 +189,7 @@ export default function ContactDetailPage() {
   if (contactQuery.isError || !contact) {
     return (
       <div className="px-6 py-8">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+        <div className="rounded-lg border border-error/30 bg-error-container p-6 text-sm text-error">
           Failed to load contact: {contactQuery.error instanceof Error ? contactQuery.error.message : 'Unknown error'}
         </div>
       </div>
@@ -236,14 +237,14 @@ export default function ContactDetailPage() {
   ];
 
   return (
-    <div className="space-y-6 bg-slate-50 px-4 py-6 sm:px-6">
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 bg-white px-6 py-5">
+    <div className="space-y-6 bg-surface-container-low px-4 py-6 sm:px-6">
+      <section className="overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-sm">
+        <div className="border-b border-outline-variant bg-surface px-6 py-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <button
               type="button"
               onClick={() => router.push('/contacts')}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center gap-2 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-bold text-on-surface hover:bg-surface-container-low"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to contacts
@@ -292,7 +293,7 @@ export default function ContactDetailPage() {
             </div>
           </div>
           {!canUpdate ? (
-            <p className="mt-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+            <p className="mt-3 rounded-lg border border-warning/30 bg-warning-container px-3 py-2 text-xs font-medium text-warning">
               Editing and document uploads are restricted by role permissions.
             </p>
           ) : null}
@@ -300,8 +301,8 @@ export default function ContactDetailPage() {
 
         <div className="grid gap-6 p-6 lg:grid-cols-[280px_minmax(0,1fr)]">
           <div className="space-y-4">
-            <div className="flex flex-col items-center rounded-xl border border-slate-100 bg-white p-5 text-center">
-              <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-2xl bg-blue-50 text-3xl font-bold text-blue-700 ring-1 ring-blue-100">
+            <div className="flex flex-col items-center rounded-xl border border-outline-variant bg-surface p-5 text-center">
+              <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-2xl bg-primary-container text-3xl font-bold text-primary ring-1 ring-primary/30">
                 {photo ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={photo} alt={`${contact.firstName} ${contact.lastName}`} className="h-full w-full object-cover" />
@@ -309,11 +310,11 @@ export default function ContactDetailPage() {
                   <UserRound className="h-12 w-12" />
                 )}
               </div>
-              <h1 className="mt-4 text-2xl font-bold text-slate-950">
+              <h1 className="mt-4 text-2xl font-bold text-on-surface">
                 {contact.firstName} {contact.lastName}
               </h1>
-              <p className="mt-1 text-sm text-slate-500">{contact.jobTitle ?? 'Stakeholder'}</p>
-              <span className="mt-3 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-blue-700">
+              <p className="mt-1 text-sm text-on-surface-variant">{contact.jobTitle ?? 'Stakeholder'}</p>
+              <span className="mt-3 rounded-full bg-primary-container px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary">
                 {lifecycle}
               </span>
               <span className={cn('mt-2 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider', slaTone(slaStatus))}>
@@ -339,13 +340,16 @@ export default function ContactDetailPage() {
           </div>
 
           <div className="space-y-6">
+            {/* Deployed page-layout (progressive enhancement): renders only when
+                a layout is assigned for `contact`; otherwise nothing extra. */}
+            <DynamicRecordLayout module="contact" record={contact as unknown as Record<string, unknown>} />
             <div className="grid gap-4 xl:grid-cols-2">
               <InfoCard title="Relationship" icon={<Building2 className="h-4 w-4" />}>
                 <DetailItem
                   label="Account"
                   value={
                     contact.accountId ? (
-                      <Link href={`/accounts/${contact.accountId}`} className="font-semibold text-blue-700 hover:underline">
+                      <Link href={`/accounts/${contact.accountId}`} className="font-semibold text-primary hover:underline">
                         {contact.accountId}
                       </Link>
                     ) : (
@@ -391,11 +395,11 @@ export default function ContactDetailPage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
+      <section className="rounded-2xl border border-outline-variant bg-surface shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant px-6 py-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-950">Contact Workspace</h2>
-            <p className="mt-1 text-sm text-slate-500">Timeline, documents, communication, auditability, and controlled actions.</p>
+            <h2 className="text-lg font-bold text-on-surface">Contact Workspace</h2>
+            <p className="mt-1 text-sm text-on-surface-variant">Timeline, documents, communication, auditability, and controlled actions.</p>
           </div>
           {tab === 'documents' && canUpdate ? (
             <Button variant="secondary" onClick={() => setDocumentOpen(true)}>
@@ -404,7 +408,7 @@ export default function ContactDetailPage() {
             </Button>
           ) : null}
         </div>
-        <div className="grid gap-2 border-b border-slate-200 px-6 py-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="grid gap-2 border-b border-outline-variant px-6 py-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {tabs.map((t) => (
             <button
               key={t.id}
@@ -413,8 +417,8 @@ export default function ContactDetailPage() {
               className={cn(
                 'rounded-lg border px-3 py-2 text-sm font-semibold transition',
                 tab === t.id
-                  ? 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'
+                  ? 'border-primary/40 bg-primary-container text-primary shadow-sm'
+                  : 'border-outline-variant bg-surface text-on-surface-variant hover:border-outline-variant hover:bg-surface-container-low hover:text-on-surface'
               )}
             >
               {t.label}
@@ -447,8 +451,8 @@ export default function ContactDetailPage() {
             />
           )}
           {tab === 'history' && (
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="mb-4 text-sm font-bold text-slate-950">Field change history</h3>
+            <div className="rounded-xl border border-outline-variant bg-surface p-5 shadow-sm">
+              <h3 className="mb-4 text-sm font-bold text-on-surface">Field change history</h3>
               <FieldHistory objectType="contact" objectId={contact.id} />
             </div>
           )}
@@ -559,7 +563,7 @@ function ContactOverviewTab({
           label="LinkedIn"
           value={
             contact.linkedInUrl ? (
-              <a href={contact.linkedInUrl} target="_blank" rel="noreferrer" className="font-semibold text-blue-700 hover:underline">
+              <a href={contact.linkedInUrl} target="_blank" rel="noreferrer" className="font-semibold text-primary hover:underline">
                 {contact.linkedInUrl}
               </a>
             ) : (
@@ -570,7 +574,7 @@ function ContactOverviewTab({
         <DetailItem label="Twitter / X" value={contact.twitterHandle ?? 'Not set'} />
         <DetailItem label="Address" value={[contact.address, contact.city, contact.country].filter(Boolean).join(', ') || 'Not set'} />
         <DetailItem label="Timezone" value={contact.timezone ?? 'Not set'} />
-        <DetailItem label="Account" value={contact.accountId ? <Link href={`/accounts/${contact.accountId}`} className="font-semibold text-blue-700 hover:underline">{contact.accountId}</Link> : 'Unassigned'} />
+        <DetailItem label="Account" value={contact.accountId ? <Link href={`/accounts/${contact.accountId}`} className="font-semibold text-primary hover:underline">{contact.accountId}</Link> : 'Unassigned'} />
       </InfoCard>
 
       <InfoCard title="Consent & controls" icon={<ShieldCheck className="h-4 w-4" />}>
@@ -668,15 +672,15 @@ function EditContactModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40">
+    <div className="fixed inset-0 z-50 flex justify-end bg-inverse-surface/40">
       <button type="button" aria-label="Close edit panel" className="flex-1" onClick={onClose} />
-      <form onSubmit={submit} className="flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+      <form onSubmit={submit} className="flex h-full w-full max-w-2xl flex-col bg-surface shadow-2xl">
+        <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-950">Edit contact</h2>
-            <p className="text-sm text-slate-500">Role-controlled changes are tracked in field history and audit.</p>
+            <h2 className="text-lg font-bold text-on-surface">Edit contact</h2>
+            <p className="text-sm text-on-surface-variant">Role-controlled changes are tracked in field history and audit.</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-on-surface-variant hover:bg-surface-container-high">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -702,11 +706,11 @@ function EditContactModal({
           <FormSection title="Lifecycle and tags">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Lifecycle stage</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Lifecycle stage</span>
                 <select
                   value={form.lifecycleStage}
                   onChange={(event) => setForm({ ...form, lifecycleStage: event.target.value })}
-                  className="mt-1 h-10 w-full rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 h-10 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary"
                 >
                   {['New relationship', 'Business champion', 'Technical evaluator', 'Executive sponsor', 'Dormant', 'Archived'].map((stage) => (
                     <option key={stage} value={stage}>{stage}</option>
@@ -735,7 +739,7 @@ function EditContactModal({
             </div>
           </FormSection>
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-100 p-4">
+        <div className="flex justify-end gap-2 border-t border-outline-variant p-4">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
           <Button type="submit" isLoading={isSaving}>
             <Save className="h-4 w-4" />
@@ -777,22 +781,22 @@ function DocumentUploadModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-      <form onSubmit={submit} className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/40 p-4">
+      <form onSubmit={submit} className="w-full max-w-lg rounded-2xl bg-surface shadow-2xl">
+        <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-950">Upload contact document</h2>
-            <p className="text-sm text-slate-500">The attachment is added to the contact record and audit trail.</p>
+            <h2 className="text-lg font-bold text-on-surface">Upload contact document</h2>
+            <p className="text-sm text-on-surface-variant">The attachment is added to the contact record and audit trail.</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-on-surface-variant hover:bg-surface-container-high">
             <X className="h-5 w-5" />
           </button>
         </div>
         <div className="space-y-4 p-6">
-          <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center hover:border-blue-300 hover:bg-blue-50">
-            <Upload className="h-8 w-8 text-blue-600" />
-            <span className="mt-3 text-sm font-bold text-slate-900">{file ? file.name : 'Choose document'}</span>
-            <span className="mt-1 text-xs text-slate-500">{file ? `${Math.round(file.size / 1024)} KB` : 'PDF, DOCX, XLSX, image, or archive'}</span>
+          <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant bg-surface-container-low px-6 py-8 text-center hover:border-primary/40 hover:bg-primary-container">
+            <Upload className="h-8 w-8 text-primary" />
+            <span className="mt-3 text-sm font-bold text-on-surface">{file ? file.name : 'Choose document'}</span>
+            <span className="mt-1 text-xs text-on-surface-variant">{file ? `${Math.round(file.size / 1024)} KB` : 'PDF, DOCX, XLSX, image, or archive'}</span>
             <input type="file" className="sr-only" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -800,7 +804,7 @@ function DocumentUploadModal({
             <Input label="Retention category" value={retentionCategory} onChange={setRetentionCategory} />
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-100 p-4">
+        <div className="flex justify-end gap-2 border-t border-outline-variant p-4">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
           <Button type="submit" isLoading={isSaving}>
             <Upload className="h-4 w-4" />
@@ -814,8 +818,8 @@ function DocumentUploadModal({
 
 function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-slate-100 p-4">
-      <h3 className="mb-3 text-sm font-bold text-slate-950">{title}</h3>
+    <section className="rounded-xl border border-outline-variant p-4">
+      <h3 className="mb-3 text-sm font-bold text-on-surface">{title}</h3>
       <div className="space-y-3">{children}</div>
     </section>
   );
@@ -836,13 +840,13 @@ function Input({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">{label}</span>
       <input
         type={type}
         required={required}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-1 h-10 w-full rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500"
+        className="mt-1 h-10 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary"
       />
     </label>
   );
@@ -850,13 +854,13 @@ function Input({
 
 function Checkbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
   return (
-    <label className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+    <label className="flex items-center justify-between gap-3 rounded-lg bg-surface-container-low px-3 py-2 text-sm font-medium text-on-surface">
       {label}
       <input
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+        className="rounded border-outline-variant text-primary focus:ring-primary"
       />
     </label>
   );
@@ -872,17 +876,17 @@ function splitCsv(value: string) {
 function DetailItem({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3 text-sm">
-      <dt className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</dt>
-      <dd className="min-w-0 text-slate-700">{value}</dd>
+      <dt className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">{label}</dt>
+      <dd className="min-w-0 text-on-surface">{value}</dd>
     </div>
   );
 }
 
 function InfoCard({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-white p-4">
-      <div className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-900">
-        <span className="text-blue-600">{icon}</span>
+    <div className="rounded-xl border border-outline-variant bg-surface p-4">
+      <div className="mb-4 flex items-center gap-2 text-sm font-bold text-on-surface">
+        <span className="text-primary">{icon}</span>
         {title}
       </div>
       <dl className="space-y-3">{children}</dl>
@@ -893,13 +897,13 @@ function InfoCard({ title, icon, children }: { title: string; icon: React.ReactN
 function TagCloud({ label, values }: { label: string; values: string[] }) {
   return (
     <div className="space-y-2">
-      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">{label}</p>
       {values.length === 0 ? (
-        <p className="text-sm text-slate-500">None</p>
+        <p className="text-sm text-on-surface-variant">None</p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {values.map((value) => (
-            <span key={value} className="rounded bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">
+            <span key={value} className="rounded bg-primary-container px-2 py-1 text-xs font-bold text-primary">
               {value}
             </span>
           ))}
@@ -921,21 +925,21 @@ function MiniFeed({
   empty: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-white p-4">
-      <div className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-900">
-        <span className="text-blue-600">{icon}</span>
+    <div className="rounded-xl border border-outline-variant bg-surface p-4">
+      <div className="mb-4 flex items-center gap-2 text-sm font-bold text-on-surface">
+        <span className="text-primary">{icon}</span>
         {title}
       </div>
       {rows.length === 0 ? (
-        <p className="text-sm text-slate-500">{empty}</p>
+        <p className="text-sm text-on-surface-variant">{empty}</p>
       ) : (
         <div className="space-y-2">
           {rows.slice(0, 4).map((row) => (
-            <div key={String(row.id ?? row.name ?? row.subject ?? row.action)} className="rounded-lg bg-slate-50 px-3 py-2">
-              <p className="text-sm font-semibold text-slate-800">
+            <div key={String(row.id ?? row.name ?? row.subject ?? row.action)} className="rounded-lg bg-surface-container-low px-3 py-2">
+              <p className="text-sm font-semibold text-on-surface">
                 {String(row.subject ?? row.name ?? row.action ?? 'Record')}
               </p>
-              <p className="mt-0.5 text-xs text-slate-500">
+              <p className="mt-0.5 text-xs text-on-surface-variant">
                 {String(row.type ?? row.actor ?? row.from ?? 'System')} - {formatDate(String(row.updatedAt ?? row.lastMessageAt ?? row.at ?? new Date().toISOString()))}
               </p>
             </div>
@@ -981,10 +985,10 @@ function customNumber(contact: Contact, key: string) {
 }
 
 function slaTone(status: string) {
-  if (status === 'healthy') return 'bg-emerald-50 text-emerald-700';
-  if (status === 'watch') return 'bg-amber-50 text-amber-700';
-  if (status === 'breached') return 'bg-rose-50 text-rose-700';
-  return 'bg-slate-100 text-slate-700';
+  if (status === 'healthy') return 'bg-success-container text-success';
+  if (status === 'watch') return 'bg-warning-container text-warning';
+  if (status === 'breached') return 'bg-error-container text-error';
+  return 'bg-surface-container-high text-on-surface';
 }
 
 function DealsTab({ data, isLoading }: { data: { data: Deal[]; total: number } | undefined; isLoading: boolean }) {
@@ -1004,14 +1008,14 @@ function DealsTab({ data, isLoading }: { data: { data: Deal[]; total: number } |
   return (
     <div className="space-y-3">
       {deals.map((d) => (
-        <div key={d.id} className="rounded-lg border border-slate-200 bg-white p-4">
+        <div key={d.id} className="rounded-lg border border-outline-variant bg-surface p-4">
           <div className="flex items-center justify-between">
-            <Link href={`/deals/${d.id}`} className="text-sm font-medium text-slate-900 hover:underline">
+            <Link href={`/deals/${d.id}`} className="text-sm font-medium text-on-surface hover:underline">
               {d.name}
             </Link>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{d.status}</span>
+            <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] text-on-surface-variant">{d.status}</span>
           </div>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-on-surface-variant">
             {d.amount} {d.currency}
           </p>
         </div>
@@ -1040,7 +1044,7 @@ function RelatedAccountsTab({
   }
   if (isError) {
     return (
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+      <div className="rounded-xl border border-warning/30 bg-warning-container p-4 text-sm text-on-warning-container">
         Related accounts could not be loaded right now.
       </div>
     );
@@ -1057,26 +1061,26 @@ function RelatedAccountsTab({
   }
   return (
     <div className="space-y-3">
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-on-surface-variant">
         This contact influences {relations.length} account{relations.length === 1 ? '' : 's'} across the buying-committee layer — they are not bound to a single account.
       </p>
       {relations.map((r) => (
         <Link
           key={r.id}
           href={`/accounts/${r.accountId}`}
-          className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 hover:border-blue-200 hover:bg-blue-50/30"
+          className="flex items-center justify-between gap-3 rounded-lg border border-outline-variant bg-surface p-4 hover:border-primary/40 hover:bg-primary-container/30"
         >
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-slate-900">{r.account.name}</p>
-            <p className="mt-0.5 text-xs text-slate-500">{r.account.industry ?? 'Industry not set'}</p>
+            <p className="truncate text-sm font-bold text-on-surface">{r.account.name}</p>
+            <p className="mt-0.5 text-xs text-on-surface-variant">{r.account.industry ?? 'Industry not set'}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {r.isPrimary ? (
-              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-blue-700">
+              <span className="rounded-full bg-primary-container px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary">
                 Primary
               </span>
             ) : null}
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{r.role}</span>
+            <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] font-semibold text-on-surface-variant">{r.role}</span>
           </div>
         </Link>
       ))}
@@ -1101,12 +1105,12 @@ function ActivitiesTab({ data, isLoading }: { data: PaginatedResult<Activity> | 
   return (
     <div className="space-y-3">
       {items.map((a) => (
-        <div key={a.id} className="rounded-lg border border-slate-200 bg-white p-4">
+        <div key={a.id} className="rounded-lg border border-outline-variant bg-surface p-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-slate-900">{a.subject}</p>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{a.status}</span>
+            <p className="text-sm font-medium text-on-surface">{a.subject}</p>
+            <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] text-on-surface-variant">{a.status}</span>
           </div>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-on-surface-variant">
             {a.type} - {a.dueDate ? formatDate(a.dueDate) : 'No due date'}
           </p>
         </div>
@@ -1143,24 +1147,24 @@ function RecordsTab({
   return (
     <div className="space-y-3">
       {rows.map((row) => (
-        <div key={String(row.id ?? row.title ?? row.name ?? row.subject ?? row.action)} className="rounded-lg border border-slate-200 bg-white p-4">
+        <div key={String(row.id ?? row.title ?? row.name ?? row.subject ?? row.action)} className="rounded-lg border border-outline-variant bg-surface p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="flex items-center gap-2 text-sm font-bold text-slate-900">
+            <p className="flex items-center gap-2 text-sm font-bold text-on-surface">
               {showTypeIcon ? timelineMeta(row).icon : null}
               {String(row.title ?? row.subject ?? row.name ?? row.action ?? row.topic ?? row.field ?? (showTypeIcon ? timelineMeta(row).label : 'Record'))}
             </p>
             {row.status ? (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+              <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] font-semibold text-on-surface-variant">
                 {String(row.status)}
               </span>
             ) : null}
           </div>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-on-surface-variant">
             {String(row.type ?? row.actor ?? row.from ?? row.aggregateType ?? row.channel ?? 'Contact record')} -{' '}
             {formatDate(String(row.at ?? row.updatedAt ?? row.lastMessageAt ?? row.createdAt ?? new Date().toISOString()))}
           </p>
           {row.description || row.meta || row.payload ? (
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-on-surface-variant">
               {String(row.description ?? row.meta ?? JSON.stringify(row.payload))}
             </p>
           ) : null}
@@ -1187,19 +1191,19 @@ function ConsentTab({ data, isLoading }: { data: { data: ConsentRecord[] } | und
   return (
     <div className="space-y-3">
       {records.map((r) => (
-        <div key={r.channel} className="rounded-lg border border-slate-200 bg-white p-4">
+        <div key={r.channel} className="rounded-lg border border-outline-variant bg-surface p-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-slate-900">{r.channel}</p>
+            <p className="text-sm font-medium text-on-surface">{r.channel}</p>
             <span
               className={cn(
                 'rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                r.granted ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                r.granted ? 'bg-success-container text-success' : 'bg-error-container text-error'
               )}
             >
               {r.granted ? 'Granted' : 'Denied'}
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500">Updated {formatDate(r.updatedAt)}</p>
+          <p className="mt-1 text-xs text-on-surface-variant">Updated {formatDate(r.updatedAt)}</p>
         </div>
       ))}
     </div>

@@ -5,16 +5,24 @@ import { withFieldEncryption } from '@nexus/security';
 import { alsStore } from './request-context.js';
 import { OutboxPublisher } from '@nexus/outbox';
 import { TOPICS } from '@nexus/kafka';
+import { invalidateListCache, cachedEntityForModel } from './lib/read-cache.js';
 
-const skipTenantModels = new Set<string>();
+// DealRoom is exempt from tenant auto-scoping: the PUBLIC customer link
+// (`GET /deal-rooms/:slug/public`, no JWT) looks a room up by its globally-unique
+// random slug BEFORE any tenant is known, which otherwise throws TenantContextError
+// under fail-closed enforcement. Safe because every AUTHENTICATED deal-room query
+// already filters by an explicit `tenantId: jwt.tenantId`, and the slug is
+// unguessable — so this is never the sole isolation boundary.
+const skipTenantModels = new Set<string>(['DealRoom']);
 
 const softDeleteModels = new Set([
   'Lead', 'Contact', 'Deal', 'Account', 'Activity', 'Note', 'Quote',
   'Pipeline', 'Stage', 'EmailThread', 'Competitor', 'Territory', 'SalesRep',
   'EnrichmentJob', 'LeadScore', 'AccountHealthScore', 'LeadScoringRule',
   'CustomFieldDefinition', 'Attachment', 'WinLossReason', 'FieldPermission',
-  'ValidationRule', 'DuplicateGroup', 'ConsentRecord', 'DealRoom',
+  'ValidationRule', 'DuplicateGroup', 'DuplicateRule', 'ConsentRecord', 'DealRoom',
   'DealCompetitor', 'LeadRoutingEvent', 'DealRoomDocument', 'MutualActionItem',
+  'Quota',
 ]);
 
 const readOperations = new Set([
@@ -168,6 +176,20 @@ export function createCrmPrisma() {
           const result = await query(args);
           if (['create', 'update', 'delete', 'upsert'].includes(operation)) {
             await publishMutationEvent(base, outbox, model, operation, result);
+            // RR-H13: event-driven cache invalidation — drop this entity's cached
+            // list/aggregate reads for the tenant on any single-row mutation.
+            // Fire-and-forget; the short read TTL bounds staleness if this misses.
+            const entity = cachedEntityForModel(model);
+            if (entity) {
+              const tid = (result as Record<string, unknown> | null)?.tenantId as string | undefined;
+              if (tid) {
+                void invalidateListCache(entity, tid);
+                // Account/Contact writes also move the data-quality dashboard rollup.
+                if (entity === 'account' || entity === 'contact') {
+                  void invalidateListCache('data-quality', tid);
+                }
+              }
+            }
           }
           return result;
         },

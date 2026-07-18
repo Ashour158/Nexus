@@ -59,7 +59,7 @@ export default function RFQsPage(): JSX.Element {
         <ExportButton module="rfqs" />
       </div>
 
-      <section className="rounded-lg border bg-white p-4">
+      <section className="rounded-lg border bg-surface p-4">
         <div className="flex gap-2">
           <input
             value={title}
@@ -67,15 +67,15 @@ export default function RFQsPage(): JSX.Element {
             className="flex-1 rounded border px-3 py-2 text-sm"
             placeholder="RFQ title"
           />
-          <button onClick={() => create.mutate()} className="rounded bg-blue-600 px-3 py-2 text-sm text-white">
+          <button onClick={() => create.mutate()} className="rounded bg-primary px-3 py-2 text-sm text-white">
             Create RFQ
           </button>
         </div>
       </section>
 
-      <section className="rounded-lg border bg-white p-2">
+      <section className="rounded-lg border bg-surface p-2">
         <table className="w-full text-sm">
-          <thead className="text-start text-xs uppercase text-gray-500">
+          <thead className="text-start text-xs uppercase text-on-surface-variant">
             <tr>
               <th className="px-3 py-2">RFQ #</th>
               <th className="px-3 py-2">Title</th>

@@ -131,7 +131,7 @@ export default function ConnectionsAndSyncPage(): JSX.Element {
                     <div className="flex items-center gap-3">
                       <span
                         className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold"
-                        style={{ backgroundColor: '#eef6ff', color: '#005baf' }}
+                        style={{ backgroundColor: '#eef6ff', color: '#4f46e5' }}
                       >
                         {connection.provider.charAt(0).toUpperCase()}
                       </span>
@@ -173,7 +173,7 @@ export default function ConnectionsAndSyncPage(): JSX.Element {
                           {scopes.map((s) => (
                             <span
                               key={s}
-                              className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600"
+                              className="rounded bg-surface-container-high px-1.5 py-0.5 text-[10px] text-on-surface-variant"
                             >
                               {s}
                             </span>
@@ -197,7 +197,7 @@ export default function ConnectionsAndSyncPage(): JSX.Element {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-red-700 hover:bg-red-50"
+                      className="text-error hover:bg-error-container"
                       disabled={!canManage}
                       isLoading={disconnect.isPending}
                       onClick={() => disconnect.mutate(connection.provider)}
@@ -245,11 +245,11 @@ export default function ConnectionsAndSyncPage(): JSX.Element {
         </div>
 
         {showSyncForm ? (
-          <div className="mb-3 grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 md:grid-cols-3">
+          <div className="mb-3 grid gap-2 rounded-md border border-outline-variant bg-surface-container-low p-3 md:grid-cols-3">
             <select
               value={connectionId}
               onChange={(e) => setConnectionId(e.target.value)}
-              className="h-9 rounded-md border border-slate-300 px-3 text-sm"
+              className="h-9 rounded-md border border-outline-variant px-3 text-sm"
             >
               <option value="">Select connection</option>
               {connections.map((c) => (
@@ -261,7 +261,7 @@ export default function ConnectionsAndSyncPage(): JSX.Element {
             <select
               value={jobType}
               onChange={(e) => setJobType(e.target.value as SyncJob['jobType'])}
-              className="h-9 rounded-md border border-slate-300 px-3 text-sm"
+              className="h-9 rounded-md border border-outline-variant px-3 text-sm"
             >
               {JOB_TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -297,7 +297,7 @@ export default function ConnectionsAndSyncPage(): JSX.Element {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-start text-xs uppercase" style={{ color: 'var(--text-muted)' }}>
-                <tr className="border-b border-slate-100">
+                <tr className="border-b border-outline-variant">
                   <th className="px-3 py-2 text-left">Provider</th>
                   <th className="px-3 py-2 text-left">Type</th>
                   <th className="px-3 py-2 text-left">Status</th>
@@ -305,7 +305,7 @@ export default function ConnectionsAndSyncPage(): JSX.Element {
                   <th className="px-3 py-2 text-left">Completed</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-outline-variant">
                 {jobs.map((job) => (
                   <tr key={job.id}>
                     <td className="px-3 py-2 capitalize">{providerLabel(job.connectionId)}</td>

@@ -2,35 +2,46 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Home, Briefcase, Users, Activity, Settings } from 'lucide-react';
+import { cn } from '@/lib/cn';
 
 const NAV_ITEMS = [
-  { href: '/', label: 'Home', icon: '🏠' },
-  { href: '/deals', label: 'Deals', icon: '💼' },
-  { href: '/contacts', label: 'Contacts', icon: '👥' },
-  { href: '/activities', label: 'Activity', icon: '📋' },
-  { href: '/settings', label: 'Settings', icon: '⚙️' },
+  { href: '/dashboard', label: 'Home', icon: Home },
+  { href: '/deals', label: 'Deals', icon: Briefcase },
+  { href: '/contacts', label: 'Contacts', icon: Users },
+  { href: '/activities', label: 'Activity', icon: Activity },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export function MobileNav() {
   const pathname = usePathname() ?? '/';
 
   return (
-    <nav className="safe-area-inset-bottom fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 md:hidden">
+    <nav className="safe-area-inset-bottom fixed inset-x-0 bottom-0 z-40 border-t border-outline-variant bg-surface/95 backdrop-blur-md md:hidden">
       <div className="grid h-16 grid-cols-5">
         {NAV_ITEMS.map((item) => {
-          const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+          const Icon = item.icon;
+          const active =
+            pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center justify-center gap-0.5 text-xs transition-colors ${
-                active
-                  ? 'text-indigo-600 dark:text-indigo-400'
-                  : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-              }`}
+              aria-current={active ? 'page' : undefined}
+              className={cn(
+                'flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors',
+                active ? 'text-primary' : 'text-on-surface-variant hover:text-on-surface'
+              )}
             >
-              <span className="text-xl" aria-hidden="true">{item.icon}</span>
-              <span className="font-medium">{item.label}</span>
+              <span
+                className={cn(
+                  'flex h-8 w-12 items-center justify-center rounded-full transition-colors',
+                  active && 'bg-primary-container'
+                )}
+              >
+                <Icon className={cn('h-5 w-5', active && 'text-on-primary-container')} />
+              </span>
+              {item.label}
             </Link>
           );
         })}

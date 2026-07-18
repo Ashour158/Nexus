@@ -159,7 +159,7 @@ export function DataTable<T>({
                         if (el) el.indeterminate = someSelected ?? false;
                       }}
                       onChange={(e) => onSelectAll?.(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"
                       aria-label="Select all rows"
                     />
                   </th>
@@ -200,7 +200,7 @@ export function DataTable<T>({
                               'h-3 w-3 -mb-1',
                               resolvedSortKey === col.key && resolvedSortDir === 'asc'
                                 ? 'text-primary'
-                                : 'text-gray-300'
+                                : 'text-outline'
                             )}
                           />
                           <ChevronDown
@@ -208,7 +208,7 @@ export function DataTable<T>({
                               'h-3 w-3',
                               resolvedSortKey === col.key && resolvedSortDir === 'desc'
                                 ? 'text-primary'
-                                : 'text-gray-300'
+                                : 'text-outline'
                             )}
                           />
                         </span>
@@ -238,9 +238,9 @@ export function DataTable<T>({
                     <tr
                       key={id}
                       className={cn(
-                        'transition-colors hover:bg-gray-50 dark:hover:bg-slate-800/50',
+                        'transition-colors hover:bg-surface-container-high',
                         rowClassName?.(row),
-                        selectedIds?.has(id) && 'bg-primary-light/30'
+                        selectedIds?.has(id) && 'bg-primary-container/40'
                       )}
                     >
                       {onSelect ? (
@@ -249,7 +249,7 @@ export function DataTable<T>({
                             type="checkbox"
                             checked={selectedIds?.has(id) ?? false}
                             onChange={(e) => onSelect(id, e.target.checked)}
-                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"
                             aria-label={`Select row ${id}`}
                           />
                         </td>
@@ -349,7 +349,7 @@ function TableLoadingRows({ cols, rows }: { cols: number; rows: number }) {
         <tr key={i}>
           {Array.from({ length: cols }).map((_, j) => (
             <td key={j} className="px-4 py-3">
-              <div className="h-4 animate-pulse rounded bg-gray-200 dark:bg-slate-700" style={{ width: j === 0 ? '60%' : '80%' }} />
+              <div className="h-4 animate-pulse rounded bg-surface-container-highest dark:bg-surface-container-highest" style={{ width: j === 0 ? '60%' : '80%' }} />
             </td>
           ))}
         </tr>
@@ -399,7 +399,7 @@ export function DataTableActions({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-surface-container-high dark:hover:bg-surface-container-highest"
         style={{ color: 'var(--text-muted)' }}
         aria-label="Actions"
         aria-expanded={open}

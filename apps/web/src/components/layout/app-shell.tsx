@@ -25,7 +25,7 @@ export function AppShell({ children, className }: AppShellProps): ReactElement {
 
   return (
     <div
-      className="min-h-screen bg-[#f9f9ff] text-slate-900 dark:bg-slate-950 dark:text-slate-100"
+      className="min-h-screen bg-background text-on-surface"
     >
       <Sidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
       <div

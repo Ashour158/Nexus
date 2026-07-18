@@ -35,7 +35,7 @@ const STATUS_VARIANT: Record<ConnectorStatus, StatusVariant> = {
 const STATUS_LABEL: Record<ConnectorStatus, string> = {
   available: 'Available',
   beta: 'Beta',
-  planned: 'Coming soon',
+  planned: 'Roadmap',
 };
 
 /** Connectors that have a dedicated managed subpage. */
@@ -78,7 +78,7 @@ function ConnectorCard({
         <div className="flex items-start gap-3">
           <span
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
-            style={{ backgroundColor: '#eef6ff', color: '#005baf' }}
+            style={{ backgroundColor: '#eef6ff', color: '#4f46e5' }}
             aria-hidden="true"
           >
             {connectorInitial(connector.name)}
@@ -115,22 +115,22 @@ function ConnectorCard({
               href={connector.docsUrl}
               target="_blank"
               rel="noreferrer"
-              className="text-xs font-medium text-[#005baf] hover:underline"
+              className="text-xs font-medium text-[#4f46e5] hover:underline"
             >
               Docs
             </a>
           ) : null}
 
           {isPlanned ? (
-            <Button size="sm" variant="secondary" disabled>
-              Coming soon
+            <Button size="sm" variant="secondary" disabled title="On the roadmap — not yet available">
+              Roadmap
             </Button>
           ) : connector.connected ? (
             <div className="flex items-center gap-2">
               {managePath ? (
                 <Link
                   href={managePath}
-                  className="text-xs font-medium text-[#005baf] hover:underline"
+                  className="text-xs font-medium text-[#4f46e5] hover:underline"
                 >
                   Manage
                 </Link>
@@ -139,7 +139,7 @@ function ConnectorCard({
                 <Button
                   size="sm"
                   variant="secondary"
-                  className="border-red-300 text-red-700 hover:bg-red-50"
+                  className="border-error/40 text-error hover:bg-error-container"
                   isLoading={disconnect.isPending}
                   onClick={() =>
                     disconnect.mutate(

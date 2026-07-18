@@ -12,13 +12,13 @@ import { ExportButton } from '@/components/export/ExportButton';
 const PAGE_SIZE = 25;
 
 const STATUS_STYLES: Record<string, string> = {
-  DRAFT: 'bg-slate-100 text-slate-600',
-  PENDING_APPROVAL: 'bg-amber-100 text-amber-700',
-  CONFIRMED: 'bg-blue-100 text-blue-700',
-  FULFILLING: 'bg-indigo-100 text-indigo-700',
-  FULFILLED: 'bg-emerald-100 text-emerald-700',
-  CANCELLED: 'bg-red-100 text-red-700 line-through',
-  CLOSED: 'bg-slate-100 text-slate-400',
+  DRAFT: 'bg-surface-container-high text-on-surface-variant',
+  PENDING_APPROVAL: 'bg-warning-container text-warning',
+  CONFIRMED: 'bg-primary-container text-primary',
+  FULFILLING: 'bg-primary-container text-primary',
+  FULFILLED: 'bg-success-container text-success',
+  CANCELLED: 'bg-error-container text-error line-through',
+  CLOSED: 'bg-surface-container-high text-on-surface-variant',
 };
 
 export default function OrdersPage(): JSX.Element {
@@ -39,8 +39,8 @@ export default function OrdersPage(): JSX.Element {
     <main className="space-y-4 p-4">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Orders</h1>
-          <p className="text-sm text-slate-500">{total} total sales orders</p>
+          <h1 className="text-xl font-semibold text-on-surface">Orders</h1>
+          <p className="text-sm text-on-surface-variant">{total} total sales orders</p>
         </div>
         <ExportButton module="orders" filters={{ status: statusFilter }} />
       </header>
@@ -56,7 +56,7 @@ export default function OrdersPage(): JSX.Element {
               setPage(1);
             }}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              statusFilter === s ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              statusFilter === s ? 'bg-inverse-surface text-white' : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'
             }`}
           >
             {s.replace('_', ' ')}
@@ -65,11 +65,11 @@ export default function OrdersPage(): JSX.Element {
       </div>
 
       {/* Table */}
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <section className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
         {ordersQuery.isLoading ? (
           <TableSkeleton rows={8} cols={6} />
         ) : ordersQuery.isError ? (
-          <div className="p-8 text-center text-sm text-red-600">Could not load orders.</div>
+          <div className="p-8 text-center text-sm text-error">Could not load orders.</div>
         ) : orders.length === 0 ? (
           <EmptyState
             icon="📦"
@@ -82,7 +82,7 @@ export default function OrdersPage(): JSX.Element {
           />
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-start text-xs uppercase tracking-wide text-slate-500">
+            <thead className="bg-surface-container-low text-start text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
                 <th className="px-4 py-3 text-left">Order #</th>
                 <th className="px-4 py-3 text-left">Name</th>
@@ -92,29 +92,29 @@ export default function OrdersPage(): JSX.Element {
                 <th className="px-4 py-3 text-left">Created</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-outline-variant">
               {orders.map((order) => (
-                <tr key={order.id} className="cursor-pointer hover:bg-slate-50">
-                  <td className="px-4 py-3 font-mono text-xs font-medium text-slate-900">
+                <tr key={order.id} className="cursor-pointer hover:bg-surface-container-low">
+                  <td className="px-4 py-3 font-mono text-xs font-medium text-on-surface">
                     <Link href={`/orders/${order.id}`} className="hover:underline">
                       {order.orderNumber}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-slate-700">
+                  <td className="px-4 py-3 text-on-surface">
                     <Link href={`/orders/${order.id}`} className="hover:underline">
                       {order.name}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 font-mono text-[11px] text-slate-500">{order.accountId.slice(0, 10)}…</td>
+                  <td className="px-4 py-3 font-mono text-[11px] text-on-surface-variant">{order.accountId.slice(0, 10)}…</td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[order.status] ?? ''}`}>
                       {order.status.replace('_', ' ')}
                     </span>
                   </td>
-                  <td className="px-4 py-3 font-semibold text-slate-900">
+                  <td className="px-4 py-3 font-semibold text-on-surface">
                     {formatCurrency(order.total, order.currency)}
                   </td>
-                  <td className="px-4 py-3 text-slate-500">{formatDate(order.createdAt)}</td>
+                  <td className="px-4 py-3 text-on-surface-variant">{formatDate(order.createdAt)}</td>
                 </tr>
               ))}
             </tbody>
@@ -124,7 +124,7 @@ export default function OrdersPage(): JSX.Element {
 
       {/* Pagination */}
       {total > PAGE_SIZE && (
-        <div className="flex items-center justify-between text-sm text-slate-600">
+        <div className="flex items-center justify-between text-sm text-on-surface-variant">
           <span>
             Page {page} of {totalPages}
           </span>
@@ -133,7 +133,7 @@ export default function OrdersPage(): JSX.Element {
               type="button"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-lg border border-outline-variant px-3 py-1.5 disabled:opacity-40"
             >
               <ChevronLeft className="h-4 w-4" /> Prev
             </button>
@@ -141,7 +141,7 @@ export default function OrdersPage(): JSX.Element {
               type="button"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-lg border border-outline-variant px-3 py-1.5 disabled:opacity-40"
             >
               Next <ChevronRight className="h-4 w-4" />
             </button>

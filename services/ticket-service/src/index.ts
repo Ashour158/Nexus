@@ -9,10 +9,12 @@ import {
 } from '@nexus/service-utils';
 import rateLimit from '@fastify/rate-limit';
 import { NexusProducer } from '@nexus/kafka';
-import { getPrisma, tenantAls } from './prisma.js';
+import { getPrisma, getRawPrisma, tenantAls } from './prisma.js';
 import { createTicketsService } from './services/tickets.service.js';
 import { registerTicketRoutes } from './routes/tickets.routes.js';
 import { registerSlaRoutes } from './routes/sla.routes.js';
+import { registerEntitlementRoutes } from './routes/entitlements.routes.js';
+import { registerInternalPortalRoutes } from './routes/internal-portal.routes.js';
 
 startTracing({ serviceName: 'ticket-service' });
 const port = parseInt(process.env.PORT ?? '3029', 10);
@@ -29,8 +31,10 @@ const app = await createService({
 });
 
 const prisma = getPrisma();
+// Raw (non-tenant-extended) client for the cross-tenant SLA breach sweep.
+const rawPrisma = getRawPrisma() as unknown as typeof prisma;
 const producer = new NexusProducer('ticket-service');
-const tickets = createTicketsService(prisma, producer);
+const tickets = createTicketsService(prisma, producer, rawPrisma);
 
 // Bridge Fastify request-context tenantId into Prisma tenant ALS (defense-in-depth).
 app.addHook('preHandler', async (request) => {
@@ -54,6 +58,8 @@ app.setErrorHandler(globalErrorHandler);
 
 await registerTicketRoutes(app, tickets);
 await registerSlaRoutes(app, tickets);
+await registerEntitlementRoutes(app, tickets);
+await registerInternalPortalRoutes(app, prisma);
 
 // Kafka producer is best-effort: if the broker is down we keep serving requests.
 try {

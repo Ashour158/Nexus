@@ -79,12 +79,20 @@ export default function LoginPage() {
         roles: Array.isArray(claims.roles) ? (claims.roles as string[]) : [],
         permissions: Array.isArray(claims.permissions) ? (claims.permissions as string[]) : [],
       });
-      // Coarse-grained session cookie for middleware route protection.
+      // Store the raw JWT ONLY in a server-set HttpOnly, Secure, SameSite=Strict
+      // cookie (RR-H10). This POST hands the token to a server-side route handler
+      // that writes it via `Set-Cookie` — it is never placed in `document.cookie`
+      // or web storage, so client JS (and any XSS) can never read it. The
+      // server-side middleware reads that HttpOnly cookie and attaches
+      // `Authorization: Bearer` when proxying /api/* requests upstream.
+      await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken }),
+      });
+      // Coarse-grained, non-secret presence flag for middleware route protection.
+      // (Not the token — just "a session exists"; safe to be JS-readable.)
       document.cookie = 'nexus_session=1;path=/;max-age=86400;SameSite=Lax';
-      // The access token in a cookie too, so server-side /api/* route handlers
-      // (which can't read the client's sessionStorage) can forward it upstream.
-      // Middleware injects it as the Authorization header on /api/* requests.
-      document.cookie = `nexus_token=${accessToken};path=/;max-age=86400;SameSite=Lax`;
       const redirect = searchParams.get('redirect');
       router.push(redirect ?? '/deals');
     } catch (err) {
@@ -100,10 +108,10 @@ export default function LoginPage() {
     <main className="mx-auto flex min-h-screen max-w-md items-center px-6">
       <form
         onSubmit={onSubmit}
-        className="w-full rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
+        className="w-full rounded-lg border border-outline-variant bg-surface p-6 shadow-sm"
       >
-        <h1 className="text-xl font-bold text-slate-900">Sign in to Nexus</h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <h1 className="text-xl font-bold text-on-surface">Sign in to Nexus</h1>
+        <p className="mt-1 text-sm text-on-surface-variant">
           Use your corporate email and password.
         </p>
 
@@ -135,7 +143,7 @@ export default function LoginPage() {
         </div>
 
         {error ? (
-          <p role="alert" className="mt-4 text-sm text-red-600">
+          <p role="alert" className="mt-4 text-sm text-error">
             {error}
           </p>
         ) : null}
@@ -146,10 +154,10 @@ export default function LoginPage() {
           </Button>
         </div>
 
-        <p className="mt-6 text-center text-xs text-slate-400">
+        <p className="mt-6 text-center text-xs text-on-surface-variant">
           By signing in you agree to our{' '}
-          <a href="/legal/terms" className="underline hover:text-slate-600">Terms</a>{' '}and{' '}
-          <a href="/legal/privacy" className="underline hover:text-slate-600">Privacy Policy</a>.
+          <a href="/legal/terms" className="underline hover:text-on-surface-variant">Terms</a>{' '}and{' '}
+          <a href="/legal/privacy" className="underline hover:text-on-surface-variant">Privacy Policy</a>.
         </p>
       </form>
     </main>

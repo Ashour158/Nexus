@@ -92,7 +92,7 @@ function id(prefix: string) {
 function seed(): MetadataState {
   const moduleId = 'mod_projects';
   const ts = nowIso();
-  const module: CustomModule = {
+  const mod: CustomModule = {
     id: moduleId,
     label: 'Project',
     pluralLabel: 'Projects',
@@ -128,7 +128,7 @@ function seed(): MetadataState {
     { id: id('rec'), moduleId, values: { name: 'Atlas Rollout', status: 'Active', budget: 120000, spent: 45000, ownerEmail: 'lead@acme.test', startDate: '2026-06-01', active: true }, createdAt: ts, updatedAt: ts },
     { id: id('rec'), moduleId, values: { name: 'Beacon Migration', status: 'Planned', budget: 80000, spent: 0, ownerEmail: 'pm@acme.test', startDate: '2026-08-15', active: false }, createdAt: ts, updatedAt: ts },
   ];
-  return { modules: [module], fields, layouts: [layout], records };
+  return { modules: [mod], fields, layouts: [layout], records };
 }
 
 function store(): MetadataState {
@@ -150,7 +150,7 @@ export function getModule(moduleId: string): CustomModule | undefined {
 export function createModule(input: Record<string, unknown>): CustomModule {
   const ts = nowIso();
   const label = String(input.label ?? 'Untitled');
-  const module: CustomModule = {
+  const mod: CustomModule = {
     id: id('mod'),
     label,
     pluralLabel: String(input.pluralLabel ?? `${label}s`),
@@ -160,50 +160,50 @@ export function createModule(input: Record<string, unknown>): CustomModule {
     createdAt: ts,
     updatedAt: ts,
   };
-  store().modules.push(module);
-  return module;
+  store().modules.push(mod);
+  return mod;
 }
 
 export function updateModule(moduleId: string, patch: Record<string, unknown>): CustomModule | undefined {
-  const module = getModule(moduleId);
-  if (!module) return undefined;
-  Object.assign(module, {
-    label: patch.label !== undefined ? String(patch.label) : module.label,
-    pluralLabel: patch.pluralLabel !== undefined ? String(patch.pluralLabel) : module.pluralLabel,
-    description: patch.description !== undefined ? String(patch.description) : module.description,
-    icon: patch.icon !== undefined ? String(patch.icon) : module.icon,
+  const mod = getModule(moduleId);
+  if (!mod) return undefined;
+  Object.assign(mod, {
+    label: patch.label !== undefined ? String(patch.label) : mod.label,
+    pluralLabel: patch.pluralLabel !== undefined ? String(patch.pluralLabel) : mod.pluralLabel,
+    description: patch.description !== undefined ? String(patch.description) : mod.description,
+    icon: patch.icon !== undefined ? String(patch.icon) : mod.icon,
     updatedAt: nowIso(),
   });
-  return module;
+  return mod;
 }
 
 export function deleteModule(moduleId: string): boolean {
   const s = store();
-  const module = getModule(moduleId);
-  if (!module) return false;
-  s.modules = s.modules.filter((m) => m.id !== module.id);
-  s.fields = s.fields.filter((f) => f.moduleId !== module.id);
-  s.layouts = s.layouts.filter((l) => l.moduleId !== module.id);
-  s.records = s.records.filter((r) => r.moduleId !== module.id);
+  const mod = getModule(moduleId);
+  if (!mod) return false;
+  s.modules = s.modules.filter((m) => m.id !== mod.id);
+  s.fields = s.fields.filter((f) => f.moduleId !== mod.id);
+  s.layouts = s.layouts.filter((l) => l.moduleId !== mod.id);
+  s.records = s.records.filter((r) => r.moduleId !== mod.id);
   return true;
 }
 
 // ---- Fields ----
 export function listFields(moduleId: string): CustomField[] {
-  const module = getModule(moduleId);
-  if (!module) return [];
-  return store().fields.filter((f) => f.moduleId === module.id).sort((a, b) => a.order - b.order);
+  const mod = getModule(moduleId);
+  if (!mod) return [];
+  return store().fields.filter((f) => f.moduleId === mod.id).sort((a, b) => a.order - b.order);
 }
 
 export function createField(moduleId: string, input: Record<string, unknown>): CustomField | undefined {
-  const module = getModule(moduleId);
-  if (!module) return undefined;
+  const mod = getModule(moduleId);
+  if (!mod) return undefined;
   const ts = nowIso();
-  const existing = listFields(module.id);
+  const existing = listFields(mod.id);
   const label = String(input.label ?? 'Field');
   const field: CustomField = {
     id: id('fld'),
-    moduleId: module.id,
+    moduleId: mod.id,
     label,
     apiName: String(input.apiName ?? label.toLowerCase().replace(/[^a-z0-9]+/g, '_')),
     type: (input.type as FieldType) ?? 'TEXT',
@@ -221,9 +221,9 @@ export function createField(moduleId: string, input: Record<string, unknown>): C
 }
 
 export function updateField(moduleId: string, fieldId: string, patch: Record<string, unknown>): CustomField | undefined {
-  const module = getModule(moduleId);
-  if (!module) return undefined;
-  const field = store().fields.find((f) => f.id === fieldId && f.moduleId === module.id);
+  const mod = getModule(moduleId);
+  if (!mod) return undefined;
+  const field = store().fields.find((f) => f.id === fieldId && f.moduleId === mod.id);
   if (!field) return undefined;
   Object.assign(field, {
     label: patch.label !== undefined ? String(patch.label) : field.label,
@@ -239,18 +239,18 @@ export function updateField(moduleId: string, fieldId: string, patch: Record<str
 }
 
 export function deleteField(moduleId: string, fieldId: string): boolean {
-  const module = getModule(moduleId);
-  if (!module) return false;
+  const mod = getModule(moduleId);
+  if (!mod) return false;
   const s = store();
   const before = s.fields.length;
-  s.fields = s.fields.filter((f) => !(f.id === fieldId && f.moduleId === module.id));
+  s.fields = s.fields.filter((f) => !(f.id === fieldId && f.moduleId === mod.id));
   return s.fields.length < before;
 }
 
 export function reorderFields(moduleId: string, order: string[]): CustomField[] | undefined {
-  const module = getModule(moduleId);
-  if (!module) return undefined;
-  const fields = store().fields.filter((f) => f.moduleId === module.id);
+  const mod = getModule(moduleId);
+  if (!mod) return undefined;
+  const fields = store().fields.filter((f) => f.moduleId === mod.id);
   order.forEach((fieldId, index) => {
     const field = fields.find((f) => f.id === fieldId);
     if (field) {
@@ -258,32 +258,32 @@ export function reorderFields(moduleId: string, order: string[]): CustomField[] 
       field.updatedAt = nowIso();
     }
   });
-  return listFields(module.id);
+  return listFields(mod.id);
 }
 
 // ---- Layouts ----
 export function listLayouts(moduleId: string): CustomLayout[] {
-  const module = getModule(moduleId);
-  if (!module) return [];
-  return store().layouts.filter((l) => l.moduleId === module.id);
+  const mod = getModule(moduleId);
+  if (!mod) return [];
+  return store().layouts.filter((l) => l.moduleId === mod.id);
 }
 
 export function getLayout(moduleId: string, layoutId: string): CustomLayout | undefined {
-  const module = getModule(moduleId);
-  if (!module) return undefined;
-  return store().layouts.find((l) => l.id === layoutId && l.moduleId === module.id);
+  const mod = getModule(moduleId);
+  if (!mod) return undefined;
+  return store().layouts.find((l) => l.id === layoutId && l.moduleId === mod.id);
 }
 
 export function createLayout(moduleId: string, input: Record<string, unknown>): CustomLayout | undefined {
-  const module = getModule(moduleId);
-  if (!module) return undefined;
+  const mod = getModule(moduleId);
+  if (!mod) return undefined;
   const ts = nowIso();
   const layout: CustomLayout = {
     id: id('lyt'),
-    moduleId: module.id,
+    moduleId: mod.id,
     name: String(input.name ?? 'Layout'),
     sections: (input.sections as LayoutSection[]) ?? [],
-    isDefault: Boolean(input.isDefault) || listLayouts(module.id).length === 0,
+    isDefault: Boolean(input.isDefault) || listLayouts(mod.id).length === 0,
     createdAt: ts,
     updatedAt: ts,
   };
@@ -304,11 +304,11 @@ export function updateLayout(moduleId: string, layoutId: string, patch: Record<s
 }
 
 export function deleteLayout(moduleId: string, layoutId: string): boolean {
-  const module = getModule(moduleId);
-  if (!module) return false;
+  const mod = getModule(moduleId);
+  if (!mod) return false;
   const s = store();
   const before = s.layouts.length;
-  s.layouts = s.layouts.filter((l) => !(l.id === layoutId && l.moduleId === module.id));
+  s.layouts = s.layouts.filter((l) => !(l.id === layoutId && l.moduleId === mod.id));
   return s.layouts.length < before;
 }
 
@@ -324,11 +324,11 @@ export function listRecords(
   moduleId: string,
   opts: { page?: number; pageSize?: number; filter?: string } = {}
 ): RecordListResult {
-  const module = getModule(moduleId);
+  const mod = getModule(moduleId);
   const page = opts.page ?? 1;
   const pageSize = opts.pageSize ?? 25;
-  if (!module) return { data: [], page, pageSize, total: 0 };
-  let rows = store().records.filter((r) => r.moduleId === module.id);
+  if (!mod) return { data: [], page, pageSize, total: 0 };
+  let rows = store().records.filter((r) => r.moduleId === mod.id);
   if (opts.filter) {
     const needle = opts.filter.toLowerCase();
     rows = rows.filter((r) =>
@@ -341,9 +341,9 @@ export function listRecords(
 }
 
 export function getRecord(moduleId: string, recordId: string): CustomRecord | undefined {
-  const module = getModule(moduleId);
-  if (!module) return undefined;
-  return store().records.find((r) => r.id === recordId && r.moduleId === module.id);
+  const mod = getModule(moduleId);
+  if (!mod) return undefined;
+  return store().records.find((r) => r.id === recordId && r.moduleId === mod.id);
 }
 
 export interface ValidationIssue {
@@ -351,11 +351,11 @@ export interface ValidationIssue {
   message: string;
 }
 
-/** Validates a record's values against the module fields. Returns issues (empty = valid). */
+/** Validates a record's values against the mod fields. Returns issues (empty = valid). */
 export function validateRecord(moduleId: string, values: Record<string, unknown>, recordId?: string): ValidationIssue[] {
-  const module = getModule(moduleId);
-  if (!module) return [{ field: '_module', message: 'Module not found' }];
-  const fields = listFields(module.id);
+  const mod = getModule(moduleId);
+  if (!mod) return [{ field: '_module', message: 'Module not found' }];
+  const fields = listFields(mod.id);
   const issues: ValidationIssue[] = [];
   for (const field of fields) {
     if (field.type === 'FORMULA') continue;
@@ -377,7 +377,7 @@ export function validateRecord(moduleId: string, values: Record<string, unknown>
     }
     if (field.unique) {
       const clash = store().records.some(
-        (r) => r.moduleId === module.id && r.id !== recordId && r.values[field.apiName] === value
+        (r) => r.moduleId === mod.id && r.id !== recordId && r.values[field.apiName] === value
       );
       if (clash) issues.push({ field: field.apiName, message: `${field.label} must be unique` });
     }
@@ -386,12 +386,12 @@ export function validateRecord(moduleId: string, values: Record<string, unknown>
 }
 
 export function createRecord(moduleId: string, values: Record<string, unknown>): CustomRecord | ValidationIssue[] | undefined {
-  const module = getModule(moduleId);
-  if (!module) return undefined;
-  const issues = validateRecord(module.id, values);
+  const mod = getModule(moduleId);
+  if (!mod) return undefined;
+  const issues = validateRecord(mod.id, values);
   if (issues.length) return issues;
   const ts = nowIso();
-  const record: CustomRecord = { id: id('rec'), moduleId: module.id, values, createdAt: ts, updatedAt: ts };
+  const record: CustomRecord = { id: id('rec'), moduleId: mod.id, values, createdAt: ts, updatedAt: ts };
   store().records.push(record);
   return record;
 }
@@ -407,11 +407,11 @@ export function updateRecord(moduleId: string, recordId: string, values: Record<
 }
 
 export function deleteRecord(moduleId: string, recordId: string): boolean {
-  const module = getModule(moduleId);
-  if (!module) return false;
+  const mod = getModule(moduleId);
+  if (!mod) return false;
   const s = store();
   const before = s.records.length;
-  s.records = s.records.filter((r) => !(r.id === recordId && r.moduleId === module.id));
+  s.records = s.records.filter((r) => !(r.id === recordId && r.moduleId === mod.id));
   return s.records.length < before;
 }
 

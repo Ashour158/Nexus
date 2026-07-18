@@ -65,6 +65,44 @@ function warnOnce(key: string, message: string, meta?: Record<string, unknown>):
   );
 }
 
+/**
+ * Pure conversion: apply an already-resolved rate table to a single amount.
+ * Shared by the per-row {@link RatesService.convertToBase} and the batched
+ * {@link RatesService.getConverter} so both paths behave identically. Never throws.
+ */
+function applyRates(
+  rates: TenantRates | undefined,
+  tenantId: string,
+  amount: number,
+  currency: string
+): ConvertResult {
+  const amt = Number.isFinite(amount) ? amount : 0;
+  const from = (currency || DEFAULT_BASE_CURRENCY).toUpperCase();
+
+  if (!rates) {
+    // No rates available at all -> 1:1, base currency unknown, echo source currency.
+    return { baseAmount: amt, baseCurrency: from };
+  }
+
+  const base = rates.baseCurrency;
+  if (from === base) {
+    return { baseAmount: amt, baseCurrency: base };
+  }
+
+  const rate = rates.toBase[from];
+  if (typeof rate === 'number' && Number.isFinite(rate) && rate > 0) {
+    return { baseAmount: amt * rate, baseCurrency: base };
+  }
+
+  // Rate missing for this currency pair -> 1:1 into base, keep the event.
+  warnOnce(`missingrate:${tenantId}:${from}`, 'Missing exchange rate; using 1:1 fallback', {
+    tenantId,
+    from,
+    base,
+  });
+  return { baseAmount: amt, baseCurrency: base };
+}
+
 export class RatesService {
   private cache = new Map<string, TenantRates>();
   /** de-dupe concurrent fetches for the same tenant */
@@ -75,43 +113,41 @@ export class RatesService {
    * Always resolves — never throws. Falls back to 1:1 on any failure.
    */
   async convertToBase(tenantId: string, amount: number, currency: string): Promise<ConvertResult> {
-    const amt = Number.isFinite(amount) ? amount : 0;
-    const from = (currency || DEFAULT_BASE_CURRENCY).toUpperCase();
+    const rates = await this.resolveRates(tenantId);
+    return applyRates(rates, tenantId, amount, currency);
+  }
 
-    let rates: TenantRates | undefined;
+  /**
+   * Resolve the tenant's rate table ONCE and return a synchronous converter for
+   * reuse across many rows in a single request/batch.
+   *
+   * This is the batched alternative to calling {@link convertToBase} per row: a
+   * forecast / rebuild path that converts N deals otherwise awaits N times (an
+   * N+1 of async hops, each re-reading the cache). Here the FX rates are fetched
+   * a single time up front and every subsequent conversion is a pure in-memory
+   * lookup keyed by currency — no per-deal await. Behaviour (including the 1:1
+   * fallbacks and missing-rate warnings) is identical to `convertToBase`.
+   */
+  async getConverter(
+    tenantId: string
+  ): Promise<(amount: number, currency: string) => ConvertResult> {
+    const rates = await this.resolveRates(tenantId);
+    return (amount: number, currency: string): ConvertResult =>
+      applyRates(rates, tenantId, amount, currency);
+  }
+
+  /** Load rates, swallowing any error into `undefined` (→ 1:1 fallback). Never throws. */
+  private async resolveRates(tenantId: string): Promise<TenantRates | undefined> {
     try {
-      rates = await this.getRates(tenantId);
+      return await this.getRates(tenantId);
     } catch (err) {
       // getRates is already guarded, but belt-and-suspenders: never propagate.
       warnOnce(`getrates:${tenantId}`, 'Failed to load exchange rates; using 1:1 fallback', {
         tenantId,
         error: (err as Error)?.message,
       });
-      rates = undefined;
+      return undefined;
     }
-
-    if (!rates) {
-      // No rates available at all -> 1:1, base currency unknown, echo source currency.
-      return { baseAmount: amt, baseCurrency: from };
-    }
-
-    const base = rates.baseCurrency;
-    if (from === base) {
-      return { baseAmount: amt, baseCurrency: base };
-    }
-
-    const rate = rates.toBase[from];
-    if (typeof rate === 'number' && Number.isFinite(rate) && rate > 0) {
-      return { baseAmount: amt * rate, baseCurrency: base };
-    }
-
-    // Rate missing for this currency pair -> 1:1 into base, keep the event.
-    warnOnce(`missingrate:${tenantId}:${from}`, 'Missing exchange rate; using 1:1 fallback', {
-      tenantId,
-      from,
-      base,
-    });
-    return { baseAmount: amt, baseCurrency: base };
   }
 
   /** Returns cached rates when fresh; otherwise fetches (de-duped) from finance. */

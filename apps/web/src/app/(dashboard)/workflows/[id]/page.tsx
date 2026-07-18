@@ -38,23 +38,23 @@ interface Workflow {
 }
 
 const NODE_COLORS: Record<NodeType, string> = {
-  TRIGGER: 'bg-emerald-100 text-emerald-700 border-emerald-300',
-  CONDITION: 'bg-amber-100 text-amber-700 border-amber-300',
-  WAIT: 'bg-slate-100 text-slate-700 border-slate-300',
-  ACTION: 'bg-blue-100 text-blue-700 border-blue-300',
-  EMAIL: 'bg-purple-100 text-purple-700 border-purple-300',
-  WEBHOOK: 'bg-cyan-100 text-cyan-700 border-cyan-300',
-  SET_FIELD: 'bg-pink-100 text-pink-700 border-pink-300',
-  CREATE_ACTIVITY: 'bg-indigo-100 text-indigo-700 border-indigo-300',
-  CREATE_TASK: 'bg-teal-100 text-teal-700 border-teal-300',
-  ASSIGN: 'bg-orange-100 text-orange-700 border-orange-300',
-  NOTIFY: 'bg-rose-100 text-rose-700 border-rose-300',
-  FORK: 'bg-lime-100 text-lime-700 border-lime-300',
-  JOIN: 'bg-violet-100 text-violet-700 border-violet-300',
-  END: 'bg-red-100 text-red-700 border-red-300',
-  APPROVAL_REQUEST: 'bg-yellow-100 text-yellow-700 border-yellow-300',
-  VALIDATION_RULE: 'bg-sky-100 text-sky-700 border-sky-300',
-  SLA_CHECK: 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300',
+  TRIGGER: 'bg-success-container text-success border-success/40',
+  CONDITION: 'bg-warning-container text-warning border-warning/40',
+  WAIT: 'bg-surface-container-high text-on-surface border-outline-variant',
+  ACTION: 'bg-primary-container text-primary border-primary/40',
+  EMAIL: 'bg-tertiary-container text-tertiary border-tertiary/40',
+  WEBHOOK: 'bg-info-container text-info border-info/40',
+  SET_FIELD: 'bg-tertiary-container text-tertiary border-tertiary/40',
+  CREATE_ACTIVITY: 'bg-primary-container text-primary border-primary/40',
+  CREATE_TASK: 'bg-success-container text-success border-success/40',
+  ASSIGN: 'bg-warning-container text-warning border-warning/40',
+  NOTIFY: 'bg-error-container text-error border-error/40',
+  FORK: 'bg-success-container text-success border-success/40',
+  JOIN: 'bg-tertiary-container text-tertiary border-tertiary/40',
+  END: 'bg-error-container text-error border-error/40',
+  APPROVAL_REQUEST: 'bg-warning-container text-warning border-warning/40',
+  VALIDATION_RULE: 'bg-info-container text-info border-info/40',
+  SLA_CHECK: 'bg-tertiary-container text-tertiary border-tertiary/40',
 };
 
 // Branch-capable node types produce two labelled outgoing edges so the engine
@@ -202,7 +202,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
 
   return (
     <main className="flex h-[calc(100vh-4rem)] flex-col">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant bg-surface px-4 py-3">
         <div className="flex items-center gap-3">
           <Button variant="secondary" onClick={() => router.push('/workflows')}>
             ← Back
@@ -229,8 +229,8 @@ export default function WorkflowCanvasPage(): JSX.Element {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Node palette */}
-        <aside className="w-48 overflow-y-auto border-r border-slate-200 bg-white p-3">
-          <p className="mb-2 text-xs font-semibold uppercase text-slate-500">Nodes</p>
+        <aside className="w-48 overflow-y-auto border-r border-outline-variant bg-surface p-3">
+          <p className="mb-2 text-xs font-semibold uppercase text-on-surface-variant">Nodes</p>
           <div className="space-y-1">
             {(['CONDITION', 'WAIT', 'ACTION', 'EMAIL', 'WEBHOOK', 'SET_FIELD', 'CREATE_ACTIVITY', 'CREATE_TASK', 'ASSIGN', 'NOTIFY', 'APPROVAL_REQUEST', 'VALIDATION_RULE', 'SLA_CHECK', 'FORK', 'JOIN', 'END'] as NodeType[]).map((type) => (
               <button
@@ -245,7 +245,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
         </aside>
 
         {/* Canvas */}
-        <div className="relative flex-1 overflow-auto bg-slate-50">
+        <div className="relative flex-1 overflow-auto bg-surface-container-low">
           {workflowQuery.isLoading && !isNew ? (
             <div className="p-8">
               <Skeleton className="h-8 w-48" />
@@ -294,7 +294,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
                 onClick={() => setSelectedNodeId(node.id)}
                 className={`absolute w-40 cursor-pointer rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm transition hover:shadow-md ${
                   NODE_COLORS[node.type]
-                } ${selectedNodeId === node.id ? 'ring-2 ring-offset-2 ring-blue-500' : ''}`}
+                } ${selectedNodeId === node.id ? 'ring-2 ring-offset-2 ring-primary' : ''}`}
                 style={{ left: pos.x, top: pos.y }}
               >
                 <div className="flex items-center justify-between">
@@ -304,7 +304,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
                       e.stopPropagation();
                       removeNode(node.id);
                     }}
-                    className="text-slate-400 hover:text-red-500"
+                    className="text-on-surface-variant hover:text-error"
                   >
                     ×
                   </button>
@@ -340,21 +340,21 @@ export default function WorkflowCanvasPage(): JSX.Element {
         </div>
 
         {/* Properties panel */}
-        <aside className="w-64 overflow-y-auto border-l border-slate-200 bg-white p-3">
-          <p className="mb-2 text-xs font-semibold uppercase text-slate-500">Properties</p>
+        <aside className="w-64 overflow-y-auto border-l border-outline-variant bg-surface p-3">
+          <p className="mb-2 text-xs font-semibold uppercase text-on-surface-variant">Properties</p>
           {selectedNode ? (
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-slate-600">Type</label>
+                <label className="text-xs text-on-surface-variant">Type</label>
                 <p className="text-sm font-medium">{selectedNode.type}</p>
               </div>
               <div>
-                <label className="text-xs text-slate-600">ID</label>
-                <p className="font-mono text-[10px] text-slate-400">{selectedNode.id}</p>
+                <label className="text-xs text-on-surface-variant">ID</label>
+                <p className="font-mono text-[10px] text-on-surface-variant">{selectedNode.id}</p>
               </div>
               {selectedNode.type === 'TRIGGER' && (
                 <div>
-                  <label className="text-xs text-slate-600">Trigger event</label>
+                  <label className="text-xs text-on-surface-variant">Trigger event</label>
                   <Input
                     value={String(selectedNode.config?.event ?? trigger)}
                     onChange={(e) => updateNodeConfig(selectedNode.id, 'event', e.target.value)}
@@ -365,7 +365,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
               {selectedNode.type === 'CONDITION' && (
                 <>
                   <div>
-                    <label className="text-xs text-slate-600">Field</label>
+                    <label className="text-xs text-on-surface-variant">Field</label>
                     <Input
                       value={String(selectedNode.config?.field ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'field', e.target.value)}
@@ -374,11 +374,11 @@ export default function WorkflowCanvasPage(): JSX.Element {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-600">Operator</label>
+                    <label className="text-xs text-on-surface-variant">Operator</label>
                     <select
                       value={String(selectedNode.config?.operator ?? 'eq')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'operator', e.target.value)}
-                      className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-xs"
+                      className="mt-1 w-full rounded-md border border-outline-variant px-2 py-1 text-xs"
                     >
                       {['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains'].map((op) => (
                         <option key={op} value={op}>{op}</option>
@@ -386,7 +386,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-slate-600">Value</label>
+                    <label className="text-xs text-on-surface-variant">Value</label>
                     <Input
                       value={String(selectedNode.config?.value ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'value', e.target.value)}
@@ -397,7 +397,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
               )}
               {selectedNode.type === 'ACTION' && (
                 <div>
-                  <label className="text-xs text-slate-600">URL</label>
+                  <label className="text-xs text-on-surface-variant">URL</label>
                   <Input
                     value={String(selectedNode.config?.url ?? '')}
                     onChange={(e) => updateNodeConfig(selectedNode.id, 'url', e.target.value)}
@@ -409,7 +409,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
               {selectedNode.type === 'EMAIL' && (
                 <>
                   <div>
-                    <label className="text-xs text-slate-600">Subject</label>
+                    <label className="text-xs text-on-surface-variant">Subject</label>
                     <Input
                       value={String(selectedNode.config?.subject ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'subject', e.target.value)}
@@ -417,11 +417,11 @@ export default function WorkflowCanvasPage(): JSX.Element {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-600">Body</label>
+                    <label className="text-xs text-on-surface-variant">Body</label>
                     <textarea
                       value={String(selectedNode.config?.body ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'body', e.target.value)}
-                      className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-xs"
+                      className="mt-1 w-full rounded-md border border-outline-variant px-2 py-1 text-xs"
                       rows={3}
                     />
                   </div>
@@ -429,7 +429,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
               )}
               {selectedNode.type === 'WAIT' && (
                 <div>
-                  <label className="text-xs text-slate-600">Delay (days)</label>
+                  <label className="text-xs text-on-surface-variant">Delay (days)</label>
                   <Input
                     type="number"
                     value={String(selectedNode.config?.delayDays ?? 1)}
@@ -441,7 +441,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
               {selectedNode.type === 'SET_FIELD' && (
                 <>
                   <div>
-                    <label className="text-xs text-slate-600">Field</label>
+                    <label className="text-xs text-on-surface-variant">Field</label>
                     <Input
                       value={String(selectedNode.config?.field ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'field', e.target.value)}
@@ -449,7 +449,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-600">Value</label>
+                    <label className="text-xs text-on-surface-variant">Value</label>
                     <Input
                       value={String(selectedNode.config?.value ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'value', e.target.value)}
@@ -461,7 +461,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
               {selectedNode.type === 'APPROVAL_REQUEST' && (
                 <>
                   <div>
-                    <label className="text-xs text-slate-600">Policy ID</label>
+                    <label className="text-xs text-on-surface-variant">Policy ID</label>
                     <Input
                       value={String(selectedNode.config?.policyId ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'policyId', e.target.value)}
@@ -470,7 +470,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-600">Entity type</label>
+                    <label className="text-xs text-on-surface-variant">Entity type</label>
                     <Input
                       value={String(selectedNode.config?.entityType ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'entityType', e.target.value)}
@@ -479,7 +479,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-600">Entity ID</label>
+                    <label className="text-xs text-on-surface-variant">Entity ID</label>
                     <Input
                       value={String(selectedNode.config?.entityId ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'entityId', e.target.value)}
@@ -488,7 +488,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-600">Requester ID</label>
+                    <label className="text-xs text-on-surface-variant">Requester ID</label>
                     <Input
                       value={String(selectedNode.config?.requesterId ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'requesterId', e.target.value)}
@@ -497,24 +497,24 @@ export default function WorkflowCanvasPage(): JSX.Element {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-600">Notes</label>
+                    <label className="text-xs text-on-surface-variant">Notes</label>
                     <textarea
                       value={String(selectedNode.config?.notes ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'notes', e.target.value)}
-                      className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-xs"
+                      className="mt-1 w-full rounded-md border border-outline-variant px-2 py-1 text-xs"
                       rows={2}
                     />
                   </div>
-                  <p className="text-[10px] text-slate-400">
-                    Routes on <span className="font-medium text-emerald-600">approved</span> /{' '}
-                    <span className="font-medium text-red-600">rejected</span> branch edges.
+                  <p className="text-[10px] text-on-surface-variant">
+                    Routes on <span className="font-medium text-success">approved</span> /{' '}
+                    <span className="font-medium text-error">rejected</span> branch edges.
                   </p>
                 </>
               )}
               {selectedNode.type === 'VALIDATION_RULE' && (
                 <>
                   <div>
-                    <label className="text-xs text-slate-600">Pipeline ID</label>
+                    <label className="text-xs text-on-surface-variant">Pipeline ID</label>
                     <Input
                       value={String(selectedNode.config?.pipelineId ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'pipelineId', e.target.value)}
@@ -522,7 +522,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-600">From stage ID</label>
+                    <label className="text-xs text-on-surface-variant">From stage ID</label>
                     <Input
                       value={String(selectedNode.config?.fromStageId ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'fromStageId', e.target.value)}
@@ -530,7 +530,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-600">To stage ID</label>
+                    <label className="text-xs text-on-surface-variant">To stage ID</label>
                     <Input
                       value={String(selectedNode.config?.toStageId ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'toStageId', e.target.value)}
@@ -538,23 +538,23 @@ export default function WorkflowCanvasPage(): JSX.Element {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-600">Deal ID</label>
+                    <label className="text-xs text-on-surface-variant">Deal ID</label>
                     <Input
                       value={String(selectedNode.config?.dealId ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'dealId', e.target.value)}
                       className="mt-1 h-8 text-xs"
                     />
                   </div>
-                  <p className="text-[10px] text-slate-400">
-                    Routes on <span className="font-medium text-emerald-600">valid</span> /{' '}
-                    <span className="font-medium text-red-600">invalid</span> branch edges.
+                  <p className="text-[10px] text-on-surface-variant">
+                    Routes on <span className="font-medium text-success">valid</span> /{' '}
+                    <span className="font-medium text-error">invalid</span> branch edges.
                   </p>
                 </>
               )}
               {selectedNode.type === 'SLA_CHECK' && (
                 <>
                   <div>
-                    <label className="text-xs text-slate-600">Entity type</label>
+                    <label className="text-xs text-on-surface-variant">Entity type</label>
                     <Input
                       value={String(selectedNode.config?.entityType ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'entityType', e.target.value)}
@@ -563,7 +563,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-600">Entity ID</label>
+                    <label className="text-xs text-on-surface-variant">Entity ID</label>
                     <Input
                       value={String(selectedNode.config?.entityId ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'entityId', e.target.value)}
@@ -572,7 +572,7 @@ export default function WorkflowCanvasPage(): JSX.Element {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-600">SLA ID</label>
+                    <label className="text-xs text-on-surface-variant">SLA ID</label>
                     <Input
                       value={String(selectedNode.config?.slaId ?? '')}
                       onChange={(e) => updateNodeConfig(selectedNode.id, 'slaId', e.target.value)}
@@ -580,15 +580,15 @@ export default function WorkflowCanvasPage(): JSX.Element {
                       placeholder="optional — specific SLA definition"
                     />
                   </div>
-                  <p className="text-[10px] text-slate-400">
-                    Routes on <span className="font-medium text-red-600">breached</span> /{' '}
-                    <span className="font-medium text-emerald-600">within</span> branch edges.
+                  <p className="text-[10px] text-on-surface-variant">
+                    Routes on <span className="font-medium text-error">breached</span> /{' '}
+                    <span className="font-medium text-success">within</span> branch edges.
                   </p>
                 </>
               )}
             </div>
           ) : (
-            <p className="text-xs text-slate-400">Select a node to edit its properties.</p>
+            <p className="text-xs text-on-surface-variant">Select a node to edit its properties.</p>
           )}
         </aside>
       </div>

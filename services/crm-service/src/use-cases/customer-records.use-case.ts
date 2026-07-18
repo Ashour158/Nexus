@@ -6,7 +6,7 @@ type CustomerModuleService = {
   create: (tenantId: string, data: Record<string, unknown>, userId?: string, userName?: string) => Promise<unknown>;
   get: (tenantId: string, id: string) => Promise<Record<string, unknown>>;
   update: (tenantId: string, id: string, updates: Record<string, unknown>, userId?: string, userName?: string, roles?: string[]) => Promise<unknown>;
-  archive: (tenantId: string, id: string) => Promise<unknown>;
+  archive: (tenantId: string, id: string, deletedBy?: string, deletedByName?: string) => Promise<unknown>;
   restore: (tenantId: string, id: string) => Promise<unknown>;
 };
 
@@ -99,7 +99,7 @@ export function createCustomerRecordsUseCase(deps: CustomerRecordsUseCaseDeps) {
     const row = await deps.repositories[input.entityType].findFirst({
       where: { id: input.id, tenantId: actor(ctx).tenantId },
     });
-    await deps.services[input.entityType].archive(actor(ctx).tenantId, input.id);
+    await deps.services[input.entityType].archive(actor(ctx).tenantId, input.id, actor(ctx).userId, actor(ctx).email);
     if (row) {
       await Promise.resolve(deps.recycle?.({
         module: moduleName(input.entityType),
@@ -136,7 +136,7 @@ export function createCustomerRecordsUseCase(deps: CustomerRecordsUseCaseDeps) {
 
     let count = 0;
     for (const row of rows) {
-      await deps.services[input.entityType].archive(actor(ctx).tenantId, row.id);
+      await deps.services[input.entityType].archive(actor(ctx).tenantId, row.id, actor(ctx).userId, actor(ctx).email);
       count += 1;
       await Promise.resolve(deps.recycle?.({
         module: moduleName(input.entityType),

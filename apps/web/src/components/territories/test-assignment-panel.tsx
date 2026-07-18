@@ -46,10 +46,10 @@ export function TestAssignmentPanel() {
   const result = test.data;
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
-      <h3 className="font-semibold text-gray-900">Test Assignment (dry-run)</h3>
-      <p className="mb-4 mt-1 text-sm text-gray-500">
-        Enter a sample record's attributes and see which territory + owner it would route to.
+    <div className="rounded-xl border border-outline-variant bg-surface p-5">
+      <h3 className="font-semibold text-on-surface">Test Assignment (dry-run)</h3>
+      <p className="mb-4 mt-1 text-sm text-on-surface-variant">
+        Enter a sample record&apos;s attributes and see which territory + owner it would route to.
       </p>
 
       <div className="space-y-2">
@@ -68,7 +68,7 @@ export function TestAssignmentPanel() {
             <button
               type="button"
               onClick={() => setAttrs((p) => p.filter((x) => x.key !== a.key))}
-              className="rounded-lg px-2 py-1 text-red-400 hover:bg-red-50 hover:text-red-600"
+              className="rounded-lg px-2 py-1 text-error hover:bg-error-container hover:text-error"
               aria-label="Remove attribute"
             >
               ×
@@ -87,30 +87,30 @@ export function TestAssignmentPanel() {
       </div>
 
       {test.isError ? (
-        <p className="mt-4 text-sm text-red-600">
+        <p className="mt-4 text-sm text-error">
           Test failed. The territory service may be unavailable.
         </p>
       ) : null}
 
       {test.isSuccess ? (
         result ? (
-          <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4 text-sm">
-            <p className="font-medium text-green-800">
+          <div className="mt-4 rounded-lg border border-success/30 bg-success-container p-4 text-sm">
+            <p className="font-medium text-on-success-container">
               Would route to: {result.territory.name}
             </p>
-            <dl className="mt-2 grid grid-cols-2 gap-1 text-green-900/80">
-              <dt className="text-green-700">Type</dt>
+            <dl className="mt-2 grid grid-cols-2 gap-1 text-on-success-container/80">
+              <dt className="text-success">Type</dt>
               <dd>{result.territory.type}</dd>
-              <dt className="text-green-700">Owner</dt>
+              <dt className="text-success">Owner</dt>
               <dd>{ownerName(result.assignedOwnerId)}</dd>
-              <dt className="text-green-700">Matched rules</dt>
+              <dt className="text-success">Matched rules</dt>
               <dd>{result.matchedRuleIds.length}</dd>
-              <dt className="text-green-700">Via default</dt>
+              <dt className="text-success">Via default</dt>
               <dd>{result.viaDefault ? 'Yes' : 'No'}</dd>
             </dl>
           </div>
         ) : (
-          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <div className="mt-4 rounded-lg border border-warning/30 bg-warning-container p-4 text-sm text-on-warning-container">
             No territory matched this record (and no default territory is configured).
           </div>
         )

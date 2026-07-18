@@ -45,25 +45,25 @@ export function PipelineColumn({
       data-testid="pipeline-column"
       data-stage-id={stage.id}
       className={cn(
-        'flex h-full w-[300px] shrink-0 flex-col rounded-lg border border-border bg-muted/40 transition-colors',
-        isOver && 'bg-primary/5 ring-2 ring-primary/40'
+        'flex h-full w-[300px] shrink-0 flex-col rounded-xl border border-outline-variant bg-surface-container-low transition-colors',
+        isOver && 'bg-primary-container/40 ring-2 ring-primary/40'
       )}
     >
-      <header className="border-b border-border px-3 py-2">
+      <header className="border-b border-outline-variant px-3 py-2.5">
         <div className="flex items-center gap-2">
           <span
             aria-hidden="true"
             className="h-2.5 w-2.5 shrink-0 rounded-full"
             style={{ backgroundColor: stage.color }}
           />
-          <h3 className="flex-1 truncate text-sm font-semibold text-foreground">
+          <h3 className="flex-1 truncate text-sm font-semibold uppercase tracking-wide text-on-surface">
             {stage.name}
           </h3>
-          <span className="shrink-0 rounded bg-background px-1.5 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+          <span className="shrink-0 rounded-full bg-surface-container-high px-2 py-0.5 text-xs font-semibold tabular-nums text-on-surface-variant">
             {formatCount(deals.length)}
           </span>
         </div>
-        <div className="mt-1 text-xs tabular-nums text-muted-foreground">
+        <div className="mt-1 text-xs font-medium tabular-nums text-on-surface-variant">
           {formatCurrency(totalValue, currency)}
         </div>
       </header>
@@ -73,7 +73,7 @@ export function PipelineColumn({
         className="flex-1 space-y-2 overflow-y-auto p-2"
       >
         {deals.length === 0 ? (
-          <div className="flex h-full min-h-[96px] items-center justify-center rounded border border-dashed border-border text-xs text-muted-foreground">
+          <div className="flex h-full min-h-[96px] items-center justify-center rounded-lg border border-dashed border-outline-variant text-xs text-on-surface-variant">
             Drop deals here
           </div>
         ) : (

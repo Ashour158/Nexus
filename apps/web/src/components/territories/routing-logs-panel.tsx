@@ -33,10 +33,10 @@ export function RoutingLogsPanel() {
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
+    <div className="rounded-xl border border-outline-variant bg-surface p-5">
       <div className="mb-4 flex flex-wrap items-end gap-2">
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Filter by record ID</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Filter by record ID</label>
           <Input
             value={leadFilter}
             onChange={(e) => setLeadFilter(e.target.value)}
@@ -72,7 +72,7 @@ export function RoutingLogsPanel() {
       {isLoading ? (
         <div className="space-y-2">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-10 animate-pulse rounded-lg bg-gray-100" />
+            <div key={i} className="h-10 animate-pulse rounded-lg bg-surface-container-high" />
           ))}
         </div>
       ) : isError ? (
@@ -95,7 +95,7 @@ export function RoutingLogsPanel() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 text-left text-xs uppercase text-gray-400">
+                <tr className="border-b border-outline-variant text-left text-xs uppercase text-on-surface-variant">
                   <th className="px-2 py-2">Routed At</th>
                   <th className="px-2 py-2">Record</th>
                   <th className="px-2 py-2">Territory</th>
@@ -105,30 +105,30 @@ export function RoutingLogsPanel() {
               </thead>
               <tbody>
                 {logs.map((log) => (
-                  <tr key={log.id} className="border-b border-gray-50 last:border-0">
-                    <td className="px-2 py-2 text-gray-500">
+                  <tr key={log.id} className="border-b border-outline-variant last:border-0">
+                    <td className="px-2 py-2 text-on-surface-variant">
                       {new Date(log.routedAt).toLocaleString()}
                     </td>
                     <td className="px-2 py-2">
-                      <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
+                      <span className="rounded bg-surface-container-high px-1.5 py-0.5 text-xs text-on-surface-variant">
                         {log.recordType}
                       </span>{' '}
-                      <span className="font-mono text-xs text-gray-500">{log.leadId}</span>
+                      <span className="font-mono text-xs text-on-surface-variant">{log.leadId}</span>
                     </td>
                     <td className="px-2 py-2">
                       {log.territory ? (
-                        <span className="font-medium text-gray-900">{log.territory.name}</span>
+                        <span className="font-medium text-on-surface">{log.territory.name}</span>
                       ) : (
-                        <span className="text-gray-400">Unassigned</span>
+                        <span className="text-on-surface-variant">Unassigned</span>
                       )}
                       {log.viaDefault ? (
-                        <span className="ms-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700">
+                        <span className="ms-1 rounded bg-warning-container px-1.5 py-0.5 text-xs text-warning">
                           default
                         </span>
                       ) : null}
                     </td>
-                    <td className="px-2 py-2 text-gray-700">{ownerName(log.assignedOwnerId)}</td>
-                    <td className="px-2 py-2 text-gray-500">
+                    <td className="px-2 py-2 text-on-surface">{ownerName(log.assignedOwnerId)}</td>
+                    <td className="px-2 py-2 text-on-surface-variant">
                       {log.matchedRuleIds.length > 0 ? `${log.matchedRuleIds.length} matched` : '—'}
                     </td>
                   </tr>
@@ -138,7 +138,7 @@ export function RoutingLogsPanel() {
           </div>
 
           {totalPages > 1 ? (
-            <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
+            <div className="mt-4 flex items-center justify-between text-sm text-on-surface-variant">
               <span>
                 Page {page} of {totalPages} · {total} decisions
               </span>

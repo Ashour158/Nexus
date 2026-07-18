@@ -22,7 +22,7 @@ export default function ContactPortalPage() {
   if (!canRead) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
+        <div className="rounded-lg border border-warning/30 bg-warning-container p-6 text-sm text-on-warning-container">
           You do not have permission to view contacts.
         </div>
       </div>
@@ -41,7 +41,7 @@ export default function ContactPortalPage() {
   if (contactQuery.isError || !contact) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+        <div className="rounded-lg border border-error/30 bg-error-container p-6 text-sm text-error">
           Failed to load contact.
         </div>
       </div>
@@ -52,10 +52,10 @@ export default function ContactPortalPage() {
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-2xl font-bold text-on-surface">
             Portal Access
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-on-surface-variant">
             {contact.firstName} {contact.lastName} · {contact.email ?? 'No email'}
           </p>
         </div>
@@ -64,14 +64,14 @@ export default function ContactPortalPage() {
         </Button>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <div className="rounded-xl border border-outline-variant bg-surface p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">Customer Portal</h2>
-            <p className="mt-1 text-xs text-slate-500">
+            <h2 className="text-sm font-semibold text-on-surface">Customer Portal</h2>
+            <p className="mt-1 text-xs text-on-surface-variant">
               Enable portal access to let this contact view deals, invoices, and support tickets.
             </p>
-            <span className="mt-2 inline-block rounded bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+            <span className="mt-2 inline-block rounded bg-warning-container px-2 py-0.5 text-[11px] font-medium text-on-warning-container">
               Preview only — not yet saved to the backend
             </span>
           </div>
@@ -80,12 +80,12 @@ export default function ContactPortalPage() {
             onClick={() => setPortalEnabled((v) => !v)}
             className={cn(
               'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
-              portalEnabled ? 'bg-slate-900' : 'bg-slate-200'
+              portalEnabled ? 'bg-inverse-surface' : 'bg-surface-container-highest'
             )}
           >
             <span
               className={cn(
-                'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                'inline-block h-4 w-4 transform rounded-full bg-surface transition-transform',
                 portalEnabled ? 'translate-x-6' : 'translate-x-1'
               )}
             />
@@ -93,21 +93,21 @@ export default function ContactPortalPage() {
         </div>
 
         <div className="mt-6 space-y-3">
-          <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-3">
-            <span className="text-sm text-slate-700">View Deals</span>
-            <span className={cn('text-xs font-medium', portalEnabled ? 'text-slate-900' : 'text-slate-400')}>
+          <div className="flex items-center justify-between rounded-lg border border-outline-variant bg-surface-container-low p-3">
+            <span className="text-sm text-on-surface">View Deals</span>
+            <span className={cn('text-xs font-medium', portalEnabled ? 'text-on-surface' : 'text-on-surface-variant')}>
               {portalEnabled ? 'Enabled' : 'Disabled'}
             </span>
           </div>
-          <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-3">
-            <span className="text-sm text-slate-700">View Invoices</span>
-            <span className={cn('text-xs font-medium', portalEnabled ? 'text-slate-900' : 'text-slate-400')}>
+          <div className="flex items-center justify-between rounded-lg border border-outline-variant bg-surface-container-low p-3">
+            <span className="text-sm text-on-surface">View Invoices</span>
+            <span className={cn('text-xs font-medium', portalEnabled ? 'text-on-surface' : 'text-on-surface-variant')}>
               {portalEnabled ? 'Enabled' : 'Disabled'}
             </span>
           </div>
-          <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-3">
-            <span className="text-sm text-slate-700">Submit Support Tickets</span>
-            <span className={cn('text-xs font-medium', portalEnabled ? 'text-slate-900' : 'text-slate-400')}>
+          <div className="flex items-center justify-between rounded-lg border border-outline-variant bg-surface-container-low p-3">
+            <span className="text-sm text-on-surface">Submit Support Tickets</span>
+            <span className={cn('text-xs font-medium', portalEnabled ? 'text-on-surface' : 'text-on-surface-variant')}>
               {portalEnabled ? 'Enabled' : 'Disabled'}
             </span>
           </div>

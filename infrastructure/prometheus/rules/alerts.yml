@@ -23,7 +23,7 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: 'Service {{ $labels.service | default $labels.instance }} is restarting'
+          summary: 'Service {{ if $labels.service }}{{ $labels.service }}{{ else }}{{ $labels.instance }}{{ end }} is restarting'
           description: '{{ $labels.instance }} has restarted more than twice in the last 15 minutes (possible crash loop).'
 
   - name: nexus-http

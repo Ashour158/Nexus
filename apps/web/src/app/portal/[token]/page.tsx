@@ -22,7 +22,7 @@ export default async function PortalPage({ params }: { params: { token: string }
     return (
       <main className="mx-auto max-w-2xl p-8">
         <h1 className="text-2xl font-semibold">Portal link unavailable</h1>
-        <p className="mt-2 text-slate-600">This link may have expired or been revoked.</p>
+        <p className="mt-2 text-on-surface-variant">This link may have expired or been revoked.</p>
       </main>
     );
   }
@@ -32,12 +32,12 @@ export default async function PortalPage({ params }: { params: { token: string }
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-6">
-      <header className="rounded-lg border border-slate-200 bg-white p-5" style={{ borderTop: `6px solid ${color}` }}>
+      <header className="rounded-lg border border-outline-variant bg-surface p-5" style={{ borderTop: `6px solid ${color}` }}>
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm text-slate-500">{ctx.branding.companyName ?? 'Nexus'}</p>
+            <p className="text-sm text-on-surface-variant">{ctx.branding.companyName ?? 'Nexus'}</p>
             <h1 className="text-2xl font-semibold">Quote {String(quote.quoteNumber ?? '')}</h1>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-on-surface-variant">
               Valid until {formatDate(String(quote.validUntil ?? ''))} · {String(quote.status ?? '')}
             </p>
           </div>
@@ -54,9 +54,9 @@ export default async function PortalPage({ params }: { params: { token: string }
         </div>
       </header>
 
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <section className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+          <thead className="bg-surface-container-low text-left text-xs uppercase text-on-surface-variant">
             <tr><th className="px-3 py-2">Product</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
           </thead>
           <tbody>
@@ -72,7 +72,7 @@ export default async function PortalPage({ params }: { params: { token: string }
         </table>
       </section>
 
-      <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-4">
+      <section className="grid gap-3 rounded-lg border border-outline-variant bg-surface p-4 sm:grid-cols-4">
         <Metric label="Subtotal" value={formatCurrency(Number(quote.subtotal ?? 0))} />
         <Metric label="Discount" value={formatCurrency(Number(quote.discountAmount ?? quote.discountTotal ?? 0))} />
         <Metric label="Tax" value={formatCurrency(Number(quote.taxAmount ?? quote.taxTotal ?? 0))} />
@@ -81,19 +81,19 @@ export default async function PortalPage({ params }: { params: { token: string }
 
       <section className="flex flex-wrap gap-2">
         <form action={`${process.env.NEXT_PUBLIC_PORTAL_URL ?? 'http://localhost:3022'}/portal/${params.token}/accept`} method="post">
-          <button className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white">Accept Quote</button>
+          <button className="rounded-md bg-success px-4 py-2 text-sm font-medium text-white">Accept Quote</button>
         </form>
         <form action={`${process.env.NEXT_PUBLIC_PORTAL_URL ?? 'http://localhost:3022'}/portal/${params.token}/reject`} method="post">
-          <button className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium">Reject Quote</button>
+          <button className="rounded-md border border-outline-variant px-4 py-2 text-sm font-medium">Reject Quote</button>
         </form>
-        <Link className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium" href={`${process.env.NEXT_PUBLIC_PORTAL_URL ?? 'http://localhost:3022'}/portal/${params.token}/download`}>
+        <Link className="rounded-md border border-outline-variant px-4 py-2 text-sm font-medium" href={`${process.env.NEXT_PUBLIC_PORTAL_URL ?? 'http://localhost:3022'}/portal/${params.token}/download`}>
           Download PDF
         </Link>
       </section>
 
       {quote.terms ? (
-        <section className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
-          <h2 className="font-semibold text-slate-900">Terms & Conditions</h2>
+        <section className="rounded-lg border border-outline-variant bg-surface p-4 text-sm text-on-surface-variant">
+          <h2 className="font-semibold text-on-surface">Terms & Conditions</h2>
           <p className="mt-2 whitespace-pre-wrap">{String(quote.terms)}</p>
         </section>
       ) : null}
@@ -104,7 +104,7 @@ export default async function PortalPage({ params }: { params: { token: string }
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs uppercase text-slate-500">{label}</p>
+      <p className="text-xs uppercase text-on-surface-variant">{label}</p>
       <p className="text-lg font-semibold">{value}</p>
     </div>
   );

@@ -6,7 +6,7 @@ type LeadServiceAdapter = {
   create: (tenantId: string, data: Record<string, unknown>, force?: boolean) => Promise<unknown>;
   get: (tenantId: string, id: string) => Promise<Record<string, unknown>>;
   update: (tenantId: string, id: string, data: Record<string, unknown>, userId?: string, userName?: string, roles?: string[]) => Promise<unknown>;
-  archive: (tenantId: string, id: string) => Promise<unknown>;
+  archive: (tenantId: string, id: string, deletedBy?: string, deletedByName?: string) => Promise<unknown>;
   restore: (tenantId: string, id: string) => Promise<unknown>;
   convert: (tenantId: string, id: string, data: Record<string, unknown>) => Promise<unknown>;
   findDuplicates: (
@@ -19,7 +19,7 @@ type DealServiceAdapter = {
   create: (tenantId: string, data: Record<string, unknown>) => Promise<unknown>;
   get: (tenantId: string, id: string) => Promise<Record<string, unknown>>;
   update: (tenantId: string, id: string, data: Record<string, unknown>, actor?: { userId: string; userEmail?: string }, roles?: string[]) => Promise<unknown>;
-  archive: (tenantId: string, id: string) => Promise<unknown>;
+  archive: (tenantId: string, id: string, deletedBy?: string, deletedByName?: string) => Promise<unknown>;
   restore: (tenantId: string, id: string) => Promise<unknown>;
   moveStage: (tenantId: string, id: string, stageId: string) => Promise<unknown>;
   markWon: (tenantId: string, id: string) => Promise<unknown>;
@@ -89,7 +89,7 @@ export function createSalesRecordsUseCase(deps: SalesRecordsUseCaseDeps) {
     const row = await deps.repositories[input.entityType].findFirst({
       where: { id: input.id, tenantId: actor(ctx).tenantId },
     });
-    await service(input.entityType).archive(actor(ctx).tenantId, input.id);
+    await service(input.entityType).archive(actor(ctx).tenantId, input.id, actor(ctx).userId, actor(ctx).email);
     if (row) {
       await Promise.resolve(deps.recycle?.({
         module: moduleName(input.entityType),
@@ -126,7 +126,7 @@ export function createSalesRecordsUseCase(deps: SalesRecordsUseCaseDeps) {
 
     let count = 0;
     for (const row of rows) {
-      await service(input.entityType).archive(actor(ctx).tenantId, row.id);
+      await service(input.entityType).archive(actor(ctx).tenantId, row.id, actor(ctx).userId, actor(ctx).email);
       count += 1;
       await Promise.resolve(deps.recycle?.({
         module: moduleName(input.entityType),

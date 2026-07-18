@@ -37,10 +37,24 @@ const nextConfig = {
   // redirected; they remain where they are and are surfaced via the Admin hub.
   async redirects() {
     return [
-      // Roles existed at both /roles and /admin/roles — canonicalize on the admin tree.
-      { source: '/roles', destination: '/admin/roles', permanent: false },
-      // Validation Rules existed at both /settings/validation-rules and /admin/validation-rules.
-      { source: '/settings/validation-rules', destination: '/admin/validation-rules', permanent: false },
+      // Roles canonicalized under the unified Setup tree at /settings/roles
+      // (/admin/roles now redirects there too).
+      { source: '/roles', destination: '/settings/roles', permanent: false },
+      // NOTE: the old '/settings/validation-rules -> /admin/validation-rules' redirect
+      // was REMOVED — after the Setup consolidation /settings/validation-rules is the
+      // canonical real page and /admin/validation-rules redirects TO it, so the old
+      // rule created an infinite redirect loop.
+      // Commissions existed twice: the finance-backed /commissions and the wired
+      // incentive-backed /commission (plans + per-rep statements). Canonicalize on
+      // /commission and retire the /commissions twin.
+      { source: '/commissions', destination: '/commission', permanent: false },
+      // Journeys existed at both /journeys and /command-center (same
+      // workflow-service journey engine). Canonicalize on /command-center — the
+      // builder that owns create + step editing. Order matters: the /new rule
+      // must precede the :id rule so "new" is not treated as a journey id.
+      { source: '/journeys/new', destination: '/command-center', permanent: false },
+      { source: '/journeys/:id', destination: '/command-center/:id', permanent: false },
+      { source: '/journeys', destination: '/command-center', permanent: false },
     ];
   },
   // Same-origin BFF proxy: the browser calls /bff/<domain>/* on the web origin and
@@ -51,6 +65,9 @@ const nextConfig = {
       { source: '/bff/auth/:path*', destination: 'http://auth-service:3000/api/v1/:path*' },
       { source: '/bff/crm/:path*', destination: 'http://crm-service:3001/api/v1/:path*' },
       { source: '/bff/finance/:path*', destination: 'http://finance-service:3002/api/v1/:path*' },
+      // Setup pages (Global Picklist Sets, Page Layouts, Blueprint Transitions) call these.
+      { source: '/bff/metadata/:path*', destination: 'http://metadata-service:3004/api/v1/:path*' },
+      { source: '/bff/blueprint/:path*', destination: 'http://blueprint-service:3013/api/v1/:path*' },
       // Approval requests live on approval-service, not workflow-service. The
       // approvals UI calls them via the workflow BFF (apiClients.workflow), so
       // route just the /approval/* subpath to approval-service. Must precede the
@@ -67,6 +84,9 @@ const nextConfig = {
       { source: '/bff/integration/:path*', destination: 'http://integration-service:3012/api/v1/:path*' },
       { source: '/bff/tickets/:path*', destination: 'http://ticket-service:3029/api/v1/:path*' },
       { source: '/bff/campaign/:path*', destination: 'http://campaign-service:3025/api/v1/:path*' },
+      // Setup pages (Territories) + (Scheduled Jobs / Mapping Templates) call these.
+      { source: '/bff/territory/:path*', destination: 'http://territory-service:3019/api/v1/:path*' },
+      { source: '/bff/data/:path*', destination: 'http://data-service:3015/api/v1/:path*' },
     ];
   },
   async headers() {
@@ -82,7 +102,18 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              // RR-H10: 'unsafe-eval' is a code-injection amplifier and is NOT
+              // needed by any production client dependency (verified: the only
+              // eval/Function use in the app is server-side dev-mock code, which
+              // is not subject to browser CSP). It is kept ONLY in development,
+              // where Next.js's webpack `eval` devtool / HMR require it.
+              // 'unsafe-inline' stays for now: Next.js injects inline bootstrap
+              // and framework runtime <script> tags without a per-request nonce,
+              // so a strict nonce-based policy is a larger migration (tracked as a
+              // follow-up — needs middleware nonce generation + propagation).
+              isDevelopment
+                ? "script-src 'self' 'unsafe-eval' 'unsafe-inline'"
+                : "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self'",

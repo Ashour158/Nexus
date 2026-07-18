@@ -1,6 +1,7 @@
 import { NexusConsumer, TOPICS } from '@nexus/kafka';
 import type { NexusProducer } from '@nexus/kafka';
 import type { BillingPrisma } from '../prisma.js';
+import { getStripe, provisionStripeSubscription, type StripePlanRef } from '../lib/stripe.js';
 
 interface LoggerLike {
   info: (...args: unknown[]) => void;
@@ -88,30 +89,52 @@ function periodEnd(start: Date, period: string): Date {
   return end;
 }
 
+interface StripeMirrorResult {
+  stripeSubId: string | null;
+  stripeCustomerId: string | null;
+  stripeStatus: string | null;
+  stripeLatestInvoiceId: string | null;
+}
+
 /**
- * Best-effort Stripe mirror. Skips cleanly (returns null) when STRIPE_SECRET_KEY
- * is unset — billing must never require Stripe to be configured. Any Stripe
- * failure is swallowed so the local mirror still succeeds.
+ * Provisions a real Stripe Subscription for the finance-mirrored subscription.
+ * Safe no-op (returns all-null) when STRIPE_SECRET_KEY is unset — billing must
+ * never require Stripe to be configured. Any Stripe failure is swallowed so the
+ * local mirror still succeeds; provisioning is idempotent on the finance sub id.
  */
 async function maybeCreateStripeSubscription(
+  prisma: BillingPrisma,
   log: LoggerLike,
-  args: { planName: string; amount: number; currency: string; interval: string; customerRef: string }
-): Promise<{ stripeSubId: string | null }> {
-  const stripeKey = process.env.STRIPE_SECRET_KEY;
-  if (!stripeKey) {
-    log.info('Stripe not configured (STRIPE_SECRET_KEY unset); mirroring finance subscription locally only');
-    return { stripeSubId: null };
+  args: {
+    tenantId: string;
+    accountId: string;
+    financeSubscriptionId: string;
+    quantity: number;
+    plan: StripePlanRef;
+  }
+): Promise<StripeMirrorResult> {
+  const empty: StripeMirrorResult = {
+    stripeSubId: null,
+    stripeCustomerId: null,
+    stripeStatus: null,
+    stripeLatestInvoiceId: null,
+  };
+  const stripe = getStripe(log);
+  if (!stripe) {
+    // Stub mode: getStripe() already warned once. Mirror locally only.
+    return empty;
   }
   try {
-    // Stripe provisioning is intentionally left as a guarded hook. We avoid
-    // making live calls (customer/price/subscription creation) unless a
-    // dedicated provisioning path is wired up, so a configured key alone does
-    // not trigger side effects during the finance→billing mirror.
-    log.info({ customerRef: args.customerRef }, 'Stripe configured; provisioning hook is a no-op for finance mirror');
-    return { stripeSubId: null };
+    return await provisionStripeSubscription(stripe, prisma, log, {
+      tenantId: args.tenantId,
+      accountId: args.accountId,
+      financeSubscriptionId: args.financeSubscriptionId,
+      quantity: args.quantity,
+      plan: args.plan,
+    });
   } catch (err) {
-    log.warn({ err }, 'Stripe provisioning failed; continuing with local mirror only');
-    return { stripeSubId: null };
+    log.warn({ err, financeSubscriptionId: args.financeSubscriptionId }, 'Stripe provisioning failed; continuing with local mirror only');
+    return empty;
   }
 }
 
@@ -123,11 +146,11 @@ async function ensurePlan(
   prisma: BillingPrisma,
   tenantId: string,
   args: { name: string; amount: number; currency: string; interval: string }
-): Promise<string> {
+): Promise<{ id: string; stripePriceId: string | null }> {
   const existing = await prisma.plan.findFirst({
     where: { tenantId, name: args.name },
   });
-  if (existing) return existing.id;
+  if (existing) return { id: existing.id, stripePriceId: existing.stripePriceId };
   try {
     const created = await prisma.plan.create({
       data: {
@@ -138,11 +161,11 @@ async function ensurePlan(
         interval: args.interval,
       },
     });
-    return created.id;
+    return { id: created.id, stripePriceId: created.stripePriceId };
   } catch {
     // Concurrent create (unique [tenantId, name]) — re-read.
     const race = await prisma.plan.findFirst({ where: { tenantId, name: args.name } });
-    if (race) return race.id;
+    if (race) return { id: race.id, stripePriceId: race.stripePriceId };
     throw new Error(`Failed to ensure billing plan "${args.name}"`);
   }
 }
@@ -188,19 +211,27 @@ export async function handleFinanceSubscriptionCreated(
   const start = toDate(payload.startDate, new Date());
   const end = toDate(payload.nextBillingDate, periodEnd(start, billingPeriod));
 
-  const planId = await ensurePlan(prisma, tenantId, {
+  const plan = await ensurePlan(prisma, tenantId, {
     name: planName,
     amount: planAmount,
     currency,
     interval,
   });
+  const planId = plan.id;
 
-  const stripe = await maybeCreateStripeSubscription(log, {
-    planName,
-    amount: planAmount,
-    currency,
-    interval,
-    customerRef: accountId,
+  const stripe = await maybeCreateStripeSubscription(prisma, log, {
+    tenantId,
+    accountId,
+    financeSubscriptionId,
+    quantity,
+    plan: {
+      id: plan.id,
+      name: planName,
+      amount: planAmount,
+      currency,
+      interval,
+      stripePriceId: plan.stripePriceId,
+    },
   });
 
   try {
@@ -223,6 +254,11 @@ export async function handleFinanceSubscriptionCreated(
           source: 'finance-service.subscription.created',
           mrr: toNum(payload.mrr, planAmount),
           arr: toNum(payload.arr, planAmount * 12),
+          // Stripe linkage (null in stub mode). stripeCustomerId is persisted
+          // here because there is no first-class column for it.
+          stripeCustomerId: stripe.stripeCustomerId,
+          stripeStatus: stripe.stripeStatus,
+          stripeLatestInvoiceId: stripe.stripeLatestInvoiceId,
         },
       },
     });

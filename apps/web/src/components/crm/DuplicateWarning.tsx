@@ -54,14 +54,14 @@ export function DuplicateWarning({ email, phone, firstName, lastName, type }: Du
     };
   }, [email, phone, firstName, lastName, type]);
 
-  if (checking) return <p className="mt-1 text-xs text-gray-400">Checking for duplicates...</p>;
+  if (checking) return <p className="mt-1 text-xs text-on-surface-variant">Checking for duplicates...</p>;
   if (duplicates.length === 0) return null;
 
   return (
-    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+    <div className="mt-2 rounded-lg border border-warning/30 bg-warning-container p-3">
       <div className="mb-2 flex items-center gap-2">
-        <span className="text-amber-500">⚠️</span>
-        <p className="text-sm font-medium text-amber-800">
+        <span className="text-warning">⚠️</span>
+        <p className="text-sm font-medium text-on-warning-container">
           {duplicates.length} possible duplicate{duplicates.length > 1 ? 's' : ''} found
         </p>
       </div>
@@ -72,15 +72,15 @@ export function DuplicateWarning({ email, phone, firstName, lastName, type }: Du
             href={`/${type === 'contact' ? 'contacts' : 'leads'}/${dup.id}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-between rounded border border-amber-100 bg-white p-2 text-xs transition-colors hover:border-amber-300"
+            className="flex items-center justify-between rounded border border-warning/30 bg-surface p-2 text-xs transition-colors hover:border-warning/40"
           >
-            <span className="font-medium text-gray-800">{dup.name}</span>
-            <span className="text-gray-400">{dup.email}</span>
-            <span className="font-medium text-amber-600">{dup.score}% match</span>
+            <span className="font-medium text-on-surface">{dup.name}</span>
+            <span className="text-on-surface-variant">{dup.email}</span>
+            <span className="font-medium text-warning">{dup.score}% match</span>
           </a>
         ))}
       </div>
-      <p className="mt-2 text-xs text-amber-600">Review these before creating a new record</p>
+      <p className="mt-2 text-xs text-warning">Review these before creating a new record</p>
     </div>
   );
 }

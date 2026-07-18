@@ -8,8 +8,15 @@ import {
 } from 'kafkajs';
 import { randomUUID } from 'node:crypto';
 import type { NexusKafkaEvent } from '@nexus/shared-types';
+// Seed tenant AsyncLocalStorage per message so consumer handlers touching
+// tenant-scoped Prisma satisfy fail-closed enforcement (RR-H2). Imported from
+// the lean request-context subpath (only pulls @fastify/request-context +
+// node:async_hooks — no fastify server code). service-utils does NOT depend on
+// @nexus/kafka, so this dependency is acyclic.
+import { runWithTenant } from '@nexus/service-utils/request-context';
 import type { IdempotencyStore } from './idempotency.js';
 import { createIdempotencyStore } from './idempotency.js';
+import { getCausation } from './causation.js';
 
 function getTraceparent(): string | undefined {
   try {
@@ -159,9 +166,26 @@ export class NexusProducer {
   ): Promise<void> {
     this.checkBackpressure();
     this.queueCount++;
+    const eventId = randomUUID();
+    // AU-5: inherit the ambient cause chain, if this publish happens inside an
+    // automation-driven request. An explicit value on the event always wins.
+    const causation = getCausation();
+    const causationDepth =
+      typeof event.causationDepth === 'number' ? event.causationDepth : causation?.depth;
+    const rootEventId =
+      typeof event.rootEventId === 'string'
+        ? event.rootEventId
+        : causation
+          ? // The chain has to be rooted somewhere: if the caller never supplied a
+            // root, this event is it, so later hops can trace back to here.
+            (causation.rootEventId ?? eventId)
+          : undefined;
+
     const fullEvent = {
       ...event,
-      eventId: randomUUID(),
+      ...(causationDepth !== undefined ? { causationDepth } : {}),
+      ...(rootEventId !== undefined ? { rootEventId } : {}),
+      eventId,
       timestamp: new Date().toISOString(),
       version: 1,
       source: this.serviceName,
@@ -172,6 +196,9 @@ export class NexusProducer {
       tenantId: fullEvent.tenantId,
       correlationId: fullEvent.correlationId ?? fullEvent.eventId,
       source: this.serviceName,
+      // Mirrored as headers so a consumer can read the chain without parsing the body.
+      ...(causationDepth !== undefined ? { 'x-causation-depth': String(causationDepth) } : {}),
+      ...(rootEventId !== undefined ? { 'x-root-event-id': rootEventId } : {}),
     };
     const traceparent = opts?.traceparent ?? getTraceparent();
     if (traceparent) {
@@ -273,7 +300,10 @@ export class NexusConsumer {
       // Process up to 10 messages concurrently per partition to increase throughput
       partitionsConsumedConcurrently: 10,
     } as any);
-    this.idempotencyStore = idempotencyStore ?? createIdempotencyStore();
+    // Namespace dedup keys by groupId so idempotency is per-consumer-group, not
+    // global — otherwise the first group to process an event blocks every other
+    // group from ever reacting to it (breaks cross-service event fan-out).
+    this.idempotencyStore = idempotencyStore ?? createIdempotencyStore(undefined, groupId);
     this.ignoredSources = new Set(ignoredSources);
     this.dlqEnabled = dlqEnabled;
     this.maxRetries = maxRetries;
@@ -354,6 +384,10 @@ export class NexusConsumer {
     }
 
     const handlers = this.handlers.get(event.type) ?? [];
+    // Every domain event carries `tenantId`; seed it into tenant ALS for the
+    // handler's duration so awaited Prisma ops see it (RR-H2 fail-closed). When
+    // absent (malformed event), invoke unwrapped — behavior is unchanged.
+    const tenantId = typeof event.tenantId === 'string' ? event.tenantId : '';
     let allSuccess = true;
     let lastError: unknown;
 
@@ -362,7 +396,9 @@ export class NexusConsumer {
       let success = false;
       while (attempt <= this.maxRetries && !success) {
         try {
-          await handler(event, message);
+          await (tenantId
+            ? runWithTenant(tenantId, () => handler(event, message))
+            : handler(event, message));
           success = true;
         } catch (err) {
           lastError = err;
@@ -430,3 +466,7 @@ export class NexusConsumer {
     await this.consumer.disconnect();
   }
 }
+
+// AU-5 cause-chain propagation (see causation.ts).
+export { runWithCausation, getCausation, parseCausation } from './causation.js';
+export type { CausationContext } from './causation.js';

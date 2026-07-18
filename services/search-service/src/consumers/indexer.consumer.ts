@@ -7,8 +7,14 @@ import { upsertLeadDoc } from '../indexes/leads.index.js';
 import { upsertActivityDoc, deleteActivityDoc } from '../indexes/activities.index.js';
 import { upsertQuoteDoc, deleteQuoteDoc } from '../indexes/quotes.index.js';
 import { upsertKbArticleDoc, deleteKbArticleDoc, KB_ARTICLES_TOPIC } from '../indexes/kb-articles.index.js';
+import { addSearchMeta } from '../indexes/doc-meta.js';
 
 type IndexEvent = { tenantId: string; payload: Record<string, unknown>; type: string };
+
+/** Merge the event tenant into the payload and derive numeric timestamp mirrors. */
+function toDoc(event: IndexEvent): Record<string, unknown> {
+  return addSearchMeta({ ...event.payload, tenantId: event.tenantId });
+}
 
 export async function startIndexerConsumer(client: MeiliSearch): Promise<NexusConsumer> {
   const consumer = new NexusConsumer('search-service.indexer');
@@ -35,7 +41,7 @@ export async function startIndexerConsumer(client: MeiliSearch): Promise<NexusCo
   };
 
   const upsertFromEvent = guard(async (event: IndexEvent) => {
-    const payload = { ...event.payload, tenantId: event.tenantId };
+    const payload = toDoc(event);
     if (event.type.startsWith('deal.')) await upsertDealDoc(client, payload);
     if (event.type.startsWith('contact.')) await upsertContactDoc(client, payload);
     if (event.type.startsWith('account.')) await upsertAccountDoc(client, payload);
@@ -43,21 +49,21 @@ export async function startIndexerConsumer(client: MeiliSearch): Promise<NexusCo
   });
 
   const upsertActivity = guard(async (event: IndexEvent) => {
-    await upsertActivityDoc(client, { ...event.payload, tenantId: event.tenantId });
+    await upsertActivityDoc(client, toDoc(event));
   });
   const removeActivity = guard(async (event: IndexEvent) => {
     await deleteActivityDoc(client, { ...event.payload, tenantId: event.tenantId });
   });
 
   const upsertQuote = guard(async (event: IndexEvent) => {
-    await upsertQuoteDoc(client, { ...event.payload, tenantId: event.tenantId });
+    await upsertQuoteDoc(client, toDoc(event));
   });
   const removeQuote = guard(async (event: IndexEvent) => {
     await deleteQuoteDoc(client, { ...event.payload, tenantId: event.tenantId });
   });
 
   const upsertKbArticle = guard(async (event: IndexEvent) => {
-    await upsertKbArticleDoc(client, { ...event.payload, tenantId: event.tenantId });
+    await upsertKbArticleDoc(client, toDoc(event));
   });
   const removeKbArticle = guard(async (event: IndexEvent) => {
     await deleteKbArticleDoc(client, { ...event.payload, tenantId: event.tenantId });

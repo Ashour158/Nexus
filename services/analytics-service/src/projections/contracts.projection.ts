@@ -1,3 +1,4 @@
+import { chDateTime } from '../lib/ch-datetime.js';
 import type { ClickHouseClient } from '@clickhouse/client';
 import type { NexusKafkaEvent } from '@nexus/shared-types';
 
@@ -20,7 +21,7 @@ export class ContractsSummaryProjection {
           status,
           total_value: value,
           contract_count: 1,
-          updated_at: event.timestamp,
+          updated_at: chDateTime(event.timestamp),
         },
       ],
       format: 'JSONEachRow',

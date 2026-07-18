@@ -103,7 +103,7 @@ export function DealRoomPanel({ dealId }: { dealId: string }) {
   }
 
   if (isLoading)
-    return <div className="h-40 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />;
+    return <div className="h-40 animate-pulse rounded-xl bg-surface-container-high dark:bg-surface-container-high" />;
   if (!room) return null;
 
   const repItems = room.items.filter((i) => i.owner === 'rep');
@@ -117,14 +117,14 @@ export function DealRoomPanel({ dealId }: { dealId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+      <div className="space-y-3 rounded-xl border border-outline-variant bg-surface p-4 dark:border-outline-variant dark:bg-surface">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-slate-900 dark:text-slate-100">Deal Room</h3>
+          <h3 className="font-semibold text-on-surface ">Deal Room</h3>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={copyLink}
-              className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+              className="flex items-center gap-1 rounded-lg border border-outline-variant px-3 py-1.5 text-xs text-on-surface-variant hover:bg-surface-container-low dark:border-outline-variant dark:text-on-surface-variant dark:hover:bg-surface-container-highest"
             >
               <Copy className="h-3 w-3" /> {showCopied ? 'Copied!' : 'Copy link'}
             </button>
@@ -133,8 +133,8 @@ export function DealRoomPanel({ dealId }: { dealId: string }) {
               onClick={() => updateRoom.mutate({ isPublished: !room.isPublished })}
               className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
                 room.isPublished
-                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                  : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                  ? 'bg-success-container text-success '
+                  : 'bg-surface-container-high text-on-surface-variant dark:bg-surface-container-high dark:text-on-surface-variant'
               }`}
             >
               {room.isPublished ? '✓ Published' : 'Publish'}
@@ -142,27 +142,27 @@ export function DealRoomPanel({ dealId }: { dealId: string }) {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-container-high dark:bg-surface-container-high">
             <div
-              className="h-full rounded-full bg-indigo-500 transition-all"
+              className="h-full rounded-full bg-primary transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
-          <span className="w-10 text-end text-xs font-medium text-slate-600 dark:text-slate-400">
+          <span className="w-10 text-end text-xs font-medium text-on-surface-variant dark:text-on-surface-variant">
             {progress}%
           </span>
         </div>
         {room.viewCount > 0 ? (
-          <p className="text-xs text-slate-400">👁 Viewed {room.viewCount} times</p>
+          <p className="text-xs text-on-surface-variant">👁 Viewed {room.viewCount} times</p>
         ) : null}
       </div>
 
       {(['rep', 'buyer'] as const).map((ownerType) => (
         <div
           key={ownerType}
-          className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+          className="space-y-2 rounded-xl border border-outline-variant bg-surface p-4 dark:border-outline-variant dark:bg-surface"
         >
-          <h4 className="text-sm font-medium uppercase tracking-wide text-slate-700 dark:text-slate-300">
+          <h4 className="text-sm font-medium uppercase tracking-wide text-on-surface dark:text-outline">
             {ownerType === 'rep' ? '🧑‍💼 Your actions' : '🤝 Buyer actions'}
           </h4>
           {(ownerType === 'rep' ? repItems : buyerItems).map((item) => (
@@ -178,23 +178,23 @@ export function DealRoomPanel({ dealId }: { dealId: string }) {
                 className="mt-0.5 flex-shrink-0"
               >
                 {item.completedAt ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  <CheckCircle2 className="h-4 w-4 text-success" />
                 ) : (
-                  <Circle className="h-4 w-4 text-slate-300 group-hover:text-indigo-400 dark:text-slate-600" />
+                  <Circle className="h-4 w-4 text-outline group-hover:text-primary dark:text-on-surface-variant" />
                 )}
               </button>
               <div className="flex-1">
                 <p
                   className={`text-sm ${
                     item.completedAt
-                      ? 'text-slate-400 line-through'
-                      : 'text-slate-800 dark:text-slate-200'
+                      ? 'text-on-surface-variant line-through'
+                      : 'text-on-surface dark:text-outline'
                   }`}
                 >
                   {item.title}
                 </p>
                 {item.dueDate ? (
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-on-surface-variant">
                     Due{' '}
                     {new Date(
                       typeof item.dueDate === 'string' ? item.dueDate : item.dueDate
@@ -205,25 +205,25 @@ export function DealRoomPanel({ dealId }: { dealId: string }) {
             </div>
           ))}
           {(ownerType === 'rep' ? repItems : buyerItems).length === 0 ? (
-            <p className="text-xs italic text-slate-400">No items yet</p>
+            <p className="text-xs italic text-on-surface-variant">No items yet</p>
           ) : null}
         </div>
       ))}
 
-      <div className="space-y-2 rounded-xl border border-dashed border-slate-200 p-3 dark:border-slate-700">
+      <div className="space-y-2 rounded-xl border border-dashed border-outline-variant p-3 dark:border-outline-variant">
         <div className="flex flex-wrap gap-2">
           <input
             value={newItem.title}
             onChange={(e) => setNewItem((p) => ({ ...p, title: e.target.value }))}
             placeholder="Add action item…"
-            className="min-w-[12rem] flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="min-w-[12rem] flex-1 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface dark:border-outline-variant dark:bg-surface "
           />
           <select
             value={newItem.owner}
             onChange={(e) =>
               setNewItem((p) => ({ ...p, owner: e.target.value as 'rep' | 'buyer' }))
             }
-            className="rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="rounded-lg border border-outline-variant bg-surface px-2 py-2 text-sm dark:border-outline-variant dark:bg-surface "
           >
             <option value="rep">You</option>
             <option value="buyer">Buyer</option>
@@ -232,13 +232,13 @@ export function DealRoomPanel({ dealId }: { dealId: string }) {
             type="date"
             value={newItem.dueDate}
             onChange={(e) => setNewItem((p) => ({ ...p, dueDate: e.target.value }))}
-            className="rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="rounded-lg border border-outline-variant bg-surface px-2 py-2 text-sm dark:border-outline-variant dark:bg-surface "
           />
           <button
             type="button"
             disabled={!newItem.title.trim() || addItem.isPending}
             onClick={() => addItem.mutate(newItem)}
-            className="flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-60"
+            className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-sm text-white hover:bg-primary disabled:opacity-60"
           >
             <Plus className="h-4 w-4" />
           </button>

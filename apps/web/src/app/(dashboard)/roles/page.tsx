@@ -98,13 +98,13 @@ export default function RolesPage(): JSX.Element {
     <main className="mx-auto max-w-6xl space-y-4 px-4 py-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Roles & Permissions</h1>
-          <p className="text-sm text-slate-600">Create roles and define what each team member can access.</p>
+          <h1 className="text-2xl font-bold text-on-surface">Roles & Permissions</h1>
+          <p className="text-sm text-on-surface-variant">Create roles and define what each team member can access.</p>
         </div>
         <Button onClick={openCreate}>+ Create Role</Button>
       </header>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <section className="rounded-lg border border-outline-variant bg-surface p-4">
         <div className="max-w-md">
           <Input
             placeholder="Search roles..."
@@ -114,7 +114,7 @@ export default function RolesPage(): JSX.Element {
         </div>
       </section>
 
-      <section className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <section className="overflow-x-auto rounded-lg border border-outline-variant bg-surface">
         {rolesQuery.isLoading ? (
           <div className="p-4 space-y-2">
             <Skeleton className="h-10" />
@@ -123,7 +123,7 @@ export default function RolesPage(): JSX.Element {
           </div>
         ) : (
           <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+            <thead className="bg-surface-container-low text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
                 <th className="px-4 py-3 text-start">Role</th>
                 <th className="px-4 py-3 text-start">Description</th>
@@ -134,19 +134,19 @@ export default function RolesPage(): JSX.Element {
             </thead>
             <tbody>
               {filteredRoles.map((role) => (
-                <tr key={role.id} className="border-t border-slate-100">
-                  <td className="px-4 py-3 font-medium text-slate-900">{role.name}</td>
-                  <td className="px-4 py-3 text-slate-600">{role.description ?? '—'}</td>
+                <tr key={role.id} className="border-t border-outline-variant">
+                  <td className="px-4 py-3 font-medium text-on-surface">{role.name}</td>
+                  <td className="px-4 py-3 text-on-surface-variant">{role.description ?? '—'}</td>
                   <td className="px-4 py-3">
-                    <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+                    <span className="inline-flex items-center rounded-md bg-surface-container-high px-2 py-0.5 text-xs text-on-surface">
                       {role.permissions?.length ?? 0} permissions
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
                     {role.isSystem ? (
-                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">System</span>
+                      <span className="rounded-full bg-primary-container px-2 py-0.5 text-xs text-primary">System</span>
                     ) : (
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">Custom</span>
+                      <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-xs text-on-surface-variant">Custom</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -156,7 +156,7 @@ export default function RolesPage(): JSX.Element {
                       </Button>
                       <Button
                         variant="ghost"
-                        className="text-red-600 hover:text-red-700"
+                        className="text-error hover:text-error"
                         onClick={() => handleDelete(role.id, role.name)}
                         disabled={role.isSystem}
                       >
@@ -168,7 +168,7 @@ export default function RolesPage(): JSX.Element {
               ))}
               {filteredRoles.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-on-surface-variant">
                     No roles found.
                   </td>
                 </tr>
@@ -180,34 +180,34 @@ export default function RolesPage(): JSX.Element {
 
       {ConfirmDialog}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
-            <h2 className="text-lg font-semibold text-slate-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/50 p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg bg-surface p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-on-surface">
               {editingRole ? 'Edit Role' : 'Create Role'}
             </h2>
             <div className="mt-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700">Role name</label>
+                <label className="block text-sm font-medium text-on-surface">Role name</label>
                 <Input value={roleName} onChange={(e) => setRoleName(e.target.value)} placeholder="e.g. Sales Manager" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700">Description</label>
+                <label className="block text-sm font-medium text-on-surface">Description</label>
                 <Input value={roleDescription} onChange={(e) => setRoleDescription(e.target.value)} placeholder="Optional description" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700">Permissions</label>
+                <label className="block text-sm font-medium text-on-surface">Permissions</label>
                 {matrixQuery.isLoading ? (
                   <Skeleton className="h-32" />
                 ) : (
-                  <div className="mt-2 max-h-64 overflow-y-auto rounded-md border border-slate-200 p-3">
+                  <div className="mt-2 max-h-64 overflow-y-auto rounded-md border border-outline-variant p-3">
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {allPermissions.map((perm) => (
-                        <label key={perm} className="flex items-center gap-2 text-sm text-slate-700">
+                        <label key={perm} className="flex items-center gap-2 text-sm text-on-surface">
                           <input
                             type="checkbox"
                             checked={selectedPerms.has(perm)}
                             onChange={() => togglePerm(perm)}
-                            className="rounded border-slate-300"
+                            className="rounded border-outline-variant"
                           />
                           <span className="font-mono text-xs">{perm}</span>
                         </label>

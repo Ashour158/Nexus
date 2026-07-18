@@ -5,11 +5,15 @@ import rateLimit from '@fastify/rate-limit';
 import { NexusProducer } from '@nexus/kafka';
 import { getPrisma, tenantAls } from './prisma.js';
 import { createQuotasService } from './services/quotas.service.js';
+import { createQuotaService } from './services/quota.service.js';
+import { createCategoryMapService } from './services/category-map.service.js';
 import { createForecastsService } from './services/forecasts.service.js';
 import { registerQuotasRoutes } from './routes/quotas.routes.js';
+import { registerQuotaRoutes } from './routes/quota.routes.js';
 import { registerForecastsRoutes } from './routes/forecasts.routes.js';
 import { registerForecastOverrideRoutes } from './routes/forecast-override.routes.js';
 import { registerForecastRollupRoutes } from './routes/forecast-rollup.routes.js';
+import { registerForecastRoutes } from './routes/forecast.routes.js';
 import { registerForecastHierarchyRoutes } from './routes/forecast-hierarchy.routes.js';
 import { registerForecastEntryRoutes } from './routes/forecast-entry.routes.js';
 import { createForecastRollupService } from './services/forecast-rollup.service.js';
@@ -91,10 +95,14 @@ app.addHook('onClose', async () => {
 });
 
 await startService(app, port, async () => {
+  const categoryMapService = createCategoryMapService(prisma);
+  const rollupService = createForecastRollupService(prisma, { categoryResolver: categoryMapService });
   await registerQuotasRoutes(app, createQuotasService(prisma));
+  await registerQuotaRoutes(app, createQuotaService(prisma));
   await registerForecastsRoutes(app, createForecastsService(prisma, producer));
   await registerForecastOverrideRoutes(app, prisma);
-  await registerForecastRollupRoutes(app, createForecastRollupService(prisma));
+  await registerForecastRollupRoutes(app, rollupService);
+  await registerForecastRoutes(app, rollupService, categoryMapService);
   await registerForecastHierarchyRoutes(app, createForecastHierarchyService(prisma));
   await registerForecastEntryRoutes(app, createForecastEntryService(prisma));
 });

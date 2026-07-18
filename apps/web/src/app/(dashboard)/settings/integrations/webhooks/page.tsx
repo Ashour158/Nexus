@@ -114,18 +114,18 @@ function WebhookFormDialog({
 
         <div className="mt-4 space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
+            <label className="mb-1 block text-sm font-medium text-on-surface">
               Name
             </label>
             <input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="Billing sync"
-              className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="h-9 w-full rounded-md border border-outline-variant px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
+            <label className="mb-1 block text-sm font-medium text-on-surface">
               Target URL
             </label>
             <input
@@ -134,16 +134,16 @@ function WebhookFormDialog({
                 setForm((f) => ({ ...f, targetUrl: e.target.value }))
               }
               placeholder="https://example.com/webhooks/nexus"
-              className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="h-9 w-full rounded-md border border-outline-variant px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             />
             {form.targetUrl && !/^https?:\/\/.+/.test(form.targetUrl.trim()) ? (
-              <p className="mt-1 text-xs text-red-600">
+              <p className="mt-1 text-xs text-error">
                 Enter a valid http(s) URL.
               </p>
             ) : null}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
+            <label className="mb-1 block text-sm font-medium text-on-surface">
               Events
             </label>
             <MultiSelect
@@ -244,9 +244,9 @@ function WebhookRow({
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
         >
           {expanded ? (
-            <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+            <ChevronDown className="h-4 w-4 shrink-0 text-on-surface-variant" />
           ) : (
-            <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+            <ChevronRight className="h-4 w-4 shrink-0 text-on-surface-variant" />
           )}
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -258,7 +258,7 @@ function WebhookRow({
                 variant={webhook.isActive ? 'success' : 'neutral'}
               />
               {typeof webhook.version === 'number' ? (
-                <span className="text-[10px] text-slate-400">v{webhook.version}</span>
+                <span className="text-[10px] text-on-surface-variant">v{webhook.version}</span>
               ) : null}
             </div>
             <p className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -268,13 +268,13 @@ function WebhookRow({
               {webhook.events.slice(0, 6).map((e) => (
                 <span
                   key={e}
-                  className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600"
+                  className="rounded bg-surface-container-high px-1.5 py-0.5 text-[10px] text-on-surface-variant"
                 >
                   {e}
                 </span>
               ))}
               {webhook.events.length > 6 ? (
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[10px] text-on-surface-variant">
                   +{webhook.events.length - 6} more
                 </span>
               ) : null}
@@ -284,7 +284,7 @@ function WebhookRow({
 
         {canManage ? (
           <div className="flex shrink-0 items-center gap-1">
-            <label className="mr-1 flex cursor-pointer items-center gap-1.5 text-xs text-slate-600">
+            <label className="mr-1 flex cursor-pointer items-center gap-1.5 text-xs text-on-surface-variant">
               <input
                 type="checkbox"
                 checked={webhook.isActive}
@@ -309,7 +309,7 @@ function WebhookRow({
             <Button
               variant="ghost"
               size="sm"
-              className="text-red-700 hover:bg-red-50"
+              className="text-error hover:bg-error-container"
               onClick={onDelete}
               aria-label="Delete"
             >

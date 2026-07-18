@@ -13,7 +13,7 @@ export function DiscountApprovalBanner({ discountPercent, thresholdPercent, onRe
   if (discountPercent == null || discountPercent <= thresholdPercent) return null;
 
   return (
-    <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+    <div className="rounded-lg border border-warning/40 bg-warning-container p-3 text-sm text-on-warning-container">
       <p>?? Discount of {discountPercent}% exceeds your limit of {thresholdPercent}%.</p>
       <p>This deal requires manager approval before sending a quote.</p>
       <button
@@ -21,11 +21,11 @@ export function DiscountApprovalBanner({ discountPercent, thresholdPercent, onRe
           setRequested(true);
           onRequestApproval?.();
         }}
-        className="mt-2 rounded bg-amber-600 px-3 py-1.5 text-xs font-medium text-white"
+        className="mt-2 rounded bg-warning px-3 py-1.5 text-xs font-medium text-white"
       >
         Request Approval
       </button>
-      {requested ? <p className="mt-1 text-xs text-amber-800">Approval request sent to manager queue.</p> : null}
+      {requested ? <p className="mt-1 text-xs text-on-warning-container">Approval request sent to manager queue.</p> : null}
     </div>
   );
 }

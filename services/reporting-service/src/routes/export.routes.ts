@@ -5,10 +5,22 @@ import type { ReportingPrisma } from '../prisma.js';
 import { createReportAuditLogger } from '../lib/audit-logger.js';
 
 /**
- * PDF Export route for reports.
- * Generates a simple HTML page from report data and returns it as a printable HTML response.
- * The browser can then print-to-PDF or a downstream service can convert this to PDF.
+ * Printable-HTML export route for reports (browser "print to PDF" or a downstream
+ * html→pdf converter). It returns `text/html`, NOT a binary PDF — the route path
+ * keeps the `/export/pdf` name for backwards compatibility, but the content-type
+ * and `.html` filename are honest about what is actually produced.
  */
+
+/** HTML-escape a value before interpolating it into markup (stored-XSS guard). */
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export async function registerExportRoutes(
   app: FastifyInstance,
   reports: ReturnType<typeof createReportsService>,
@@ -47,14 +59,14 @@ export async function registerExportRoutes(
   </style>
 </head>
 <body>
-  <h1>Report Export</h1>
-  <div class="meta">Generated on ${new Date().toLocaleString()} · ${rows.length} rows</div>
+  <h1>${escapeHtml(report?.name ?? 'Report Export')}</h1>
+  <div class="meta">Generated on ${escapeHtml(new Date().toLocaleString())} · ${rows.length} rows</div>
   <table>
     <thead>
-      <tr>${columns.map((c) => `<th>${String(c).replace(/_/g, ' ')}</th>`).join('')}</tr>
+      <tr>${columns.map((c) => `<th>${escapeHtml(String(c).replace(/_/g, ' '))}</th>`).join('')}</tr>
     </thead>
     <tbody>
-      ${rows.map((row: unknown) => `<tr>${columns.map((c) => `<td>${String((row as Record<string, unknown>)[c] ?? '—')}</td>`).join('')}</tr>`).join('')}
+      ${rows.map((row: unknown) => `<tr>${columns.map((c) => `<td>${escapeHtml((row as Record<string, unknown>)[c] ?? '—')}</td>`).join('')}</tr>`).join('')}
     </tbody>
   </table>
 </body>

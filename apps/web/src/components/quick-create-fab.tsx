@@ -45,7 +45,7 @@ export function QuickCreateFab(): ReactElement {
         <button
           type="button"
           onClick={() => setOpen((s) => !s)}
-          className="h-12 w-12 rounded-full bg-slate-900 text-2xl text-white shadow-lg"
+          className="h-12 w-12 rounded-full bg-primary text-2xl text-on-primary shadow-modal"
         >
           +
         </button>
@@ -160,7 +160,7 @@ function FabItem({ label, onClick }: { label: string; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm shadow"
+      className="rounded-full border border-outline-variant bg-surface px-3 py-1 text-sm shadow"
     >
       + {label}
     </button>
@@ -183,29 +183,29 @@ function SimpleModal({
   const [secondRef, setSecondRef] = useState('');
   const [thirdRef, setThirdRef] = useState('');
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 md:items-center md:p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-on-surface/40 p-0 md:items-center md:p-4">
       <form
-        className="max-h-[90vh] w-full space-y-3 overflow-y-auto rounded-t-2xl bg-white p-4 md:max-w-md md:rounded-2xl dark:bg-slate-900"
+        className="max-h-[90vh] w-full space-y-3 overflow-y-auto rounded-t-2xl bg-surface p-4 md:max-w-md md:rounded-2xl"
         onSubmit={(e) => {
           e.preventDefault();
           void onSubmit({ name, idOrRef, secondRef, thirdRef });
         }}
       >
         <div className="flex justify-center pb-1 pt-1 md:hidden">
-          <div className="h-1 w-10 rounded-full bg-slate-300 dark:bg-slate-600" />
+          <div className="h-1 w-10 rounded-full bg-outline-variant" />
         </div>
         <h3 className="text-lg font-semibold">{title}</h3>
-        <input className="h-9 w-full rounded border border-slate-200 px-3 text-sm" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
+        <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
         {includeRefs ? (
           <>
-            <input className="h-9 w-full rounded border border-slate-200 px-3 text-sm" value={idOrRef} onChange={(e) => setIdOrRef(e.target.value)} placeholder="Account ID" />
-            <input className="h-9 w-full rounded border border-slate-200 px-3 text-sm" value={secondRef} onChange={(e) => setSecondRef(e.target.value)} placeholder="Pipeline ID" />
-            <input className="h-9 w-full rounded border border-slate-200 px-3 text-sm" value={thirdRef} onChange={(e) => setThirdRef(e.target.value)} placeholder="Stage ID" />
+            <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={idOrRef} onChange={(e) => setIdOrRef(e.target.value)} placeholder="Account ID" />
+            <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={secondRef} onChange={(e) => setSecondRef(e.target.value)} placeholder="Pipeline ID" />
+            <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={thirdRef} onChange={(e) => setThirdRef(e.target.value)} placeholder="Stage ID" />
           </>
         ) : null}
         <div className="flex justify-end gap-2">
-          <button type="button" className="rounded border border-slate-200 px-3 py-1.5 text-sm" onClick={onClose}>Cancel</button>
-          <button type="submit" className="rounded bg-slate-900 px-3 py-1.5 text-sm text-white">Create</button>
+          <button type="button" className="rounded border border-outline-variant px-3 py-1.5 text-sm" onClick={onClose}>Cancel</button>
+          <button type="submit" className="rounded bg-primary px-3 py-1.5 text-sm text-on-primary">Create</button>
         </div>
       </form>
     </div>

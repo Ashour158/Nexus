@@ -9,6 +9,7 @@ import { registerSavedReportsRoutes } from './routes/saved-reports.routes.js';
 import { registerDashboardsRoutes } from './routes/dashboards.routes.js';
 import { registerFunnelRoutes } from './routes/funnel.routes.js';
 import { registerBiRoutes } from './routes/bi.routes.js';
+import { registerAnnotationRoutes } from './routes/annotations.routes.js';
 import { registerExportRoutes } from './routes/export.routes.js';
 import { startSnapshotScheduler } from './lib/snapshot.job.js';
 import { startScheduleRunner } from './lib/schedule-runner.js';
@@ -58,6 +59,7 @@ await startService(app, port, async (a) => {
   await registerDashboardsRoutes(a, prisma);
   await registerFunnelRoutes(a, prisma);
   await registerBiRoutes(a, prisma);
+  await registerAnnotationRoutes(a, prisma);
   await registerExportRoutes(a, reports, prisma);
 
   // Start background jobs (non-blocking)
@@ -67,6 +69,10 @@ await startService(app, port, async (a) => {
     a.log.warn({ err }, 'Snapshot scheduler failed to start');
   }
   try {
+    // Single consolidated schedule runner: renders + delivers BOTH the
+    // self-serve ReportSchedule and the legacy DefinitionReportSchedule models
+    // through the comm outbox email path (RR-H20 — previously the definition
+    // schedules never executed).
     startScheduleRunner(prisma);
   } catch (err) {
     a.log.warn({ err }, 'Schedule runner failed to start');

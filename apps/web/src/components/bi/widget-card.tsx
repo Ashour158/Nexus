@@ -33,11 +33,11 @@ export function WidgetCard({
   });
 
   return (
-    <div className="flex flex-col rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+    <div className="flex flex-col rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
-          <h3 className="text-sm font-bold text-slate-900">{widget.title}</h3>
-          <p className="text-[11px] uppercase tracking-wider text-slate-400">
+          <h3 className="text-sm font-bold text-on-surface">{widget.title}</h3>
+          <p className="text-[11px] uppercase tracking-wider text-on-surface-variant">
             {widget.spec.dataset} · {widget.chartType}
           </p>
         </div>
@@ -61,15 +61,15 @@ export function WidgetCard({
 
       <div className="flex-1">
         {isLoading ? (
-          <div className="flex h-[240px] items-center justify-center text-sm text-slate-400">
+          <div className="flex h-[240px] items-center justify-center text-sm text-on-surface-variant">
             Loading…
           </div>
         ) : error ? (
-          <div className="flex h-[240px] items-center justify-center text-center text-sm text-rose-600">
+          <div className="flex h-[240px] items-center justify-center text-center text-sm text-error">
             {(error as Error).message || 'Failed to run widget'}
           </div>
         ) : data ? (
-          <WidgetChart chartType={widget.chartType} result={data} height={240} />
+          <WidgetChart chartType={widget.chartType} result={data} height={240} measures={widget.spec?.measures} />
         ) : null}
       </div>
     </div>
@@ -94,8 +94,8 @@ function IconBtn({
       title={title}
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-md p-1.5 text-slate-400 transition disabled:opacity-30 ${
-        danger ? 'hover:bg-rose-50 hover:text-rose-600' : 'hover:bg-slate-100 hover:text-slate-700'
+      className={`rounded-md p-1.5 text-on-surface-variant transition disabled:opacity-30 ${
+        danger ? 'hover:bg-error-container hover:text-error' : 'hover:bg-surface-container-high hover:text-on-surface'
       }`}
     >
       {children}

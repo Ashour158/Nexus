@@ -2,6 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { createFieldCrypto, signWebhookBody } from '../lib/crypto.js';
 import { createWebhooksService } from '../services/webhooks.service.js';
 
+// The delivery path runs an SSRF/private-IP guard that resolves the target
+// host via DNS. Stub it to a public address so the unit test is deterministic
+// (the reserved `example.test` TLD does not resolve) and exercises delivery.
+vi.mock('node:dns/promises', () => ({
+  lookup: vi.fn().mockResolvedValue({ address: '93.184.216.34', family: 4 }),
+}));
+
 describe('integration webhooks', () => {
   it('signWebhookBody produces stable HMAC hex', () => {
     const sig = signWebhookBody('secret', '{"a":1}');

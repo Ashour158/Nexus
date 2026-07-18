@@ -9,8 +9,18 @@ import { alsStore } from './request-context.js';
  * Tenant isolation — Section 35.1 semantics via Prisma 5 `$extends`.
  * Models without `tenantId` and global `Tenant` are excluded.
  */
-// Models that have no tenantId column — the tenant extension must not inject one.
-const skipTenantModels = new Set(['Tenant', 'Session', 'UserRole', 'MfaConfiguration', 'PasswordReset']);
+// Models the tenant extension must NOT auto-scope. Two reasons appear here:
+//  - genuinely tenant-less globals (Tenant), and
+//  - identity control-plane models that auth-service queries *before* a tenant is
+//    known. `User` is the critical one: login and password-reset look a user up by
+//    email across all tenants (you derive the tenant *from* the user), so under
+//    fail-closed enforcement (NEXUS_TENANT_ENFORCEMENT=on) an auto-injected tenant
+//    filter would throw TenantContextError and make login impossible. Exempting
+//    User here is safe because every *authenticated* User query in auth-service
+//    (org/profile/permissions routes) already passes an explicit
+//    `tenantId: jwt.tenantId` in its where clause — the extension was only ever
+//    defense-in-depth for those, never the sole isolation boundary.
+const skipTenantModels = new Set(['Tenant', 'Session', 'UserRole', 'MfaConfiguration', 'PasswordReset', 'User']);
 
 export function createAuthPrisma() {
   const base = createPrismaClientWithReplicas(
@@ -29,7 +39,14 @@ export function createAuthPrisma() {
   const encryptionKey = process.env.ENCRYPTION_MASTER_KEY;
   if (encryptionKey && encryptionKey.length >= 32) {
     withFieldEncryption(base as any, encryptionKey, [
-      { model: 'User', fields: ['email', 'phone', 'firstName', 'lastName'] },
+      // NOTE: `email` is intentionally NOT encrypted. Local login looks users up by
+      // plaintext email (`findFirst({ where: { email } })`) and there is no
+      // `emailHash` blind index on User — so an encrypted email is unfindable and
+      // the account can never log in locally (it only surfaced once invited users
+      // got a local password instead of Keycloak SSO). Proper fix = add an
+      // `emailHash` blind index and look up by it; until then email stays plaintext
+      // to match every existing loginnable user.
+      { model: 'User', fields: ['phone', 'firstName', 'lastName'] },
       { model: 'UserProfile', fields: ['personalEmail', 'emergencyPhone', 'address', 'dateOfBirth'] },
       { model: 'SsoConfiguration', fields: ['certificate'] },
       { model: 'MfaConfiguration', fields: ['secret'] },

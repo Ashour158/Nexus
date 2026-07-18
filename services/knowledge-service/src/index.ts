@@ -44,5 +44,5 @@ const knowledgeSvc = createKnowledgeService(prisma, producer);
 await registerGraphQL(app, prisma);
 
 await startService(app, port, async () => {
-  await registerRoutes(app, knowledgeSvc);
+  await registerRoutes(app, knowledgeSvc, prisma);
 });

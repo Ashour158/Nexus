@@ -28,10 +28,10 @@ export default function NotificationsPage() {
     <div className="mx-auto max-w-3xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Bell className="h-6 w-6 text-blue-600" />
-          <h1 className="text-2xl font-semibold text-slate-900">Notifications</h1>
+          <Bell className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-semibold text-on-surface">Notifications</h1>
           {unreadCount > 0 && (
-            <span className="rounded-full bg-blue-600 px-2.5 py-0.5 text-xs font-medium text-white">
+            <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-medium text-white">
               {unreadCount}
             </span>
           )}
@@ -40,7 +40,7 @@ export default function NotificationsPage() {
           <button
             onClick={() => refetch()}
             disabled={isFetching}
-            className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
+            className="rounded-lg border border-outline-variant p-2 text-on-surface-variant transition hover:bg-surface-container-low"
             title="Refresh"
           >
             <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
@@ -49,7 +49,7 @@ export default function NotificationsPage() {
             <button
               onClick={() => markAllRead.mutate()}
               disabled={markAllRead.isPending}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              className="flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-medium text-on-surface transition hover:bg-surface-container-low"
             >
               <CheckCheck className="h-4 w-4" />
               Mark all read
@@ -58,7 +58,7 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      <div className="mb-4 flex gap-2 border-b border-slate-200">
+      <div className="mb-4 flex gap-2 border-b border-outline-variant">
         {(['all', 'unread'] as const).map((tab) => (
           <button
             key={tab}
@@ -66,8 +66,8 @@ export default function NotificationsPage() {
             className={cn(
               'px-4 py-2 text-sm font-medium capitalize transition',
               filter === tab
-                ? 'border-b-2 border-blue-600 text-blue-600'
-                : 'text-slate-500 hover:text-slate-700'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-on-surface-variant hover:text-on-surface'
             )}
           >
             {tab}
@@ -76,14 +76,14 @@ export default function NotificationsPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex h-48 items-center justify-center text-slate-400">Loading…</div>
+        <div className="flex h-48 items-center justify-center text-on-surface-variant">Loading…</div>
       ) : filtered.length === 0 ? (
-        <div className="flex h-48 flex-col items-center justify-center gap-2 text-slate-400">
+        <div className="flex h-48 flex-col items-center justify-center gap-2 text-on-surface-variant">
           <Bell className="h-10 w-10 opacity-40" />
           <p>{filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}</p>
         </div>
       ) : (
-        <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+        <ul className="divide-y divide-outline-variant rounded-xl border border-outline-variant bg-surface">
           {filtered.map((n) => (
             <NotificationRow
               key={n.id}
@@ -105,23 +105,23 @@ function NotificationRow({
   onMarkRead: () => void;
 }) {
   return (
-    <li className={cn('flex items-start gap-3 p-4 transition hover:bg-slate-50', !n.isRead && 'bg-blue-50/40')}>
+    <li className={cn('flex items-start gap-3 p-4 transition hover:bg-surface-container-low', !n.isRead && 'bg-primary-container/40')}>
       {!n.isRead && (
-        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-600" aria-hidden="true" />
+        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden="true" />
       )}
       {n.isRead && <span className="mt-1.5 h-2 w-2 shrink-0" />}
       <div className="min-w-0 flex-1">
-        <p className={cn('text-sm', n.isRead ? 'text-slate-700' : 'font-medium text-slate-900')}>
+        <p className={cn('text-sm', n.isRead ? 'text-on-surface' : 'font-medium text-on-surface')}>
           {n.title}
         </p>
-        <p className="mt-0.5 line-clamp-2 text-sm text-slate-500">{n.body}</p>
-        <p className="mt-1 text-xs text-slate-400">{formatDate(n.createdAt)}</p>
+        <p className="mt-0.5 line-clamp-2 text-sm text-on-surface-variant">{n.body}</p>
+        <p className="mt-1 text-xs text-on-surface-variant">{formatDate(n.createdAt)}</p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {n.actionUrl && (
           <Link
             href={n.actionUrl}
-            className="rounded p-1 text-slate-400 transition hover:text-blue-600"
+            className="rounded p-1 text-on-surface-variant transition hover:text-primary"
             title="View"
           >
             <ExternalLink className="h-4 w-4" />
@@ -130,7 +130,7 @@ function NotificationRow({
         {!n.isRead && (
           <button
             onClick={onMarkRead}
-            className="rounded p-1 text-slate-400 transition hover:text-green-600"
+            className="rounded p-1 text-on-surface-variant transition hover:text-success"
             title="Mark as read"
           >
             <Check className="h-4 w-4" />

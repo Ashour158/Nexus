@@ -24,11 +24,46 @@ export type Aggregation = 'sum' | 'count' | 'count_distinct' | 'avg' | 'min' | '
 export type TimeGrain = 'day' | 'week' | 'month' | 'quarter' | 'year';
 export type FilterOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'contains';
 export type SortDir = 'asc' | 'desc';
-export type ChartType = 'bar' | 'line' | 'area' | 'pie' | 'table' | 'kpi' | 'funnel';
+export type ChartType =
+  | 'bar'
+  | 'stacked_bar'
+  | 'hbar'
+  | 'line'
+  | 'area'
+  | 'combo'
+  | 'pie'
+  | 'donut'
+  | 'scatter'
+  | 'radar'
+  | 'treemap'
+  | 'radial'
+  | 'funnel'
+  | 'table'
+  | 'pivot'
+  | 'kpi';
+
+/**
+ * Excel-style "show value as" transforms. These are PRESENTATION concerns: the
+ * query engine ignores them (they are not compiled to SQL); the client applies
+ * them to the returned rows. Persisted on the measure so a saved report keeps
+ * its formatting.
+ */
+export type QuickCalc = 'percent_of_total' | 'running_total' | 'growth' | 'rank';
+export const QUICK_CALCS: readonly QuickCalc[] = ['percent_of_total', 'running_total', 'growth', 'rank'];
 
 export interface Measure {
-  field: string;
-  agg: Aggregation;
+  /** Physical field for a base aggregate. Omitted on a calculated measure. */
+  field?: string;
+  /** Aggregation for a base measure. Omitted on a calculated measure. */
+  agg?: Aggregation;
+  /**
+   * Calculated measure — a safe arithmetic formula over the aliases of measures
+   * defined earlier in the spec (e.g. "won / total"). Compiled by
+   * analytics-service; div-by-zero guarded.
+   */
+  formula?: string;
+  /** Client-side "show value as" transform (% of total, running total, …). */
+  quickCalc?: QuickCalc;
   alias?: string;
 }
 
@@ -48,8 +83,23 @@ export interface SortClause {
   dir: SortDir;
 }
 
+/**
+ * Cross-object join. Attaches another dataset's latest attributes to the base
+ * rows so a report can span objects. Joined fields are then referenced with a
+ * dotted name — "<alias>.<field>", alias defaulting to the joined dataset.
+ * analytics-service resolves/whitelists the fields and compiles the SQL.
+ */
+export interface JoinClause {
+  dataset: Dataset;
+  /** Foreign-key field on the BASE dataset (e.g. 'account_id'). */
+  on: string;
+  /** Reference prefix for joined fields. Defaults to `dataset`. */
+  alias?: string;
+}
+
 export interface ReportSpec {
   dataset: Dataset;
+  joins?: JoinClause[];
   measures: Measure[];
   dimensions: Dimension[];
   filters: FilterClause[];
@@ -76,7 +126,10 @@ const AGGS: readonly Aggregation[] = ['sum', 'count', 'count_distinct', 'avg', '
 const TIME_GRAINS: readonly TimeGrain[] = ['day', 'week', 'month', 'quarter', 'year'];
 const FILTER_OPS: readonly FilterOp[] = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'contains'];
 const SORT_DIRS: readonly SortDir[] = ['asc', 'desc'];
-export const CHART_TYPES: readonly ChartType[] = ['bar', 'line', 'area', 'pie', 'table', 'kpi', 'funnel'];
+export const CHART_TYPES: readonly ChartType[] = [
+  'bar', 'stacked_bar', 'hbar', 'line', 'area', 'combo', 'pie', 'donut',
+  'scatter', 'radar', 'treemap', 'radial', 'funnel', 'table', 'pivot', 'kpi',
+];
 
 export interface ValidationResult {
   valid: boolean;
@@ -130,19 +183,42 @@ export function validateReportSpec(input: unknown): ValidationResult {
         errors.push(`measures[${i}] must be an object`);
         return;
       }
+      if (m.alias !== undefined && typeof m.alias !== 'string') {
+        errors.push(`measures[${i}].alias must be a string`);
+      }
+      if (m.quickCalc !== undefined && !QUICK_CALCS.includes(m.quickCalc as QuickCalc)) {
+        errors.push(`measures[${i}].quickCalc must be one of: ${QUICK_CALCS.join(', ')}`);
+      }
+      const quick =
+        typeof m.quickCalc === 'string' && QUICK_CALCS.includes(m.quickCalc as QuickCalc)
+          ? { quickCalc: m.quickCalc as QuickCalc }
+          : {};
+      // Calculated measure: a formula string, no field/agg. Deep validation of
+      // the expression (whitelisted tokens, alias resolution) happens in
+      // analytics-service's compiler; here we just carry it through.
+      if (typeof m.formula === 'string') {
+        if (m.formula.trim().length === 0) {
+          errors.push(`measures[${i}].formula must be a non-empty string`);
+        } else {
+          measures.push({
+            formula: m.formula,
+            ...quick,
+            ...(typeof m.alias === 'string' ? { alias: m.alias } : {}),
+          });
+        }
+        return;
+      }
       if (typeof m.field !== 'string' || m.field.length === 0) {
         errors.push(`measures[${i}].field is required`);
       }
       if (typeof m.agg !== 'string' || !AGGS.includes(m.agg as Aggregation)) {
         errors.push(`measures[${i}].agg must be one of: ${AGGS.join(', ')}`);
       }
-      if (m.alias !== undefined && typeof m.alias !== 'string') {
-        errors.push(`measures[${i}].alias must be a string`);
-      }
       if (typeof m.field === 'string' && typeof m.agg === 'string' && AGGS.includes(m.agg as Aggregation)) {
         measures.push({
           field: m.field,
           agg: m.agg as Aggregation,
+          ...quick,
           ...(typeof m.alias === 'string' ? { alias: m.alias } : {}),
         });
       }
@@ -239,6 +315,40 @@ export function validateReportSpec(input: unknown): ValidationResult {
   // The only hard requirement beyond a known dataset is structural validity,
   // already checked above. (measures non-empty OR raw table both pass.)
 
+  // Joins — structural validation only; analytics-service whitelists the joined
+  // dataset/fields and compiles the SQL.
+  let joins: JoinClause[] | undefined;
+  if (input.joins !== undefined) {
+    if (!Array.isArray(input.joins)) {
+      errors.push('joins must be an array');
+    } else {
+      joins = [];
+      input.joins.forEach((j: unknown, i: number) => {
+        if (!isPlainObject(j)) {
+          errors.push(`joins[${i}] must be an object`);
+          return;
+        }
+        if (typeof j.dataset !== 'string' || !DATASETS.includes(j.dataset as Dataset)) {
+          errors.push(`joins[${i}].dataset must be one of: ${DATASETS.join(', ')}`);
+          return;
+        }
+        if (typeof j.on !== 'string' || j.on.length === 0) {
+          errors.push(`joins[${i}].on is required`);
+          return;
+        }
+        if (j.alias !== undefined && typeof j.alias !== 'string') {
+          errors.push(`joins[${i}].alias must be a string`);
+          return;
+        }
+        joins!.push({
+          dataset: j.dataset as Dataset,
+          on: j.on,
+          ...(typeof j.alias === 'string' ? { alias: j.alias } : {}),
+        });
+      });
+    }
+  }
+
   // A spec with neither a measure nor a dimension has nothing to project and is
   // rejected downstream by the compiler — reject it here so validation matches.
   if (measures.length === 0 && dimensions.length === 0) {
@@ -254,6 +364,7 @@ export function validateReportSpec(input: unknown): ValidationResult {
     errors: [],
     spec: {
       dataset: dataset as Dataset,
+      ...(joins !== undefined && joins.length > 0 ? { joins } : {}),
       measures,
       dimensions,
       filters,

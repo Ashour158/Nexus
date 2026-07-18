@@ -14,8 +14,15 @@ model CustomFieldDefinition {
   entityType String
   name       String
   apiKey     String
+  // text|textarea|number|currency|percent|boolean|date|datetime|email|phone|url|
+  // picklist|multipicklist|lookup|multilookup|subform|rollup|user
   fieldType  String
   options    Json     @default("[]")
+  // Advanced type-specific config (lookup/rollup/subform/dependent picklist).
+  config     Json?
+  // Optional reference to a shared GlobalPicklistSet (picklist-family fields).
+  globalSetId String?
+  globalSet  GlobalPicklistSet? @relation(fields: [globalSetId], references: [id])
   required   Boolean  @default(false)
   showOnCard Boolean  @default(false)
   position   Int      @default(0)
@@ -25,6 +32,26 @@ model CustomFieldDefinition {
 
   @@unique([tenantId, entityType, apiKey])
   @@index([tenantId, entityType])
+  @@index([globalSetId])
+  @@unique([id, tenantId])
+}
+
+// Tenant-level named set of picklist options, reusable across many fields.
+// A picklist/multipicklist CustomFieldDefinition may reference one via
+// `globalSetId`; its option list is resolved from `options` here at read time.
+model GlobalPicklistSet {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  options   Json     @default("[]")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fields    CustomFieldDefinition[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
   @@unique([id, tenantId])
 }
 
@@ -291,6 +318,117 @@ model FeatureFlag {
   @@unique([id, tenantId])
 }
 
+// ─── Page Layouts + Layout Rules (Zoho-parity dynamic layouts) ───────────────
+// Additive, tenant-scoped. Admins define per-module page layouts (ordered
+// sections → fields/columns), assign them to profiles (role names), and attach
+// conditional Layout Rules that show/hide/require fields & sections based on the
+// live record's field values. Unconfigured module => today's behavior (the UI
+// falls back to its static layout when /layouts/resolve returns nothing).
+
+model PageLayout {
+  id               String   @id @default(cuid())
+  tenantId         String
+  module           String
+  name             String
+  isDefault        Boolean  @default(false)
+  // Role names this layout is assigned to. Empty => not profile-restricted.
+  assignedProfiles String[] @default([])
+  // Ordered sections: [{ id?, title, columns, fields: [fieldApiName], ... }]
+  sections         Json     @default("[]")
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  rules            LayoutRule[]
+
+  @@index([tenantId, module])
+  @@unique([id, tenantId])
+}
+
+model LayoutRule {
+  id           String   @id @default(cuid())
+  tenantId     String
+  layoutId     String
+  layout       PageLayout @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+  name         String
+  triggerField String
+  // eq|ne|in|gt|lt|is_empty|is_not_empty
+  operator     String
+  triggerValue Json?
+  // Ordered list of { type: SHOW_FIELD|HIDE_FIELD|SHOW_SECTION|HIDE_SECTION|
+  //                        REQUIRE_FIELD|SET_READONLY, target }
+  actions      Json     @default("[]")
+  position     Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([tenantId, layoutId])
+  @@unique([id, tenantId])
+}
+
+model RelatedListConfig {
+  id                String   @id @default(cuid())
+  tenantId          String
+  module            String
+  name              String
+  relatedModule     String
+  displayFields     String[] @default([])
+  sortBy            String?
+  visibleToProfiles String[] @default([])
+  sortOrder         Int      @default(0)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([tenantId, module])
+  @@unique([id, tenantId])
+}
+
+// ─── Config-as-data (export/import customizations between environments) ──────
+// Additive, tenant-scoped. `GET /config/export` serialises a tenant's low-code
+// customization bundle to a single versioned JSON; `POST /config/import` diffs
+// and (on APPLY) upserts it into the CALLING tenant. Every import — DRY_RUN or
+// APPLY — is recorded here for audit/replay. `summary` holds the per-entity
+// {create,update,skip} diff the endpoint returned.
+model ConfigImportLog {
+  id            String   @id @default(cuid())
+  tenantId      String
+  bundleVersion String
+  mode          String   // DRY_RUN | APPLY
+  conflict      String   // SKIP | OVERWRITE
+  summary       Json     @default("{}")
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@unique([id, tenantId])
+}
+
+// ─── Label localization (translatable custom labels / picklist values) ───────
+// Additive, tenant-scoped. One row per (tenant, entityType, entityKey, locale)
+// overrides the base label of a custom field, custom module, or picklist value
+// for a given locale. `GET /translations/resolve` returns a key→value map the
+// UI merges over its base labels; a missing row => the base label (so an
+// unconfigured tenant behaves exactly as today).
+model LabelTranslation {
+  id         String   @id @default(cuid())
+  tenantId   String
+  // field | module | picklistValue
+  entityType String
+  // Opaque UI-chosen key, e.g. "Account.industry" (field), "project" (module),
+  // "regions.emea" (picklistValue). Uniqueness is per (entityType, entityKey).
+  entityKey  String
+  locale     String
+  value      String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantId, entityType, entityKey, locale])
+  @@index([tenantId, locale])
+  @@index([tenantId, entityType, locale])
+  @@unique([id, tenantId])
+}
+
 model CodingAllocationLog {
   id               String   @id @default(cuid())
   tenantId         String
@@ -306,4 +444,39 @@ model CodingAllocationLog {
   @@index([tenantId, entityType, entityId])
   @@index([tenantId, code])
   @@unique([tenantId, entityType, code])
+}
+
+// ─── Custom Buttons & Actions (Zoho parity) ──────────────────────────────────
+// Admin-defined buttons that render on record detail / list views and run an
+// action when clicked. Fully tenant-scoped and additive; no other model
+// references this one. `config` is an action-typed JSON blob (validated with
+// zod at the route layer per `actionType`):
+//   RUN_WORKFLOW   { workflowId }
+//   UPDATE_FIELDS  { updates: { field: value, ... } }
+//   OPEN_URL       { urlTemplate }                 // supports {{record.field}}
+//   CALL_WEBHOOK   { url, method, bodyTemplate? }  // https-only, SSRF-guarded
+model CustomButton {
+  id              String   @id @default(cuid())
+  tenantId        String
+  // lead | contact | account | deal | quote | ticket
+  module          String
+  label           String
+  icon            String?
+  // RECORD | LIST | BOTH — where the button is offered in the UI.
+  placement       String   @default("RECORD")
+  // RUN_WORKFLOW | UPDATE_FIELDS | OPEN_URL | CALL_WEBHOOK
+  actionType      String
+  config          Json     @default("{}")
+  // Roles allowed to see/run the button; empty array = visible to all roles.
+  visibilityRoles String[] @default([])
+  // When true the UI must confirm before invoking /execute.
+  confirmRequired Boolean  @default(false)
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId, module, placement])
+  @@index([tenantId, module, isActive])
+  @@unique([id, tenantId])
 }

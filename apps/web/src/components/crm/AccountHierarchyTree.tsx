@@ -19,27 +19,27 @@ function AccountNodeView({ account, depth = 0 }: { account: AccountNode; depth?:
   return (
     <div
       className={
-        depth > 0 ? 'ms-6 mt-2 border-s-2 border-slate-200 ps-4 dark:border-slate-700' : 'mt-2'
+        depth > 0 ? 'ms-6 mt-2 border-s-2 border-outline-variant ps-4 dark:border-outline-variant' : 'mt-2'
       }
     >
-      <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 transition-colors hover:border-indigo-300 dark:border-slate-800 dark:bg-slate-900">
-        <Building2 className="h-4 w-4 flex-shrink-0 text-indigo-500" />
+      <div className="flex items-center gap-3 rounded-lg border border-outline-variant bg-surface p-3 transition-colors hover:border-primary/40 dark:border-outline-variant dark:bg-surface">
+        <Building2 className="h-4 w-4 flex-shrink-0 text-primary" />
         <div className="min-w-0 flex-1">
           <Link
             href={`/accounts/${account.id}`}
-            className="block truncate text-sm font-medium text-slate-900 hover:text-indigo-600 dark:text-slate-100"
+            className="block truncate text-sm font-medium text-on-surface hover:text-primary "
           >
             {account.name}
           </Link>
           {account.industry ? (
-            <p className="text-xs text-slate-400">{account.industry}</p>
+            <p className="text-xs text-on-surface-variant">{account.industry}</p>
           ) : null}
         </div>
-        <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+        <div className="flex items-center gap-3 text-xs text-on-surface-variant dark:text-on-surface-variant">
           <span>{account._count.deals} deals</span>
           <span>{account._count.contacts} contacts</span>
           {account.rollup && account.rollup.totalValue > 0 ? (
-            <span className="flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
+            <span className="flex items-center gap-1 font-medium text-success dark:text-success">
               <TrendingUp className="h-3 w-3" />$
               {account.rollup.totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </span>
@@ -47,7 +47,7 @@ function AccountNodeView({ account, depth = 0 }: { account: AccountNode; depth?:
         </div>
         <Link
           href={`/accounts/${account.id}`}
-          className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+          className="text-on-surface-variant hover:text-on-surface-variant dark:hover:text-outline"
         >
           <ChevronRight className="h-4 w-4" />
         </Link>
@@ -81,12 +81,12 @@ export function AccountHierarchyTree({ accountId }: { accountId: string }) {
   });
 
   if (isLoading)
-    return <div className="h-32 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />;
+    return <div className="h-32 animate-pulse rounded-xl bg-surface-container-high dark:bg-surface-container-high" />;
   if (!data) return null;
 
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-900 dark:text-slate-100">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-on-surface ">
         Account Group
       </h3>
       <AccountNodeView account={data} />

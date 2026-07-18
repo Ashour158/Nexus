@@ -72,19 +72,19 @@ export function ConsentManager({ contactId }: { contactId: string }) {
 
   if (!accessToken) {
     return (
-      <p className="text-sm text-slate-500">Sign in to view and edit consent preferences.</p>
+      <p className="text-sm text-on-surface-variant">Sign in to view and edit consent preferences.</p>
     );
   }
 
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <Shield className="h-4 w-4 text-indigo-500" />
-        <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">
+        <Shield className="h-4 w-4 text-primary" />
+        <h3 className="font-semibold text-sm text-on-surface ">
           Consent management
         </h3>
       </div>
-      <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
+      <div className="overflow-hidden rounded-xl border border-outline-variant dark:border-outline-variant">
         {CHANNELS.map((ch, i) => {
           const consent = consentMap.get(ch.key);
           const granted = consent?.status === 'GRANTED' && consent && !isExpired(consent);
@@ -94,23 +94,23 @@ export function ConsentManager({ contactId }: { contactId: string }) {
             <div
               key={ch.key}
               className={`flex items-center justify-between px-4 py-3 ${
-                i > 0 ? 'border-t border-slate-100 dark:border-slate-800' : ''
+                i > 0 ? 'border-t border-outline-variant dark:border-outline-variant' : ''
               }`}
             >
               <div className="flex items-center gap-2">
                 <span className="text-lg">{ch.icon}</span>
                 <div>
-                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                  <p className="text-sm font-medium text-on-surface dark:text-outline">
                     {ch.label}
                   </p>
                   {consent ? (
-                    <p className="mt-0.5 text-xs text-slate-400">
+                    <p className="mt-0.5 text-xs text-on-surface-variant">
                       {granted &&
                         consent.grantedAt &&
                         `Granted ${new Date(consent.grantedAt).toLocaleDateString()}`}
-                      {expired && <span className="text-amber-500">Expired</span>}
+                      {expired && <span className="text-warning">Expired</span>}
                       {consent.status === 'WITHDRAWN' && (
-                        <span className="text-red-500">Withdrawn</span>
+                        <span className="text-error">Withdrawn</span>
                       )}
                       {consent.source && ` · ${consent.source.toLowerCase()}`}
                     </p>
@@ -118,7 +118,7 @@ export function ConsentManager({ contactId }: { contactId: string }) {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {expired ? <AlertTriangle className="h-4 w-4 text-amber-500" /> : null}
+                {expired ? <AlertTriangle className="h-4 w-4 text-warning" /> : null}
                 <button
                   type="button"
                   onClick={() =>
@@ -127,8 +127,8 @@ export function ConsentManager({ contactId }: { contactId: string }) {
                   disabled={grantMutation.isPending || withdrawMutation.isPending}
                   className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                     granted
-                      ? 'bg-emerald-50 text-emerald-700 hover:bg-red-50 hover:text-red-700 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-red-950/30 dark:hover:text-red-300'
-                      : 'bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-indigo-900/30 dark:hover:text-indigo-300'
+                      ? 'bg-success-container text-success hover:bg-error-container hover:text-error '
+                      : 'bg-surface-container-high text-on-surface-variant hover:bg-primary-container hover:text-primary dark:bg-surface-container-high dark:text-on-surface-variant '
                   }`}
                 >
                   {granted ? (

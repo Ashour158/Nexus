@@ -2,9 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    # `fix/local-boot` is the current working branch — CI runs on pushes to it
+    # in addition to the long-lived branches. Add/remove working branches here.
+    branches: [main, develop, fix/local-boot]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 concurrency:
   group: ci-${{ github.ref }}-${{ github.event_name }}
@@ -34,6 +36,70 @@ jobs:
         run: pnpm lint
       - name: Typecheck
         run: pnpm typecheck
+
+  a11y:
+    name: Accessibility (jsx-a11y)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      # next/core-web-vitals bundles eslint-plugin-jsx-a11y; this named gate makes
+      # accessibility a first-class required check on the web app. WCAG-AA runtime
+      # (axe) checks over the built app are a follow-up (needs a running server in CI).
+      - name: Accessibility lint (web)
+        run: pnpm --filter @nexus/web exec next lint --max-warnings=0
+
+  a11y-runtime:
+    name: Accessibility (axe runtime)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright browser (chromium)
+        run: pnpm --filter @nexus/web exec playwright install --with-deps chromium
+      # Build the web app once; the a11y run serves this production build via
+      # Playwright's webServer (PLAYWRIGHT_WEB_SERVER_CMD=pnpm start below).
+      - name: Build web app
+        run: pnpm --filter @nexus/web build
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: 1
+      # Runtime WCAG 2 A/AA gate: injects axe-core into the running app and
+      # asserts zero violations on the login + core authenticated routes.
+      # Only the a11y spec runs, only on chromium (the browser installed above).
+      - name: Run axe accessibility spec (web)
+        run: pnpm --filter @nexus/web exec playwright test e2e/a11y.spec.ts --project=chromium
+        env:
+          CI: 'true'
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: 1
+          # Serve the production build we just made instead of `pnpm dev`.
+          PLAYWRIGHT_WEB_SERVER_CMD: pnpm start
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-a11y-report
+          path: apps/web/playwright-report
+          retention-days: 7
 
   test:
     name: Tests

@@ -16,8 +16,8 @@ import {
 } from '@/components/ui/crm';
 
 const inputClass =
-  'h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100';
-const labelClass = 'block text-xs font-bold uppercase tracking-wider text-slate-500';
+  'h-11 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface outline-none focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30';
+const labelClass = 'block text-xs font-bold uppercase tracking-wider text-on-surface-variant';
 
 export default function NewCampaignPage() {
   const router = useRouter();
@@ -69,7 +69,7 @@ export default function NewCampaignPage() {
         actions={
           <Link
             href="/campaigns"
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50"
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 text-sm font-bold text-on-surface-variant hover:bg-surface-container-low"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
@@ -177,14 +177,14 @@ export default function NewCampaignPage() {
             onChange={(e) => setContentHtml(e.target.value)}
             rows={8}
             placeholder="<h1>Hello {{first_name}}</h1>…"
-            className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-900 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+            className="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 font-mono text-sm text-on-surface outline-none focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
           />
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+        <div className="flex justify-end gap-2 border-t border-outline-variant pt-4">
           <Link
             href="/campaigns"
-            className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50"
+            className="inline-flex h-11 items-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 text-sm font-bold text-on-surface-variant hover:bg-surface-container-low"
           >
             Cancel
           </Link>
@@ -192,7 +192,7 @@ export default function NewCampaignPage() {
             type="button"
             onClick={handleSubmit}
             disabled={create.isPending || !name.trim()}
-            className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#137fec] px-5 text-sm font-bold text-white hover:bg-[#005baf] disabled:opacity-50"
+            className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#4f46e5] px-5 text-sm font-bold text-white hover:bg-[#4f46e5] disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
             {create.isPending ? 'Creating…' : 'Create campaign'}

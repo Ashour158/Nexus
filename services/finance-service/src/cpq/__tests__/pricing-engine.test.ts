@@ -66,6 +66,17 @@ function makePrisma(opts: {
           .filter((p) => where.id.in.includes(p.id) && (p.isActive ?? true))
           .map(toPrismaProduct);
       }),
+      // loadCostMap (margin feature) falls back to Product.cost when no vendor
+      // cost exists. These tests carry no cost data → no margin.
+      findFirst: vi.fn(async () => ({ cost: null })),
+    },
+    // Margin feature: preferred vendor cost lookup. No vendor products in tests.
+    vendorProduct: {
+      findMany: vi.fn(async () => []),
+    },
+    // Multi-currency feature: no base currency configured → no FX conversion.
+    currency: {
+      findFirst: vi.fn(async () => null),
     },
     account: {
       findFirst: vi.fn(async () =>
@@ -279,6 +290,29 @@ describe('CpqPricingEngine.calculate', () => {
     } as never);
     expect(result.items[0].unitPrice).toBeGreaterThanOrEqual(500);
     expect(result.floorPriceWarnings.length).toBeGreaterThan(0);
+  });
+
+  it('floor re-clamp: payment-term discount cannot push price below the floor', async () => {
+    // List 1000, SMB -5% → 950, floor 950. The NET_0 -2% would drop it to 931
+    // (below floor) — the post-Rule-9 re-clamp must lift it back to 950.
+    const { engine } = makeEngine({
+      products: [
+        {
+          id: 'p1',
+          listPrice: 1000,
+          pricingRules: [{ type: 'FLOOR', floors: { SMB: 950, DEFAULT: 950 } }],
+        },
+      ],
+      account: { tier: 'SMB' },
+    });
+    const result = await engine.calculate({
+      ...baseReq,
+      paymentTerms: 'NET_0',
+    } as never);
+    expect(result.items[0].unitPrice).toBeGreaterThanOrEqual(950);
+    expect(
+      result.floorPriceWarnings.some((w) => w.includes('re-floored'))
+    ).toBe(true);
   });
 
   it('non-standard override: sets approvalRequired=true', async () => {

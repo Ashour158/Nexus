@@ -4,6 +4,7 @@ import type { ReportingPrisma } from '../prisma.js';
 import { SYSTEM_TEMPLATES } from '../templates/index.js';
 import { executeReport, type QuerySpec } from './executor.service.js';
 import { analyticsClient } from '../lib/analytics-client.js';
+import { computeNextRun, runDueSchedules } from '../lib/schedule-runner.js';
 
 /**
  * Reads the most recent daily PipelineSnapshot rows for a tenant and rolls them
@@ -59,17 +60,6 @@ interface SaveReportInput {
   datasource: string;
   querySpec: QuerySpec;
   isShared?: boolean;
-}
-
-function nextRunFromCron(cron: string): Date {
-  const now = new Date();
-  const parts = cron.split(/\s+/);
-  const hour = Number(parts[1] ?? 8);
-  const minute = Number(parts[0] ?? 0);
-  const next = new Date(now);
-  next.setHours(Number.isFinite(hour) ? hour : 8, Number.isFinite(minute) ? minute : 0, 0, 0);
-  if (next <= now) next.setDate(next.getDate() + 1);
-  return next;
 }
 
 export function createReportsService(prisma: ReportingPrisma) {
@@ -142,7 +132,7 @@ export function createReportsService(prisma: ReportingPrisma) {
           cron: input.cron,
           format: input.format ?? 'xlsx',
           recipients: input.recipients,
-          nextRunAt: nextRunFromCron(input.cron),
+          nextRunAt: computeNextRun(input.cron, new Date()),
         },
       });
     },
@@ -158,20 +148,16 @@ export function createReportsService(prisma: ReportingPrisma) {
       return prisma.definitionReportSchedule.deleteMany({ where: { tenantId, id: scheduleId } });
     },
 
+    /**
+     * Manual/test trigger for the scheduled-report pipeline. Delegates to the
+     * single consolidated runner (schedule-runner.runDueSchedules) which renders
+     * AND delivers both schedule models via the comm outbox — the periodic
+     * execution is driven by startScheduleRunner in index.ts. Previously this was
+     * a divergent no-op (never invoked, and it never delivered).
+     */
     async processSchedules() {
-      const due = await prisma.definitionReportSchedule.findMany({
-        where: { isActive: true, nextRunAt: { lte: new Date() } },
-        include: { report: true },
-        take: 25,
-      });
-      for (const schedule of due) {
-        await this.runReport(schedule.tenantId, schedule.reportId, {});
-        await prisma.definitionReportSchedule.update({
-          where: { id: schedule.id },
-          data: { lastRunAt: new Date(), nextRunAt: nextRunFromCron(schedule.cron) },
-        });
-      }
-      return { processed: due.length };
+      const { savedProcessed, definitionProcessed } = await runDueSchedules(prisma);
+      return { processed: savedProcessed + definitionProcessed, savedProcessed, definitionProcessed };
     },
 
     /**

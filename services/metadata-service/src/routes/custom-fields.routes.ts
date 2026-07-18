@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { JwtPayload } from '@nexus/shared-types';
 import { PERMISSIONS, requirePermission, ValidationError } from '@nexus/service-utils';
-import { CreateCustomFieldSchema, IdParamSchema, UpdateCustomFieldSchema } from '@nexus/validation';
+import { CreateCustomFieldSchema, IdParamSchema, RollupRecomputeSchema, UpdateCustomFieldSchema } from '@nexus/validation';
 import type { MetadataPrisma } from '../prisma.js';
 import { createCustomFieldsService } from '../services/custom-fields.service.js';
 
@@ -58,6 +58,24 @@ export async function registerCustomFieldsRoutes(
           const jwt = request.user as JwtPayload;
           const { controllingValue } = request.query as { controllingValue?: string };
           const result = await service.getDependentOptions(jwt.tenantId, id, controllingValue);
+          return reply.send({ success: true, data: result });
+        }
+      );
+
+      // POST /api/v1/custom-fields/:id/rollup/recompute
+      // Aggregates a ROLLUP_SUMMARY field over supplied child rows (or numeric
+      // values) using the field's stored rollup config. Returns the computed
+      // { function, field, value, count }. The event-driven recompute that keeps
+      // the stored value fresh lives in crm-service; this is the shared math.
+      r.post(
+        '/custom-fields/:id/rollup/recompute',
+        { preHandler: requirePermission(PERMISSIONS.SETTINGS.READ) },
+        async (request, reply) => {
+          const { id } = IdParamSchema.parse(request.params);
+          const parsed = RollupRecomputeSchema.safeParse(request.body ?? {});
+          if (!parsed.success) throw new ValidationError('Invalid body', parsed.error.flatten());
+          const jwt = request.user as JwtPayload;
+          const result = await service.recomputeRollup(jwt.tenantId, id, parsed.data);
           return reply.send({ success: true, data: result });
         }
       );

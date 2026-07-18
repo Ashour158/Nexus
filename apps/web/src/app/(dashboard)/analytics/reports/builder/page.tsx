@@ -27,9 +27,9 @@ import {
 import { formatCurrency } from '@/lib/format';
 
 const selectCls =
-  'rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500';
+  'rounded-lg border border-outline-variant bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-primary';
 const inputCls =
-  'rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500';
+  'rounded-lg border border-outline-variant bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-primary';
 
 export default function ReportBuilderPage(): ReactElement {
   const [name, setName] = useState('');
@@ -97,21 +97,21 @@ export default function ReportBuilderPage(): ReactElement {
     <main className="space-y-6">
       <Link
         href="/analytics/dashboards"
-        className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500 hover:text-slate-800"
+        className="inline-flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-on-surface"
       >
         <ArrowLeft className="h-4 w-4" /> Dashboards
       </Link>
 
       <header>
-        <h1 className="text-2xl font-bold text-slate-900">Report builder</h1>
-        <p className="text-sm text-slate-500">Build an ad-hoc report, run it into a table, and save it.</p>
+        <h1 className="text-2xl font-bold text-on-surface">Report builder</h1>
+        <p className="text-sm text-on-surface-variant">Build an ad-hoc report, run it into a table, and save it.</p>
       </header>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
         {/* Builder */}
-        <div className="space-y-5 rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+        <div className="space-y-5 rounded-xl border border-outline-variant bg-surface p-5 shadow-sm">
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Dataset</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Dataset</span>
             <select value={dataset} onChange={(e) => onDatasetChange(e.target.value as Dataset)} className={cn(selectCls, 'w-full')}>
               {DATASETS.map((d) => (
                 <option key={d.value} value={d.value}>{d.label}</option>
@@ -163,14 +163,14 @@ export default function ReportBuilderPage(): ReactElement {
           ))}
 
           <div className="flex items-center gap-2 pt-2">
-            <button onClick={run} disabled={!spec || running} className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
+            <button onClick={run} disabled={!spec || running} className="inline-flex items-center gap-2 rounded-lg bg-inverse-surface px-4 py-2 text-sm font-semibold text-white hover:bg-surface-container-highest disabled:opacity-50">
               <Play className="h-4 w-4" /> {running ? 'Running…' : 'Run'}
             </button>
           </div>
 
-          <div className="flex items-center gap-2 border-t border-slate-100 pt-4">
+          <div className="flex items-center gap-2 border-t border-outline-variant pt-4">
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Report name to save" className={cn(inputCls, 'flex-1')} />
-            <button onClick={save} disabled={!spec || !name.trim() || createReport.isPending} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+            <button onClick={save} disabled={!spec || !name.trim() || createReport.isPending} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary disabled:opacity-50">
               <Save className="h-4 w-4" /> Save
             </button>
           </div>
@@ -178,29 +178,29 @@ export default function ReportBuilderPage(): ReactElement {
 
         {/* Result + saved reports */}
         <div className="space-y-6">
-          <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-            <h3 className="mb-3 text-sm font-bold text-slate-900">Result</h3>
+          <div className="rounded-xl border border-outline-variant bg-surface p-5 shadow-sm">
+            <h3 className="mb-3 text-sm font-bold text-on-surface">Result</h3>
             {runError ? (
-              <p className="text-sm text-rose-600">{runError}</p>
+              <p className="text-sm text-error">{runError}</p>
             ) : !result ? (
-              <p className="text-sm text-slate-400">Configure a measure and press Run.</p>
+              <p className="text-sm text-on-surface-variant">Configure a measure and press Run.</p>
             ) : result.rows.length === 0 ? (
-              <p className="text-sm text-slate-400">No rows.</p>
+              <p className="text-sm text-on-surface-variant">No rows.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-left text-sm">
                   <thead>
-                    <tr className="bg-slate-50">
+                    <tr className="bg-surface-container-low">
                       {result.columns.map((c) => (
-                        <th key={c.key} className="border-b border-slate-100 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">{c.label}</th>
+                        <th key={c.key} className="border-b border-outline-variant px-3 py-2 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">{c.label}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-outline-variant">
                     {result.rows.map((row, i) => (
-                      <tr key={i} className="hover:bg-slate-50">
+                      <tr key={i} className="hover:bg-surface-container-low">
                         {result.columns.map((c) => (
-                          <td key={c.key} className="px-3 py-2 text-slate-700">
+                          <td key={c.key} className="px-3 py-2 text-on-surface">
                             {c.type === 'currency' && typeof row[c.key] === 'number'
                               ? formatCurrency(row[c.key] as number)
                               : String(row[c.key] ?? '—')}
@@ -214,19 +214,19 @@ export default function ReportBuilderPage(): ReactElement {
             )}
           </div>
 
-          <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-            <h3 className="mb-3 text-sm font-bold text-slate-900">Saved reports</h3>
+          <div className="rounded-xl border border-outline-variant bg-surface p-5 shadow-sm">
+            <h3 className="mb-3 text-sm font-bold text-on-surface">Saved reports</h3>
             {!reports?.length ? (
-              <p className="text-sm text-slate-400">No saved reports yet.</p>
+              <p className="text-sm text-on-surface-variant">No saved reports yet.</p>
             ) : (
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-outline-variant">
                 {reports.map((r) => (
                   <li key={r.id} className="flex items-center justify-between py-2">
                     <div>
-                      <p className="text-sm font-semibold text-slate-800">{r.name}</p>
-                      <p className="text-xs text-slate-400">{r.spec.dataset}</p>
+                      <p className="text-sm font-semibold text-on-surface">{r.name}</p>
+                      <p className="text-xs text-on-surface-variant">{r.spec.dataset}</p>
                     </div>
-                    <button onClick={() => deleteReport.mutate(r.id)} className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="Delete">
+                    <button onClick={() => deleteReport.mutate(r.id)} className="rounded-md p-1.5 text-on-surface-variant hover:bg-error-container hover:text-error" title="Delete">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </li>
@@ -243,8 +243,8 @@ export default function ReportBuilderPage(): ReactElement {
 function SectionHeader({ label, onAdd }: { label: string; onAdd: () => void }): ReactElement {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</span>
-      <button onClick={onAdd} className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">{label}</span>
+      <button onClick={onAdd} className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-primary hover:bg-primary-container">
         <Plus className="h-3.5 w-3.5" /> Add
       </button>
     </div>
@@ -253,7 +253,7 @@ function SectionHeader({ label, onAdd }: { label: string; onAdd: () => void }): 
 
 function RemoveBtn({ onClick }: { onClick: () => void }): ReactElement {
   return (
-    <button onClick={onClick} className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="Remove">
+    <button onClick={onClick} className="rounded-md p-1.5 text-on-surface-variant hover:bg-error-container hover:text-error" title="Remove">
       <Trash2 className="h-4 w-4" />
     </button>
   );

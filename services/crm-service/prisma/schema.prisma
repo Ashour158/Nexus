@@ -49,6 +49,8 @@ model Lead {
   assignedTo       String?
   priority         String?            @default("medium") // urgent, high, medium, low
   deletedAt        DateTime?
+  deletedBy        String?
+  deletedByName    String?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   activities       Activity[]
@@ -76,6 +78,7 @@ model Lead {
   @@index([territoryId])
   @@index([assignedTo])
   @@index([priority])
+  @@index([tenantId, deletedAt])
 }
 
 enum LeadSource {
@@ -116,6 +119,10 @@ model Contact {
   firstName        String
   lastName         String
   email            String?
+  // Deterministic keyed-HMAC blind index of the normalized email. Backs tenant
+  // email uniqueness + app-level dedup because `email` may be stored as
+  // randomized AES-GCM ciphertext (see packages/security computeBlindIndex).
+  emailHash        String?
   phone            String?
   mobile           String?
   jobTitle         String?
@@ -137,6 +144,8 @@ model Contact {
   isActive         Boolean           @default(true)
   dataQualityScore Int?
   deletedAt        DateTime?
+  deletedBy        String?
+  deletedByName    String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   deals            DealContact[]
@@ -150,7 +159,9 @@ model Contact {
   addresses        ContactAddress[]
   accountRelations AccountContactRelation[]
 
-  @@unique([tenantId, email])
+  // Uniqueness is on the blind index (deterministic), NOT on `email` — the raw
+  // email column may hold randomized ciphertext, which can never collide.
+  @@unique([tenantId, emailHash])
   @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, accountId])
@@ -159,6 +170,7 @@ model Contact {
   @@index([tenantId, createdAt])
   @@index([tenantId, updatedAt])
   @@index([tenantId, email])
+  @@index([tenantId, deletedAt])
 }
 
 model ContactEmail {
@@ -309,6 +321,8 @@ model Account {
   lng              Float?
   tags             String[]
   deletedAt        DateTime?
+  deletedBy        String?
+  deletedByName    String?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   contacts         Contact[]
@@ -330,6 +344,7 @@ model Account {
   @@index([tenantId, code])
   @@index([tenantId, taxId])
   @@index([tenantId, vatNumber])
+  @@index([tenantId, deletedAt])
 }
 
 enum AccountType {
@@ -384,6 +399,8 @@ model Deal {
   tags              String[]
   version           Int               @default(1)
   deletedAt         DateTime?
+  deletedBy         String?
+  deletedByName     String?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   contacts          DealContact[]
@@ -423,6 +440,14 @@ model Deal {
   mrr                Decimal?  @db.Decimal(18, 2)
   arr                Decimal?  @db.Decimal(18, 2)
 
+  // ─── Territory routing (additive, nullable, no data loss) ─────────────────
+  // Territory this deal was routed to by the standalone territory-service on
+  // create. Stored as a plain indexed string (NOT a Prisma relation) because the
+  // authoritative territory catalog lives in territory-service and its ids need
+  // not exist in this service's CRM-native `Territory` table — a FK would risk
+  // failing the write. Enrichment-only + fail-open.
+  territoryId        String?
+
   @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, pipelineId, stageId])
@@ -433,6 +458,8 @@ model Deal {
   @@index([tenantId, isRenewal])
   @@index([tenantId, contractEndDate])
   @@index([tenantId, renewedFromDealId])
+  @@index([tenantId, territoryId])
+  @@index([tenantId, deletedAt])
 }
 
 enum DealStatus {
@@ -448,6 +475,29 @@ enum ForecastCategory {
   COMMIT
   CLOSED
   OMITTED
+}
+
+/// Sales quota / target for a rep, team, or territory over a named period
+/// (e.g. "2026-Q3", "2026-07"). Exactly one scope field is typically set;
+/// attainment (GET /forecast/attainment) compares realized closed-won vs target.
+model Quota {
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String?
+  teamId      String?
+  territoryId String?
+  period      String
+  target      Decimal  @default(0) @db.Decimal(18, 2)
+  currency    String   @default("USD")
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, period])
+  @@index([tenantId, userId, period])
+  @@index([tenantId, teamId, period])
+  @@index([tenantId, territoryId, period])
 }
 
 model DealContact {
@@ -667,18 +717,25 @@ model WinLossReason {
   @@index([tenantId, type])
 }
 
+// Field-Level Security — per-ROLE per-FIELD read/edit control, layered on top of
+// the existing own/team/all ownership scoping. Each row grants (or denies) a
+// single role's ability to read/edit a single field of a module. Enforcement is
+// DEFAULT-ALLOW: a field with no matching row for the caller's roles is fully
+// visible/editable, so tenants that never configure FLS see no behavior change.
 model FieldPermission {
-  id           String    @id @default(cuid())
-  tenantId     String
-  objectType   String
-  fieldName    String
-  allowedRoles Json
-  deletedAt    DateTime?
-  createdAt    DateTime  @default(now())
+  id         String    @id @default(cuid())
+  tenantId   String
+  module     String
+  field      String
+  roleName   String
+  canRead    Boolean   @default(true)
+  canEdit    Boolean   @default(true)
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
 
-  @@unique([tenantId, objectType, fieldName])
+  @@unique([tenantId, module, field, roleName])
   @@unique([id, tenantId])
-  @@index([tenantId, objectType])
+  @@index([tenantId, module])
 }
 
 model ValidationRule {
@@ -695,6 +752,142 @@ model ValidationRule {
 
   @@unique([id, tenantId])
   @@index([tenantId, objectType])
+}
+
+// Review Process (maker-checker). When a ReviewProcessConfig is active for a
+// module, edits to the configured fields are held as a PendingChange in PENDING
+// state until a reviewer approves (applies it to the real record) or rejects it.
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model PendingChange {
+  id              String       @id @default(cuid())
+  tenantId        String
+  module          String
+  recordId        String
+  submittedById   String
+  changes         Json
+  status          ReviewStatus @default(PENDING)
+  reviewerComment String?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  createdAt       DateTime     @default(now())
+
+  @@unique([id, tenantId])
+  @@index([tenantId, module, status])
+  @@index([tenantId, recordId])
+}
+
+model ReviewProcessConfig {
+  id        String   @id @default(cuid())
+  tenantId  String
+  module    String
+  fields    String[]
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, module])
+  @@unique([id, tenantId])
+  @@index([tenantId, module])
+}
+
+// ─── Data Governance: record-level access control (Zoho "Data Sharing") ───────
+// All models below are ADDITIVE and OPT-IN. Enforcement (lib/sharing.ts,
+// lib/record-lock.ts) is skipped entirely for a (tenant, module) that has no
+// OrgWideDefault and no SharingRule, so unconfigured tenants keep today's
+// behavior (fail-open / permissive).
+
+// Org-Wide Default sharing per module. Absence of a row ⇒ PUBLIC_READ_WRITE
+// (fail-open). accessLevel ∈ {PRIVATE, PUBLIC_READ, PUBLIC_READ_WRITE};
+// module ∈ {account, contact, deal, lead}.
+model OrgWideDefault {
+  id                   String   @id @default(cuid())
+  tenantId             String
+  module               String
+  accessLevel          String
+  grantHierarchyAccess Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([tenantId, module])
+  @@unique([id, tenantId])
+  @@index([tenantId, module])
+}
+
+// A rule that GRANTS access (READ | READ_WRITE) on records owned by `source`
+// to members of `target`. sourceType/targetType ∈ {ROLE, GROUP, TERRITORY,
+// OWNER, USER}. Rules only add access on top of the OrgWideDefault.
+model SharingRule {
+  id          String   @id @default(cuid())
+  tenantId    String
+  module      String
+  name        String
+  sourceType  String
+  sourceValue String
+  targetType  String
+  targetValue String
+  accessLevel String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@unique([id, tenantId])
+  @@index([tenantId, module, isActive])
+}
+
+// Zoho "manual sharing" — an explicit per-record grant to a user or role.
+// granteeType ∈ {USER, ROLE}; accessLevel ∈ {READ, READ_WRITE}.
+model ManualShare {
+  id          String   @id @default(cuid())
+  tenantId    String
+  module      String
+  recordId    String
+  granteeType String
+  granteeId   String
+  accessLevel String
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  @@unique([id, tenantId])
+  @@index([tenantId, module, recordId])
+}
+
+// Record locking (Zoho "record locking" / lock-on-approval). An active lock is
+// one with unlockedAt = null; there is at most one active lock per record
+// (enforced in application logic). Only ADMIN or the locker may unlock.
+model RecordLock {
+  id         String    @id @default(cuid())
+  tenantId   String
+  module     String
+  recordId   String
+  reason     String?
+  lockedBy   String
+  lockedAt   DateTime  @default(now())
+  unlockedAt DateTime?
+
+  @@unique([id, tenantId])
+  @@index([tenantId, module, recordId, unlockedAt])
+}
+
+// Assignment Rules (Zoho "Assignment Rules"). strategy ∈ {ROUND_ROBIN,
+// LOAD_BALANCED, CRITERIA}; module ∈ {lead, deal, account, contact}. `cursor`
+// persists round-robin position across invocations.
+model AssignmentRule {
+  id           String   @id @default(cuid())
+  tenantId     String
+  module       String
+  name         String
+  strategy     String
+  criteria     Json?
+  assigneePool String[]
+  isActive     Boolean  @default(true)
+  cursor       Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@unique([id, tenantId])
+  @@index([tenantId, module, isActive])
 }
 
 model Activity {
@@ -719,6 +912,23 @@ model Activity {
   account      Account?         @relation(fields: [accountId], references: [id])
   dealId       String?
   deal         Deal?            @relation(fields: [dealId], references: [id])
+  // ─── Polymorphic link to non-CRM money objects (A1) ─────────────────────
+  // Native CRM parents use the typed FKs above; commercial objects that live
+  // in finance-service (QUOTE|INVOICE|ORDER|CONTRACT|CAMPAIGN) attach via this
+  // string-keyed pair. Exactly one of {typed FK, entityType+entityId} is set.
+  entityType   String?
+  entityId     String?
+  // ─── Task / Meeting first-class fields (B5) ─────────────────────────────
+  location                 String?
+  videoLink                String?
+  // iCal RRULE string for recurring tasks/meetings (e.g. FREQ=WEEKLY;BYDAY=MO).
+  recurrence               String?
+  attendees                String[] @default([])
+  // Minutes-before-start reminder offset (null = no reminder).
+  reminderMinutes          Int?
+  // External calendar linkage (Google/Microsoft) populated by /meetings/:id/sync.
+  externalCalendarEventId  String?
+  externalCalendarProvider String?
   customFields Json             @default("{}")
   deletedAt    DateTime?
   createdAt    DateTime         @default(now())
@@ -730,6 +940,7 @@ model Activity {
   @@index([tenantId, dealId])
   @@index([tenantId, contactId])
   @@index([tenantId, accountId])
+  @@index([tenantId, entityType, entityId])
   @@index([tenantId, type])
   @@index([tenantId, status])
   @@index([tenantId, dueDate])
@@ -781,6 +992,9 @@ model Note {
   account   Account?  @relation(fields: [accountId], references: [id])
   dealId    String?
   deal      Deal?     @relation(fields: [dealId], references: [id])
+  // Polymorphic link to non-CRM money objects (A1); see Activity.entityType.
+  entityType String?
+  entityId   String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -790,6 +1004,7 @@ model Note {
   @@index([tenantId, contactId])
   @@index([tenantId, accountId])
   @@index([tenantId, leadId])
+  @@index([tenantId, entityType, entityId])
   @@index([tenantId, authorId])
   @@index([tenantId, createdAt])
 }
@@ -1009,6 +1224,44 @@ model DuplicateRecord {
 
   @@unique([groupId, recordId])
   @@index([groupId])
+}
+
+/// Tenant-configurable duplicate-detection rule (unified across all core
+/// modules). `module` is one of lead|contact|account|deal; `matchFields` names
+/// the record columns to compare (e.g. [email] or [firstName,lastName,phone]);
+/// `matchType` is EXACT (normalized equality on every field) or FUZZY
+/// (normalized similarity ≥ `threshold`% averaged across the fields).
+model DuplicateRule {
+  id          String    @id @default(cuid())
+  tenantId    String
+  module      String
+  name        String
+  matchFields String[]
+  matchType   String    @default("EXACT")
+  threshold   Int?
+  isActive    Boolean   @default(true)
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([id, tenantId])
+  @@index([tenantId, module, isActive])
+}
+
+/// A persisted duplicate finding produced by the rule-driven detector so it can
+/// be worked (surfaced, merged, or ignored). `recordIds` is the matched cluster
+/// (2+ ids of the same `module`); `status` is OPEN|MERGED|IGNORED.
+model DuplicateCandidate {
+  id        String   @id @default(cuid())
+  tenantId  String
+  module    String
+  recordIds String[]
+  ruleId    String?
+  score     Float    @default(0)
+  status    String   @default("OPEN")
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, module, status])
 }
 
 model LeadScore {
@@ -1317,4 +1570,21 @@ model SavedView {
 
   @@index([tenantId, ownerId, entityType])
   @@index([tenantId, entityType, isShared])
+}
+
+/// Idempotency ledger for core CRM create endpoints (leads/accounts/contacts/
+/// deals). Used only as the durable fallback when Redis (the primary store) is
+/// unavailable: a client-supplied `Idempotency-Key` maps to the prior HTTP
+/// result so a retried POST returns the original response instead of creating a
+/// duplicate. Scoped per tenant.
+model IdempotencyKey {
+  id         String   @id @default(cuid())
+  tenantId   String
+  key        String
+  statusCode Int
+  response   Json
+  createdAt  DateTime @default(now())
+
+  @@unique([tenantId, key])
+  @@index([tenantId, createdAt])
 }

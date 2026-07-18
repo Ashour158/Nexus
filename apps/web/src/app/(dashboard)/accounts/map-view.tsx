@@ -50,19 +50,19 @@ export default function AccountMapView({ accounts, mapAccount, onMapAccountChang
 
   if (!mapsApiKey) {
     return (
-      <div className="p-10 text-center text-sm text-slate-500">
+      <div className="p-10 text-center text-sm text-on-surface-variant">
         Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to enable the map.
       </div>
     );
   }
 
   if (!maps.isLoaded) {
-    return <div className="p-10 text-center text-sm text-slate-500">Loading map…</div>;
+    return <div className="p-10 text-center text-sm text-on-surface-variant">Loading map…</div>;
   }
 
   if (mappedAccounts.length === 0) {
     return (
-      <div className="p-10 text-center text-sm text-slate-500">
+      <div className="p-10 text-center text-sm text-on-surface-variant">
         No visible accounts have coordinates yet.
       </div>
     );
@@ -88,11 +88,11 @@ export default function AccountMapView({ accounts, mapAccount, onMapAccountChang
           onCloseClick={() => onMapAccountChange(null)}
         >
           <div className="max-w-xs text-sm">
-            <Link href={`/accounts/${mapAccount.id}`} className="font-semibold text-slate-900 underline">
+            <Link href={`/accounts/${mapAccount.id}`} className="font-semibold text-on-surface underline">
               {mapAccount.name}
             </Link>
-            <p className="mt-1 text-slate-600">{mapAccount.industry ?? 'No industry'}</p>
-            <p className="text-slate-600">
+            <p className="mt-1 text-on-surface-variant">{mapAccount.industry ?? 'No industry'}</p>
+            <p className="text-on-surface-variant">
               ARR:{' '}
               {mapAccount.annualRevenue
                 ? formatCurrency(mapAccount.annualRevenue, 'USD')

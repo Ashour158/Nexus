@@ -14,6 +14,8 @@ export * from './env.js';
 export * from './rbac.js';
 export * from './entitlement.js';
 export * from './errors.js';
+export * from './validation.js';
+export * from './swagger.js';
 export * from './graphql.js';
 export * from './verify-token.js';
 export * from './coding-client.js';

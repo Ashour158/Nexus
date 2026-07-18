@@ -59,19 +59,19 @@ export async function registerBulkRoutes(
     services: {
       contact: {
         update: (tenantId, id, updates, userId) => contacts.updateContact(tenantId, id, updates as any, userId),
-        archive: (tenantId, id) => contacts.deleteContact(tenantId, id),
+        archive: (tenantId, id, deletedBy, deletedByName) => contacts.deleteContact(tenantId, id, deletedBy, deletedByName),
       },
       deal: {
         update: (tenantId, id, updates, userId) => deals.updateDeal(tenantId, id, updates as any, userId ? { userId } : undefined),
-        archive: (tenantId, id) => deals.deleteDeal(tenantId, id),
+        archive: (tenantId, id, deletedBy, deletedByName) => deals.deleteDeal(tenantId, id, deletedBy, deletedByName),
       },
       lead: {
         update: (tenantId, id, updates, userId) => leads.updateLead(tenantId, id, updates as any, userId),
-        archive: (tenantId, id) => leads.deleteLead(tenantId, id),
+        archive: (tenantId, id, deletedBy, deletedByName) => leads.deleteLead(tenantId, id, deletedBy, deletedByName),
       },
       account: {
         update: (tenantId, id, updates, userId) => accounts.updateAccount(tenantId, id, updates as any, userId),
-        archive: (tenantId, id) => accounts.deleteAccount(tenantId, id),
+        archive: (tenantId, id, deletedBy, deletedByName) => accounts.deleteAccount(tenantId, id, deletedBy, deletedByName),
       },
     },
     prisma,

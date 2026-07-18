@@ -22,7 +22,7 @@ export default function DocumentDetailPage() {
   if (!canRead) {
     return (
       <main className="p-4">
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="rounded-xl border border-warning/30 bg-warning-container p-4 text-sm text-on-warning-container">
           You do not have permission to view documents.
         </div>
       </main>
@@ -56,24 +56,24 @@ export default function DocumentDetailPage() {
 
   return (
     <main className="grid gap-4 p-4 lg:grid-cols-12">
-      <section className="space-y-3 lg:col-span-8 rounded-xl border border-slate-200 bg-white p-4">
+      <section className="space-y-3 lg:col-span-8 rounded-xl border border-outline-variant bg-surface p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-sm text-slate-500">
-              <Link href="/documents" className="hover:text-slate-800">
+            <div className="text-sm text-on-surface-variant">
+              <Link href="/documents" className="hover:text-on-surface">
                 Documents
               </Link>
               <span> / </span>
               <span className="font-mono text-xs">{id.slice(0, 8)}</span>
             </div>
-            <h1 className="mt-1 text-2xl font-bold text-slate-900">{meta.name}</h1>
+            <h1 className="mt-1 text-2xl font-bold text-on-surface">{meta.name}</h1>
           </div>
           {hasUrl && (
             <a
               href={downloadQuery.data?.url ?? ''}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary"
               download
             >
               Download
@@ -81,15 +81,15 @@ export default function DocumentDetailPage() {
           )}
         </div>
 
-        <div className="rounded border border-slate-200 bg-slate-50 p-2">
+        <div className="rounded border border-outline-variant bg-surface-container-low p-2">
           {hasUrl && downloadQuery.data ? (
             <iframe
               title="preview"
               src={downloadQuery.data.url}
-              className="h-[420px] w-full rounded bg-white"
+              className="h-[420px] w-full rounded bg-surface"
             />
           ) : (
-            <div className="flex h-[420px] items-center justify-center text-sm text-slate-500">
+            <div className="flex h-[420px] items-center justify-center text-sm text-on-surface-variant">
               Preview not available
             </div>
           )}
@@ -97,9 +97,9 @@ export default function DocumentDetailPage() {
       </section>
 
       <aside className="space-y-3 lg:col-span-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
-          <h2 className="font-semibold text-slate-900">Metadata</h2>
-          <dl className="mt-3 space-y-2 text-slate-600">
+        <div className="rounded-xl border border-outline-variant bg-surface p-4 text-sm">
+          <h2 className="font-semibold text-on-surface">Metadata</h2>
+          <dl className="mt-3 space-y-2 text-on-surface-variant">
             <div className="flex justify-between gap-2">
               <dt>Type</dt>
               <dd>{meta.type}</dd>
@@ -119,16 +119,16 @@ export default function DocumentDetailPage() {
           </dl>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
-          <h2 className="font-semibold text-slate-900">Associated records</h2>
-          <p className="mt-2 text-slate-600">
+        <div className="rounded-xl border border-outline-variant bg-surface p-4 text-sm">
+          <h2 className="font-semibold text-on-surface">Associated records</h2>
+          <p className="mt-2 text-on-surface-variant">
             Link this document to deals, contacts, or accounts from the document library.
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
-          <h2 className="font-semibold text-slate-900">Version history</h2>
-          <p className="mt-2 text-xs text-slate-500">Version tracking coming soon.</p>
+        <div className="rounded-xl border border-outline-variant bg-surface p-4 text-sm">
+          <h2 className="font-semibold text-on-surface">Version history</h2>
+          <p className="mt-2 text-xs text-on-surface-variant">Version tracking coming soon.</p>
         </div>
       </aside>
     </main>

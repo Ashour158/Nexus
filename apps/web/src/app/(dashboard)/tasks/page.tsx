@@ -71,18 +71,18 @@ type PriorityFilter = 'all' | 'HIGH' | 'NORMAL' | 'LOW';
 type DueFilter = 'all' | 'overdue' | 'today' | 'week';
 
 const PRIORITY_STYLES: Record<string, string> = {
-  HIGH: 'bg-red-100 text-red-700',
-  NORMAL: 'bg-orange-100 text-orange-700',
-  LOW: 'bg-emerald-100 text-emerald-700',
+  HIGH: 'bg-error-container text-error',
+  NORMAL: 'bg-warning-container text-warning',
+  LOW: 'bg-success-container text-success',
 };
 
 const STATUS_STYLES: Record<string, string> = {
-  TODO: 'bg-blue-100 text-blue-700',
-  PLANNED: 'bg-blue-100 text-blue-700',
-  IN_PROGRESS: 'bg-amber-100 text-amber-700',
-  COMPLETED: 'bg-emerald-100 text-emerald-700',
-  DONE: 'bg-emerald-100 text-emerald-700',
-  CANCELLED: 'bg-slate-100 text-slate-500',
+  TODO: 'bg-primary-container text-primary',
+  PLANNED: 'bg-primary-container text-primary',
+  IN_PROGRESS: 'bg-warning-container text-warning',
+  COMPLETED: 'bg-success-container text-success',
+  DONE: 'bg-success-container text-success',
+  CANCELLED: 'bg-surface-container-high text-on-surface-variant',
 };
 
 function isCompleted(task: TaskItem): boolean {
@@ -255,14 +255,14 @@ export default function TasksPage(): ReactElement {
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
       <section className="min-w-0 space-y-5">
-        <div className="overflow-hidden rounded-lg border border-[#dbe7f3] bg-white shadow-sm">
-          <div className="h-1.5 bg-gradient-to-r from-[#4A90E2] via-[#7ED321] to-amber-400" />
+        <div className="overflow-hidden rounded-lg border border-[#dbe7f3] bg-surface shadow-sm">
+          <div className="h-1.5 bg-gradient-to-r from-[#4A90E2] via-[#7ED321] to-warning" />
           <div className="p-4 sm:p-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase text-blue-700">Execution queue</p>
-                <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">Tasks</h1>
-                <p className="mt-1 text-sm text-slate-500">Manage follow-ups, ownership, priorities, and due dates efficiently.</p>
+                <p className="text-xs font-semibold uppercase text-primary">Execution queue</p>
+                <h1 className="mt-1 text-3xl font-black tracking-tight text-on-surface">Tasks</h1>
+                <p className="mt-1 text-sm text-on-surface-variant">Manage follow-ups, ownership, priorities, and due dates efficiently.</p>
               </div>
               <div className="flex items-center gap-2">
                 <ExportButton module="tasks" />
@@ -286,15 +286,15 @@ export default function TasksPage(): ReactElement {
           </div>
         </div>
 
-        <div className="rounded-xl border border-[#e7edf3] bg-white p-4 shadow-sm">
+        <div className="rounded-xl border border-[#e7edf3] bg-surface p-4 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row">
             <label className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search tasks..."
-                className="h-12 w-full rounded-lg border border-slate-200 bg-slate-100 pl-10 pr-3 text-sm outline-none transition focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                className="h-12 w-full rounded-lg border border-outline-variant bg-surface-container-high pl-10 pr-3 text-sm outline-none transition focus:border-primary/40 focus:bg-surface focus:ring-2 focus:ring-primary/30"
               />
             </label>
             <FilterSelect label="Status" value={statusFilter} onChange={(value) => setStatusFilter(value as StatusFilter)} options={[
@@ -318,11 +318,11 @@ export default function TasksPage(): ReactElement {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-[#e7edf3] bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-[#e7edf3] bg-surface shadow-sm">
           {tasksQuery.isLoading ? (
             <div className="space-y-3 p-4">
               {[...Array(5)].map((_, index) => (
-                <div key={index} className="h-16 animate-pulse rounded-lg bg-slate-100" />
+                <div key={index} className="h-16 animate-pulse rounded-lg bg-surface-container-high" />
               ))}
             </div>
           ) : filteredTasks.length === 0 ? (
@@ -330,7 +330,7 @@ export default function TasksPage(): ReactElement {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] text-sm">
-                <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <thead className="bg-surface-container-low text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
                   <tr>
                     <th className="w-2/5 p-4 text-left">Task Name</th>
                     <th className="p-4 text-left">Due Date</th>
@@ -340,35 +340,35 @@ export default function TasksPage(): ReactElement {
                     <th className="p-4 text-left">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-outline-variant">
                   {filteredTasks.map((task) => (
                     <tr
                       key={task.id}
                       onClick={() => setSelectedId(task.id)}
                       className={cn(
-                        'cursor-pointer transition hover:bg-slate-50',
-                        selectedTask?.id === task.id && 'bg-blue-50/70'
+                        'cursor-pointer transition hover:bg-surface-container-low',
+                        selectedTask?.id === task.id && 'bg-primary-container/70'
                       )}
                     >
-                      <td className={cn('p-4 font-semibold', selectedTask?.id === task.id ? 'text-[#4A90E2]' : 'text-slate-900')}>
+                      <td className={cn('p-4 font-semibold', selectedTask?.id === task.id ? 'text-[#4A90E2]' : 'text-on-surface')}>
                         {task.subject}
                         {isOverdue(task) ? (
-                          <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase text-red-700">
+                          <span className="ml-2 rounded-full bg-error-container px-2 py-0.5 text-[10px] font-bold uppercase text-error">
                             Overdue
                           </span>
                         ) : null}
                       </td>
-                      <td className="p-4 text-slate-500">{formatDate(task.dueDate)}</td>
+                      <td className="p-4 text-on-surface-variant">{formatDate(task.dueDate)}</td>
                       <td className="p-4">
                         <Badge className={PRIORITY_STYLES[task.priority] ?? PRIORITY_STYLES.NORMAL}>{task.priority}</Badge>
                       </td>
-                      <td className="p-4 text-slate-500">{task.ownerId ? ownerMap.get(task.ownerId) ?? task.ownerId : 'Unassigned'}</td>
+                      <td className="p-4 text-on-surface-variant">{task.ownerId ? ownerMap.get(task.ownerId) ?? task.ownerId : 'Unassigned'}</td>
                       <td className="p-4">
                         <Badge className={STATUS_STYLES[task.status] ?? STATUS_STYLES.TODO}>{task.status.replace('_', ' ')}</Badge>
                       </td>
                       <td className="p-4">
                         {isCompleted(task) ? (
-                          <span className="text-xs font-semibold text-slate-400">Completed</span>
+                          <span className="text-xs font-semibold text-on-surface-variant">Completed</span>
                         ) : (
                           <button
                             type="button"
@@ -391,13 +391,13 @@ export default function TasksPage(): ReactElement {
         </div>
       </section>
 
-      <aside className="rounded-xl border border-[#e7edf3] bg-white p-5 shadow-sm xl:sticky xl:top-24 xl:self-start">
+      <aside className="rounded-xl border border-[#e7edf3] bg-surface p-5 shadow-sm xl:sticky xl:top-24 xl:self-start">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase text-blue-700">Task details</p>
-            <h2 className="mt-1 text-xl font-bold text-slate-950">Selected task</h2>
+            <p className="text-xs font-semibold uppercase text-primary">Task details</p>
+            <h2 className="mt-1 text-xl font-bold text-on-surface">Selected task</h2>
           </div>
-          <div className="rounded-lg bg-blue-50 p-2 text-blue-700">
+          <div className="rounded-lg bg-primary-container p-2 text-primary">
             <CheckSquare className="h-5 w-5" />
           </div>
         </div>
@@ -405,17 +405,17 @@ export default function TasksPage(): ReactElement {
         {selectedTask ? (
           <form className="mt-5 space-y-4" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
             <Field label="Task Name">
-              <input className="form-input h-11 w-full rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100" value={draft.subject} onChange={(event) => setDraft((prev) => ({ ...prev, subject: event.target.value }))} />
+              <input className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.subject} onChange={(event) => setDraft((prev) => ({ ...prev, subject: event.target.value }))} />
             </Field>
             <Field label="Description">
-              <textarea className="form-textarea min-h-28 w-full resize-none rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100" value={draft.description} onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))} />
+              <textarea className="form-textarea min-h-28 w-full resize-none rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.description} onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))} />
             </Field>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
               <Field label="Due Date">
-                <input type="date" className="form-input h-11 w-full rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100" value={draft.dueDate} onChange={(event) => setDraft((prev) => ({ ...prev, dueDate: event.target.value }))} />
+                <input type="date" className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.dueDate} onChange={(event) => setDraft((prev) => ({ ...prev, dueDate: event.target.value }))} />
               </Field>
               <Field label="Priority">
-                <select className="form-select h-11 w-full rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100" value={draft.priority} onChange={(event) => setDraft((prev) => ({ ...prev, priority: event.target.value }))}>
+                <select className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.priority} onChange={(event) => setDraft((prev) => ({ ...prev, priority: event.target.value }))}>
                   <option value="LOW">Low</option>
                   <option value="NORMAL">Medium</option>
                   <option value="HIGH">High</option>
@@ -424,7 +424,7 @@ export default function TasksPage(): ReactElement {
             </div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
               <Field label="Assigned To">
-                <select className="form-select h-11 w-full rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100" value={draft.ownerId} onChange={(event) => setDraft((prev) => ({ ...prev, ownerId: event.target.value }))}>
+                <select className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.ownerId} onChange={(event) => setDraft((prev) => ({ ...prev, ownerId: event.target.value }))}>
                   <option value="">Unassigned</option>
                   {(usersQuery.data?.data ?? []).map((user) => (
                     <option key={user.id} value={user.id}>{user.firstName} {user.lastName}</option>
@@ -432,7 +432,7 @@ export default function TasksPage(): ReactElement {
                 </select>
               </Field>
               <Field label="Status">
-                <select className="form-select h-11 w-full rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100" value={draft.status} onChange={(event) => setDraft((prev) => ({ ...prev, status: event.target.value }))}>
+                <select className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.status} onChange={(event) => setDraft((prev) => ({ ...prev, status: event.target.value }))}>
                   <option value="TODO">Open</option>
                   <option value="PLANNED">Planned</option>
                   <option value="IN_PROGRESS">In Progress</option>
@@ -442,8 +442,8 @@ export default function TasksPage(): ReactElement {
             </div>
 
             <div>
-              <p className="mb-1 text-sm font-medium text-slate-700">Associated Record</p>
-              <div className="space-y-2 rounded-lg bg-slate-100 p-3 text-sm">
+              <p className="mb-1 text-sm font-medium text-on-surface">Associated Record</p>
+              <div className="space-y-2 rounded-lg bg-surface-container-high p-3 text-sm">
                 <AssociatedLink href={selectedTask.leadId ? `/leads/${selectedTask.leadId}` : null} label="Lead" value={selectedTask.leadId} />
                 <AssociatedLink href={selectedTask.dealId ? `/deals/${selectedTask.dealId}` : null} label="Deal" value={selectedTask.dealId} />
                 <AssociatedLink href={selectedTask.contactId ? `/contacts/${selectedTask.contactId}` : null} label="Contact" value={selectedTask.contactId} />
@@ -451,14 +451,14 @@ export default function TasksPage(): ReactElement {
               </div>
             </div>
 
-            <div className="grid gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm text-slate-600">
-              <span className="inline-flex items-center gap-2"><CalendarDays className="h-4 w-4 text-blue-600" /> Created {formatDate(selectedTask.createdAt)}</span>
-              <span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4 text-blue-600" /> Owner {selectedTask.ownerId ? ownerMap.get(selectedTask.ownerId) ?? selectedTask.ownerId : 'Unassigned'}</span>
-              {isOverdue(selectedTask) ? <span className="inline-flex items-center gap-2 text-red-600"><AlertCircle className="h-4 w-4" /> This task is overdue</span> : null}
+            <div className="grid gap-3 rounded-lg border border-outline-variant bg-surface-container-low p-3 text-sm text-on-surface-variant">
+              <span className="inline-flex items-center gap-2"><CalendarDays className="h-4 w-4 text-primary" /> Created {formatDate(selectedTask.createdAt)}</span>
+              <span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4 text-primary" /> Owner {selectedTask.ownerId ? ownerMap.get(selectedTask.ownerId) ?? selectedTask.ownerId : 'Unassigned'}</span>
+              {isOverdue(selectedTask) ? <span className="inline-flex items-center gap-2 text-error"><AlertCircle className="h-4 w-4" /> This task is overdue</span> : null}
             </div>
 
-            <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
-              <button type="button" className="h-10 rounded-lg bg-slate-100 px-4 text-sm font-bold text-slate-700" onClick={() => setSelectedId(filteredTasks[0]?.id ?? null)}>
+            <div className="flex justify-end gap-3 border-t border-outline-variant pt-4">
+              <button type="button" className="h-10 rounded-lg bg-surface-container-high px-4 text-sm font-bold text-on-surface" onClick={() => setSelectedId(filteredTasks[0]?.id ?? null)}>
                 Cancel
               </button>
               <Button type="submit" className="h-10 bg-[#7ED321] px-4 text-sm font-bold text-white hover:bg-[#70bd1d]" isLoading={updateActivity.isPending}>
@@ -468,10 +468,10 @@ export default function TasksPage(): ReactElement {
             </div>
           </form>
         ) : (
-          <div className="mt-8 rounded-lg border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
-            <Clock className="mx-auto h-10 w-10 text-slate-300" />
-            <p className="mt-3 text-sm font-semibold text-slate-700">No task selected</p>
-            <p className="mt-1 text-sm text-slate-500">Select a task from the queue to inspect and edit it.</p>
+          <div className="mt-8 rounded-lg border border-dashed border-outline-variant bg-surface-container-low p-8 text-center">
+            <Clock className="mx-auto h-10 w-10 text-outline" />
+            <p className="mt-3 text-sm font-semibold text-on-surface">No task selected</p>
+            <p className="mt-1 text-sm text-on-surface-variant">Select a task from the queue to inspect and edit it.</p>
           </div>
         )}
       </aside>
@@ -485,7 +485,7 @@ export default function TasksPage(): ReactElement {
           <form onSubmit={handleCreate} className="mt-4 space-y-4">
             <Field label="Title">
               <input
-                className="form-input h-11 w-full rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100"
+                className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30"
                 value={createDraft.subject}
                 onChange={(event) => setCreateDraft((prev) => ({ ...prev, subject: event.target.value }))}
                 placeholder="Call back the prospect"
@@ -494,7 +494,7 @@ export default function TasksPage(): ReactElement {
             </Field>
             <Field label="Description">
               <textarea
-                className="form-textarea min-h-24 w-full resize-none rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100"
+                className="form-textarea min-h-24 w-full resize-none rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30"
                 value={createDraft.description}
                 onChange={(event) => setCreateDraft((prev) => ({ ...prev, description: event.target.value }))}
               />
@@ -503,14 +503,14 @@ export default function TasksPage(): ReactElement {
               <Field label="Due Date">
                 <input
                   type="date"
-                  className="form-input h-11 w-full rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100"
+                  className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30"
                   value={createDraft.dueDate}
                   onChange={(event) => setCreateDraft((prev) => ({ ...prev, dueDate: event.target.value }))}
                 />
               </Field>
               <Field label="Priority">
                 <select
-                  className="form-select h-11 w-full rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100"
+                  className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30"
                   value={createDraft.priority}
                   onChange={(event) => setCreateDraft((prev) => ({ ...prev, priority: event.target.value }))}
                 >
@@ -524,7 +524,7 @@ export default function TasksPage(): ReactElement {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Related To">
                 <select
-                  className="form-select h-11 w-full rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100"
+                  className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30"
                   value={createDraft.relatedToField}
                   onChange={(event) => setCreateDraft((prev) => ({ ...prev, relatedToField: event.target.value as RelatedToField }))}
                 >
@@ -535,7 +535,7 @@ export default function TasksPage(): ReactElement {
               </Field>
               <Field label="Record ID">
                 <input
-                  className="form-input h-11 w-full rounded-lg border-slate-200 text-sm focus:border-blue-400 focus:ring-blue-100"
+                  className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30"
                   value={createDraft.relatedToId}
                   onChange={(event) => setCreateDraft((prev) => ({ ...prev, relatedToId: event.target.value }))}
                   placeholder="Paste the record ID"
@@ -560,16 +560,16 @@ export default function TasksPage(): ReactElement {
 
 function Metric({ label, value, tone }: { label: string; value: string; tone: 'blue' | 'red' | 'amber' | 'green' }): ReactElement {
   const styles = {
-    blue: 'from-blue-500 to-cyan-400 text-blue-700',
-    red: 'from-red-500 to-pink-400 text-red-700',
-    amber: 'from-amber-500 to-orange-400 text-amber-700',
-    green: 'from-emerald-500 to-lime-400 text-emerald-700',
+    blue: 'from-primary to-info text-primary',
+    red: 'from-error to-tertiary text-error',
+    amber: 'from-warning to-warning text-warning',
+    green: 'from-success to-success text-success',
   }[tone];
   return (
     <div className="overflow-hidden rounded-lg border border-[#e7edf3] bg-[#f9f9ff]">
       <div className={cn('h-1.5 bg-gradient-to-r', styles.split(' ').slice(0, 2).join(' '))} />
       <div className="p-4">
-        <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
+        <p className="text-xs font-semibold uppercase text-on-surface-variant">{label}</p>
         <p className={cn('mt-2 text-2xl font-bold', styles.split(' ')[2])}>{value}</p>
       </div>
     </div>
@@ -589,11 +589,12 @@ function FilterSelect({
 }): ReactElement {
   return (
     <label className="relative min-w-[160px]">
-      <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
       <select
         value={value}
+        aria-label={label}
         onChange={(event) => onChange(event.target.value)}
-        className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-8 text-sm font-medium text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+        className="h-12 w-full rounded-lg border border-outline-variant bg-surface pl-9 pr-8 text-sm font-medium text-on-surface outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/30"
       >
         {options.map(([optionValue, optionLabel]) => (
           <option key={optionValue} value={optionValue}>{label}: {optionLabel}</option>
@@ -610,7 +611,7 @@ function Badge({ children, className }: { children: React.ReactNode; className: 
 function Field({ label, children }: { label: string; children: React.ReactNode }): ReactElement {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
+      <span className="mb-1 block text-sm font-medium text-on-surface">{label}</span>
       {children}
     </label>
   );
@@ -624,7 +625,7 @@ function AssociatedLink({ href, label, value }: { href: string | null; label: st
       {label}: {value}
     </Link>
   ) : (
-    <span className="flex items-center gap-2 font-medium text-slate-700">
+    <span className="flex items-center gap-2 font-medium text-on-surface">
       <CheckSquare className="h-4 w-4 text-[#4A90E2]" />
       {label}: {value}
     </span>

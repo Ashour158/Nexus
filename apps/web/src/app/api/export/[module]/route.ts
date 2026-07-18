@@ -11,9 +11,9 @@ export async function POST(req: NextRequest, { params }: { params: { module: str
   const auth = req.headers.get('authorization');
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const module = encodeURIComponent(params.module);
+  const moduleName = encodeURIComponent(params.module);
   const body = await req.text();
-  const upstream = await fetch(`${DATA_SERVICE}/api/v1/export/${module}`, {
+  const upstream = await fetch(`${DATA_SERVICE}/api/v1/export/${moduleName}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

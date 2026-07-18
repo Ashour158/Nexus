@@ -234,9 +234,9 @@ function BoardLoadingSkeleton({
         {Array.from({ length: columnCount }).map((_, colIdx) => (
           <div
             key={colIdx}
-            className="flex h-full w-[300px] shrink-0 flex-col rounded-lg border border-border bg-muted/40"
+            className="flex h-full w-[300px] shrink-0 flex-col rounded-xl border border-outline-variant bg-surface-container-low"
           >
-            <div className="border-b border-border px-3 py-2">
+            <div className="border-b border-outline-variant px-3 py-2.5">
               <Skeleton className="mb-2 h-3 w-24" />
               <Skeleton className="h-3 w-16" />
             </div>
@@ -244,7 +244,7 @@ function BoardLoadingSkeleton({
               {Array.from({ length: 3 }).map((__, rowIdx) => (
                 <div
                   key={rowIdx}
-                  className="rounded-md border border-border bg-background p-3"
+                  className="rounded-lg border border-outline-variant bg-surface p-3"
                 >
                   <Skeleton className="mb-2 h-3 w-3/4" />
                   <Skeleton className="mb-2 h-4 w-1/2" />
@@ -273,7 +273,7 @@ function BoardEmptyState({
       data-testid="pipeline-board-empty"
       data-pipeline-id={pipelineId}
       className={cn(
-        'flex h-full flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 p-10 text-center',
+        'flex h-full flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant bg-surface-container-low p-10 text-center',
         className
       )}
     >

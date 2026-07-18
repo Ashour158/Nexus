@@ -5,42 +5,47 @@ import { cn } from '@/lib/cn';
 
 type Tone = 'blue' | 'emerald' | 'amber' | 'orange' | 'rose' | 'slate';
 
+/**
+ * Tone → Material-3 token classes. Keys are kept for backwards compatibility
+ * with existing callers; the values now resolve to the Stitch Indigo palette
+ * and flip automatically in dark mode.
+ */
 const toneClasses: Record<Tone, { soft: string; text: string; solid: string; ring: string }> = {
   blue: {
-    soft: 'bg-blue-50',
-    text: 'text-[#005baf]',
-    solid: 'bg-[#137fec]',
-    ring: 'ring-blue-200',
+    soft: 'bg-primary-container',
+    text: 'text-on-primary-container',
+    solid: 'bg-primary',
+    ring: 'ring-primary/20',
   },
   emerald: {
-    soft: 'bg-emerald-50',
-    text: 'text-emerald-700',
-    solid: 'bg-emerald-600',
-    ring: 'ring-emerald-200',
+    soft: 'bg-success-container',
+    text: 'text-on-success-container',
+    solid: 'bg-success',
+    ring: 'ring-success/20',
   },
   amber: {
-    soft: 'bg-amber-50',
-    text: 'text-amber-700',
-    solid: 'bg-amber-500',
-    ring: 'ring-amber-200',
+    soft: 'bg-warning-container',
+    text: 'text-on-warning-container',
+    solid: 'bg-warning',
+    ring: 'ring-warning/20',
   },
   orange: {
-    soft: 'bg-orange-50',
-    text: 'text-orange-700',
-    solid: 'bg-orange-500',
-    ring: 'ring-orange-200',
+    soft: 'bg-tertiary-container',
+    text: 'text-on-tertiary-container',
+    solid: 'bg-tertiary',
+    ring: 'ring-tertiary/20',
   },
   rose: {
-    soft: 'bg-rose-50',
-    text: 'text-rose-700',
-    solid: 'bg-rose-600',
-    ring: 'ring-rose-200',
+    soft: 'bg-error-container',
+    text: 'text-on-error-container',
+    solid: 'bg-error',
+    ring: 'ring-error/20',
   },
   slate: {
-    soft: 'bg-slate-100',
-    text: 'text-slate-700',
-    solid: 'bg-slate-950',
-    ring: 'ring-slate-200',
+    soft: 'bg-surface-container-high',
+    text: 'text-on-surface-variant',
+    solid: 'bg-inverse-surface',
+    ring: 'ring-outline-variant',
   },
 };
 
@@ -85,12 +90,12 @@ export function CRMPageHeader({
   className?: string;
 }) {
   return (
-    <section className={cn('overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm', className)}>
+    <section className={cn('overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-card', className)}>
       <div className={cn(metrics ? 'grid lg:grid-cols-[1fr_360px]' : '')}>
         <div className="p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-3">
             {eyebrow ? (
-              <span className="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#005baf]">
+              <span className="inline-flex items-center gap-2 rounded-lg bg-primary-container px-3 py-2 text-xs font-bold uppercase tracking-wider text-on-primary-container">
                 {Icon ? <Icon className="h-4 w-4" /> : null}
                 {eyebrow}
               </span>
@@ -99,15 +104,15 @@ export function CRMPageHeader({
           </div>
           <div className="mt-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">{title}</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-on-surface sm:text-4xl">{title}</h1>
               {description ? (
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-500 sm:text-base">{description}</p>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-on-surface-variant sm:text-base">{description}</p>
               ) : null}
             </div>
             {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
           </div>
         </div>
-        {metrics ? <div className="border-t border-slate-100 bg-slate-50 p-5 lg:border-l lg:border-t-0">{metrics}</div> : null}
+        {metrics ? <div className="border-t border-outline-variant bg-surface-container-low p-5 lg:border-l lg:border-t-0">{metrics}</div> : null}
       </div>
     </section>
   );
@@ -129,12 +134,12 @@ export function CRMCard({
   padded?: boolean;
 }) {
   return (
-    <section className={cn('rounded-xl border border-slate-100 bg-white shadow-sm', className)}>
+    <section className={cn('rounded-xl border border-outline-variant bg-surface shadow-card', className)}>
       {title || description || actions ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant px-5 py-4">
           <div>
-            {title ? <h2 className="text-lg font-bold text-slate-950">{title}</h2> : null}
-            {description ? <p className="mt-1 text-sm text-slate-500">{description}</p> : null}
+            {title ? <h2 className="text-lg font-bold text-on-surface">{title}</h2> : null}
+            {description ? <p className="mt-1 text-sm text-on-surface-variant">{description}</p> : null}
           </div>
           {actions}
         </div>
@@ -163,20 +168,20 @@ export function CRMMetricCard({
 }) {
   const toneClass = toneClasses[tone];
   return (
-    <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-card">
       <div className={cn('mb-3 inline-flex rounded-lg p-2', toneClass.soft, toneClass.text)}>
         <Icon className="h-4 w-4" />
       </div>
-      <p className="text-2xl font-black text-slate-950">{value}</p>
-      <p className="mt-1 text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
-      {note ? <p className="mt-1 text-xs text-slate-500">{note}</p> : null}
+      <p className="text-2xl font-bold text-on-surface">{value}</p>
+      <p className="mt-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant">{label}</p>
+      {note ? <p className="mt-1 text-xs text-on-surface-variant">{note}</p> : null}
     </div>
   );
 }
 
 export function CRMToolbar({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <section className={cn('rounded-xl border border-slate-100 bg-white p-4 shadow-sm', className)}>
+    <section className={cn('rounded-xl border border-outline-variant bg-surface p-4 shadow-card', className)}>
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">{children}</div>
     </section>
   );
@@ -194,7 +199,7 @@ export function CRMSegmentedControl<T extends string>({
   className?: string;
 }) {
   return (
-    <div className={cn('inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white', className)}>
+    <div className={cn('inline-flex overflow-hidden rounded-lg border border-outline-variant bg-surface', className)}>
       {options.map((option) => {
         const Icon = option.icon;
         const active = option.value === value;
@@ -205,7 +210,7 @@ export function CRMSegmentedControl<T extends string>({
             onClick={() => onChange(option.value)}
             className={cn(
               'inline-flex h-10 items-center gap-2 px-4 text-sm font-bold transition',
-              active ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'
+              active ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container-high'
             )}
           >
             {Icon ? <Icon className="h-4 w-4" /> : null}
@@ -238,8 +243,8 @@ export function CRMFilterPills<T extends string>({
           className={cn(
             'rounded-lg px-4 py-2 text-sm font-bold transition',
             value === option.value
-              ? 'bg-[#137fec] text-white shadow-sm'
-              : 'border border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-[#005baf]'
+              ? 'bg-primary text-on-primary shadow-sm'
+              : 'border border-outline-variant bg-surface text-on-surface-variant hover:border-primary/40 hover:bg-primary-container hover:text-on-primary-container'
           )}
         >
           {option.label}
@@ -260,7 +265,7 @@ export function CRMStatusBadge({
 }) {
   const toneClass = toneClasses[tone];
   return (
-    <span className={cn('inline-flex rounded px-2.5 py-1 text-xs font-bold ring-1', toneClass.soft, toneClass.text, toneClass.ring, className)}>
+    <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1', toneClass.soft, toneClass.text, toneClass.ring, className)}>
       {children}
     </span>
   );
@@ -268,7 +273,7 @@ export function CRMStatusBadge({
 
 export function CRMTableShell({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm', className)}>
+    <div className={cn('overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-card', className)}>
       <div className="overflow-x-auto">{children}</div>
     </div>
   );
@@ -289,9 +294,9 @@ export function CRMEmptyState({
 }) {
   return (
     <div className={cn('p-10 text-center', className)}>
-      {Icon ? <Icon className="mx-auto h-8 w-8 text-slate-300" /> : null}
-      <h3 className="mt-3 text-sm font-bold text-slate-950">{title}</h3>
-      {description ? <p className="mt-1 text-sm text-slate-500">{description}</p> : null}
+      {Icon ? <Icon className="mx-auto h-8 w-8 text-outline" /> : null}
+      <h3 className="mt-3 text-sm font-bold text-on-surface">{title}</h3>
+      {description ? <p className="mt-1 text-sm text-on-surface-variant">{description}</p> : null}
       {action ? <div className="mt-5 flex justify-center">{action}</div> : null}
     </div>
   );
@@ -307,9 +312,9 @@ export function CRMErrorState({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-rose-100 bg-rose-50 p-6 text-rose-700">
+    <div className="rounded-xl border border-error/30 bg-error-container p-6 text-on-error-container">
       <h3 className="text-sm font-bold">{title}</h3>
-      {description ? <p className="mt-1 text-sm text-rose-600">{description}</p> : null}
+      {description ? <p className="mt-1 text-sm text-on-error-container/80">{description}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
   );
@@ -322,20 +327,20 @@ export function CRMActivityTimeline({
   items: Array<{ id: string; title: string; meta: string; description?: string; tone?: Tone }>;
   empty?: string;
 }) {
-  if (items.length === 0) return <p className="text-sm text-slate-500">{empty}</p>;
+  if (items.length === 0) return <p className="text-sm text-on-surface-variant">{empty}</p>;
 
   return (
     <div className="relative space-y-4 pl-6">
-      <div className="absolute bottom-2 left-2.5 top-2 w-px bg-slate-200" />
+      <div className="absolute bottom-2 left-2.5 top-2 w-px bg-outline-variant" />
       {items.map((item) => {
         const toneClass = toneClasses[item.tone ?? 'blue'];
         return (
           <div key={item.id} className="relative">
-            <span className={cn('absolute -left-[21px] top-1.5 h-3 w-3 rounded-full ring-4 ring-white', toneClass.solid)} />
-            <div className="rounded-lg border border-slate-100 bg-white p-3">
-              <p className="text-sm font-bold text-slate-950">{item.title}</p>
-              <p className="mt-1 text-xs text-slate-500">{item.meta}</p>
-              {item.description ? <p className="mt-2 text-sm text-slate-600">{item.description}</p> : null}
+            <span className={cn('absolute -left-[21px] top-1.5 h-3 w-3 rounded-full ring-4 ring-surface', toneClass.solid)} />
+            <div className="rounded-lg border border-outline-variant bg-surface p-3">
+              <p className="text-sm font-bold text-on-surface">{item.title}</p>
+              <p className="mt-1 text-xs text-on-surface-variant">{item.meta}</p>
+              {item.description ? <p className="mt-2 text-sm text-on-surface-variant">{item.description}</p> : null}
             </div>
           </div>
         );
@@ -351,15 +356,15 @@ export function CRMDocumentList({
   documents: Array<{ id: string; name: string; type?: string; meta?: string; action?: ReactNode }>;
   empty?: string;
 }) {
-  if (documents.length === 0) return <p className="text-sm text-slate-500">{empty}</p>;
+  if (documents.length === 0) return <p className="text-sm text-on-surface-variant">{empty}</p>;
 
   return (
-    <div className="divide-y divide-slate-100 rounded-lg border border-slate-100 bg-white">
+    <div className="divide-y divide-outline-variant rounded-lg border border-outline-variant bg-surface">
       {documents.map((document) => (
         <div key={document.id} className="flex items-center justify-between gap-4 p-3">
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-slate-950">{document.name}</p>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="truncate text-sm font-bold text-on-surface">{document.name}</p>
+            <p className="mt-1 text-xs text-on-surface-variant">
               {[document.type, document.meta].filter(Boolean).join(' - ') || 'Attachment'}
             </p>
           </div>
@@ -382,9 +387,9 @@ export function CRMSidePanel({
   className?: string;
 }) {
   return (
-    <aside className={cn('rounded-xl border border-slate-100 bg-white p-5 shadow-sm', className)}>
-      <h2 className="text-lg font-bold text-slate-950">{title}</h2>
-      {description ? <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p> : null}
+    <aside className={cn('rounded-xl border border-outline-variant bg-surface p-5 shadow-card', className)}>
+      <h2 className="text-lg font-bold text-on-surface">{title}</h2>
+      {description ? <p className="mt-1 text-sm leading-6 text-on-surface-variant">{description}</p> : null}
       <div className="mt-5">{children}</div>
     </aside>
   );
@@ -402,10 +407,10 @@ export function CRMFormSection({
   className?: string;
 }) {
   return (
-    <div className={cn('rounded-xl border border-slate-100 bg-white p-5 shadow-sm', className)}>
-      <div className="border-b border-slate-100 pb-4">
-        <h2 className="text-lg font-bold text-slate-950">{title}</h2>
-        {description ? <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p> : null}
+    <div className={cn('rounded-xl border border-outline-variant bg-surface p-5 shadow-card', className)}>
+      <div className="border-b border-outline-variant pb-4">
+        <h2 className="text-lg font-bold text-on-surface">{title}</h2>
+        {description ? <p className="mt-1 text-sm leading-6 text-on-surface-variant">{description}</p> : null}
       </div>
       <div className="mt-5 grid gap-4">{children}</div>
     </div>

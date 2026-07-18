@@ -1,6 +1,13 @@
 import { TOPICS, type NexusProducer } from '@nexus/kafka';
 import type { CadencePrisma } from '../prisma.js';
 
+/** Total wait before a step fires: delayDays*24h + delayHours, in milliseconds. */
+export function stepDelayMs(step: { delayDays?: number | null; delayHours?: number | null }): number {
+  const days = step.delayDays ?? 0;
+  const hours = step.delayHours ?? 0;
+  return days * 24 * 60 * 60 * 1000 + hours * 60 * 60 * 1000;
+}
+
 export function createEnrollmentsService(prisma: CadencePrisma, producer: NexusProducer) {
   return {
     async enroll(
@@ -37,7 +44,7 @@ export function createEnrollmentsService(prisma: CadencePrisma, producer: NexusP
             enrollmentId: enrolled.id,
             stepPosition: first.position,
             stepType: first.type,
-            scheduledAt: new Date(Date.now() + (first.delayDays ?? 0) * 24 * 60 * 60 * 1000),
+            scheduledAt: new Date(Date.now() + stepDelayMs(first)),
             status: 'PENDING',
             variant: 'A',
           },
@@ -103,6 +110,102 @@ export function createEnrollmentsService(prisma: CadencePrisma, producer: NexusP
         where: { tenantId, id: enrollmentId },
         data: { status: 'EXITED', exitReason: reason, exitedAt: new Date() },
       });
+    },
+
+    /**
+     * Force an ACTIVE enrollment's next PENDING step to run on the next poller
+     * tick by pulling its scheduledAt forward to now (skipping any remaining
+     * WAIT delay). The step runner picks it up and advances the chain from
+     * there. Returns { advanced: boolean } — false when the enrollment is not
+     * active or has no pending step.
+     */
+    async advanceEnrollment(tenantId: string, enrollmentId: string): Promise<{ advanced: boolean }> {
+      const enrollment = await prisma.cadenceEnrollment.findFirst({
+        where: { tenantId, id: enrollmentId, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (!enrollment) return { advanced: false };
+      const next = await prisma.stepExecution.findFirst({
+        where: { enrollmentId, status: 'PENDING' },
+        orderBy: { scheduledAt: 'asc' },
+      });
+      if (!next) return { advanced: false };
+      await prisma.stepExecution.update({ where: { id: next.id }, data: { scheduledAt: new Date() } });
+      return { advanced: true };
+    },
+
+    /**
+     * Rule-based auto-enroll hook (B11). Enrolls one entity into every active
+     * cadence whose `autoEnrollTrigger` matches `trigger` and whose objectType
+     * matches the entity. Idempotent per (cadence, object): an existing ACTIVE
+     * enrollment is skipped (not an error). Fully guarded — a single failing
+     * enrollment never aborts the others. Returns the ids of cadences the entity
+     * was newly enrolled into.
+     */
+    async autoEnroll(
+      tenantId: string,
+      trigger: string,
+      entity: { objectType: 'CONTACT' | 'LEAD'; objectId: string; ownerId: string }
+    ): Promise<{ enrolledCadenceIds: string[]; skipped: number }> {
+      const cadences = await prisma.cadenceTemplate.findMany({
+        where: {
+          tenantId,
+          isActive: true,
+          autoEnrollTrigger: trigger,
+          objectType: entity.objectType,
+        },
+        include: { steps: { orderBy: { position: 'asc' } } },
+      });
+      const enrolledCadenceIds: string[] = [];
+      let skipped = 0;
+      for (const cadence of cadences) {
+        try {
+          const existing = await prisma.cadenceEnrollment.findFirst({
+            where: { tenantId, cadenceId: cadence.id, objectId: entity.objectId, status: 'ACTIVE' },
+            select: { id: true },
+          });
+          if (existing) {
+            skipped += 1;
+            continue;
+          }
+          const first = cadence.steps[0];
+          const enrolled = await prisma.cadenceEnrollment.create({
+            data: {
+              tenantId,
+              cadenceId: cadence.id,
+              objectType: entity.objectType,
+              objectId: entity.objectId,
+              ownerId: entity.ownerId,
+              status: 'ACTIVE',
+              currentStep: first?.position ?? 0,
+            },
+          });
+          if (first) {
+            await prisma.stepExecution.create({
+              data: {
+                enrollmentId: enrolled.id,
+                stepPosition: first.position,
+                stepType: first.type,
+                scheduledAt: new Date(Date.now() + stepDelayMs(first)),
+                status: 'PENDING',
+                variant: 'A',
+              },
+            });
+          }
+          await producer
+            .publish(TOPICS.WORKFLOWS, {
+              type: 'cadence.enrolled',
+              tenantId,
+              payload: { enrollmentId: enrolled.id, cadenceId: cadence.id, objectType: entity.objectType, objectId: entity.objectId, auto: true, trigger },
+            })
+            .catch(() => undefined);
+          enrolledCadenceIds.push(cadence.id);
+        } catch {
+          // unique-constraint race or transient error: skip this cadence only
+          skipped += 1;
+        }
+      }
+      return { enrolledCadenceIds, skipped };
     },
 
     /**

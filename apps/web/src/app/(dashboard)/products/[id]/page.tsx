@@ -43,7 +43,7 @@ export default function ProductDetailPage() {
   if (!canRead) {
     return (
       <main className="p-6">
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="rounded-xl border border-warning/30 bg-warning-container p-4 text-sm text-on-warning-container">
           You do not have permission to view products.
         </div>
       </main>
@@ -61,7 +61,7 @@ export default function ProductDetailPage() {
   if (!p) {
     return (
       <main className="p-6">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-xl border border-error/30 bg-error-container p-4 text-sm text-error">
           Product not found.
         </div>
       </main>
@@ -92,15 +92,15 @@ export default function ProductDetailPage() {
     <main className="mx-auto max-w-4xl space-y-6 p-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="text-sm text-slate-500">
-            <Link href="/products" className="hover:text-slate-800">
+          <div className="text-sm text-on-surface-variant">
+            <Link href="/products" className="hover:text-on-surface">
               Products
             </Link>
             <span> / </span>
             <span className="font-mono text-xs">{p.sku}</span>
           </div>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">{p.name}</h1>
-          <p className="text-sm text-slate-600">
+          <h1 className="mt-1 text-2xl font-bold text-on-surface">{p.name}</h1>
+          <p className="text-sm text-on-surface-variant">
             {p.category ?? 'Uncategorized'} · {p.currency}
           </p>
         </div>
@@ -118,87 +118,87 @@ export default function ProductDetailPage() {
         <Metric label="Status" value={p.isActive ?? true ? 'Active' : 'Archived'} />
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
-        <h2 className="text-sm font-semibold text-slate-900">Product details</h2>
+      <section className="rounded-xl border border-outline-variant bg-surface p-6 space-y-4">
+        <h2 className="text-sm font-semibold text-on-surface">Product details</h2>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Name (EN)</label>
+            <label className="block text-xs font-medium text-on-surface-variant mb-1">Name (EN)</label>
             <input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+              className="w-full rounded border border-outline-variant px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Name (AR)</label>
+            <label className="block text-xs font-medium text-on-surface-variant mb-1">Name (AR)</label>
             <input
               dir="rtl"
               value={form.nameAr ?? ''}
               onChange={(e) => setForm((f) => ({ ...f, nameAr: e.target.value }))}
-              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+              className="w-full rounded border border-outline-variant px-3 py-2 text-sm"
             />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Description (EN)</label>
+            <label className="block text-xs font-medium text-on-surface-variant mb-1">Description (EN)</label>
             <textarea
               rows={3}
               value={form.description ?? ''}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+              className="w-full rounded border border-outline-variant px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Description (AR)</label>
+            <label className="block text-xs font-medium text-on-surface-variant mb-1">Description (AR)</label>
             <textarea
               dir="rtl"
               rows={3}
               value={form.descriptionAr ?? ''}
               onChange={(e) => setForm((f) => ({ ...f, descriptionAr: e.target.value }))}
-              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+              className="w-full rounded border border-outline-variant px-3 py-2 text-sm"
             />
           </div>
         </div>
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Category</label>
+            <label className="block text-xs font-medium text-on-surface-variant mb-1">Category</label>
             <input
               value={form.category ?? ''}
               onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+              className="w-full rounded border border-outline-variant px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">List Price</label>
+            <label className="block text-xs font-medium text-on-surface-variant mb-1">List Price</label>
             <input
               disabled
               value={`${p.currency} ${Number(p.listPrice).toFixed(2)}`}
-              className="w-full rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+              className="w-full rounded border border-outline-variant bg-surface-container-low px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Unit (AR)</label>
+            <label className="block text-xs font-medium text-on-surface-variant mb-1">Unit (AR)</label>
             <input
               dir="rtl"
               value={form.unitAr ?? ''}
               onChange={(e) => setForm((f) => ({ ...f, unitAr: e.target.value }))}
-              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+              className="w-full rounded border border-outline-variant px-3 py-2 text-sm"
             />
           </div>
         </div>
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-6">
-        <h2 className="text-sm font-semibold text-slate-900">Related records</h2>
+      <section className="rounded-xl border border-outline-variant bg-surface p-6">
+        <h2 className="text-sm font-semibold text-on-surface">Related records</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div className="rounded border border-slate-100 bg-slate-50 p-4">
-            <p className="text-xs font-medium uppercase text-slate-500">Quotes</p>
-            <p className="mt-1 text-sm text-slate-600">Quotes that include this product will be shown here.</p>
+          <div className="rounded border border-outline-variant bg-surface-container-low p-4">
+            <p className="text-xs font-medium uppercase text-on-surface-variant">Quotes</p>
+            <p className="mt-1 text-sm text-on-surface-variant">Quotes that include this product will be shown here.</p>
           </div>
-          <div className="rounded border border-slate-100 bg-slate-50 p-4">
-            <p className="text-xs font-medium uppercase text-slate-500">Invoices</p>
-            <p className="mt-1 text-sm text-slate-600">Invoices that include this product will be shown here.</p>
+          <div className="rounded border border-outline-variant bg-surface-container-low p-4">
+            <p className="text-xs font-medium uppercase text-on-surface-variant">Invoices</p>
+            <p className="mt-1 text-sm text-on-surface-variant">Invoices that include this product will be shown here.</p>
           </div>
         </div>
       </section>
@@ -208,9 +208,9 @@ export default function ProductDetailPage() {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
+    <div className="rounded-lg border border-outline-variant bg-surface p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">{label}</p>
+      <p className="mt-1 text-lg font-bold text-on-surface">{value}</p>
     </div>
   );
 }

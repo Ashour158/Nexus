@@ -54,8 +54,8 @@ export default function WinLossPage() {
     <div className="mx-auto max-w-5xl p-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Win / Loss Analysis</h1>
-          <p className="mt-1 text-sm text-gray-500">Understand where deals are won and lost</p>
+          <h1 className="text-2xl font-bold text-on-surface">Win / Loss Analysis</h1>
+          <p className="mt-1 text-sm text-on-surface-variant">Understand where deals are won and lost</p>
         </div>
         <div className="flex gap-2">
           {PERIODS.map((p) => (
@@ -64,8 +64,8 @@ export default function WinLossPage() {
               onClick={() => setPeriod(p.value)}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
                 period === p.value
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-primary text-white'
+                  : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'
               }`}
             >
               {p.label}
@@ -74,14 +74,14 @@ export default function WinLossPage() {
         </div>
       </div>
       {error ? (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="mb-4 rounded-lg border border-warning/30 bg-warning-container px-4 py-3 text-sm text-on-warning-container">
           {error}
         </div>
       ) : null}
       {error ? null : loading || !data ? (
         <div className="grid grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-24 animate-pulse rounded-xl bg-gray-100" />
+            <div key={i} className="h-24 animate-pulse rounded-xl bg-surface-container-high" />
           ))}
         </div>
       ) : (
@@ -95,32 +95,32 @@ export default function WinLossPage() {
             <Card title="Lost Revenue" value={currency(data.summary.lostRevenue)} />
           </div>
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
-              <h2 className="mb-4 font-semibold text-gray-900">Monthly Trend</h2>
+            <div className="rounded-xl border border-outline-variant bg-surface p-5">
+              <h2 className="mb-4 font-semibold text-on-surface">Monthly Trend</h2>
               <div className="space-y-2">
                 {data.monthlyTrend.map((m) => (
                   <div key={m.month} className="flex items-center gap-3 text-sm">
-                    <span className="w-14 text-xs text-gray-500">{m.month}</span>
-                    <div className="h-5 flex-1 overflow-hidden rounded bg-gray-100">
-                      <div className="h-full bg-green-400" style={{ width: `${m.winRate}%` }} />
+                    <span className="w-14 text-xs text-on-surface-variant">{m.month}</span>
+                    <div className="h-5 flex-1 overflow-hidden rounded bg-surface-container-high">
+                      <div className="h-full bg-success" style={{ width: `${m.winRate}%` }} />
                     </div>
-                    <span className="w-10 text-end text-xs font-medium text-gray-700">{m.winRate}%</span>
+                    <span className="w-10 text-end text-xs font-medium text-on-surface">{m.winRate}%</span>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
-              <h2 className="mb-4 font-semibold text-gray-900">Top Lost Reasons</h2>
+            <div className="rounded-xl border border-outline-variant bg-surface p-5">
+              <h2 className="mb-4 font-semibold text-on-surface">Top Lost Reasons</h2>
               <div className="space-y-3">
                 {data.lostReasons.slice(0, 8).map((r) => (
                   <div key={r.reason}>
                     <div className="mb-1 flex justify-between text-sm">
-                      <span className="text-gray-700">{r.reason}</span>
-                      <span className="font-medium text-gray-900">{r.count}</span>
+                      <span className="text-on-surface">{r.reason}</span>
+                      <span className="font-medium text-on-surface">{r.count}</span>
                     </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
+                    <div className="h-1.5 overflow-hidden rounded-full bg-surface-container-high">
                       <div
-                        className="h-full rounded-full bg-red-400"
+                        className="h-full rounded-full bg-error"
                         style={{ width: `${(r.count / maxLostCount) * 100}%` }}
                       />
                     </div>
@@ -130,21 +130,21 @@ export default function WinLossPage() {
             </div>
           </div>
           <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.8fr]">
-            <section className="rounded-xl border border-gray-200 bg-white p-5">
-              <h2 className="font-semibold text-gray-900">Decision Intelligence</h2>
+            <section className="rounded-xl border border-outline-variant bg-surface p-5">
+              <h2 className="font-semibold text-on-surface">Decision Intelligence</h2>
               <div className="mt-4 space-y-3">
                 {(data.insights ?? []).map((insight) => (
-                  <p key={insight} className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <p key={insight} className="rounded-lg bg-surface-container-low px-3 py-2 text-sm text-on-surface">
                     {insight}
                   </p>
                 ))}
               </div>
             </section>
-            <section className="rounded-xl border border-gray-200 bg-white p-5">
-              <h2 className="font-semibold text-gray-900">Connected Services</h2>
+            <section className="rounded-xl border border-outline-variant bg-surface p-5">
+              <h2 className="font-semibold text-on-surface">Connected Services</h2>
               <div className="mt-4 flex flex-wrap gap-2">
                 {(data.serviceMap ?? []).map((service) => (
-                  <span key={service} className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+                  <span key={service} className="rounded-full bg-primary-container px-3 py-1 text-xs font-medium text-primary">
                     {service}
                   </span>
                 ))}
@@ -167,9 +167,9 @@ function currency(value: number) {
 
 function Card({ title, value }: { title: string; value: string }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
-      <p className="mb-1 text-xs text-gray-500">{title}</p>
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
+    <div className="rounded-xl border border-outline-variant bg-surface p-4">
+      <p className="mb-1 text-xs text-on-surface-variant">{title}</p>
+      <p className="text-2xl font-bold text-on-surface">{value}</p>
     </div>
   );
 }

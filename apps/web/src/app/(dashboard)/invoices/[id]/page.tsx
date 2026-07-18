@@ -43,7 +43,7 @@ export default function InvoiceDetailPage() {
   if (!canRead) {
     return (
       <main className="p-6">
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="rounded-xl border border-warning/30 bg-warning-container p-4 text-sm text-on-warning-container">
           You do not have permission to view invoices.
         </div>
       </main>
@@ -61,7 +61,7 @@ export default function InvoiceDetailPage() {
   if (!invoice) {
     return (
       <main className="p-6">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-xl border border-error/30 bg-error-container p-4 text-sm text-error">
           Invoice not found.
         </div>
       </main>
@@ -104,17 +104,17 @@ export default function InvoiceDetailPage() {
     <main className="space-y-6 p-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="text-sm text-slate-500">
-            <Link href="/invoices" className="hover:text-slate-800">
+          <div className="text-sm text-on-surface-variant">
+            <Link href="/invoices" className="hover:text-on-surface">
               Invoices
             </Link>
             <span> / </span>
             <span className="font-mono text-xs">{invoice.invoiceNumber}</span>
           </div>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">
+          <h1 className="mt-1 text-2xl font-bold text-on-surface">
             {inv.invoiceNumber}
           </h1>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-on-surface-variant">
             Status: <strong>{inv.status}</strong> · {inv.currency}
           </p>
         </div>
@@ -123,7 +123,7 @@ export default function InvoiceDetailPage() {
             href={`/api/finance/invoices/${inv.id}/pdf`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary"
             download
           >
             Download PDF
@@ -153,27 +153,27 @@ export default function InvoiceDetailPage() {
       {showPaymentForm && (
         <form
           onSubmit={onRecordPayment}
-          className="max-w-md space-y-3 rounded-lg border border-slate-200 bg-white p-4"
+          className="max-w-md space-y-3 rounded-lg border border-outline-variant bg-surface p-4"
         >
-          <h3 className="text-sm font-semibold text-slate-900">Record payment</h3>
+          <h3 className="text-sm font-semibold text-on-surface">Record payment</h3>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-slate-500">Amount</label>
+              <label className="block text-xs text-on-surface-variant">Amount</label>
               <input
                 type="number"
                 step="0.01"
                 value={paymentForm.amount}
                 onChange={(e) => setPaymentForm((f) => ({ ...f, amount: e.target.value }))}
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded border border-outline-variant px-3 py-2 text-sm"
                 required
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-500">Method</label>
+              <label className="block text-xs text-on-surface-variant">Method</label>
               <select
                 value={paymentForm.method}
                 onChange={(e) => setPaymentForm((f) => ({ ...f, method: e.target.value }))}
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded border border-outline-variant px-3 py-2 text-sm"
               >
                 <option value="BANK_TRANSFER">Bank Transfer</option>
                 <option value="CREDIT_CARD">Credit Card</option>
@@ -186,20 +186,20 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
           <div>
-            <label className="block text-xs text-slate-500">Reference</label>
+            <label className="block text-xs text-on-surface-variant">Reference</label>
             <input
               value={paymentForm.reference}
               onChange={(e) => setPaymentForm((f) => ({ ...f, reference: e.target.value }))}
-              className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded border border-outline-variant px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-500">Notes</label>
+            <label className="block text-xs text-on-surface-variant">Notes</label>
             <textarea
               value={paymentForm.notes}
               onChange={(e) => setPaymentForm((f) => ({ ...f, notes: e.target.value }))}
               rows={2}
-              className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded border border-outline-variant px-3 py-2 text-sm"
             />
           </div>
           <div className="flex gap-2">
@@ -226,13 +226,13 @@ export default function InvoiceDetailPage() {
 
       <section className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          <div className="rounded-lg border border-slate-200 bg-white">
-            <div className="border-b border-slate-100 px-4 py-3">
-              <h2 className="text-sm font-semibold text-slate-900">Line items</h2>
+          <div className="rounded-lg border border-outline-variant bg-surface">
+            <div className="border-b border-outline-variant px-4 py-3">
+              <h2 className="text-sm font-semibold text-on-surface">Line items</h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-start text-xs uppercase text-slate-500">
+                <thead className="bg-surface-container-low text-start text-xs uppercase text-on-surface-variant">
                   <tr>
                     <th className="px-4 py-2">Description</th>
                     <th className="px-4 py-2 text-end">Qty</th>
@@ -240,11 +240,11 @@ export default function InvoiceDetailPage() {
                     <th className="px-4 py-2 text-end">Total</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-outline-variant">
                   {lineItems.map((item: InvoiceLineItem, idx: number) => (
                     <tr key={idx}>
                       <td className="px-4 py-2">
-                        <div className="font-medium text-slate-900">
+                        <div className="font-medium text-on-surface">
                           {item.description ?? 'Item'}
                         </div>
                       </td>
@@ -261,7 +261,7 @@ export default function InvoiceDetailPage() {
                   ))}
                   {lineItems.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-4 py-6 text-center text-sm text-slate-500">
+                      <td colSpan={4} className="px-4 py-6 text-center text-sm text-on-surface-variant">
                         No line items.
                       </td>
                     </tr>
@@ -273,13 +273,13 @@ export default function InvoiceDetailPage() {
         </div>
 
         <aside className="space-y-4">
-          <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm">
-            <h2 className="font-semibold text-slate-900">Invoice details</h2>
-            <dl className="mt-3 space-y-2 text-slate-600">
+          <div className="rounded-lg border border-outline-variant bg-surface p-4 text-sm">
+            <h2 className="font-semibold text-on-surface">Invoice details</h2>
+            <dl className="mt-3 space-y-2 text-on-surface-variant">
               <div className="flex justify-between gap-2">
                 <dt>Account</dt>
                 <dd className="font-mono text-xs">
-                  <Link href={`/accounts/${inv.accountId}`} className="text-blue-700 hover:underline">
+                  <Link href={`/accounts/${inv.accountId}`} className="text-primary hover:underline">
                     {inv.accountId.slice(0, 10)}…
                   </Link>
                 </dd>
@@ -288,7 +288,7 @@ export default function InvoiceDetailPage() {
                 <dt>Due date</dt>
                 <dd>
                   {inv.dueDate ? (
-                    <DualDateDisplay date={inv.dueDate} showHijri className="text-slate-800" />
+                    <DualDateDisplay date={inv.dueDate} showHijri className="text-on-surface" />
                   ) : (
                     '—'
                   )}
@@ -297,29 +297,29 @@ export default function InvoiceDetailPage() {
               <div className="flex justify-between gap-2">
                 <dt>Created</dt>
                 <dd>
-                  <DualDateDisplay date={inv.createdAt} showHijri className="text-slate-800" />
+                  <DualDateDisplay date={inv.createdAt} showHijri className="text-on-surface" />
                 </dd>
               </div>
             </dl>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm">
-            <h2 className="font-semibold text-slate-900">Payment history</h2>
+          <div className="rounded-lg border border-outline-variant bg-surface p-4 text-sm">
+            <h2 className="font-semibold text-on-surface">Payment history</h2>
             {paymentsQuery.isLoading ? (
-              <p className="mt-2 text-xs text-slate-500">Loading…</p>
+              <p className="mt-2 text-xs text-on-surface-variant">Loading…</p>
             ) : payments.length === 0 ? (
-              <p className="mt-2 text-xs text-slate-500">No payments recorded.</p>
+              <p className="mt-2 text-xs text-on-surface-variant">No payments recorded.</p>
             ) : (
               <ul className="mt-2 space-y-2">
                 {payments.map((p) => (
-                  <li key={p.id} className="flex items-center justify-between border-t border-slate-100 pt-2 first:border-t-0 first:pt-0">
+                  <li key={p.id} className="flex items-center justify-between border-t border-outline-variant pt-2 first:border-t-0 first:pt-0">
                     <div>
-                      <p className="font-medium text-slate-900">
+                      <p className="font-medium text-on-surface">
                         {formatCurrency(Number(p.amount), p.currency)}
                       </p>
-                      <p className="text-xs text-slate-500">{p.method}</p>
+                      <p className="text-xs text-on-surface-variant">{p.method}</p>
                     </div>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-on-surface-variant">
                       {p.paidAt ? new Date(p.paidAt).toLocaleDateString() : '—'}
                     </p>
                   </li>
@@ -336,9 +336,9 @@ export default function InvoiceDetailPage() {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
+    <div className="rounded-lg border border-outline-variant bg-surface p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">{label}</p>
+      <p className="mt-1 text-lg font-bold text-on-surface">{value}</p>
     </div>
   );
 }

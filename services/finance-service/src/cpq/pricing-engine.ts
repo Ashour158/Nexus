@@ -296,7 +296,6 @@ export class CpqPricingEngine {
     const floorWarnings: string[] = [];
     let approvalRequired = false;
     const approvalReasons: string[] = [];
-    let promoCodesUsed = false;
 
     for (const reqItem of req.items) {
       const product = productMap.get(reqItem.productId);
@@ -363,7 +362,9 @@ export class CpqPricingEngine {
         if (promoDiscount > 0) {
           discountPercent = discountPercent.plus(promoDiscount);
           appliedRules.push(`Promo code: -${promoDiscount}%`);
-          promoCodesUsed = true;
+          // RR-H9: promo redemption (uses++) is committed ONLY at order commit
+          // (quote → order conversion), never on preview/calculate. See
+          // `commitPromoRedemptions` in commercial-records.use-case.ts.
         }
       }
 
@@ -412,6 +413,10 @@ export class CpqPricingEngine {
       }
 
       // ── Rule 8: Non-Standard Approval ─────────────────────────────────────
+      // A manual override is a *deliberate* sub-floor concession that flips
+      // approvalRequired — it is the one path allowed below the floor, so the
+      // Rule-9 re-clamp below must NOT undo it.
+      let manualOverrideApplied = false;
       if (reqItem.manualOverridePrice !== undefined) {
         const overridePrice = toDecimal(reqItem.manualOverridePrice);
         if (overridePrice.lt(workingPrice)) {
@@ -421,6 +426,7 @@ export class CpqPricingEngine {
             .div(listPrice)
             .times(100);
           approvalRequired = true;
+          manualOverrideApplied = true;
           approvalReasons.push(
             `Non-standard price override on ${product.name}`
           );
@@ -443,6 +449,22 @@ export class CpqPricingEngine {
         appliedRules.push(
           `Early payment (${req.paymentTerms}): -${payDiscount.toFixed(2)}%`
         );
+      }
+
+      // ── Floor re-enforcement (post Rule 9) ────────────────────────────────
+      // The Rule-9 early-payment multiplier is applied AFTER the Rule-7 floor
+      // clamp, so a working price sitting exactly at the floor would be pushed
+      // ~2% below it with no guard. Re-clamp to the floor here (unless a manual
+      // override already carried this line below the floor under approval).
+      if (floorPrice && !manualOverrideApplied && workingPrice.lt(floorPrice)) {
+        floorWarnings.push(
+          `${product.name}: price re-floored at ${req.currency} ${floorPrice.toFixed(2)} after payment-term discount`
+        );
+        workingPrice = floorPrice;
+        discountPercent = listPrice
+          .minus(workingPrice)
+          .div(listPrice)
+          .times(100);
       }
 
       const discountAmount = listPrice.minus(workingPrice);
@@ -489,7 +511,7 @@ export class CpqPricingEngine {
       (sum, i) => sum.plus(new Decimal(i.discountAmount).times(i.quantity)),
       new Decimal(0)
     );
-    const taxRate = await this.getTaxRate(req.tenantId);
+    const taxRate = await this.resolveTaxRate(req.tenantId, account);
 
     // Stamp per-line tax now that taxRate is known
     for (const item of lineItems) {
@@ -502,23 +524,6 @@ export class CpqPricingEngine {
       (sum, i) => sum.plus(new Decimal(i.taxAmount)),
       new Decimal(0)
     );
-
-    // Increment uses counter for promo codes that were actually applied
-    if (promoCodesUsed && req.appliedPromos && req.appliedPromos.length > 0) {
-      const now = new Date();
-      await this.prisma.promoCode.updateMany({
-        where: {
-          tenantId: req.tenantId,
-          code: { in: req.appliedPromos },
-          isActive: true,
-          AND: [
-            { OR: [{ validFrom: null }, { validFrom: { lte: now } }] },
-            { OR: [{ validUntil: null }, { validUntil: { gte: now } }] },
-          ],
-        },
-        data: { uses: { increment: 1 } },
-      });
-    }
 
     const total = subtotal.plus(taxTotal);
 
@@ -581,18 +586,66 @@ export class CpqPricingEngine {
   }
 
   /**
-   * Looks up the default active tax rate for the tenant.
-   * Falls back to DEFAULT_TAX_RATE if no tax rate is configured.
+   * Resolves the active tax rate for a quote by *jurisdiction*, in priority
+   * order:
+   *
+   *   1. The account's explicit `taxZoneId` — deepest match; prefers the zone's
+   *      `isDefault` rate, else any active rate in that zone.
+   *   2. The account's `country` — joined to `TaxZone.country`, then the zone's
+   *      default/active rate.
+   *   3. The tenant's global `isDefault` TaxRate.
+   *   4. `DEFAULT_TAX_RATE` (0.1) when nothing is configured.
+   *
+   * Previously only step 3 existed, so every account was taxed at the single
+   * default rate and `TaxZone.country` was never consulted. Fully guarded so a
+   * client without the `taxRate`/`taxZone` delegates (e.g. unit-test mocks) falls
+   * straight through to the default.
    */
-  private async getTaxRate(tenantId: string): Promise<number> {
+  private async resolveTaxRate(
+    tenantId: string,
+    account: { taxZoneId?: string | null; country?: string | null } | null
+  ): Promise<number> {
     if (!('taxRate' in this.prisma) || !this.prisma.taxRate) {
       return DEFAULT_TAX_RATE;
     }
+
+    // 1. Account's explicit tax zone.
+    const zoneId = account?.taxZoneId ?? null;
+    if (zoneId) {
+      const zoneRate = await this.prisma.taxRate.findFirst({
+        where: { tenantId, zoneId, isActive: true },
+        orderBy: { isDefault: 'desc' },
+        select: { rate: true },
+      });
+      if (zoneRate) return Number(zoneRate.rate);
+    }
+
+    // 2. Account's country → TaxZone.country join.
+    const country = account?.country ?? null;
+    if (country && 'taxZone' in this.prisma && this.prisma.taxZone) {
+      const zone = await this.prisma.taxZone.findFirst({
+        where: { tenantId, country, isActive: true },
+        select: {
+          rates: {
+            where: { isActive: true },
+            orderBy: { isDefault: 'desc' },
+            take: 1,
+            select: { rate: true },
+          },
+        },
+      });
+      const rate = zone?.rates?.[0]?.rate;
+      if (rate !== undefined && rate !== null) return Number(rate);
+    }
+
+    // 3. Tenant-wide default rate.
     const defaultRate = await this.prisma.taxRate.findFirst({
       where: { tenantId, isDefault: true, isActive: true },
       select: { rate: true },
     });
     if (defaultRate) return Number(defaultRate.rate);
+
+    // 4. Hardcoded fallback.
     return DEFAULT_TAX_RATE;
   }
 

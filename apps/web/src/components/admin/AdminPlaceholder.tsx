@@ -18,20 +18,20 @@ export function AdminPlaceholder({ title, description, relatedHref, relatedLabel
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold">{title}</h2>
-        <p className="mt-1 text-sm text-gray-400">{description}</p>
+        <p className="mt-1 text-sm text-on-surface-variant">{description}</p>
       </div>
-      <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-gray-700 bg-gray-900 p-12 text-center">
-        <Construction className="h-8 w-8 text-gray-500" />
-        <p className="text-sm font-medium text-gray-300">This dedicated admin page is coming soon.</p>
+      <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-outline-variant bg-inverse-surface p-12 text-center">
+        <Construction className="h-8 w-8 text-on-surface-variant" />
+        <p className="text-sm font-medium text-outline">This dedicated admin page is coming soon.</p>
         {relatedHref ? (
           <Link
             href={relatedHref}
-            className="mt-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
+            className="mt-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary"
           >
             {relatedLabel ?? 'Open related settings'}
           </Link>
         ) : null}
-        <Link href="/admin" className="text-xs text-gray-400 hover:text-gray-200">
+        <Link href="/admin" className="text-xs text-on-surface-variant hover:text-outline">
           &larr; Back to Admin Panel
         </Link>
       </div>

@@ -43,25 +43,25 @@ export default function CustomFieldsForm({ entityType, entityId, currentValues, 
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700">Custom Fields</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-on-surface">Custom Fields</h3>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {fieldDefs.map((field) => (
           <div key={field.id} className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-on-surface">
               {field.name}
-              {field.required ? <span className="ms-1 text-red-500">*</span> : null}
+              {field.required ? <span className="ms-1 text-error">*</span> : null}
             </label>
             {field.fieldType === 'text' ? (
-              <input value={(values[field.apiKey] as string) ?? ''} onChange={(e) => setValues((v) => ({ ...v, [field.apiKey]: e.target.value }))} disabled={readOnly} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+              <input value={(values[field.apiKey] as string) ?? ''} onChange={(e) => setValues((v) => ({ ...v, [field.apiKey]: e.target.value }))} disabled={readOnly} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm" />
             ) : null}
             {field.fieldType === 'number' ? (
-              <input type="number" value={(values[field.apiKey] as number) ?? ''} onChange={(e) => setValues((v) => ({ ...v, [field.apiKey]: Number(e.target.value) }))} disabled={readOnly} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+              <input type="number" value={(values[field.apiKey] as number) ?? ''} onChange={(e) => setValues((v) => ({ ...v, [field.apiKey]: Number(e.target.value) }))} disabled={readOnly} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm" />
             ) : null}
             {field.fieldType === 'date' ? (
-              <input type="date" value={(values[field.apiKey] as string) ?? ''} onChange={(e) => setValues((v) => ({ ...v, [field.apiKey]: e.target.value }))} disabled={readOnly} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+              <input type="date" value={(values[field.apiKey] as string) ?? ''} onChange={(e) => setValues((v) => ({ ...v, [field.apiKey]: e.target.value }))} disabled={readOnly} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm" />
             ) : null}
             {field.fieldType === 'select' || field.fieldType === 'multiselect' ? (
-              <select value={(values[field.apiKey] as string) ?? ''} onChange={(e) => setValues((v) => ({ ...v, [field.apiKey]: e.target.value }))} disabled={readOnly} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+              <select value={(values[field.apiKey] as string) ?? ''} onChange={(e) => setValues((v) => ({ ...v, [field.apiKey]: e.target.value }))} disabled={readOnly} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm">
                 <option value="">- Select -</option>
                 {(field.options ?? []).map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>
@@ -70,18 +70,18 @@ export default function CustomFieldsForm({ entityType, entityId, currentValues, 
             ) : null}
             {field.fieldType === 'checkbox' ? (
               <label className="flex cursor-pointer items-center gap-2">
-                <input type="checkbox" checked={(values[field.apiKey] as boolean) ?? false} onChange={(e) => setValues((v) => ({ ...v, [field.apiKey]: e.target.checked }))} disabled={readOnly} className="h-4 w-4 accent-blue-600" />
-                <span className="text-sm text-gray-600">Yes</span>
+                <input type="checkbox" checked={(values[field.apiKey] as boolean) ?? false} onChange={(e) => setValues((v) => ({ ...v, [field.apiKey]: e.target.checked }))} disabled={readOnly} className="h-4 w-4 accent-primary" />
+                <span className="text-sm text-on-surface-variant">Yes</span>
               </label>
             ) : null}
             {field.fieldType === 'url' ? (
-              <input type="url" value={(values[field.apiKey] as string) ?? ''} onChange={(e) => setValues((v) => ({ ...v, [field.apiKey]: e.target.value }))} disabled={readOnly} placeholder="https://" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+              <input type="url" value={(values[field.apiKey] as string) ?? ''} onChange={(e) => setValues((v) => ({ ...v, [field.apiKey]: e.target.value }))} disabled={readOnly} placeholder="https://" className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm" />
             ) : null}
           </div>
         ))}
       </div>
       {!readOnly ? (
-        <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+        <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary disabled:opacity-50">
           {saveMutation.isPending ? 'Saving...' : 'Save Custom Fields'}
         </button>
       ) : null}

@@ -175,9 +175,11 @@ services:
     container_name: nexus-auth
     restart: unless-stopped
     ports:
-      - '3000:3000'
+      - '127.0.0.1:3000:3000'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3000'
       APP_URL: http://localhost:3000
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_auth
@@ -201,11 +203,27 @@ services:
     container_name: nexus-crm
     restart: unless-stopped
     ports:
-      - '3001:3001'
+      - '127.0.0.1:3001:3001'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      # Governance posture: when true, a field-security / validation / sharing
+      # evaluation ERROR denies the operation (503) instead of silently allowing
+      # it. Safe default for production; unconfigured tenants (no rules) still
+      # allow in both modes, so this only bites on a real eval fault.
+      NEXUS_GOVERNANCE_FAIL_CLOSED: ${NEXUS_GOVERNANCE_FAIL_CLOSED:-false}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_crm
+      # Needed by team-resolver to resolve manager→reports for team-scoped
+      # visibility. Missing before → fell back to localhost:3001 (crm) → team
+      # scope silently collapsed to own.
+      AUTH_SERVICE_URL: http://auth-service:3000
       METADATA_SERVICE_URL: http://metadata-service:3004
+      # Lead/deal create -> territory auto-routing + cadence auto-enroll (fail-open).
+      TERRITORY_SERVICE_URL: http://territory-service:3019
+      CADENCE_SERVICE_URL: http://cadence-service:3018
+      # Meeting calendar sync (Google wired; MS Graph in progress).
+      INTEGRATION_SERVICE_URL: http://integration-service:3012
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
@@ -230,9 +248,11 @@ services:
     container_name: nexus-finance
     restart: unless-stopped
     ports:
-      - '3002:3002'
+      - '127.0.0.1:3002:3002'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       CHROMIUM_PATH: /usr/bin/chromium
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_finance
       KAFKA_BROKERS: kafka:29092
@@ -240,6 +260,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+      # Money-object timeline endpoints proxy activities/notes to crm-service.
+      CRM_SERVICE_URL: http://crm-service:3001
     depends_on:
       postgres:
         condition: service_healthy
@@ -253,7 +275,7 @@ services:
     container_name: nexus-billing
     restart: unless-stopped
     ports:
-      - '3011:3011'
+      - '127.0.0.1:3011:3011'
     environment:
       PORT: '3011'
       BILLING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_billing
@@ -309,7 +331,7 @@ services:
     container_name: nexus-activities
     restart: unless-stopped
     ports:
-      - '3043:3043'
+      - '127.0.0.1:3043:3043'
     environment:
       PORT: '3043'
       ACTIVITIES_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_activities
@@ -339,7 +361,7 @@ services:
     container_name: nexus-notes
     restart: unless-stopped
     ports:
-      - '3032:3032'
+      - '127.0.0.1:3032:3032'
     environment:
       PORT: '3032'
       NOTES_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_notes
@@ -375,7 +397,7 @@ services:
     container_name: nexus-notifications
     restart: unless-stopped
     ports:
-      - '3003:3003'
+      - '127.0.0.1:3003:3003'
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_notification
       KAFKA_BROKERS: kafka:29092
@@ -401,7 +423,7 @@ services:
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
     restart: unless-stopped
     ports:
-      - '3005:3005'
+      - '127.0.0.1:3005:3005'
     depends_on:
       kafka:
         condition: service_started
@@ -415,7 +437,7 @@ services:
     container_name: nexus-search
     restart: unless-stopped
     ports:
-      - '3006:3006'
+      - '127.0.0.1:3006:3006'
     environment:
       PORT: '3006'
       KAFKA_BROKERS: kafka:29092
@@ -424,6 +446,17 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       MEILISEARCH_URL: http://meilisearch:7700
       MEILISEARCH_KEY: ${MEILI_MASTER_KEY:-nexus-dev}
+      # Sources for POST /search/reindex, the cold-start backfill that hydrates
+      # Meili from the owning services. None of these were set, and the reindex
+      # route "skips with a warning" per source when its URL or the service token
+      # is missing — so the backfill silently did nothing and every record that
+      # predated the live indexer stayed unsearchable (accounts 0/30, contacts
+      # 0/81, leads 0/12, deals 1/15, while activities and quotes — created after
+      # the indexer was live — indexed fine).
+      CRM_SERVICE_URL: http://crm-service:3001
+      FINANCE_SERVICE_URL: http://finance-service:3002
+      KNOWLEDGE_SERVICE_URL: http://knowledge-service:3023
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       # Saved/recent searches (SRCH-08/09) persist to their own small DB.
       SEARCH_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_search
     depends_on:
@@ -439,7 +472,7 @@ services:
     container_name: nexus-workflow
     restart: unless-stopped
     ports:
-      - '3007:3007'
+      - '127.0.0.1:3007:3007'
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_workflow
       KAFKA_BROKERS: kafka:29092
@@ -447,6 +480,16 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+      # Peer service URLs the automation-rule action nodes call. Without these the
+      # nodes fall back to localhost and silently no-op (rule fires but nothing
+      # changes) — the concrete cause of "automation doesn't affect the system".
+      CRM_SERVICE_URL: http://crm-service:3001
+      APPROVAL_SERVICE_URL: http://approval-service:3014
+      BLUEPRINT_SERVICE_URL: http://blueprint-service:3013
+      WORKFLOW_SERVICE_URL: http://workflow-service:3007
+      NOTIFICATION_SERVICE_URL: http://notification-service:3003
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      BLUEPRINT_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -460,7 +503,7 @@ services:
     container_name: nexus-integration
     restart: unless-stopped
     ports:
-      - '3012:3012'
+      - '127.0.0.1:3012:3012'
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_integration
       INTEGRATION_SECRET_KEY: nexus_integration_secret_key_32b
@@ -482,7 +525,7 @@ services:
     container_name: nexus-blueprint
     restart: unless-stopped
     ports:
-      - '3013:3013'
+      - '127.0.0.1:3013:3013'
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_blueprint
       KAFKA_BROKERS: kafka:29092
@@ -491,6 +534,8 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       # Must equal crm-service's BLUEPRINT_SERVICE_TOKEN so the internal
       # validate-transition call authenticates (timingSafeEqual).
       BLUEPRINT_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
@@ -507,7 +552,7 @@ services:
     container_name: nexus-analytics
     restart: unless-stopped
     ports:
-      - '3008:3008'
+      - '127.0.0.1:3008:3008'
     environment:
       KAFKA_BROKERS: kafka:29092
       JWT_SECRET: ${JWT_SECRET}
@@ -517,6 +562,8 @@ services:
       CLICKHOUSE_DB: default
       CRM_SERVICE_URL: http://crm-service:3001
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
     depends_on:
       kafka:
         condition: service_started
@@ -552,6 +599,8 @@ services:
       # Without them they fall back to localhost (unreachable in-container) and
       # every reporting/analytics/forecast/etc call 500'd. Internal DNS names.
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       AUTH_SERVICE_URL: http://auth-service:3000
       CRM_SERVICE_URL: http://crm-service:3001
       FINANCE_SERVICE_URL: http://finance-service:3002
@@ -641,7 +690,7 @@ services:
     container_name: nexus-comm
     restart: unless-stopped
     ports:
-      - '3009:3009'
+      - '127.0.0.1:3009:3009'
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_comm
       KAFKA_BROKERS: kafka:29092
@@ -654,6 +703,8 @@ services:
       # the shared mesh token (x-service-token). Must match crm's value.
       CRM_SERVICE_URL: http://crm-service:3001
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
     depends_on:
       postgres:
         condition: service_healthy
@@ -667,12 +718,15 @@ services:
     container_name: nexus-storage
     restart: unless-stopped
     ports:
-      - '3010:3010'
+      - '127.0.0.1:3010:3010'
     environment:
       MINIO_ENDPOINT: minio
       MINIO_PORT: '9000'
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      # Must carry the SAME defaults as the minio service (nexus / nexus-minio),
+      # else an unset MINIO_ROOT_* leaves these empty and MinIO returns
+      # AccessDenied on bucket init → storage-service crash-loops.
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-nexus}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-nexus-minio}
       MINIO_BUCKET: nexus-files
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_storage
       KAFKA_BROKERS: kafka:29092
@@ -691,9 +745,11 @@ services:
     container_name: nexus-approval
     restart: unless-stopped
     ports:
-      - '3014:3014'
+      - '127.0.0.1:3014:3014'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3014'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_approval
       KAFKA_BROKERS: kafka:29092
@@ -714,7 +770,7 @@ services:
     container_name: nexus-data
     restart: unless-stopped
     ports:
-      - '3015:3015'
+      - '127.0.0.1:3015:3015'
     environment:
       PORT: '3015'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_data
@@ -733,6 +789,8 @@ services:
       CAMPAIGN_SERVICE_URL: http://campaign-service:3025
       KNOWLEDGE_SERVICE_URL: http://knowledge-service:3023
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
     depends_on:
       postgres:
         condition: service_healthy
@@ -746,7 +804,7 @@ services:
     container_name: nexus-document
     restart: unless-stopped
     ports:
-      - '3016:3016'
+      - '127.0.0.1:3016:3016'
     environment:
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
@@ -757,6 +815,8 @@ services:
       # this block entirely, so every DB query failed and /health returned 503.
       DOCUMENT_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_document
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
     depends_on:
       - finance-service
 
@@ -767,7 +827,7 @@ services:
     container_name: nexus-chatbot
     restart: unless-stopped
     ports:
-      - '3017:3017'
+      - '127.0.0.1:3017:3017'
     environment:
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
@@ -792,8 +852,20 @@ services:
     container_name: nexus-cadence
     restart: unless-stopped
     ports:
-      - '3018:3018'
+      - '127.0.0.1:3018:3018'
     environment:
+      # crm calls POST /api/v1/internal/cadence/auto-enroll; the step-runner calls
+      # crm's /internal/automation/activities — both use x-service-token.
+      # These two URLs were documented by the comment above but never set: the
+      # step-runner interpolates them unguarded, so the fetch target became
+      # "undefined/api/v1/..." and threw into a .catch(() => undefined). Every
+      # cadence email and task was silently dropped while the step still reported
+      # success and the enrollment advanced to the next step.
+      CRM_SERVICE_URL: http://crm-service:3001
+      COMM_SERVICE_URL: http://comm-service:3009
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3018'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_cadence
       KAFKA_BROKERS: kafka:29092
@@ -814,8 +886,12 @@ services:
     container_name: nexus-territory
     restart: unless-stopped
     ports:
-      - '3019:3019'
+      - '127.0.0.1:3019:3019'
     environment:
+      # crm calls POST /api/v1/internal/territories/assign with x-service-token.
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3019'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_territory
       KAFKA_BROKERS: kafka:29092
@@ -835,12 +911,14 @@ services:
     container_name: nexus-planning
     restart: unless-stopped
     ports:
-      - '3020:3020'
+      - '127.0.0.1:3020:3020'
     environment:
       PORT: '3020'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_planning
       CRM_SERVICE_URL: http://crm-service:3001
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
@@ -859,13 +937,21 @@ services:
     container_name: nexus-reporting
     restart: unless-stopped
     ports:
-      - '3021:3021'
+      - '127.0.0.1:3021:3021'
     environment:
       PORT: '3021'
       REPORTING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_reporting
       CRM_SERVICE_URL: http://crm-service:3001
       ANALYTICS_SERVICE_URL: http://analytics-service:3008/api/v1/analytics
+      # Scheduled reports are delivered through comm-service's outbox. Without
+      # this the runner fell back to localhost:3009 — itself — so every scheduled
+      # report silently failed to send.
+      COMM_SERVICE_URL: http://comm-service:3009
+      # PDF export renders via document-service, which ships the headless Chromium.
+      DOCUMENT_SERVICE_URL: http://document-service:3016
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
@@ -882,11 +968,17 @@ services:
     container_name: nexus-portal
     restart: unless-stopped
     ports:
-      - '3022:3022'
+      - '127.0.0.1:3022:3022'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3022'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_portal
+      # Portal reads the customer's own quotes/orders/invoices/tickets via
+      # internal account-scoped endpoints on finance/ticket.
+      FINANCE_SERVICE_URL: http://finance-service:3002
+      TICKET_SERVICE_URL: http://ticket-service:3029
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
       JWT_SECRET: ${JWT_SECRET}
@@ -903,9 +995,13 @@ services:
     container_name: nexus-knowledge
     restart: unless-stopped
     ports:
-      - '3023:3023'
+      - '127.0.0.1:3023:3023'
     environment:
       PORT: '3023'
+      # Required for /api/v1/internal/* : createService only bypasses its JWT
+      # preHandler when x-service-token matches this, so without it search's
+      # reindex source call fell through to end-user auth and returned 401.
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_knowledge
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
@@ -923,7 +1019,7 @@ services:
     container_name: nexus-incentive
     restart: unless-stopped
     ports:
-      - '3024:3024'
+      - '127.0.0.1:3024:3024'
     environment:
       PORT: '3024'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_incentive
@@ -945,7 +1041,7 @@ services:
     container_name: nexus-email-sync
     restart: unless-stopped
     ports:
-      - '3026:3026'
+      - '127.0.0.1:3026:3026'
     environment:
       EMAIL_SYNC_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_email_sync
       KAFKA_BROKERS: kafka:29092
@@ -966,9 +1062,11 @@ services:
     container_name: nexus-metadata
     restart: unless-stopped
     ports:
-      - '3004:3004'
+      - '127.0.0.1:3004:3004'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
@@ -1003,7 +1101,7 @@ services:
     container_name: nexus-audit-consumer
     restart: unless-stopped
     ports:
-      - '3028:3028'
+      - '127.0.0.1:3028:3028'
     environment:
       PORT: '3028'
       AUDIT_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_audit
@@ -1025,7 +1123,7 @@ services:
     container_name: nexus-outbox-relay
     restart: unless-stopped
     ports:
-      - '3027:3027'
+      - '127.0.0.1:3027:3027'
     environment:
       PORT: '3027'
       KAFKA_BROKERS: kafka:29092
@@ -1120,6 +1218,8 @@ services:
       - '127.0.0.1:3029:3029'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3029'
       TICKET_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_ticket
       KAFKA_BROKERS: kafka:29092
@@ -1143,6 +1243,8 @@ services:
       - '127.0.0.1:3025:3025'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3025'
       CAMPAIGN_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_campaign
       KAFKA_BROKERS: kafka:29092

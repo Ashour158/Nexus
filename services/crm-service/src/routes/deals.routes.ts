@@ -27,6 +27,11 @@ import { getFieldHistory } from '../lib/field-history.js';
 import { uploadToStorage } from '../lib/storage.js';
 import { createSalesRecordsUseCase } from '../use-cases/sales-records.use-case.js';
 import { buildReadAccessContext } from '../lib/access-context.js';
+import { interceptForReview } from '../lib/review-process.js';
+import { guardRecordWrite, partitionWritableRecords } from '../lib/record-write-guard.js';
+import { canAccessRecord, filterReadableRecords, isSharingConfigured } from '../lib/sharing.js';
+import { resolveAssignee } from '../lib/assignment.js';
+import { withIdempotency } from '../lib/idempotency.js';
 import type { EngineContext } from '@nexus/domain-core';
 
 // ─── Local param schemas ────────────────────────────────────────────────────
@@ -98,7 +103,7 @@ export async function registerDealsRoutes(
       create: (tenantId, data) => deals.createDeal(tenantId, data as never),
       get: (tenantId, id) => deals.getDealById(tenantId, id) as Promise<Record<string, unknown>>,
       update: (tenantId, id, data, actor, roles) => deals.updateDeal(tenantId, id, data as never, actor, roles),
-      archive: (tenantId, id) => deals.deleteDeal(tenantId, id),
+      archive: (tenantId, id, deletedBy, deletedByName) => deals.deleteDeal(tenantId, id, deletedBy, deletedByName),
       restore: (tenantId, id) => deals.restoreDeal(tenantId, id),
       moveStage: (tenantId, id, stageId) => deals.moveDealToStage(tenantId, id, stageId),
       markWon: (tenantId, id) => deals.markDealWon(tenantId, id),
@@ -163,7 +168,15 @@ export async function registerDealsRoutes(
             sortBy: q.sortBy as import('../services/deals.service.js').DealListPagination['sortBy'],
             sortDir: q.sortDir,
           }, access);
-          return reply.send({ success: true, data: result });
+          // Record-level sharing (opt-in): drop rows the caller cannot read.
+          const filtered = await filterReadableRecords(
+            prisma,
+            jwt.tenantId,
+            jwt,
+            'deal',
+            result.data as unknown as Record<string, unknown>[]
+          );
+          return reply.send({ success: true, data: { ...result, data: filtered } });
         }
       );
 
@@ -177,11 +190,23 @@ export async function registerDealsRoutes(
             throw new ValidationError('Invalid body', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
-          const deal = await salesRecords.create(engineContextFromJwt(request.id, jwt), {
-            entityType: 'deal',
-            data: parsed.data as Record<string, unknown>,
+          // Assignment Rules (opt-in): when the caller did NOT explicitly supply
+          // an ownerId and an active rule assigns one, auto-assign. An explicitly
+          // supplied ownerId is never overridden.
+          const createData = parsed.data as Record<string, unknown>;
+          const explicitOwner = Boolean((request.body as Record<string, unknown> | undefined)?.ownerId);
+          if (!explicitOwner) {
+            const assignee = await resolveAssignee(prisma, jwt.tenantId, 'deal', createData);
+            if (assignee) createData.ownerId = assignee;
+          }
+          const { statusCode, body } = await withIdempotency(prisma, request, jwt.tenantId, async () => {
+            const deal = await salesRecords.create(engineContextFromJwt(request.id, jwt), {
+              entityType: 'deal',
+              data: createData,
+            });
+            return { statusCode: 201, body: { success: true, data: deal } };
           });
-          return reply.code(201).send({ success: true, data: deal });
+          return reply.code(statusCode).send(body);
         }
       );
 
@@ -356,12 +381,16 @@ export async function registerDealsRoutes(
         async (request, reply) => {
           const body = DealMassUpdateSchema.parse(request.body);
           const jwt = request.user as JwtPayload;
-          const data = await salesRecords.massUpdate(engineContextFromJwt(request.id, jwt), {
-            entityType: 'deal',
-            ids: body.ids,
-            data: body.data,
-          });
-          return reply.send({ success: true, data });
+          // Data-governance guard (opt-in): skip locked/sharing-restricted records.
+          const { allowed, skipped } = await partitionWritableRecords(prisma, jwt, 'deal', body.ids, request.headers.authorization);
+          const data = allowed.length
+            ? await salesRecords.massUpdate(engineContextFromJwt(request.id, jwt), {
+                entityType: 'deal',
+                ids: allowed,
+                data: body.data,
+              })
+            : { count: 0 };
+          return reply.send({ success: true, data: { ...data, skipped } });
         }
       );
 
@@ -371,11 +400,15 @@ export async function registerDealsRoutes(
         async (request, reply) => {
           const body = MassIdsSchema.parse(request.body);
           const jwt = request.user as JwtPayload;
-          const data = await salesRecords.massArchive(engineContextFromJwt(request.id, jwt), {
-            entityType: 'deal',
-            ids: body.ids,
-          });
-          return reply.send({ success: true, data });
+          // Data-governance guard (opt-in): skip locked/sharing-restricted records.
+          const { allowed, skipped } = await partitionWritableRecords(prisma, jwt, 'deal', body.ids, request.headers.authorization);
+          const data = allowed.length
+            ? await salesRecords.massArchive(engineContextFromJwt(request.id, jwt), {
+                entityType: 'deal',
+                ids: allowed,
+              })
+            : { count: 0 };
+          return reply.send({ success: true, data: { ...data, skipped } });
         }
       );
 
@@ -560,6 +593,13 @@ export async function registerDealsRoutes(
           const jwt = request.user as JwtPayload;
           const access = await buildReadAccessContext(jwt, 'deal', request.headers.authorization);
           const deal = await deals.getDealById(jwt.tenantId, id, access);
+          // Record-level sharing (opt-in): deny read if not accessible.
+          if (deal && (await isSharingConfigured(prisma, jwt.tenantId, 'deal'))) {
+            const allowed = await canAccessRecord(prisma, jwt.tenantId, jwt, 'deal', deal as unknown as Record<string, unknown>, 'read');
+            if (!allowed) {
+              return reply.code(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'You do not have read access to this record', requestId: request.id } });
+            }
+          }
           return reply.send({ success: true, data: deal });
         }
       );
@@ -575,6 +615,23 @@ export async function registerDealsRoutes(
             throw new ValidationError('Invalid body', parsed.error.flatten());
           }
           const jwt = request.user as JwtPayload;
+          // Data-governance guard (opt-in): record lock (423) → sharing write (403).
+          const guard = await guardRecordWrite(prisma, jwt, 'deal', id, request.headers.authorization);
+          if (!guard.ok) {
+            return reply.code(guard.status).send({ success: false, error: { code: guard.code, message: guard.message, requestId: request.id } });
+          }
+          // Maker-checker: if a review process gates any edited field, divert the
+          // whole change into a PendingChange and return 202 instead of writing.
+          const review = await interceptForReview(prisma, {
+            tenantId: jwt.tenantId,
+            module: 'deal',
+            recordId: id,
+            changes: parsed.data as Record<string, unknown>,
+            submittedById: jwt.sub,
+          });
+          if (review) {
+            return reply.code(202).send({ success: true, pendingChangeId: review.pendingChangeId, requiresReview: true });
+          }
           const deal = await salesRecords.update(engineContextFromJwt(request.id, jwt), {
             entityType: 'deal',
             id,
@@ -623,6 +680,11 @@ export async function registerDealsRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
+          // Data-governance guard (opt-in): record lock (423) → sharing write (403).
+          const guard = await guardRecordWrite(prisma, jwt, 'deal', id, request.headers.authorization);
+          if (!guard.ok) {
+            return reply.code(guard.status).send({ success: false, error: { code: guard.code, message: guard.message, requestId: request.id } });
+          }
           const data = await salesRecords.archive(engineContextFromJwt(request.id, jwt), { entityType: 'deal', id });
           return reply.send({ success: true, data });
         }
@@ -634,6 +696,11 @@ export async function registerDealsRoutes(
         async (request, reply) => {
           const { id } = IdParamSchema.parse(request.params);
           const jwt = request.user as JwtPayload;
+          // Data-governance guard (opt-in): record lock (423) → sharing write (403).
+          const guard = await guardRecordWrite(prisma, jwt, 'deal', id, request.headers.authorization);
+          if (!guard.ok) {
+            return reply.code(guard.status).send({ success: false, error: { code: guard.code, message: guard.message, requestId: request.id } });
+          }
           const deal = await salesRecords.restore(engineContextFromJwt(request.id, jwt), { entityType: 'deal', id });
           return reply.send({ success: true, data: deal });
         }

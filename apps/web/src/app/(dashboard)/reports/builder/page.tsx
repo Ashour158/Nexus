@@ -62,9 +62,9 @@ export default function ReportBuilderPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 space-y-4">
+    <div className="min-h-screen bg-surface-container-low dark:bg-surface p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Report Builder</h1>
+        <h1 className="text-2xl font-bold text-on-surface ">Report Builder</h1>
         <div className="flex gap-2">
           {scheduleReportId && (
             <button
@@ -74,7 +74,7 @@ export default function ReportBuilderPage() {
                 if (email) scheduleMutation.mutate(email);
               }}
               disabled={scheduleMutation.isPending}
-              className="px-3 py-2 rounded-lg border border-slate-300 text-sm"
+              className="px-3 py-2 rounded-lg border border-outline-variant text-sm"
             >
               {scheduleMutation.isPending ? 'Scheduling…' : 'Schedule weekly email'}
             </button>
@@ -83,14 +83,14 @@ export default function ReportBuilderPage() {
             type="button"
             onClick={exportCsv}
             disabled={results.length === 0}
-            className="flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40"
+            className="flex items-center gap-1 px-3 py-2 rounded-lg border border-outline-variant dark:border-outline-variant text-sm hover:bg-surface-container-high dark:hover:bg-surface-container-highest disabled:opacity-40"
           >
             <Download className="h-4 w-4" /> Export CSV
           </button>
           <button
             type="button"
             onClick={() => setShowSave(true)}
-            className="flex items-center gap-1 px-3 py-2 rounded-lg border border-indigo-300 bg-indigo-50 text-indigo-700 text-sm hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700"
+            className="flex items-center gap-1 px-3 py-2 rounded-lg border border-primary/40 bg-primary-container text-primary text-sm hover:bg-primary-container "
           >
             <Save className="h-4 w-4" /> Save Report
           </button>
@@ -98,7 +98,7 @@ export default function ReportBuilderPage() {
             type="button"
             onClick={() => runMutation.mutate()}
             disabled={runMutation.isPending}
-            className="flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700 disabled:opacity-60"
+            className="flex items-center gap-1 px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary disabled:opacity-60"
           >
             <Play className="h-4 w-4" /> Run Report
           </button>

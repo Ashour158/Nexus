@@ -18,10 +18,10 @@ type CalendarEvent = {
 };
 
 const TYPE_COLORS: Record<EventType, string> = {
-  meeting: 'bg-blue-100 text-blue-800',
-  task: 'bg-orange-100 text-orange-800',
-  call: 'bg-emerald-100 text-emerald-800',
-  deadline: 'bg-red-100 text-red-800',
+  meeting: 'bg-primary-container text-on-primary-container',
+  task: 'bg-warning-container text-on-warning-container',
+  call: 'bg-success-container text-on-success-container',
+  deadline: 'bg-error-container text-on-error-container',
 };
 
 export default function CalendarPage() {
@@ -77,36 +77,36 @@ export default function CalendarPage() {
     <main className="space-y-4 p-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Calendar</h1>
-          <p className="text-sm text-slate-500">{view} view</p>
+          <h1 className="text-2xl font-bold text-on-surface">Calendar</h1>
+          <p className="text-sm text-on-surface-variant">{view} view</p>
         </div>
         <div className="flex items-center gap-2">
-          <select value={view} onChange={(e) => setView(e.target.value as 'day' | 'week' | 'month')} className="rounded border border-slate-300 px-2 py-2 text-sm">
+          <select value={view} onChange={(e) => setView(e.target.value as 'day' | 'week' | 'month')} className="rounded border border-outline-variant px-2 py-2 text-sm">
             <option value="day">Day</option><option value="week">Week</option><option value="month">Month</option>
           </select>
-          <button onClick={() => setShowCreate(true)} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white">Create event</button>
+          <button onClick={() => setShowCreate(true)} className="rounded bg-primary px-3 py-2 text-sm font-medium text-white">Create event</button>
         </div>
       </header>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="mb-3 flex items-center justify-between rounded bg-slate-50 p-3 text-sm">
+      <section className="rounded-xl border border-outline-variant bg-surface p-4">
+        <div className="mb-3 flex items-center justify-between rounded bg-surface-container-low p-3 text-sm">
           <div>
             <span className="font-medium">Google Calendar</span>{' '}
-            <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">Connected</span>
+            <span className="rounded bg-success-container px-2 py-0.5 text-xs text-on-success-container">Connected</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-slate-500">Last synced: {events.data?.[0]?.syncedAt ? new Date(events.data[0].syncedAt).toLocaleString() : 'Never'}</span>
-            <button onClick={() => sync.mutate()} className="rounded border border-slate-300 px-2 py-1" disabled={sync.isPending}>Sync</button>
-            <Link href="/settings/integrations" className="rounded border border-slate-300 px-2 py-1">Integrations</Link>
+            <span className="text-on-surface-variant">Last synced: {events.data?.[0]?.syncedAt ? new Date(events.data[0].syncedAt).toLocaleString() : 'Never'}</span>
+            <button onClick={() => sync.mutate()} className="rounded border border-outline-variant px-2 py-1" disabled={sync.isPending}>Sync</button>
+            <Link href="/settings/integrations" className="rounded border border-outline-variant px-2 py-1">Integrations</Link>
           </div>
         </div>
         <div className="grid gap-3 md:grid-cols-2">
           {grouped.map(([date, list]) => (
-            <div key={date} className="rounded border border-slate-200 p-3">
-              <p className="text-sm font-semibold text-slate-900">{date}</p>
+            <div key={date} className="rounded border border-outline-variant p-3">
+              <p className="text-sm font-semibold text-on-surface">{date}</p>
               <div className="mt-2 space-y-2">
                 {list.map((event) => (
-                  <button key={event.id} onClick={() => setSelected(event)} className="w-full rounded border border-slate-200 p-2 text-start hover:bg-slate-50">
+                  <button key={event.id} onClick={() => setSelected(event)} className="w-full rounded border border-outline-variant p-2 text-start hover:bg-surface-container-low">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium">{event.activityId.slice(0, 8)} - {event.externalId}</p>
                       <span className={`rounded px-2 py-0.5 text-xs ${TYPE_COLORS.meeting}`}>{event.provider}</span>
@@ -118,7 +118,7 @@ export default function CalendarPage() {
           ))}
           {grouped.length === 0 ? (
             events.isLoading ? (
-              <p className="text-sm text-slate-500">Loading...</p>
+              <p className="text-sm text-on-surface-variant">Loading...</p>
             ) : (
               <EmptyState
                 icon="📅"
@@ -132,8 +132,8 @@ export default function CalendarPage() {
       </section>
 
       {view === 'week' ? (
-        <section className="max-h-[420px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">Week working hours</h2>
+        <section className="max-h-[420px] overflow-y-auto rounded-xl border border-outline-variant bg-surface p-4">
+          <h2 className="mb-3 text-sm font-semibold text-on-surface">Week working hours</h2>
           <div className="space-y-0">
             {Array.from({ length: 24 }, (_, hour) => {
               const isWorkingHour = hour >= 8 && hour < 18;
@@ -143,10 +143,10 @@ export default function CalendarPage() {
                 <div
                   key={hour}
                   id={`hour-${hour}`}
-                  className={`grid grid-cols-[80px_1fr] items-center border-b border-gray-100 py-2 ${isWorkingHour ? 'bg-white' : 'bg-gray-50/60'}`}
+                  className={`grid grid-cols-[80px_1fr] items-center border-b border-outline-variant py-2 ${isWorkingHour ? 'bg-surface' : 'bg-surface-container-low/60'}`}
                 >
-                  <span className={`px-2 text-xs ${isWorkingHour ? 'text-gray-600' : 'text-gray-300'}`}>{label}</span>
-                  <div className="h-8 rounded border border-dashed border-gray-100" />
+                  <span className={`px-2 text-xs ${isWorkingHour ? 'text-on-surface-variant' : 'text-outline'}`}>{label}</span>
+                  <div className="h-8 rounded border border-dashed border-outline-variant" />
                 </div>
               );
             })}
@@ -155,30 +155,30 @@ export default function CalendarPage() {
       ) : null}
 
       {selected ? (
-        <aside className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Event details</h2>
+        <aside className="rounded-xl border border-outline-variant bg-surface p-4">
+          <h2 className="text-sm font-semibold text-on-surface">Event details</h2>
           <p className="mt-2 text-sm">Activity: {selected.activityId}</p>
-          <p className="text-sm text-slate-600">Provider: {selected.provider}</p>
-          <p className="text-sm text-slate-600">Synced: {new Date(selected.syncedAt).toLocaleString()}</p>
+          <p className="text-sm text-on-surface-variant">Provider: {selected.provider}</p>
+          <p className="text-sm text-on-surface-variant">Synced: {new Date(selected.syncedAt).toLocaleString()}</p>
         </aside>
       ) : null}
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Create event" size="xl">
         <div className="mt-1 grid gap-2 md:grid-cols-2">
-              <input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} placeholder="Title" className="rounded border border-slate-300 px-3 py-2 text-sm" />
-              <select value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as EventType }))} className="rounded border border-slate-300 px-3 py-2 text-sm"><option value="meeting">Meeting</option><option value="task">Task</option><option value="call">Call</option><option value="deadline">Deadline</option></select>
-              <input type="date" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} className="rounded border border-slate-300 px-3 py-2 text-sm" />
-              <input type="time" value={form.time} onChange={(e) => setForm((p) => ({ ...p, time: e.target.value }))} className="rounded border border-slate-300 px-3 py-2 text-sm" />
-              <input type="number" value={form.duration} onChange={(e) => setForm((p) => ({ ...p, duration: Number(e.target.value || 30) }))} placeholder="Duration" className="rounded border border-slate-300 px-3 py-2 text-sm" />
-              <input value={form.attendees} onChange={(e) => setForm((p) => ({ ...p, attendees: e.target.value }))} placeholder="Attendees" className="rounded border border-slate-300 px-3 py-2 text-sm" />
-              <input value={form.deal} onChange={(e) => setForm((p) => ({ ...p, deal: e.target.value }))} placeholder="Link to deal" className="rounded border border-slate-300 px-3 py-2 text-sm" />
-              <input value={form.joinLink} onChange={(e) => setForm((p) => ({ ...p, joinLink: e.target.value }))} placeholder="Video link" className="rounded border border-slate-300 px-3 py-2 text-sm" />
-              <select value={form.reminder} onChange={(e) => setForm((p) => ({ ...p, reminder: e.target.value }))} className="rounded border border-slate-300 px-3 py-2 text-sm"><option>15 min</option><option>1 hour</option><option>1 day</option></select>
-              <textarea value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} rows={3} placeholder="Description / agenda" className="rounded border border-slate-300 px-3 py-2 text-sm md:col-span-2" />
+              <input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} placeholder="Title" className="rounded border border-outline-variant px-3 py-2 text-sm" />
+              <select value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as EventType }))} className="rounded border border-outline-variant px-3 py-2 text-sm"><option value="meeting">Meeting</option><option value="task">Task</option><option value="call">Call</option><option value="deadline">Deadline</option></select>
+              <input type="date" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} className="rounded border border-outline-variant px-3 py-2 text-sm" />
+              <input type="time" value={form.time} onChange={(e) => setForm((p) => ({ ...p, time: e.target.value }))} className="rounded border border-outline-variant px-3 py-2 text-sm" />
+              <input type="number" value={form.duration} onChange={(e) => setForm((p) => ({ ...p, duration: Number(e.target.value || 30) }))} placeholder="Duration" className="rounded border border-outline-variant px-3 py-2 text-sm" />
+              <input value={form.attendees} onChange={(e) => setForm((p) => ({ ...p, attendees: e.target.value }))} placeholder="Attendees" className="rounded border border-outline-variant px-3 py-2 text-sm" />
+              <input value={form.deal} onChange={(e) => setForm((p) => ({ ...p, deal: e.target.value }))} placeholder="Link to deal" className="rounded border border-outline-variant px-3 py-2 text-sm" />
+              <input value={form.joinLink} onChange={(e) => setForm((p) => ({ ...p, joinLink: e.target.value }))} placeholder="Video link" className="rounded border border-outline-variant px-3 py-2 text-sm" />
+              <select value={form.reminder} onChange={(e) => setForm((p) => ({ ...p, reminder: e.target.value }))} className="rounded border border-outline-variant px-3 py-2 text-sm"><option>15 min</option><option>1 hour</option><option>1 day</option></select>
+              <textarea value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} rows={3} placeholder="Description / agenda" className="rounded border border-outline-variant px-3 py-2 text-sm md:col-span-2" />
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={() => setShowCreate(false)} className="rounded border border-slate-300 px-4 py-2 text-sm text-slate-700">Cancel</button>
-          <button type="button" onClick={() => create.mutate()} disabled={!form.title || !form.date || !form.time || create.isPending} className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50">Save event</button>
+          <button type="button" onClick={() => setShowCreate(false)} className="rounded border border-outline-variant px-4 py-2 text-sm text-on-surface">Cancel</button>
+          <button type="button" onClick={() => create.mutate()} disabled={!form.title || !form.date || !form.time || create.isPending} className="rounded bg-primary px-4 py-2 text-sm text-white disabled:opacity-50">Save event</button>
         </div>
       </Modal>
     </main>

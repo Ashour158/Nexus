@@ -17,6 +17,7 @@ import { createWorkflowPrisma } from './prisma.js';
 import { registerRoutes } from './routes/index.js';
 import { startTriggerConsumer } from './consumers/trigger.consumer.js';
 import { startAutomationConsumer } from './consumers/automation.consumer.js';
+import { startAutomationDlqReplayConsumer } from './consumers/automation-dlq.consumer.js';
 import { startBranchConsumer } from './consumers/branch.consumer.js';
 import { startApprovalConsumer } from './consumers/approval.consumer.js';
 import { startGdprConsumer } from './consumers/gdpr.consumer.js';
@@ -24,6 +25,9 @@ import { startSlaScanner } from './services/sla-scanner.js';
 import { startScheduleTrigger } from './services/schedule-trigger.js';
 import { startJourneyEnrollmentConsumer } from './consumers/journey-enrollment.consumer.js';
 import { startJourneyScheduler } from './services/journey-engine.js';
+import { startScheduledActionPoller } from './services/scheduled-actions.service.js';
+import { startEscalationPoller } from './services/escalation.js';
+import { startRecordScoringConsumer } from './consumers/record-scoring.consumer.js';
 import { createExecutionsService } from './services/executions.service.js';
 import { registerGraphQL } from './graphql/index.js';
 
@@ -92,18 +96,38 @@ let approvalConsumer: Awaited<ReturnType<typeof startApprovalConsumer>> | null =
 let gdprConsumer: Awaited<ReturnType<typeof startGdprConsumer>> | null = null;
 let journeyEnrollmentConsumer: Awaited<ReturnType<typeof startJourneyEnrollmentConsumer>> | null = null;
 let automationConsumer: Awaited<ReturnType<typeof startAutomationConsumer>> | null = null;
+let automationDlqReplayConsumer: Awaited<ReturnType<typeof startAutomationDlqReplayConsumer>> | null = null;
+let recordScoringConsumer: Awaited<ReturnType<typeof startRecordScoringConsumer>> | null = null;
 try {
   await producer.connect();
   await startTriggerConsumer(prisma, producer);
   // Cross-module automation-rules consumer — fail-open, isolated from the others.
   try {
-    automationConsumer = await startAutomationConsumer(prisma);
+    automationConsumer = await startAutomationConsumer(prisma, producer);
   } catch (err) {
     app.log.warn({ err }, 'Automation-rules consumer failed to start');
+  }
+  // WF-OPS DLQ intake — persists every parked automation event to DeadLetterEvent
+  // for the /api/v1/dlq admin replay surface. On by default; the legacy auto
+  // re-drive is a separate opt-in (AUTOMATION_DLQ_REPLAY_ENABLED) handled inside
+  // the consumer. Set AUTOMATION_DLQ_PERSIST_ENABLED=false to disable intake.
+  if (process.env.AUTOMATION_DLQ_PERSIST_ENABLED !== 'false') {
+    try {
+      automationDlqReplayConsumer = await startAutomationDlqReplayConsumer(prisma, producer);
+      app.log.info('Automation DLQ intake/replay consumer started');
+    } catch (err) {
+      app.log.warn({ err }, 'Automation DLQ intake/replay consumer failed to start');
+    }
   }
   branchConsumer = await startBranchConsumer(prisma, producer);
   approvalConsumer = await startApprovalConsumer(prisma, producer, app.log);
   gdprConsumer = await startGdprConsumer(prisma);
+  // WF-DEPTH scoring + threshold-alert consumer — fail-open, never blocks the rest.
+  try {
+    recordScoringConsumer = await startRecordScoringConsumer(prisma, producer, app.log);
+  } catch (err) {
+    app.log.warn({ err }, 'Record-scoring consumer failed to start');
+  }
   // CommandCenter auto-enrollment — fail-open, never blocks the other consumers.
   try {
     journeyEnrollmentConsumer = await startJourneyEnrollmentConsumer(prisma, producer, app.log);
@@ -121,6 +145,8 @@ app.addHook('onClose', async () => {
   try { await gdprConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'GDPR consumer disconnect failed'); }
   try { await journeyEnrollmentConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Journey enrollment consumer disconnect failed'); }
   try { await automationConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Automation-rules consumer disconnect failed'); }
+  try { await automationDlqReplayConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Automation DLQ replay consumer disconnect failed'); }
+  try { await recordScoringConsumer?.disconnect(); } catch (err) { app.log.warn({ err }, 'Record-scoring consumer disconnect failed'); }
   try { await producer.disconnect(); } catch (err) { app.log.warn({ err }, 'Producer disconnect failed'); }
 });
 
@@ -158,6 +184,18 @@ startScheduleTrigger(prisma, producer, app.log);
 // CommandCenter — advance due journey enrollments (resumeAt <= now) on a timer.
 // Tick interval configurable via JOURNEY_SCHEDULE_TICK_MS (default 30 s).
 startJourneyScheduler(prisma, producer, app.log);
+
+// WF-DEPTH — execute due time-delayed / date-relative automation actions
+// (ScheduledAutomationAction rows). Re-checks each rule's criteria at fire time
+// and runs the action(s) through the shared engine node handlers. Uses the same
+// producer so NOTIFY/EMAIL actions can publish. Tick interval configurable via
+// SCHEDULED_ACTION_TICK_MS (default 30 s).
+startScheduledActionPoller(prisma, producer, app.log);
+
+// WF-DEPTH — Escalation Rules: walk ACTIVE EscalationInstances up their tier
+// ladder, firing each tier's action at its due time. Tick interval configurable
+// via ESCALATION_TICK_MS (default 60 s).
+startEscalationPoller(prisma, producer, app.log);
 
 await registerGraphQL(app, prisma);
 

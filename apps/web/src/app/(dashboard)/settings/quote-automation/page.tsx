@@ -197,15 +197,15 @@ export default function QuoteAutomationPage(): JSX.Element {
   return (
     <main className="space-y-6 p-6">
       <header>
-        <h1 className="text-2xl font-bold text-slate-900">Quote Automation & Templates</h1>
-        <p className="mt-1 text-sm text-slate-500">Rules and templates now require complete data before they can enter the CPQ engine.</p>
+        <h1 className="text-2xl font-bold text-on-surface">Quote Automation & Templates</h1>
+        <p className="mt-1 text-sm text-on-surface-variant">Rules and templates now require complete data before they can enter the CPQ engine.</p>
       </header>
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <form onSubmit={submitRule} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <form onSubmit={submitRule} className="rounded-xl border border-outline-variant bg-surface p-5 shadow-sm">
           <div className="flex items-center gap-3">
-            <Zap className="h-5 w-5 text-blue-600" />
-            <h2 className="text-lg font-bold text-slate-900">Create automation rule</h2>
+            <Zap className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-bold text-on-surface">Create automation rule</h2>
           </div>
           <div className="mt-4 grid gap-3">
             <Field label="Rule name">
@@ -245,10 +245,10 @@ export default function QuoteAutomationPage(): JSX.Element {
           </div>
         </form>
 
-        <form onSubmit={submitTemplate} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <form onSubmit={submitTemplate} className="rounded-xl border border-outline-variant bg-surface p-5 shadow-sm">
           <div className="flex items-center gap-3">
-            <UploadCloud className="h-5 w-5 text-blue-600" />
-            <h2 className="text-lg font-bold text-slate-900">Upload quote template</h2>
+            <UploadCloud className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-bold text-on-surface">Upload quote template</h2>
           </div>
           <div className="mt-4 grid gap-3">
             <Field label="Template name">
@@ -257,10 +257,10 @@ export default function QuoteAutomationPage(): JSX.Element {
             <div className="grid gap-3 md:grid-cols-3">
               <Field label="Version"><input required type="number" min="1" value={templateForm.version} onChange={(e) => setTemplateForm((s) => ({ ...s, version: e.target.value }))} className="input" /></Field>
               <Field label="Language"><select value={templateForm.language} onChange={(e) => setTemplateForm((s) => ({ ...s, language: e.target.value }))} className="input"><option value="en">English</option><option value="ar">Arabic</option></select></Field>
-              <label className="flex items-end gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={templateForm.isDefault} onChange={(e) => setTemplateForm((s) => ({ ...s, isDefault: e.target.checked }))} /> Default</label>
+              <label className="flex items-end gap-2 text-sm font-semibold text-on-surface"><input type="checkbox" checked={templateForm.isDefault} onChange={(e) => setTemplateForm((s) => ({ ...s, isDefault: e.target.checked }))} /> Default</label>
             </div>
-            <input type="file" accept=".html,.htm,.docx" onChange={onTemplateFile} className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm" />
-            {templateForm.fileName ? <p className="text-xs font-semibold text-blue-700">Validated file: {templateForm.fileName}</p> : null}
+            <input type="file" accept=".html,.htm,.docx" onChange={onTemplateFile} className="rounded-lg border border-dashed border-outline-variant bg-surface-container-low p-3 text-sm" />
+            {templateForm.fileName ? <p className="text-xs font-semibold text-primary">Validated file: {templateForm.fileName}</p> : null}
             <Field label="HTML body">
               <textarea disabled={templateForm.contentType.includes('wordprocessingml')} rows={5} value={templateForm.body} onChange={(e) => setTemplateForm((s) => ({ ...s, body: e.target.value }))} className="input min-h-28" />
             </Field>
@@ -272,11 +272,11 @@ export default function QuoteAutomationPage(): JSX.Element {
       <section className="grid gap-6 xl:grid-cols-2">
         <ListPanel icon={GitBranch} title="Automation rules">
           {(rules.data ?? []).map((rule) => (
-            <div key={rule.id} className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm">
+            <div key={rule.id} className="rounded-lg border border-outline-variant bg-surface-container-low p-3 text-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-bold text-slate-900">{rule.name}</p>
-                  <p className="text-xs text-slate-500">{rule.trigger} · {Object.keys(rule.conditions ?? {}).length} conditions · {rule.actions?.length ?? 0} actions</p>
+                  <p className="font-bold text-on-surface">{rule.name}</p>
+                  <p className="text-xs text-on-surface-variant">{rule.trigger} · {Object.keys(rule.conditions ?? {}).length} conditions · {rule.actions?.length ?? 0} actions</p>
                 </div>
                 <Button onClick={() => toggle.mutate(rule)} variant="secondary" className="h-8 px-2 text-xs">{rule.isActive ? 'Disable' : 'Enable'}</Button>
               </div>
@@ -285,13 +285,13 @@ export default function QuoteAutomationPage(): JSX.Element {
         </ListPanel>
         <ListPanel icon={FileText} title="Quote templates">
           {(templates.data ?? []).map((template) => (
-            <div key={template.id} className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm">
+            <div key={template.id} className="rounded-lg border border-outline-variant bg-surface-container-low p-3 text-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-bold text-slate-900">{template.name} v{template.version}</p>
-                  <p className="text-xs text-slate-500">{template.contentType} · {template.status}</p>
+                  <p className="font-bold text-on-surface">{template.name} v{template.version}</p>
+                  <p className="text-xs text-on-surface-variant">{template.contentType} · {template.status}</p>
                 </div>
-                {template.isDefault ? <span className="rounded bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">Default</span> : null}
+                {template.isDefault ? <span className="rounded bg-primary-container px-2 py-1 text-xs font-bold text-primary">Default</span> : null}
               </div>
             </div>
           ))}
@@ -319,15 +319,15 @@ export default function QuoteAutomationPage(): JSX.Element {
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="space-y-1 text-xs font-bold uppercase tracking-wide text-slate-500"><span>{label}</span>{children}</label>;
+  return <label className="space-y-1 text-xs font-bold uppercase tracking-wide text-on-surface-variant"><span>{label}</span>{children}</label>;
 }
 
 function ListPanel({ icon: Icon, title, children }: { icon: ComponentType<{ className?: string }>; title: string; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-xl border border-outline-variant bg-surface p-5 shadow-sm">
       <div className="mb-4 flex items-center gap-3">
-        <Icon className="h-5 w-5 text-blue-600" />
-        <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+        <Icon className="h-5 w-5 text-primary" />
+        <h2 className="text-lg font-bold text-on-surface">{title}</h2>
       </div>
       <div className="space-y-3">{children}</div>
     </section>

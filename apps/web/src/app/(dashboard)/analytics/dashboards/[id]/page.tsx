@@ -14,6 +14,7 @@ import {
 import type { BiWidget } from '@/lib/bi-types';
 import { WidgetCard } from '@/components/bi/widget-card';
 import { WidgetBuilder, type WidgetDraft } from '@/components/bi/widget-builder';
+import { AnnotationsPanel } from '@/components/annotations/annotations-panel';
 
 export default function DashboardDetailPage(): ReactElement {
   const params = useParams<{ id: string }>();
@@ -51,17 +52,17 @@ export default function DashboardDetailPage(): ReactElement {
     <main className="space-y-6">
       <Link
         href="/analytics/dashboards"
-        className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500 hover:text-slate-800"
+        className="inline-flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-on-surface"
       >
         <ArrowLeft className="h-4 w-4" /> All dashboards
       </Link>
 
       {isLoading ? (
-        <div className="rounded-xl border border-slate-100 bg-white p-10 text-center text-sm text-slate-500">
+        <div className="rounded-xl border border-outline-variant bg-surface p-10 text-center text-sm text-on-surface-variant">
           Loading dashboard…
         </div>
       ) : error || !dashboard ? (
-        <div className="rounded-xl border border-rose-100 bg-rose-50 p-8 text-sm text-rose-700">
+        <div className="rounded-xl border border-error/30 bg-error-container p-8 text-sm text-error">
           Dashboard not available. {error ? (error as Error).message : ''}
         </div>
       ) : (
@@ -69,15 +70,15 @@ export default function DashboardDetailPage(): ReactElement {
           <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-slate-900">{dashboard.name}</h1>
+                <h1 className="text-2xl font-bold text-on-surface">{dashboard.name}</h1>
                 {dashboard.shared && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-600">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-success-container px-2 py-0.5 text-xs font-semibold text-success">
                     <Share2 className="h-3 w-3" /> Shared
                   </span>
                 )}
               </div>
               {dashboard.description && (
-                <p className="text-sm text-slate-500">{dashboard.description}</p>
+                <p className="text-sm text-on-surface-variant">{dashboard.description}</p>
               )}
             </div>
             <button
@@ -85,7 +86,7 @@ export default function DashboardDetailPage(): ReactElement {
                 setEditing(null);
                 setBuilderOpen(true);
               }}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary"
             >
               <Plus className="h-4 w-4" />
               Add widget
@@ -93,9 +94,9 @@ export default function DashboardDetailPage(): ReactElement {
           </header>
 
           {widgets.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white p-12 text-center">
-              <h3 className="text-lg font-bold text-slate-900">No widgets yet</h3>
-              <p className="mt-1 max-w-sm text-sm text-slate-500">
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant bg-surface p-12 text-center">
+              <h3 className="text-lg font-bold text-on-surface">No widgets yet</h3>
+              <p className="mt-1 max-w-sm text-sm text-on-surface-variant">
                 Add your first widget — choose a dataset, measures, dimensions and a chart type.
               </p>
               <button
@@ -103,7 +104,7 @@ export default function DashboardDetailPage(): ReactElement {
                   setEditing(null);
                   setBuilderOpen(true);
                 }}
-                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary"
               >
                 <Plus className="h-4 w-4" />
                 Add widget
@@ -131,6 +132,11 @@ export default function DashboardDetailPage(): ReactElement {
               ))}
             </div>
           )}
+
+          <div className="mt-2">
+            <h2 className="mb-2 text-sm font-semibold text-on-surface-variant">Discussion &amp; linked data</h2>
+            <AnnotationsPanel targetType="dashboard" targetId={id} targetLabel="this dashboard" />
+          </div>
         </>
       )}
 

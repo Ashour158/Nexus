@@ -75,11 +75,11 @@ export default function ModuleBuilderPage() {
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-on-surface">
             <Boxes className="h-6 w-6 text-brand-600" />
             Module Builder
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-on-surface-variant">
             Design low-code modules: define fields, layouts, and record data models.
           </p>
         </div>
@@ -99,9 +99,9 @@ export default function ModuleBuilderPage() {
           cta={{ label: 'New module', onClick: () => setOpen(true) }}
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-outline-variant bg-surface-container-low text-left text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
                 <th className="px-4 py-3">Module</th>
                 <th className="px-4 py-3">API name</th>
@@ -109,17 +109,17 @@ export default function ModuleBuilderPage() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-outline-variant">
               {modules.map((m) => (
-                <tr key={m.id} className="hover:bg-slate-50">
+                <tr key={m.id} className="hover:bg-surface-container-low">
                   <td className="px-4 py-3">
-                    <Link href={`/settings/modules/${m.id}`} className="flex items-center gap-2 font-medium text-slate-900 hover:text-brand-700">
+                    <Link href={`/settings/modules/${m.id}`} className="flex items-center gap-2 font-medium text-on-surface hover:text-brand-700">
                       <span>{m.icon ?? '📦'}</span>
                       <span>{m.pluralLabel}</span>
                     </Link>
-                    {m.description && <p className="mt-0.5 text-xs text-slate-500">{m.description}</p>}
+                    {m.description && <p className="mt-0.5 text-xs text-on-surface-variant">{m.description}</p>}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-600">{m.apiName}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-on-surface-variant">{m.apiName}</td>
                   <td className="px-4 py-3">
                     <Link href={`/modules/${m.apiName}`} className="inline-flex items-center gap-1 text-xs text-brand-700 hover:underline">
                       View records <ArrowRight className="h-3 w-3" />
@@ -133,7 +133,7 @@ export default function ModuleBuilderPage() {
                       <button
                         type="button"
                         onClick={() => handleDelete(m.id, m.label)}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                        className="rounded-lg p-1.5 text-on-surface-variant hover:bg-error-container hover:text-error"
                         aria-label={`Delete ${m.label}`}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -150,7 +150,7 @@ export default function ModuleBuilderPage() {
       <Modal open={open} onClose={() => setOpen(false)} title="New module" size="md">
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Singular label</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface">Singular label</label>
             <Input
               value={form.label}
               onChange={(e) => setForm({ ...form, label: e.target.value, apiName: form.apiName || slugify(e.target.value) })}
@@ -158,19 +158,19 @@ export default function ModuleBuilderPage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Plural label</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface">Plural label</label>
             <Input value={form.pluralLabel} onChange={(e) => setForm({ ...form, pluralLabel: e.target.value })} placeholder="Projects" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">API name</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface">API name</label>
             <Input value={form.apiName} onChange={(e) => setForm({ ...form, apiName: slugify(e.target.value) })} placeholder="project" className="font-mono" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Icon (emoji)</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface">Icon (emoji)</label>
             <Input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} placeholder="📁" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface">Description</label>
             <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} />
           </div>
           <div className="flex justify-end gap-2 pt-2">

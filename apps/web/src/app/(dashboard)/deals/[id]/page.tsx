@@ -19,6 +19,7 @@ import {
   useUpdateDeal,
   useConvertDealToRenewal,
 } from '@/hooks/use-deals';
+import { useDealActivities } from '@/hooks/use-activities';
 import { useUsers } from '@/hooks/use-users';
 import type { UserRef } from '@/hooks/use-users';
 import type { DealHealth, DealScoringInsights } from '@/hooks/use-deals';
@@ -39,12 +40,14 @@ import {
   type SplitType,
 } from '@/hooks/use-deal-team';
 import { DealRoomPanel } from '@/components/crm/DealRoomPanel';
+import { DynamicRecordLayout } from '@/components/crm/DynamicRecordLayout';
+import { RecordTimeline } from '@/components/crm/RecordTimeline';
 import { api } from '@/lib/api-client';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/auth.store';
 
-type DealTab = 'health' | 'timeline' | 'notes' | 'products' | 'team' | 'dealroom' | 'cpq' | 'orders' | 'documents' | 'stakeholders' | 'governance' | 'competitors';
+type DealTab = 'health' | 'journey' | 'timeline' | 'notes' | 'products' | 'team' | 'dealroom' | 'cpq' | 'orders' | 'documents' | 'stakeholders' | 'governance' | 'competitors';
 type AnyRecord = Record<string, unknown>;
 
 interface Stakeholder {
@@ -83,6 +86,7 @@ export default function DealDetailPage() {
   const canUpdate = isDevPreview || hasPermission('deals:update') || hasPermission('deals:*');
   const dealQuery = useDeal(dealId);
   const timelineQuery = useDealTimeline(dealId);
+  const dealActivitiesQuery = useDealActivities(dealId, { limit: 100 });
   const insightsQuery = useDealScoringInsights(dealId);
   const notesQuery = useDealNotes(dealId, { limit: 50 });
   const usersQuery = useUsers({ limit: 100 });
@@ -154,7 +158,7 @@ export default function DealDetailPage() {
   if (!canRead) {
     return (
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
+        <div className="rounded-lg border border-warning/30 bg-warning-container p-6 text-sm text-on-warning-container">
           You do not have permission to view deals.
         </div>
       </div>
@@ -173,7 +177,7 @@ export default function DealDetailPage() {
   if (dealQuery.isError || !deal) {
     return (
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+        <div className="rounded-lg border border-error/30 bg-error-container p-6 text-sm text-error">
           Failed to load deal: {dealQuery.error instanceof Error ? dealQuery.error.message : 'Unknown error'}
         </div>
       </div>
@@ -182,6 +186,7 @@ export default function DealDetailPage() {
 
   const tabs: { id: DealTab; label: string }[] = [
     { id: 'health', label: 'Health' },
+    { id: 'journey', label: 'Journey' },
     { id: 'timeline', label: 'Timeline' },
     { id: 'notes', label: 'Notes' },
     { id: 'products', label: 'Products' },
@@ -216,8 +221,8 @@ export default function DealDetailPage() {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">{deal.name}</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-3xl font-bold text-on-surface">{deal.name}</h1>
+          <p className="mt-1 text-sm text-on-surface-variant">
             {deal.status} | {stageName} | {formatCurrency(deal.amount, deal.currency)}
           </p>
         </div>
@@ -234,25 +239,32 @@ export default function DealDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-1">
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-500">Deal Control</h2>
-            <dl className="space-y-2 text-sm">
-              <DetailItem label="Code" value={String(dealRecord.code ?? '-')} />
-              <DetailItem label="Value" value={formatCurrency(deal.amount, deal.currency)} />
-              <DetailItem label="Stage" value={stageName} />
-              <DetailItem label="Status" value={<StatusBadge status={deal.status} />} />
-              <DetailItem label="Probability" value={`${deal.probability}%`} />
-              <DetailItem label="Owner" value={ownerName} />
-              <DetailItem label="Account" value={<Link href={`/accounts/${deal.accountId}`} className="text-brand-700 hover:underline">{accountName}</Link>} />
-              <DetailItem label="Close Date" value={deal.expectedCloseDate ? formatDate(deal.expectedCloseDate) : '-'} />
-              <DetailItem label="Forecast" value={deal.forecastCategory} />
-              <DetailItem label="MEDDIC" value={String(dealRecord.meddicicScore ?? '-')} />
-              <DetailItem label="Created" value={formatDate(deal.createdAt)} />
-            </dl>
-          </div>
+          <DynamicRecordLayout
+            module="deal"
+            record={dealRecord}
+            labels={{ meddicicScore: 'MEDDIC', expectedCloseDate: 'Close Date', pipelineId: 'Pipeline' }}
+            fallback={
+              <div className="rounded-xl border border-outline-variant bg-surface p-5">
+                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-on-surface-variant">Deal Control</h2>
+                <dl className="space-y-2 text-sm">
+                  <DetailItem label="Code" value={String(dealRecord.code ?? '-')} />
+                  <DetailItem label="Value" value={formatCurrency(deal.amount, deal.currency)} />
+                  <DetailItem label="Stage" value={stageName} />
+                  <DetailItem label="Status" value={<StatusBadge status={deal.status} />} />
+                  <DetailItem label="Probability" value={`${deal.probability}%`} />
+                  <DetailItem label="Owner" value={ownerName} />
+                  <DetailItem label="Account" value={<Link href={`/accounts/${deal.accountId}`} className="text-brand-700 hover:underline">{accountName}</Link>} />
+                  <DetailItem label="Close Date" value={deal.expectedCloseDate ? formatDate(deal.expectedCloseDate) : '-'} />
+                  <DetailItem label="Forecast" value={deal.forecastCategory} />
+                  <DetailItem label="MEDDIC" value={String(dealRecord.meddicicScore ?? '-')} />
+                  <DetailItem label="Created" value={formatDate(deal.createdAt)} />
+                </dl>
+              </div>
+            }
+          />
           <RenewalPanel deal={deal} canEdit={canUpdate} />
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-500">Stage Hardening</h2>
+          <div className="rounded-xl border border-outline-variant bg-surface p-5">
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-on-surface-variant">Stage Hardening</h2>
             <div className="space-y-3 text-sm">
               <ReadinessItem label="Account linked" ok={Boolean(deal.accountId)} />
               <ReadinessItem label="Pipeline active" ok={Boolean(deal.pipelineId && deal.stageId)} />
@@ -263,7 +275,7 @@ export default function DealDetailPage() {
         </div>
 
         <div className="lg:col-span-2">
-          <div className="mb-4 flex gap-1 overflow-x-auto border-b border-slate-200">
+          <div className="mb-4 flex gap-1 overflow-x-auto border-b border-outline-variant">
             {tabs.map((t) => (
               <button
                 key={t.id}
@@ -272,8 +284,8 @@ export default function DealDetailPage() {
                 className={cn(
                   '-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium',
                   tab === t.id
-                    ? 'border-slate-900 text-slate-900'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                    ? 'border-outline text-on-surface'
+                    : 'border-transparent text-on-surface-variant hover:text-on-surface'
                 )}
               >
                 {t.label}
@@ -286,6 +298,21 @@ export default function DealDetailPage() {
               data={insightsQuery.data}
               isLoading={insightsQuery.isLoading}
               isError={insightsQuery.isError}
+            />
+          )}
+          {tab === 'journey' && (
+            <RecordTimeline
+              objectType="deal"
+              objectId={dealId}
+              activities={(dealActivitiesQuery.data?.data ?? []).map((a) => ({
+                id: a.id,
+                type: a.type,
+                subject: a.subject,
+                at: a.dueDate ?? a.createdAt,
+                description: a.description ?? undefined,
+                status: a.status,
+              }))}
+              activitiesLoading={dealActivitiesQuery.isLoading}
             />
           )}
           {tab === 'timeline' && <TimelineTab data={timelineQuery.data} isLoading={timelineQuery.isLoading} />}
@@ -363,8 +390,8 @@ export default function DealDetailPage() {
 function DetailItem({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start gap-2">
-      <dt className="w-28 shrink-0 text-xs uppercase tracking-wider text-slate-400">{label}</dt>
-      <dd className="flex-1 text-slate-700">{value}</dd>
+      <dt className="w-28 shrink-0 text-xs uppercase tracking-wider text-on-surface-variant">{label}</dt>
+      <dd className="flex-1 text-on-surface">{value}</dd>
     </div>
   );
 }
@@ -480,16 +507,16 @@ function RenewalPanel({ deal, canEdit }: { deal: Deal; canEdit: boolean }) {
   ];
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
+    <div className="rounded-xl border border-outline-variant bg-surface p-5">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Renewal</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-on-surface-variant">Renewal</h2>
         {deal.isRenewal ? (
-          <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700">Renewal</span>
+          <span className="rounded-full bg-tertiary-container px-2 py-0.5 text-[11px] font-semibold text-tertiary">Renewal</span>
         ) : null}
       </div>
 
       {deal.isRenewal && deal.renewedFromDealId ? (
-        <p className="mb-3 text-xs text-slate-500">
+        <p className="mb-3 text-xs text-on-surface-variant">
           Renewed from{' '}
           <Link href={`/deals/${deal.renewedFromDealId}`} className="text-brand-700 hover:underline">
             original deal
@@ -500,8 +527,8 @@ function RenewalPanel({ deal, canEdit }: { deal: Deal; canEdit: boolean }) {
       <dl className="space-y-2 text-sm">
         {rows.map((row) => (
           <div key={row.key} className="flex items-start gap-2">
-            <dt className="w-28 shrink-0 text-xs uppercase tracking-wider text-slate-400">{row.label}</dt>
-            <dd className="flex-1 text-slate-700">
+            <dt className="w-28 shrink-0 text-xs uppercase tracking-wider text-on-surface-variant">{row.label}</dt>
+            <dd className="flex-1 text-on-surface">
               {field === row.key ? (
                 <input
                   autoFocus
@@ -511,12 +538,12 @@ function RenewalPanel({ deal, canEdit }: { deal: Deal; canEdit: boolean }) {
                   onChange={(e) => setDraft(e.target.value)}
                   onBlur={commit}
                   onKeyDown={onKeyDown}
-                  className="w-full rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-primary"
+                  className="w-full rounded border border-outline-variant px-2 py-1 text-sm outline-none focus:border-primary"
                 />
               ) : (
                 <span
                   onClick={() => begin(row.key, row.editValue)}
-                  className={cn(canEdit && 'cursor-text rounded px-1 py-0.5 hover:bg-slate-50')}
+                  className={cn(canEdit && 'cursor-text rounded px-1 py-0.5 hover:bg-surface-container-low')}
                   title={canEdit ? 'Click to edit' : undefined}
                 >
                   {row.display}
@@ -532,9 +559,9 @@ function RenewalPanel({ deal, canEdit }: { deal: Deal; canEdit: boolean }) {
 
 function ReadinessItem({ label, ok }: { label: string; ok: boolean }) {
   return (
-    <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-      <span className="font-medium text-slate-700">{label}</span>
-      <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', ok ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
+    <div className="flex items-center justify-between rounded-lg bg-surface-container-low px-3 py-2">
+      <span className="font-medium text-on-surface">{label}</span>
+      <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', ok ? 'bg-success-container text-success' : 'bg-warning-container text-warning')}>
         {ok ? 'Ready' : 'Needs data'}
       </span>
     </div>
@@ -544,28 +571,28 @@ function ReadinessItem({ label, ok }: { label: string; ok: boolean }) {
 function StatusBadge({ status }: { status: string }) {
   const color =
     status === 'WON'
-      ? 'bg-emerald-100 text-emerald-700'
+      ? 'bg-success-container text-success'
       : status === 'LOST'
-        ? 'bg-red-100 text-red-700'
+        ? 'bg-error-container text-error'
         : status === 'DORMANT'
-          ? 'bg-slate-100 text-slate-700'
-          : 'bg-blue-100 text-blue-700';
+          ? 'bg-surface-container-high text-on-surface'
+          : 'bg-primary-container text-primary';
   return <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', color)}>{status}</span>;
 }
 
 const HEALTH_META: Record<DealHealth, { label: string; score: number; badge: string; bar: string }> = {
-  healthy: { label: 'Healthy', score: 90, badge: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-500' },
-  at_risk: { label: 'At risk', score: 55, badge: 'bg-amber-100 text-amber-700', bar: 'bg-amber-500' },
-  stalled: { label: 'Stalled', score: 35, badge: 'bg-orange-100 text-orange-700', bar: 'bg-orange-500' },
-  won: { label: 'Won', score: 100, badge: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-500' },
-  lost: { label: 'Lost', score: 0, badge: 'bg-red-100 text-red-700', bar: 'bg-red-500' },
+  healthy: { label: 'Healthy', score: 90, badge: 'bg-success-container text-success', bar: 'bg-success' },
+  at_risk: { label: 'At risk', score: 55, badge: 'bg-warning-container text-warning', bar: 'bg-warning' },
+  stalled: { label: 'Stalled', score: 35, badge: 'bg-warning-container text-warning', bar: 'bg-warning' },
+  won: { label: 'Won', score: 100, badge: 'bg-success-container text-success', bar: 'bg-success' },
+  lost: { label: 'Lost', score: 0, badge: 'bg-error-container text-error', bar: 'bg-error' },
 };
 
 function HealthTab({ data, isLoading, isError }: { data: DealScoringInsights | undefined; isLoading: boolean; isError: boolean }) {
   if (isLoading) return <Skeleton className="h-48" />;
   if (isError || !data) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+      <div className="rounded-lg border border-warning/30 bg-warning-container p-4 text-sm text-on-warning-container">
         Deal health could not be computed right now. It is derived from the deal&apos;s stage age, MEDDIC coverage,
         data quality and recent activity.
       </div>
@@ -598,44 +625,44 @@ function HealthTab({ data, isLoading, isError }: { data: DealScoringInsights | u
         />
       ) : null}
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5">
+      <div className="rounded-xl border border-outline-variant bg-surface p-5">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Deal Health</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-on-surface-variant">Deal Health</h3>
           <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-semibold', meta.badge)}>{meta.label}</span>
         </div>
         <div className="mt-3 flex items-end gap-2">
-          <span className="text-4xl font-bold text-slate-900">{score}</span>
-          <span className="pb-1 text-sm text-slate-400">/ 100</span>
+          <span className="text-4xl font-bold text-on-surface">{score}</span>
+          <span className="pb-1 text-sm text-on-surface-variant">/ 100</span>
         </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-container-high">
           <div className={cn('h-full rounded-full', meta.bar)} style={{ width: `${Math.max(0, Math.min(100, score))}%` }} />
         </div>
         {s.isRotten ? (
-          <p className="mt-3 text-xs font-medium text-orange-600">This deal has exceeded its stage rotten-day limit.</p>
+          <p className="mt-3 text-xs font-medium text-warning">This deal has exceeded its stage rotten-day limit.</p>
         ) : null}
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Signals</h3>
+      <div className="rounded-xl border border-outline-variant bg-surface p-5">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-on-surface-variant">Signals</h3>
         <dl className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2">
           {signalRows.map((row) => (
-            <div key={row.label} className="flex items-center justify-between border-b border-slate-50 py-1 text-sm">
-              <dt className="text-slate-500">{row.label}</dt>
-              <dd className="font-medium text-slate-800">{row.value}</dd>
+            <div key={row.label} className="flex items-center justify-between border-b border-outline-variant py-1 text-sm">
+              <dt className="text-on-surface-variant">{row.label}</dt>
+              <dd className="font-medium text-on-surface">{row.value}</dd>
             </div>
           ))}
         </dl>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Recommendations</h3>
+      <div className="rounded-xl border border-outline-variant bg-surface p-5">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-on-surface-variant">Recommendations</h3>
         {data.recommendations.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-500">No action needed — this deal looks on track.</p>
+          <p className="mt-3 text-sm text-on-surface-variant">No action needed — this deal looks on track.</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {data.recommendations.map((rec, i) => (
-              <li key={i} className="flex gap-2 text-sm text-slate-700">
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+              <li key={i} className="flex gap-2 text-sm text-on-surface">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                 <span>{rec}</span>
               </li>
             ))}
@@ -655,16 +682,16 @@ function TimelineTab({ data, isLoading }: { data: PaginatedResult<TimelineEvent>
       {events.map((evt) => {
         const meta = timelineMeta(evt as unknown as Record<string, unknown>);
         return (
-          <div key={evt.id} className="rounded-lg border border-slate-200 bg-white p-4">
+          <div key={evt.id} className="rounded-lg border border-outline-variant bg-surface p-4">
             <div className="flex items-center justify-between">
-              <p className="flex items-center gap-2 text-sm font-medium text-slate-900">
+              <p className="flex items-center gap-2 text-sm font-medium text-on-surface">
                 {meta.icon}
                 {evt.title}
               </p>
-              <span className="text-xs text-slate-400">{formatDateTime(evt.at)}</span>
+              <span className="text-xs text-on-surface-variant">{formatDateTime(evt.at)}</span>
             </div>
-            {evt.description && <p className="mt-1 text-xs text-slate-500">{evt.description}</p>}
-            <span className="mt-2 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{meta.label}</span>
+            {evt.description && <p className="mt-1 text-xs text-on-surface-variant">{evt.description}</p>}
+            <span className="mt-2 inline-block rounded bg-surface-container-high px-1.5 py-0.5 text-[10px] text-on-surface-variant">{meta.label}</span>
           </div>
         );
       })}
@@ -684,7 +711,7 @@ function NotesTab({
   if (isLoading) return <Skeleton className="h-32" />;
   if (error) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+      <div className="rounded-lg border border-warning/30 bg-warning-container p-4 text-sm text-on-warning-container">
         Notes could not be loaded right now. The deal record and linked commercial data are still available.
       </div>
     );
@@ -694,9 +721,9 @@ function NotesTab({
   return (
     <div className="space-y-3">
       {notes.map((note) => (
-        <div key={note.id} className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="whitespace-pre-wrap text-sm text-slate-700">{note.content}</p>
-          <div className="mt-2 text-xs text-slate-400">{formatDate(note.createdAt)}</div>
+        <div key={note.id} className="rounded-lg border border-outline-variant bg-surface p-4">
+          <p className="whitespace-pre-wrap text-sm text-on-surface">{note.content}</p>
+          <div className="mt-2 text-xs text-on-surface-variant">{formatDate(note.createdAt)}</div>
         </div>
       ))}
     </div>
@@ -707,13 +734,13 @@ function CommercialTab({ title, rows, isLoading }: { title: string; rows: AnyRec
   if (isLoading) return <Skeleton className="h-32" />;
   if (rows.length === 0) return <EmptyState icon="table" title={`No ${title.toLowerCase()}`} description={`${title} linked to this deal will appear here.`} />;
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <div className="border-b border-slate-100 p-4">
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+    <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
+      <div className="border-b border-outline-variant p-4">
+        <h3 className="text-sm font-semibold text-on-surface">{title}</h3>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+          <thead className="bg-surface-container-low text-xs uppercase tracking-wider text-on-surface-variant">
             <tr>
               <th className="px-4 py-3">Reference</th>
               <th className="px-4 py-3">Status</th>
@@ -721,13 +748,13 @@ function CommercialTab({ title, rows, isLoading }: { title: string; rows: AnyRec
               <th className="px-4 py-3">Updated</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-outline-variant">
             {rows.map((row, index) => (
               <tr key={String(row.id ?? index)}>
-                <td className="px-4 py-3 font-medium text-slate-900">{String(row.quoteNumber ?? row.orderNumber ?? row.code ?? row.id ?? '-')}</td>
+                <td className="px-4 py-3 font-medium text-on-surface">{String(row.quoteNumber ?? row.orderNumber ?? row.code ?? row.id ?? '-')}</td>
                 <td className="px-4 py-3">{String(row.status ?? '-')}</td>
                 <td className="px-4 py-3">{String(row.total ?? row.grandTotal ?? row.amount ?? '-')} {String(row.currency ?? '')}</td>
-                <td className="px-4 py-3 text-slate-500">{row.updatedAt ? formatDate(String(row.updatedAt)) : '-'}</td>
+                <td className="px-4 py-3 text-on-surface-variant">{row.updatedAt ? formatDate(String(row.updatedAt)) : '-'}</td>
               </tr>
             ))}
           </tbody>
@@ -740,25 +767,25 @@ function CommercialTab({ title, rows, isLoading }: { title: string; rows: AnyRec
 function DocumentsTab({ rows, isLoading, canUpload, isUploading, onPick }: { rows: AnyRecord[]; isLoading: boolean; canUpload: boolean; isUploading: boolean; onPick: () => void }) {
   if (isLoading) return <Skeleton className="h-32" />;
   return (
-    <div className="rounded-xl border border-slate-200 bg-white">
-      <div className="flex items-center justify-between border-b border-slate-100 p-4">
+    <div className="rounded-xl border border-outline-variant bg-surface">
+      <div className="flex items-center justify-between border-b border-outline-variant p-4">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">Deal Documents</h3>
-          <p className="text-xs text-slate-500">RFQs, quote templates, purchase files and approval proof.</p>
+          <h3 className="text-sm font-semibold text-on-surface">Deal Documents</h3>
+          <p className="text-xs text-on-surface-variant">RFQs, quote templates, purchase files and approval proof.</p>
         </div>
         {canUpload && <Button onClick={onPick} disabled={isUploading}>{isUploading ? 'Uploading' : 'Upload'}</Button>}
       </div>
       {rows.length === 0 ? (
         <div className="p-4"><EmptyState icon="folder" title="No documents" description="Upload files connected to this deal." /></div>
       ) : (
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-outline-variant">
           {rows.map((doc, index) => (
             <div key={String(doc.id ?? index)} className="flex items-center justify-between p-4 text-sm">
               <div>
-                <p className="font-medium text-slate-900">{String(doc.fileName ?? doc.name ?? 'Document')}</p>
-                <p className="text-xs text-slate-500">{String(doc.mimeType ?? doc.category ?? 'file')} | {String(doc.fileSize ?? doc.size ?? 0)} bytes</p>
+                <p className="font-medium text-on-surface">{String(doc.fileName ?? doc.name ?? 'Document')}</p>
+                <p className="text-xs text-on-surface-variant">{String(doc.mimeType ?? doc.category ?? 'file')} | {String(doc.fileSize ?? doc.size ?? 0)} bytes</p>
               </div>
-              <span className="text-xs text-slate-400">{doc.createdAt ? formatDate(String(doc.createdAt)) : '-'}</span>
+              <span className="text-xs text-on-surface-variant">{doc.createdAt ? formatDate(String(doc.createdAt)) : '-'}</span>
             </div>
           ))}
         </div>
@@ -774,13 +801,13 @@ function StakeholdersTab({ data, isLoading }: { data: { data: Stakeholder[] } | 
   return (
     <div className="space-y-3">
       {items.map((s) => (
-        <div key={s.id} className="rounded-lg border border-slate-200 bg-white p-4">
+        <div key={s.id} className="rounded-lg border border-outline-variant bg-surface p-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-slate-900">{s.name}</p>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{s.influence}</span>
+            <p className="text-sm font-medium text-on-surface">{s.name}</p>
+            <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] text-on-surface-variant">{s.influence}</span>
           </div>
-          <p className="text-xs text-slate-500">{s.role}</p>
-          {s.email && <p className="text-xs text-slate-400">{s.email}</p>}
+          <p className="text-xs text-on-surface-variant">{s.role}</p>
+          {s.email && <p className="text-xs text-on-surface-variant">{s.email}</p>}
         </div>
       ))}
     </div>
@@ -794,12 +821,12 @@ function CompetitorsTab({ data, isLoading }: { data: { data: Competitor[] } | un
   return (
     <div className="space-y-3">
       {items.map((c) => (
-        <div key={c.id} className="rounded-lg border border-slate-200 bg-white p-4">
+        <div key={c.id} className="rounded-lg border border-outline-variant bg-surface p-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-slate-900">{c.name}</p>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{c.threatLevel ?? '-'}</span>
+            <p className="text-sm font-medium text-on-surface">{c.name}</p>
+            <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] text-on-surface-variant">{c.threatLevel ?? '-'}</span>
           </div>
-          {c.strength && <p className="text-xs text-slate-500">{c.strength}</p>}
+          {c.strength && <p className="text-xs text-on-surface-variant">{c.strength}</p>}
         </div>
       ))}
     </div>
@@ -819,14 +846,14 @@ function GovernanceTab({ fieldHistory, audit, outbox, isLoading }: { fieldHistor
 
 function GovernanceList({ title, rows, primary, secondary, dateKey }: { title: string; rows: AnyRecord[]; primary: string; secondary: string; dateKey: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+    <div className="rounded-xl border border-outline-variant bg-surface p-4">
+      <h3 className="text-sm font-semibold text-on-surface">{title}</h3>
       <div className="mt-3 space-y-3">
-        {rows.length === 0 ? <p className="text-xs text-slate-500">No records yet.</p> : rows.slice(0, 8).map((row, index) => (
-          <div key={String(row.id ?? index)} className="rounded-lg bg-slate-50 p-3 text-xs">
-            <p className="font-semibold text-slate-800">{String(row[primary] ?? row.description ?? '-')}</p>
-            <p className="mt-1 text-slate-500">{String(row[secondary] ?? '-')}</p>
-            <p className="mt-1 text-slate-400">{row[dateKey] ? formatDate(String(row[dateKey])) : '-'}</p>
+        {rows.length === 0 ? <p className="text-xs text-on-surface-variant">No records yet.</p> : rows.slice(0, 8).map((row, index) => (
+          <div key={String(row.id ?? index)} className="rounded-lg bg-surface-container-low p-3 text-xs">
+            <p className="font-semibold text-on-surface">{String(row[primary] ?? row.description ?? '-')}</p>
+            <p className="mt-1 text-on-surface-variant">{String(row[secondary] ?? '-')}</p>
+            <p className="mt-1 text-on-surface-variant">{row[dateKey] ? formatDate(String(row[dateKey])) : '-'}</p>
           </div>
         ))}
       </div>
@@ -910,21 +937,21 @@ function ProductsTab({ dealId, currency, canEdit }: { dealId: string; currency: 
   return (
     <div className="space-y-4">
       {productsQuery.isError ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="rounded-lg border border-warning/30 bg-warning-container p-4 text-sm text-on-warning-container">
           Product line items are not available yet. You can still work the deal — this connects once the products
           service is deployed.
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <div className="flex items-center justify-between border-b border-slate-100 p-4">
+      <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
+        <div className="flex items-center justify-between border-b border-outline-variant p-4">
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">Products</h3>
-            <p className="text-xs text-slate-500">The deal amount is derived from these line items.</p>
+            <h3 className="text-sm font-semibold text-on-surface">Products</h3>
+            <p className="text-xs text-on-surface-variant">The deal amount is derived from these line items.</p>
           </div>
           <div className="text-right">
-            <p className="text-xs uppercase tracking-wider text-slate-400">Total</p>
-            <p className="text-lg font-semibold text-slate-900">{formatCurrency(summedTotal, currency)}</p>
+            <p className="text-xs uppercase tracking-wider text-on-surface-variant">Total</p>
+            <p className="text-lg font-semibold text-on-surface">{formatCurrency(summedTotal, currency)}</p>
           </div>
         </div>
 
@@ -935,7 +962,7 @@ function ProductsTab({ dealId, currency, canEdit }: { dealId: string; currency: 
         ) : rows.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+              <thead className="bg-surface-container-low text-xs uppercase tracking-wider text-on-surface-variant">
                 <tr>
                   <th className="px-4 py-3">Product</th>
                   <th className="px-4 py-3">Qty</th>
@@ -945,7 +972,7 @@ function ProductsTab({ dealId, currency, canEdit }: { dealId: string; currency: 
                   {canEdit ? <th className="px-4 py-3" /> : null}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-outline-variant">
                 {rows.map((row) => (
                   <ProductRow
                     key={row.id}
@@ -963,23 +990,23 @@ function ProductsTab({ dealId, currency, canEdit }: { dealId: string; currency: 
       </div>
 
       {canEdit ? (
-        <div className="space-y-3 rounded-xl border border-dashed border-slate-200 p-4">
-          <h4 className="text-sm font-medium text-slate-700">Add line item</h4>
+        <div className="space-y-3 rounded-xl border border-dashed border-outline-variant p-4">
+          <h4 className="text-sm font-medium text-on-surface">Add line item</h4>
           <div className="relative">
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search pricebook (optional)…"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm"
             />
             {search.trim().length > 0 && (pickerQuery.data?.length ?? 0) > 0 ? (
-              <div className="absolute z-10 mt-1 max-h-44 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow">
+              <div className="absolute z-10 mt-1 max-h-44 w-full overflow-auto rounded-lg border border-outline-variant bg-surface shadow">
                 {(pickerQuery.data ?? []).map((p) => (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => pickProduct(p)}
-                    className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                    className="block w-full px-3 py-2 text-left text-sm hover:bg-surface-container-low"
                   >
                     {p.name} — {p.currency ?? currency} {String(p.price ?? p.listPrice ?? '')}
                   </button>
@@ -992,7 +1019,7 @@ function ProductsTab({ dealId, currency, canEdit }: { dealId: string; currency: 
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="Name"
-              className="min-w-[12rem] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="min-w-[12rem] flex-1 rounded-lg border border-outline-variant px-3 py-2 text-sm"
             />
             <input
               type="number"
@@ -1000,21 +1027,21 @@ function ProductsTab({ dealId, currency, canEdit }: { dealId: string; currency: 
               value={form.quantity}
               onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))}
               placeholder="Qty"
-              className="w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="w-20 rounded-lg border border-outline-variant px-3 py-2 text-sm"
             />
             <input
               type="number"
               value={form.unitPrice}
               onChange={(e) => setForm((f) => ({ ...f, unitPrice: e.target.value }))}
               placeholder="Unit price"
-              className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="w-28 rounded-lg border border-outline-variant px-3 py-2 text-sm"
             />
             <input
               type="number"
               value={form.discountPercent}
               onChange={(e) => setForm((f) => ({ ...f, discountPercent: e.target.value }))}
               placeholder="Disc %"
-              className="w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="w-20 rounded-lg border border-outline-variant px-3 py-2 text-sm"
             />
             <Button onClick={submit} disabled={!form.name.trim() || addProduct.isPending}>
               {addProduct.isPending ? 'Adding' : 'Add'}
@@ -1049,7 +1076,7 @@ function ProductRow({
   if (!editing) {
     return (
       <tr>
-        <td className="px-4 py-3 font-medium text-slate-900">{row.name}</td>
+        <td className="px-4 py-3 font-medium text-on-surface">{row.name}</td>
         <td className="px-4 py-3">{row.quantity}</td>
         <td className="px-4 py-3">{formatCurrency(Number(row.unitPrice), row.currency || currency)}</td>
         <td className="px-4 py-3">{row.discountPercent}%</td>
@@ -1058,7 +1085,7 @@ function ProductRow({
           <td className="px-4 py-3 text-right">
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setEditing(true)} className="text-xs font-medium text-brand-700 hover:underline">Edit</button>
-              <button type="button" onClick={onRemove} className="text-xs font-medium text-red-600 hover:underline">Remove</button>
+              <button type="button" onClick={onRemove} className="text-xs font-medium text-error hover:underline">Remove</button>
             </div>
           </td>
         ) : null}
@@ -1067,18 +1094,18 @@ function ProductRow({
   }
 
   return (
-    <tr className="bg-slate-50">
-      <td className="px-4 py-3 font-medium text-slate-900">{row.name}</td>
+    <tr className="bg-surface-container-low">
+      <td className="px-4 py-3 font-medium text-on-surface">{row.name}</td>
       <td className="px-4 py-3">
-        <input type="number" min={1} value={draft.quantity} onChange={(e) => setDraft((d) => ({ ...d, quantity: e.target.value }))} className="w-16 rounded border border-slate-300 px-2 py-1 text-sm" />
+        <input type="number" min={1} value={draft.quantity} onChange={(e) => setDraft((d) => ({ ...d, quantity: e.target.value }))} className="w-16 rounded border border-outline-variant px-2 py-1 text-sm" />
       </td>
       <td className="px-4 py-3">
-        <input type="number" value={draft.unitPrice} onChange={(e) => setDraft((d) => ({ ...d, unitPrice: e.target.value }))} className="w-24 rounded border border-slate-300 px-2 py-1 text-sm" />
+        <input type="number" value={draft.unitPrice} onChange={(e) => setDraft((d) => ({ ...d, unitPrice: e.target.value }))} className="w-24 rounded border border-outline-variant px-2 py-1 text-sm" />
       </td>
       <td className="px-4 py-3">
-        <input type="number" value={draft.discountPercent} onChange={(e) => setDraft((d) => ({ ...d, discountPercent: e.target.value }))} className="w-16 rounded border border-slate-300 px-2 py-1 text-sm" />
+        <input type="number" value={draft.discountPercent} onChange={(e) => setDraft((d) => ({ ...d, discountPercent: e.target.value }))} className="w-16 rounded border border-outline-variant px-2 py-1 text-sm" />
       </td>
-      <td className="px-4 py-3 text-slate-400">—</td>
+      <td className="px-4 py-3 text-on-surface-variant">—</td>
       <td className="px-4 py-3 text-right">
         <div className="flex justify-end gap-2">
           <button
@@ -1091,11 +1118,11 @@ function ProductRow({
               });
               setEditing(false);
             }}
-            className="text-xs font-medium text-emerald-700 hover:underline"
+            className="text-xs font-medium text-success hover:underline"
           >
             Save
           </button>
-          <button type="button" onClick={() => setEditing(false)} className="text-xs font-medium text-slate-500 hover:underline">Cancel</button>
+          <button type="button" onClick={() => setEditing(false)} className="text-xs font-medium text-on-surface-variant hover:underline">Cancel</button>
         </div>
       </td>
     </tr>
@@ -1142,22 +1169,22 @@ function TeamTab({ dealId, users, canEdit }: { dealId: string; users: UserRef[];
   return (
     <div className="space-y-4">
       {teamQuery.isError ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="rounded-lg border border-warning/30 bg-warning-container p-4 text-sm text-on-warning-container">
           Deal team & splits are not available yet. This connects once the backend endpoint is deployed.
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <div className="flex items-center justify-between border-b border-slate-100 p-4">
-          <h3 className="text-sm font-semibold text-slate-900">Team & Splits</h3>
+      <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
+        <div className="flex items-center justify-between border-b border-outline-variant p-4">
+          <h3 className="text-sm font-semibold text-on-surface">Team & Splits</h3>
           <div className="text-right">
-            <p className="text-xs uppercase tracking-wider text-slate-400">Revenue split</p>
-            <p className={cn('text-lg font-semibold', revenueSplit > 100 ? 'text-red-600' : 'text-slate-900')}>{revenueSplit}%</p>
+            <p className="text-xs uppercase tracking-wider text-on-surface-variant">Revenue split</p>
+            <p className={cn('text-lg font-semibold', revenueSplit > 100 ? 'text-error' : 'text-on-surface')}>{revenueSplit}%</p>
           </div>
         </div>
 
         {revenueSplit > 100 ? (
-          <div className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-800">
+          <div className="border-b border-warning/30 bg-warning-container px-4 py-2 text-xs font-medium text-on-warning-container">
             Total revenue split exceeds 100%.
           </div>
         ) : null}
@@ -1169,7 +1196,7 @@ function TeamTab({ dealId, users, canEdit }: { dealId: string; users: UserRef[];
         ) : rows.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+              <thead className="bg-surface-container-low text-xs uppercase tracking-wider text-on-surface-variant">
                 <tr>
                   <th className="px-4 py-3">Member</th>
                   <th className="px-4 py-3">Role</th>
@@ -1178,7 +1205,7 @@ function TeamTab({ dealId, users, canEdit }: { dealId: string; users: UserRef[];
                   {canEdit ? <th className="px-4 py-3" /> : null}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-outline-variant">
                 {rows.map((row) => (
                   <TeamRow
                     key={row.id}
@@ -1196,13 +1223,13 @@ function TeamTab({ dealId, users, canEdit }: { dealId: string; users: UserRef[];
       </div>
 
       {canEdit ? (
-        <div className="space-y-3 rounded-xl border border-dashed border-slate-200 p-4">
-          <h4 className="text-sm font-medium text-slate-700">Add team member</h4>
+        <div className="space-y-3 rounded-xl border border-dashed border-outline-variant p-4">
+          <h4 className="text-sm font-medium text-on-surface">Add team member</h4>
           <div className="flex flex-wrap gap-2">
             <select
               value={form.userId}
               onChange={(e) => setForm((f) => ({ ...f, userId: e.target.value }))}
-              className="min-w-[12rem] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="min-w-[12rem] flex-1 rounded-lg border border-outline-variant px-3 py-2 text-sm"
             >
               <option value="">Select user…</option>
               {users.map((u) => (
@@ -1213,19 +1240,19 @@ function TeamTab({ dealId, users, canEdit }: { dealId: string; users: UserRef[];
               value={form.role}
               onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
               placeholder="Role"
-              className="w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="w-32 rounded-lg border border-outline-variant px-3 py-2 text-sm"
             />
             <input
               type="number"
               value={form.splitPercent}
               onChange={(e) => setForm((f) => ({ ...f, splitPercent: e.target.value }))}
               placeholder="Split %"
-              className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="w-24 rounded-lg border border-outline-variant px-3 py-2 text-sm"
             />
             <select
               value={form.splitType}
               onChange={(e) => setForm((f) => ({ ...f, splitType: e.target.value as SplitType }))}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-lg border border-outline-variant px-3 py-2 text-sm"
             >
               <option value="revenue">Revenue</option>
               <option value="overlay">Overlay</option>
@@ -1263,17 +1290,17 @@ function TeamRow({
   if (!editing) {
     return (
       <tr>
-        <td className="px-4 py-3 font-medium text-slate-900">{userLabel(users, row.userId)}</td>
+        <td className="px-4 py-3 font-medium text-on-surface">{userLabel(users, row.userId)}</td>
         <td className="px-4 py-3">{row.role}</td>
         <td className="px-4 py-3">{row.splitPercent}%</td>
         <td className="px-4 py-3">
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{row.splitType}</span>
+          <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] text-on-surface-variant">{row.splitType}</span>
         </td>
         {canEdit ? (
           <td className="px-4 py-3 text-right">
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setEditing(true)} className="text-xs font-medium text-brand-700 hover:underline">Edit</button>
-              <button type="button" onClick={onRemove} className="text-xs font-medium text-red-600 hover:underline">Remove</button>
+              <button type="button" onClick={onRemove} className="text-xs font-medium text-error hover:underline">Remove</button>
             </div>
           </td>
         ) : null}
@@ -1282,16 +1309,16 @@ function TeamRow({
   }
 
   return (
-    <tr className="bg-slate-50">
-      <td className="px-4 py-3 font-medium text-slate-900">{userLabel(users, row.userId)}</td>
+    <tr className="bg-surface-container-low">
+      <td className="px-4 py-3 font-medium text-on-surface">{userLabel(users, row.userId)}</td>
       <td className="px-4 py-3">
-        <input value={draft.role} onChange={(e) => setDraft((d) => ({ ...d, role: e.target.value }))} className="w-28 rounded border border-slate-300 px-2 py-1 text-sm" />
+        <input value={draft.role} onChange={(e) => setDraft((d) => ({ ...d, role: e.target.value }))} className="w-28 rounded border border-outline-variant px-2 py-1 text-sm" />
       </td>
       <td className="px-4 py-3">
-        <input type="number" value={draft.splitPercent} onChange={(e) => setDraft((d) => ({ ...d, splitPercent: e.target.value }))} className="w-20 rounded border border-slate-300 px-2 py-1 text-sm" />
+        <input type="number" value={draft.splitPercent} onChange={(e) => setDraft((d) => ({ ...d, splitPercent: e.target.value }))} className="w-20 rounded border border-outline-variant px-2 py-1 text-sm" />
       </td>
       <td className="px-4 py-3">
-        <select value={draft.splitType} onChange={(e) => setDraft((d) => ({ ...d, splitType: e.target.value as SplitType }))} className="rounded border border-slate-300 px-2 py-1 text-sm">
+        <select value={draft.splitType} onChange={(e) => setDraft((d) => ({ ...d, splitType: e.target.value as SplitType }))} className="rounded border border-outline-variant px-2 py-1 text-sm">
           <option value="revenue">Revenue</option>
           <option value="overlay">Overlay</option>
         </select>
@@ -1308,11 +1335,11 @@ function TeamRow({
               });
               setEditing(false);
             }}
-            className="text-xs font-medium text-emerald-700 hover:underline"
+            className="text-xs font-medium text-success hover:underline"
           >
             Save
           </button>
-          <button type="button" onClick={() => setEditing(false)} className="text-xs font-medium text-slate-500 hover:underline">Cancel</button>
+          <button type="button" onClick={() => setEditing(false)} className="text-xs font-medium text-on-surface-variant hover:underline">Cancel</button>
         </div>
       </td>
     </tr>

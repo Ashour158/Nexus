@@ -41,37 +41,37 @@ export default function ContactDuplicatesPage() {
 
   return (
     <main className="space-y-4 p-4">
-      <h1 className="text-2xl font-bold text-slate-900">Duplicate Contact Center</h1>
-      <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+      <h1 className="text-2xl font-bold text-on-surface">Duplicate Contact Center</h1>
+      <section className="space-y-3 rounded-xl border border-outline-variant bg-surface p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => scan.mutate()} className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white" disabled={scan.isPending}>Run duplicate scan</button>
-          <p className="text-sm text-slate-600">{groups.length} potential duplicate groups found</p>
+          <button onClick={() => scan.mutate()} className="rounded bg-primary px-3 py-2 text-sm font-medium text-white" disabled={scan.isPending}>Run duplicate scan</button>
+          <p className="text-sm text-on-surface-variant">{groups.length} potential duplicate groups found</p>
         </div>
-        <div className="flex gap-2 text-sm"><select value={confidence} onChange={(e) => setConfidence(e.target.value as 'all' | 'high' | 'medium' | 'low')} className="rounded border border-slate-300 px-2 py-1"><option value="all">All confidence</option><option value="high">High {'>'}90%</option><option value="medium">Medium 60-90%</option><option value="low">Low {'<'}60%</option></select></div>
-        <div className="space-y-2 rounded bg-slate-50 p-3 text-sm"><label className="flex items-center gap-2"><input type="checkbox" checked={autoMergeExactEmail} onChange={(e) => setAutoMergeExactEmail(e.target.checked)} />Auto-merge exact email matches</label><label className="flex items-center gap-2">Auto-merge threshold<input type="number" value={threshold} onChange={(e) => setThreshold(Number(e.target.value || 90))} className="w-20 rounded border border-slate-300 px-2 py-1" />%</label></div>
+        <div className="flex gap-2 text-sm"><select value={confidence} onChange={(e) => setConfidence(e.target.value as 'all' | 'high' | 'medium' | 'low')} className="rounded border border-outline-variant px-2 py-1"><option value="all">All confidence</option><option value="high">High {'>'}90%</option><option value="medium">Medium 60-90%</option><option value="low">Low {'<'}60%</option></select></div>
+        <div className="space-y-2 rounded bg-surface-container-low p-3 text-sm"><label className="flex items-center gap-2"><input type="checkbox" checked={autoMergeExactEmail} onChange={(e) => setAutoMergeExactEmail(e.target.checked)} />Auto-merge exact email matches</label><label className="flex items-center gap-2">Auto-merge threshold<input type="number" value={threshold} onChange={(e) => setThreshold(Number(e.target.value || 90))} className="w-20 rounded border border-outline-variant px-2 py-1" />%</label></div>
       </section>
 
       <section className="space-y-3">
         {filtered.map((group) => {
           const master = masterByGroup[group.id] ?? group.contacts[0]?.id;
           return (
-            <article key={group.id} className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="mb-2 flex items-center justify-between"><p className="font-semibold text-slate-900">Group {group.id}</p><span className="text-sm text-slate-500">Confidence {group.confidence}%</span></div>
+            <article key={group.id} className="rounded-xl border border-outline-variant bg-surface p-4">
+              <div className="mb-2 flex items-center justify-between"><p className="font-semibold text-on-surface">Group {group.id}</p><span className="text-sm text-on-surface-variant">Confidence {group.confidence}%</span></div>
               <div className="grid gap-3 md:grid-cols-2">
                 {group.contacts.map((c) => (
-                  <div key={c.id} className="rounded border border-slate-200 p-3 text-sm">
+                  <div key={c.id} className="rounded border border-outline-variant p-3 text-sm">
                     <label className="inline-flex items-center gap-2"><input type="radio" name={`master-${group.id}`} checked={master === c.id} onChange={() => setMasterByGroup((prev) => ({ ...prev, [group.id]: c.id }))} />Master</label>
-                    <p className="mt-1 bg-yellow-50 font-medium">{c.name}</p>
-                    <p className="bg-green-50">{c.email}</p>
-                    <p className="bg-yellow-50">{c.company}</p>
-                    <p className="bg-green-50">{c.phone}</p>
+                    <p className="mt-1 bg-warning-container font-medium">{c.name}</p>
+                    <p className="bg-success-container">{c.email}</p>
+                    <p className="bg-warning-container">{c.company}</p>
+                    <p className="bg-success-container">{c.phone}</p>
                     <label className="mt-2 block text-xs"><input type="checkbox" className="me-1" defaultChecked />Keep this record fields</label>
                   </div>
                 ))}
               </div>
               <div className="mt-3 flex gap-2">
                 <button
-                  className="rounded bg-blue-600 px-3 py-2 text-sm text-white"
+                  className="rounded bg-primary px-3 py-2 text-sm text-white"
                   onClick={() => {
                     const masterId = master;
                     const mergeIds = group.contacts.map((c) => c.id).filter((id) => id !== masterId);
@@ -81,12 +81,12 @@ export default function ContactDuplicatesPage() {
                 >
                   Merge
                 </button>
-                <button className="rounded border border-slate-300 px-3 py-2 text-sm">Not duplicates</button>
+                <button className="rounded border border-outline-variant px-3 py-2 text-sm">Not duplicates</button>
               </div>
             </article>
           );
         })}
-        {scan.isSuccess && filtered.length === 0 ? <p className="text-sm text-slate-500">No duplicates found. Your contacts are clean!</p> : null}
+        {scan.isSuccess && filtered.length === 0 ? <p className="text-sm text-on-surface-variant">No duplicates found. Your contacts are clean!</p> : null}
       </section>
     </main>
   );

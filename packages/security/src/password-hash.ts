@@ -52,11 +52,19 @@ export async function verifyPassword(plaintext: string, storedHash: string): Pro
 }
 
 /**
- * Validate password strength (OWASP ASVS V2.1).
+ * Minimum length for NEW/changed passwords. OWASP ASVS allows 8; SOC 2 programs
+ * commonly expect >= 12. Raised to 12 as the user-facing policy. The hashing
+ * sanity-floor stays at 8 so pre-existing hashes and seeded fixtures still work.
+ */
+export const MIN_PASSWORD_LENGTH = 12;
+
+/**
+ * Validate password strength (OWASP ASVS V2.1, SOC2-aligned length).
  */
 export function validatePasswordStrength(password: string): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
-  if (password.length < 8) errors.push('Minimum 8 characters');
+  if (password.length < MIN_PASSWORD_LENGTH)
+    errors.push(`Minimum ${MIN_PASSWORD_LENGTH} characters`);
   if (password.length > 128) errors.push('Maximum 128 characters');
   if (!/[A-Z]/.test(password)) errors.push('At least one uppercase letter');
   if (!/[a-z]/.test(password)) errors.push('At least one lowercase letter');

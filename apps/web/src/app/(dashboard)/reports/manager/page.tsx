@@ -9,9 +9,9 @@ import { EmptyState } from '@/components/dashboard/EmptyState';
 import { StatCard } from '@/components/dashboard/StatCard';
 
 function heatClass(value: number) {
-  if (value >= 9) return 'bg-rose-200 text-rose-800 font-semibold';
-  if (value >= 6) return 'bg-amber-100 text-amber-800';
-  return 'bg-emerald-50 text-emerald-700';
+  if (value >= 9) return 'bg-error-container text-on-error-container font-semibold';
+  if (value >= 6) return 'bg-warning-container text-on-warning-container';
+  return 'bg-success-container text-success';
 }
 
 export default function ManagerDashboardPage() {
@@ -56,7 +56,7 @@ export default function ManagerDashboardPage() {
       process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS !== 'false');
   if (!allowed) {
     router.replace('/');
-    return <div className="p-4 text-sm text-slate-500">Redirecting...</div>;
+    return <div className="p-4 text-sm text-on-surface-variant">Redirecting...</div>;
   }
 
   const totalQuota = reportData?.totalQuota ?? totals.quota;
@@ -73,10 +73,10 @@ export default function ManagerDashboardPage() {
     return (
       <main className="space-y-6">
         <header>
-          <h1 className="text-2xl font-bold text-slate-900">Manager Dashboard</h1>
-          <p className="text-sm text-slate-500">Team forecast, coaching insights, and risk concentration.</p>
+          <h1 className="text-2xl font-bold text-on-surface">Manager Dashboard</h1>
+          <p className="text-sm text-on-surface-variant">Team forecast, coaching insights, and risk concentration.</p>
         </header>
-        <div className="py-12 text-center text-slate-500">Loading reports...</div>
+        <div className="py-12 text-center text-on-surface-variant">Loading reports...</div>
       </main>
     );
   }
@@ -85,8 +85,8 @@ export default function ManagerDashboardPage() {
     return (
       <main className="space-y-6">
         <header>
-          <h1 className="text-2xl font-bold text-slate-900">Manager Dashboard</h1>
-          <p className="text-sm text-slate-500">Team forecast, coaching insights, and risk concentration.</p>
+          <h1 className="text-2xl font-bold text-on-surface">Manager Dashboard</h1>
+          <p className="text-sm text-on-surface-variant">Team forecast, coaching insights, and risk concentration.</p>
         </header>
         <EmptyState
           icon={<BarChart3 className="h-5 w-5" />}
@@ -100,8 +100,8 @@ export default function ManagerDashboardPage() {
   return (
     <main className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold text-slate-900">Manager Dashboard</h1>
-        <p className="text-sm text-slate-500">Team forecast, coaching insights, and risk concentration.</p>
+        <h1 className="text-2xl font-bold text-on-surface">Manager Dashboard</h1>
+        <p className="text-sm text-on-surface-variant">Team forecast, coaching insights, and risk concentration.</p>
       </header>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -110,33 +110,33 @@ export default function ManagerDashboardPage() {
           value={totalQuota > 0 ? `${Math.round((totalRevenue / totalQuota) * 100)}%` : 'N/A'}
           delta={8.2}
           icon={<TrendingDown className="h-5 w-5" />}
-          iconBg="bg-blue-100 text-blue-700"
+          iconBg="bg-primary-container text-primary"
         />
         <StatCard
           label="Reps on track"
           value={onTrack}
           icon={<CalendarClock className="h-5 w-5" />}
-          iconBg="bg-emerald-100 text-emerald-700"
+          iconBg="bg-success-container text-success"
         />
         <StatCard
           label="Reps at risk"
           value={atRisk}
           icon={<AlertTriangle className="h-5 w-5" />}
-          iconBg="bg-amber-100 text-amber-700"
+          iconBg="bg-warning-container text-warning"
         />
         <StatCard
           label="Reps behind"
           value={behind}
           icon={<AlertTriangle className="h-5 w-5" />}
-          iconBg="bg-rose-100 text-rose-700"
+          iconBg="bg-error-container text-error"
         />
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Forecast summary</h2>
+      <section className="rounded-xl border border-outline-variant bg-surface p-4">
+        <h2 className="mb-3 text-sm font-semibold text-on-surface">Forecast summary</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
-            <thead className="text-start text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-start text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
                 <th className="px-2 py-2">Rep</th>
                 <th className="px-2 py-2">Commit</th>
@@ -151,9 +151,9 @@ export default function ManagerDashboardPage() {
               {forecastRows.map((row: any) => {
                 const ratio = row.weighted / row.quota;
                 const color =
-                  ratio >= 1 ? 'text-emerald-700' : ratio >= 0.75 ? 'text-amber-700' : 'text-rose-700';
+                  ratio >= 1 ? 'text-success' : ratio >= 0.75 ? 'text-warning' : 'text-error';
                 return (
-                  <tr key={row.rep} className="border-t border-slate-100">
+                  <tr key={row.rep} className="border-t border-outline-variant">
                     <td className="px-2 py-2 font-medium">{row.rep}</td>
                     <td className="px-2 py-2">${row.commit.toLocaleString()}</td>
                     <td className="px-2 py-2">${row.best.toLocaleString()}</td>
@@ -166,7 +166,7 @@ export default function ManagerDashboardPage() {
                   </tr>
                 );
               })}
-              <tr className="border-t border-slate-200 bg-slate-50 font-semibold">
+              <tr className="border-t border-outline-variant bg-surface-container-low font-semibold">
                 <td className="px-2 py-2">Totals</td>
                 <td className="px-2 py-2">${totals.commit.toLocaleString()}</td>
                 <td className="px-2 py-2">${totals.best.toLocaleString()}</td>
@@ -180,21 +180,21 @@ export default function ManagerDashboardPage() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Coaching opportunities</h2>
+      <section className="rounded-xl border border-outline-variant bg-surface p-4">
+        <h2 className="mb-3 text-sm font-semibold text-on-surface">Coaching opportunities</h2>
         <ul className="space-y-2">
           {coaching.map((signal: any) => (
             <li
               key={signal.rep + signal.metric}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 p-3"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-outline-variant p-3"
             >
               <div>
-                <p className="text-sm font-semibold text-slate-900">{signal.rep}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-sm font-semibold text-on-surface">{signal.rep}</p>
+                <p className="text-xs text-on-surface-variant">
                   {signal.metric} · {signal.deviation}
                 </p>
               </div>
-              <button className="rounded border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">
+              <button className="rounded border border-primary/40 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary-container">
                 Schedule 1:1
               </button>
             </li>
@@ -202,11 +202,11 @@ export default function ManagerDashboardPage() {
         </ul>
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Pipeline risk heatmap</h2>
+      <section className="rounded-xl border border-outline-variant bg-surface p-4">
+        <h2 className="mb-3 text-sm font-semibold text-on-surface">Pipeline risk heatmap</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
-            <thead className="text-start text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-start text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
                 <th className="px-2 py-2">Stage</th>
                 <th className="px-2 py-2">$0–$10k</th>
@@ -216,7 +216,7 @@ export default function ManagerDashboardPage() {
             </thead>
             <tbody>
               {heatmap.map((row: any) => (
-                <tr key={row.stage} className="border-t border-slate-100">
+                <tr key={row.stage} className="border-t border-outline-variant">
                   <td className="px-2 py-2 font-medium">{row.stage}</td>
                   <td className="px-2 py-2">
                     <span className={`rounded px-2 py-1 ${heatClass(row.small)}`}>{row.small}</span>

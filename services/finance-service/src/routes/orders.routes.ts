@@ -10,6 +10,7 @@ import { createDiscountRequestsService } from '../services/discount-requests.ser
 import { CpqPricingEngine } from '../cpq/pricing-engine.js';
 import { checkDiscountApproval } from '../lib/discount-approval.js';
 import { createCommercialRecordsUseCase } from '../use-cases/commercial-records.use-case.js';
+import { createFulfillmentService } from '../services/fulfillment.service.js';
 
 const OrderListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -19,7 +20,50 @@ const OrderListQuerySchema = z.object({
   dealId: z.string().optional(),
   quoteId: z.string().optional(),
   status: z.enum(['DRAFT', 'PENDING_APPROVAL', 'CONFIRMED', 'FULFILLING', 'FULFILLED', 'CANCELLED', 'CLOSED']).optional(),
+  fulfillmentStatus: z.enum(['PENDING', 'PARTIAL', 'FULFILLED', 'CANCELLED']).optional(),
   sortDir: z.enum(['asc', 'desc']).default('desc'),
+});
+
+const DeliveredQtySchema = z.record(z.coerce.number());
+
+const CreateFulfillmentSchema = z.object({
+  deliveredQtyByLine: DeliveredQtySchema.default({}),
+  status: z.enum(['PENDING', 'PARTIAL', 'FULFILLED', 'CANCELLED']).optional(),
+  deliveredAt: z.string().datetime().optional(),
+  reference: z.string().optional(),
+  carrier: z.string().optional(),
+  trackingNumber: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+const UpdateFulfillmentSchema = z
+  .object({
+    deliveredQtyByLine: DeliveredQtySchema.optional(),
+    status: z.enum(['PENDING', 'PARTIAL', 'FULFILLED', 'CANCELLED']).optional(),
+    deliveredAt: z.string().datetime().nullable().optional(),
+    reference: z.string().optional(),
+    carrier: z.string().optional(),
+    trackingNumber: z.string().optional(),
+    notes: z.string().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: 'At least one field is required' });
+
+const UpdateOrderSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    status: z.enum(['DRAFT', 'PENDING_APPROVAL', 'CONFIRMED', 'FULFILLING', 'FULFILLED', 'CANCELLED', 'CLOSED']).optional(),
+    expectedFulfillmentAt: z.string().datetime().nullable().optional(),
+    lineItems: z.array(z.record(z.unknown())).optional(),
+    subtotal: z.number().nonnegative().optional(),
+    taxAmount: z.number().nonnegative().optional(),
+    discountAmount: z.number().nonnegative().optional(),
+    total: z.number().nonnegative().optional(),
+    customFields: z.record(z.unknown()).optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: 'At least one field is required' });
+
+const CancelOrderSchema = z.object({
+  reason: z.string().min(1),
 });
 
 const CreateOrderSchema = z.object({
@@ -55,6 +99,7 @@ export async function registerOrdersRoutes(
     pricingEngine: new CpqPricingEngine(prisma),
     checkDiscountApproval,
   });
+  const fulfillment = createFulfillmentService(prisma, producer);
 
   function engineContextFromJwt(requestId: string, jwt: JwtPayload): EngineContext {
     return {
@@ -110,6 +155,32 @@ export async function registerOrdersRoutes(
         }
       );
 
+      r.patch(
+        '/orders/:id',
+        { preHandler: requirePermission(PERMISSIONS.QUOTES.UPDATE) },
+        async (request, reply) => {
+          const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+          const parsed = UpdateOrderSchema.safeParse(request.body);
+          if (!parsed.success) throw new ValidationError('Invalid body', parsed.error.flatten());
+          const jwt = request.user as JwtPayload;
+          const order = await commercial.updateOrder(engineContextFromJwt(request.id, jwt), id, parsed.data);
+          return reply.send({ success: true, data: order });
+        }
+      );
+
+      r.post(
+        '/orders/:id/cancel',
+        { preHandler: requirePermission(PERMISSIONS.QUOTES.UPDATE) },
+        async (request, reply) => {
+          const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+          const parsed = CancelOrderSchema.safeParse(request.body);
+          if (!parsed.success) throw new ValidationError('Invalid body', parsed.error.flatten());
+          const jwt = request.user as JwtPayload;
+          const order = await commercial.cancelOrder(engineContextFromJwt(request.id, jwt), id, parsed.data.reason);
+          return reply.send({ success: true, data: order });
+        }
+      );
+
       r.post(
         '/quotes/:id/convert-order',
         { preHandler: requirePermission(PERMISSIONS.QUOTES.UPDATE) },
@@ -118,6 +189,44 @@ export async function registerOrdersRoutes(
           const jwt = request.user as JwtPayload;
           const order = await commercial.convertQuoteToOrder(engineContextFromJwt(request.id, jwt), id);
           return reply.code(201).send({ success: true, data: order });
+        }
+      );
+
+      // ─── B1: fulfillment / delivery status ──────────────────────────────
+      r.get(
+        '/orders/:id/fulfillments',
+        { preHandler: requirePermission(PERMISSIONS.QUOTES.READ) },
+        async (request, reply) => {
+          const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+          const jwt = request.user as JwtPayload;
+          const result = await fulfillment.listFulfillments(engineContextFromJwt(request.id, jwt), id);
+          return reply.send({ success: true, data: result });
+        }
+      );
+
+      r.post(
+        '/orders/:id/fulfillments',
+        { preHandler: requirePermission(PERMISSIONS.QUOTES.UPDATE) },
+        async (request, reply) => {
+          const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+          const parsed = CreateFulfillmentSchema.safeParse(request.body);
+          if (!parsed.success) throw new ValidationError('Invalid body', parsed.error.flatten());
+          const jwt = request.user as JwtPayload;
+          const result = await fulfillment.createFulfillment(engineContextFromJwt(request.id, jwt), id, parsed.data);
+          return reply.code(201).send({ success: true, data: result });
+        }
+      );
+
+      r.patch(
+        '/fulfillments/:id',
+        { preHandler: requirePermission(PERMISSIONS.QUOTES.UPDATE) },
+        async (request, reply) => {
+          const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+          const parsed = UpdateFulfillmentSchema.safeParse(request.body);
+          if (!parsed.success) throw new ValidationError('Invalid body', parsed.error.flatten());
+          const jwt = request.user as JwtPayload;
+          const result = await fulfillment.updateFulfillment(engineContextFromJwt(request.id, jwt), id, parsed.data);
+          return reply.send({ success: true, data: result });
         }
       );
     },

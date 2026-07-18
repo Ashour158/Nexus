@@ -58,6 +58,8 @@ export async function registerNotesRoutes(
               contactId: q.contactId,
               leadId: q.leadId,
               accountId: q.accountId,
+              entityType: q.entityType,
+              entityId: q.entityId,
               isPinned: q.isPinned,
               authorId: q.authorId,
             },

@@ -13,7 +13,20 @@ export async function registerForecastAnalyticsRoutes(
     async (r) => {
       r.get('/analytics/forecast/weighted-pipeline', { preHandler: requirePermission(PERMISSIONS.ANALYTICS.READ) }, async (request, reply) => {
         const jwt = request.user as JwtPayload;
-        return reply.send({ success: true, data: await svc.getWeightedPipeline(jwt.tenantId) });
+        const { groupBy } = (request.query ?? {}) as { groupBy?: string };
+        const forecast = await svc.getWeightedPipeline(jwt.tenantId);
+        // `?groupBy=category` returns just the category breakdown; otherwise the
+        // full forecast (which already embeds `forecastByCategory`).
+        if (groupBy === 'category') {
+          return reply.send({
+            success: true,
+            data: {
+              winRate: forecast.winRate,
+              forecastByCategory: forecast.forecastByCategory,
+            },
+          });
+        }
+        return reply.send({ success: true, data: forecast });
       });
     },
     { prefix: '/api/v1' }

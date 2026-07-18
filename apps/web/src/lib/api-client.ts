@@ -5,6 +5,9 @@ import { notify } from '@/lib/toast';
 function clearAuthCookie() {
   if (typeof document !== 'undefined') {
     document.cookie = 'nexus_session=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    // The raw JWT lives in an HttpOnly cookie (RR-H10) that client JS cannot
+    // clear — ask the server to expire it. Fire-and-forget.
+    void fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
   }
 }
 

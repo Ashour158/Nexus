@@ -15,11 +15,11 @@ export function DualDateDisplay({ date, showHijri = false, className = '' }: Pro
 
   return (
     <span className={`inline-flex flex-col ${className}`}>
-      <span className="text-slate-800 dark:text-slate-200">
+      <span className="text-on-surface dark:text-outline">
         {isRtl ? `${hijri.day}/${hijri.month}/${hijri.year}` : gregorian}
       </span>
       {showHijri && (
-        <span className="text-xs text-slate-500 dark:text-slate-400">
+        <span className="text-xs text-on-surface-variant dark:text-on-surface-variant">
           {isRtl ? gregorian : hijri.formatted}
         </span>
       )}

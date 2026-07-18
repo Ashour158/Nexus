@@ -40,15 +40,15 @@ export default function IncentivesPage() {
 
   return (
     <div className="p-6">
-      <h1 className="mb-6 text-2xl font-bold text-gray-900">Incentives & Badges</h1>
+      <h1 className="mb-6 text-2xl font-bold text-on-surface">Incentives & Badges</h1>
       {loading ? (
-        <div className="animate-pulse space-y-3">{[1, 2].map((i) => <div key={i} className="h-24 rounded-xl bg-gray-100" />)}</div>
+        <div className="animate-pulse space-y-3">{[1, 2].map((i) => <div key={i} className="h-24 rounded-xl bg-surface-container-high" />)}</div>
       ) : (
         <>
           <section className="mb-8">
-            <h2 className="mb-3 font-semibold text-gray-700">Your Badges</h2>
+            <h2 className="mb-3 font-semibold text-on-surface">Your Badges</h2>
             {badges.length === 0 ? (
-              <div className="rounded-xl bg-gray-50 py-2">
+              <div className="rounded-xl bg-surface-container-low py-2">
                 <EmptyState
                   icon="🏅"
                   compact
@@ -59,19 +59,19 @@ export default function IncentivesPage() {
             ) : (
               <div className="grid grid-cols-3 gap-3 md:grid-cols-6">
                 {badges.map((b) => (
-                  <div key={b.id} className="rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-center" title={b.description}>
+                  <div key={b.id} className="rounded-xl border border-warning/30 bg-warning-container p-3 text-center" title={b.description}>
                     <p className="text-3xl">{b.icon || '🏅'}</p>
-                    <p className="mt-1 text-xs font-medium text-gray-700">{b.name}</p>
-                    <p className="text-xs text-gray-400">{new Date(b.earnedAt).toLocaleDateString()}</p>
+                    <p className="mt-1 text-xs font-medium text-on-surface">{b.name}</p>
+                    <p className="text-xs text-on-surface-variant">{new Date(b.earnedAt).toLocaleDateString()}</p>
                   </div>
                 ))}
               </div>
             )}
           </section>
           <section>
-            <h2 className="mb-3 font-semibold text-gray-700">Active Contests</h2>
+            <h2 className="mb-3 font-semibold text-on-surface">Active Contests</h2>
             {contests.length === 0 ? (
-              <div className="rounded-xl bg-gray-50 py-2">
+              <div className="rounded-xl bg-surface-container-low py-2">
                 <EmptyState
                   icon="🏆"
                   compact
@@ -82,15 +82,15 @@ export default function IncentivesPage() {
             ) : (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {contests.map((c) => (
-                  <div key={c.id} className="rounded-xl border border-gray-200 bg-white p-4">
+                  <div key={c.id} className="rounded-xl border border-outline-variant bg-surface p-4">
                     <div className="flex items-start justify-between">
                       <div>
-                        <h3 className="font-semibold text-gray-900">{c.name}</h3>
-                        <p className="mt-0.5 text-xs text-gray-500">{c.description}</p>
+                        <h3 className="font-semibold text-on-surface">{c.name}</h3>
+                        <p className="mt-0.5 text-xs text-on-surface-variant">{c.description}</p>
                       </div>
-                      <span className={`rounded px-2 py-0.5 text-xs font-medium ${c.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>{c.status}</span>
+                      <span className={`rounded px-2 py-0.5 text-xs font-medium ${c.status === 'ACTIVE' ? 'bg-success-container text-on-success-container' : 'bg-surface-container-high text-on-surface'}`}>{c.status}</span>
                     </div>
-                    <p className="mt-2 text-xs text-gray-500">🏆 Prize: {c.prize} · Ends: {new Date(c.endsAt).toLocaleDateString()}</p>
+                    <p className="mt-2 text-xs text-on-surface-variant">🏆 Prize: {c.prize} · Ends: {new Date(c.endsAt).toLocaleDateString()}</p>
                     {c.leaderboard && c.leaderboard.length > 0 ? (
                       <ol className="mt-3 space-y-1">
                         {c.leaderboard.slice(0, 3).map((entry, i) => (

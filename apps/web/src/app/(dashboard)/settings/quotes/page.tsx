@@ -79,7 +79,7 @@ export default function QuoteSettingsPage() {
   if (!isAdmin) {
     return (
       <main className="px-6 py-8">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
+        <div className="rounded-lg border border-warning/30 bg-warning-container p-6 text-sm text-on-warning-container">
           Quote administration is restricted to admins.
         </div>
       </main>
@@ -95,43 +95,43 @@ export default function QuoteSettingsPage() {
   return (
     <main className="space-y-6 px-6 py-6">
       <header>
-        <h1 className="text-2xl font-bold text-slate-900">Quote administration</h1>
-        <p className="text-sm text-slate-600">Control quote numbering and multi-level approval thresholds.</p>
+        <h1 className="text-2xl font-bold text-on-surface">Quote administration</h1>
+        <p className="text-sm text-on-surface-variant">Control quote numbering and multi-level approval thresholds.</p>
       </header>
 
       {/* Numbering */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="text-sm font-bold text-slate-900">Auto-numbering</h2>
-        <p className="mt-1 text-xs text-slate-500">Next quote will be numbered <span className="font-mono font-semibold text-blue-700">{preview}</span>.</p>
+      <section className="rounded-xl border border-outline-variant bg-surface p-5">
+        <h2 className="text-sm font-bold text-on-surface">Auto-numbering</h2>
+        <p className="mt-1 text-xs text-on-surface-variant">Next quote will be numbered <span className="font-mono font-semibold text-primary">{preview}</span>.</p>
         {cfg ? (
           <div className="mt-4 grid gap-4 md:grid-cols-3">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
               Prefix
               <Input value={cfg.prefix} onChange={(e) => setCfg({ ...cfg, prefix: e.target.value })} />
             </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
               Separator
               <Input value={cfg.separator} onChange={(e) => setCfg({ ...cfg, separator: e.target.value })} />
             </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
               Padding (digits)
               <Input type="number" min={1} max={10} value={cfg.padding} onChange={(e) => setCfg({ ...cfg, padding: Number(e.target.value) })} />
             </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
               Next sequence
               <Input type="number" min={1} value={cfg.nextSequence} onChange={(e) => setCfg({ ...cfg, nextSequence: Number(e.target.value) })} />
             </label>
-            <label className="flex items-center gap-2 self-end text-sm text-slate-700">
+            <label className="flex items-center gap-2 self-end text-sm text-on-surface">
               <input type="checkbox" checked={cfg.includeYear} onChange={(e) => setCfg({ ...cfg, includeYear: e.target.checked })} />
               Include year
             </label>
-            <label className="flex items-center gap-2 self-end text-sm text-slate-700">
+            <label className="flex items-center gap-2 self-end text-sm text-on-surface">
               <input type="checkbox" checked={cfg.resetYearly} onChange={(e) => setCfg({ ...cfg, resetYearly: e.target.checked })} />
               Reset yearly
             </label>
           </div>
         ) : (
-          <p className="mt-3 text-sm text-slate-500">Loading…</p>
+          <p className="mt-3 text-sm text-on-surface-variant">Loading…</p>
         )}
         <div className="mt-4">
           <Button onClick={() => cfg && saveCfg.mutate(cfg)} isLoading={saveCfg.isPending} disabled={!cfg}>
@@ -141,12 +141,12 @@ export default function QuoteSettingsPage() {
       </section>
 
       {/* Approval tiers */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="text-sm font-bold text-slate-900">Approval thresholds</h2>
-        <p className="mt-1 text-xs text-slate-500">A quote needs the highest level of any tier whose amount / discount % it crosses.</p>
-        <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200">
+      <section className="rounded-xl border border-outline-variant bg-surface p-5">
+        <h2 className="text-sm font-bold text-on-surface">Approval thresholds</h2>
+        <p className="mt-1 text-xs text-on-surface-variant">A quote needs the highest level of any tier whose amount / discount % it crosses.</p>
+        <div className="mt-4 overflow-x-auto rounded-lg border border-outline-variant">
           <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+            <thead className="bg-surface-container-low text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
                 <th className="px-3 py-2 text-start">Name</th>
                 <th className="px-3 py-2 text-center">Level</th>
@@ -157,7 +157,7 @@ export default function QuoteSettingsPage() {
             </thead>
             <tbody>
               {(tiersQuery.data?.data ?? []).map((t) => (
-                <tr key={t.id} className="border-t border-slate-100">
+                <tr key={t.id} className="border-t border-outline-variant">
                   <td className="px-3 py-2 font-medium">{t.name}</td>
                   <td className="px-3 py-2 text-center">L{t.level}</td>
                   <td className="px-3 py-2 text-end">{t.minAmount ? Number(t.minAmount).toLocaleString() : '—'}</td>
@@ -168,7 +168,7 @@ export default function QuoteSettingsPage() {
                 </tr>
               ))}
               {(tiersQuery.data?.data ?? []).length === 0 ? (
-                <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-500">No approval tiers — quotes need no approval.</td></tr>
+                <tr><td colSpan={5} className="px-3 py-6 text-center text-on-surface-variant">No approval tiers — quotes need no approval.</td></tr>
               ) : null}
             </tbody>
           </table>

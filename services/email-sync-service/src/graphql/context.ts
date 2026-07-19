@@ -1,8 +1,8 @@
-import type { PrismaClient } from '@prisma/client';
 import DataLoader from 'dataloader';
+import type { PrismaClient as EmailSyncPrisma } from '../../../../node_modules/.prisma/email-sync-client/index.js';
 
 export interface GraphQLContext {
-  prisma: PrismaClient;
+  prisma: EmailSyncPrisma;
   tenantId: string | null;
   userId: string | null;
   loaders: {
@@ -11,7 +11,7 @@ export interface GraphQLContext {
   };
 }
 
-function createLoaders(prisma: PrismaClient) {
+function createLoaders(prisma: EmailSyncPrisma) {
   const connectionLoader = new DataLoader<string, any>(async (ids) => {
     const items = await prisma.emailConnection.findMany({ where: { id: { in: [...ids] } } });
     const map = new Map(items.map((i: any) => [i.id, i]));
@@ -25,7 +25,7 @@ function createLoaders(prisma: PrismaClient) {
   return { connectionLoader, messageLoader };
 }
 
-export function buildContext(prisma: PrismaClient) {
+export function buildContext(prisma: EmailSyncPrisma) {
   return async function createContext({ request }: { request: Request }): Promise<GraphQLContext> {
     let tenantId: string | null = request.headers.get('x-tenant-id');
     let userId: string | null = null;

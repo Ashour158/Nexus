@@ -114,6 +114,7 @@ function buildPrismaMock() {
     activity: { findMany: vi.fn() },
     note: { findMany: vi.fn() },
     quote: { count: vi.fn(), findMany: vi.fn() },
+    validationRule: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(async (ops: unknown[]) => Promise.all(ops as Promise<unknown>[])),
   };
 }
@@ -245,8 +246,8 @@ describe('createDeal', () => {
 
     const args = ctx.prisma.deal.create.mock.calls[0][0];
     expect(args.data.contacts.create).toEqual([
-      { contactId: 'c1', isPrimary: true },
-      { contactId: 'c2', isPrimary: false },
+      { tenantId: TENANT, contactId: 'c1', isPrimary: true },
+      { tenantId: TENANT, contactId: 'c2', isPrimary: false },
     ]);
   });
 });

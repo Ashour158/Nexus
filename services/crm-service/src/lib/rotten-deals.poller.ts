@@ -1,3 +1,4 @@
+import { runCrossTenant } from '@nexus/service-utils/prisma-tenant';
 import type { CrmPrisma } from '../prisma.js';
 import { NexusProducer, TOPICS } from '@nexus/kafka';
 
@@ -115,7 +116,7 @@ export function startRottenDealsPoller(
   };
 
   const timer = setInterval(() => {
-    void runOnce();
+    void runCrossTenant('rotten-deal sweep scans deals across all tenants', runOnce);
   }, intervalMs);
   // Do not keep the event loop alive.
   if (typeof timer.unref === 'function') timer.unref();

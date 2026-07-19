@@ -6,6 +6,10 @@
 #   POSTGRES_PASSWORD, REDIS_PASSWORD, MINIO_ROOT_PASSWORD
 #   JWT_SECRET, KEYCLOAK_ADMIN_PASSWORD
 
+x-release-metadata: &release-metadata
+  GIT_SHA: ${GIT_SHA:-release-sha-required}
+  BUILT_AT: ${BUILT_AT:-unknown}
+
 services:
   # ─── Infrastructure ─────────────────────────────────────────────────────
   postgres:
@@ -40,6 +44,7 @@ services:
         reservations: { cpus: '0.25', memory: 128M }
 
   minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     restart: always
     environment:
       MINIO_ROOT_USER: nexus
@@ -97,11 +102,13 @@ services:
         limits: { cpus: '0.25', memory: 256M }
 
   graphql-gateway:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-graphql-gateway:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-graphql-gateway:${IMAGE_TAG:-release-tag-required}
     restart: always
     ports:
-      - '4000:4000'
+      - '127.0.0.1:4000:4000'
+      - '127.0.0.1:8088:8088'
     environment:
+      <<: *release-metadata
       APOLLO_KEY: ${APOLLO_KEY}
     deploy:
       resources:
@@ -109,8 +116,9 @@ services:
 
   # ─── App Services ────────────────────────────────────────────────────────
   auth-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-auth-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-auth-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     healthcheck:
       test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/health || exit 1']
       interval: 30s
@@ -123,8 +131,9 @@ services:
         reservations: { cpus: '0.25', memory: 256M }
 
   crm-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-crm-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-crm-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     healthcheck:
       test: ['CMD-SHELL', 'wget -qO- http://localhost:3001/health || exit 1']
       interval: 30s
@@ -137,57 +146,89 @@ services:
         reservations: { cpus: '0.5', memory: 512M }
 
   finance-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-finance-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-finance-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  billing-service:
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-billing-service:${IMAGE_TAG:-release-tag-required}
+    restart: always
+    environment: *release-metadata
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  activities-service:
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-activities-service:${IMAGE_TAG:-release-tag-required}
+    restart: always
+    environment: *release-metadata
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  notes-service:
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-notes-service:${IMAGE_TAG:-release-tag-required}
+    restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   notification-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-notification-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-notification-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.25', memory: 256M }
 
   realtime-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-realtime-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-realtime-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   search-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-search-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-search-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   workflow-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-workflow-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-workflow-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   analytics-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-analytics-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-analytics-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '1.0', memory: 1G }
 
   comm-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-comm-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-comm-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   storage-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-storage-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-storage-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
@@ -195,106 +236,137 @@ services:
         reservations: { cpus: '0.25', memory: 256M }
 
   integration-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-integration-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-integration-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   blueprint-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-blueprint-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-blueprint-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   approval-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-approval-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-approval-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   data-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-data-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-data-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   document-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-document-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-document-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   chatbot-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-chatbot-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-chatbot-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '1.0', memory: 1G }
 
   cadence-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-cadence-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-cadence-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  campaign-service:
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-campaign-service:${IMAGE_TAG:-release-tag-required}
+    restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   territory-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-territory-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-territory-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   planning-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-planning-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-planning-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   reporting-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-reporting-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-reporting-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   portal-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-portal-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-portal-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   knowledge-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-knowledge-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-knowledge-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   incentive-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-incentive-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-incentive-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   email-sync-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-email-sync-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-email-sync-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.25', memory: 256M }
 
   metadata-service:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-metadata-service:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-metadata-service:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+
+  ticket-service:
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-ticket-service:${IMAGE_TAG:-release-tag-required}
+    restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
@@ -303,15 +375,17 @@ services:
   # services/quotes-service/DEPRECATED.md). Removed from the stack.
 
   router-coprocessor:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-router-coprocessor:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-router-coprocessor:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
 
   web:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-web:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-web:${IMAGE_TAG:-release-tag-required}
     restart: always
+    environment: *release-metadata
     healthcheck:
       test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/health || exit 1']
       interval: 30s
@@ -325,9 +399,10 @@ services:
 
   # ─── Observability ────────────────────────────────────────────────────────
   outbox-relay:
-    image: ghcr.io/${GHCR_OWNER:-nexus-crm}/nexus-outbox-relay:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-outbox-relay:${IMAGE_TAG:-release-tag-required}
     restart: always
     environment:
+      <<: *release-metadata
       PORT: '3027'
       JWT_SECRET: ${JWT_SECRET}
       KAFKA_BROKERS: kafka:29092
@@ -347,6 +422,15 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    deploy:
+      resources:
+        limits: { cpus: '0.5', memory: 512M }
+        reservations: { cpus: '0.25', memory: 256M }
+
+  audit-consumer:
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-nexus-crm}/nexus-audit-consumer:${IMAGE_TAG:-release-tag-required}
+    restart: always
+    environment: *release-metadata
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 512M }
@@ -374,7 +458,7 @@ services:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
       - '--storage.path=/alertmanager'
     ports:
-      - '9093:9093'
+      - '127.0.0.1:9093:9093'
     deploy:
       resources:
         limits: { cpus: '0.25', memory: 128M }

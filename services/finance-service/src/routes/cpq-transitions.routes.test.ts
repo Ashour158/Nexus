@@ -35,6 +35,27 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
     quote: {
       update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
     },
+    quoteNumberConfig: {
+      findUnique: vi.fn(async () => ({
+        tenantId: 'ten_test',
+        prefix: 'QUO',
+        separator: '-',
+        includeYear: true,
+        padding: 5,
+        nextSequence: 2,
+        resetYearly: true,
+        lastYear: new Date().getUTCFullYear(),
+      })),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    quoteLine: {
+      deleteMany: vi.fn(async () => ({ count: 0 })),
+      createMany: vi.fn(async ({ data }) => ({ count: data.length })),
+    },
+    quoteRevision: {
+      createMany: vi.fn(async () => ({ count: 1 })),
+    },
   };
   return {
     rFQ: {
@@ -89,6 +110,12 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
         priceTiers: [],
       }]),
     },
+    currency: {
+      findFirst: vi.fn(async () => ({ code: 'USD' })),
+    },
+    vendorProduct: {
+      findMany: vi.fn(async () => []),
+    },
     account: {
       findFirst: vi.fn(async () => ({
         id: 'acct_1',
@@ -97,6 +124,12 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
         annualRevenue: new Prisma.Decimal(0),
       })),
     },
+    taxRate: {
+      findFirst: vi.fn(async () => null),
+    },
+    taxZone: {
+      findFirst: vi.fn(async () => null),
+    },
     promoCode: {
       findFirst: vi.fn(async () => null),
     },
@@ -104,6 +137,10 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
       findMany: vi.fn(async () => []),
     },
     quoteTemplate: {
+      findMany: vi.fn(async () => []),
+      findFirst: vi.fn(async () => null),
+    },
+    quoteApprovalTier: {
       findMany: vi.fn(async () => []),
     },
     salesOrder: {
@@ -133,7 +170,7 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
       create: vi.fn(async ({ data }) => ({ id: 'outbox_1', ...data })),
     },
     cpqTransitionLedger: {
-      findUnique: vi.fn(async () => null),
+      findFirst: vi.fn(async () => null),
       create: vi.fn(async ({ data }) => ({ id: 'ledger_1', ...data })),
       update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
     },
@@ -200,7 +237,7 @@ describe('CPQ transition route', () => {
       payload: { entity: 'rfq', entityId: 'rfq_1', action: 'CONVERT_TO_QUOTE', idempotencyKey: 'idem_1' },
     });
 
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode, res.payload).toBe(200);
     const body = JSON.parse(res.payload);
     expect(body.data).toEqual(expect.objectContaining({
       previousStatus: 'READY_FOR_QUOTE',
@@ -273,7 +310,7 @@ describe('CPQ transition route', () => {
   it('returns the stored transition result for duplicate idempotency keys', async () => {
     prisma = createMockPrisma({
       cpqTransitionLedger: {
-        findUnique: vi.fn(async () => ({
+        findFirst: vi.fn(async () => ({
           id: 'ledger_1',
           status: 'SUCCEEDED',
           result: { rfqId: 'rfq_1', quoteId: 'quote_existing', transitionLedgerId: 'ledger_1' },

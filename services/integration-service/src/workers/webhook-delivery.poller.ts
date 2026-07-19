@@ -1,3 +1,4 @@
+import { runCrossTenant } from '@nexus/service-utils/prisma-tenant';
 import type { createWebhooksService } from '../services/webhooks.service.js';
 
 type Webhooks = ReturnType<typeof createWebhooksService>;
@@ -56,7 +57,7 @@ export function startWebhookDeliveryPoller(
   };
 
   const timer = setInterval(() => {
-    void runOnce();
+    void runCrossTenant('webhook delivery queue drain spans all tenants', runOnce);
   }, intervalMs);
   // Do not keep the event loop alive.
   if (typeof timer.unref === 'function') timer.unref();

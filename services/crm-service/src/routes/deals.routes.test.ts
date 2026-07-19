@@ -3,6 +3,18 @@ import Fastify from 'fastify';
 import { registerDealsRoutes } from './deals.routes.js';
 import { dealFactory } from '../test/factories/deal.factory.js';
 
+vi.mock('@nexus/cache', () => ({
+  getSharedCache: () => ({
+    cacheAside: async <T>(
+      _key: string,
+      factory: () => Promise<T>
+    ): Promise<T> => factory(),
+    invalidatePattern: vi.fn(),
+  }),
+}));
+
+const DEAL_ID = 'cdeal000000000000000001';
+
 function createMockPrisma() {
   return {
     deal: {
@@ -21,6 +33,12 @@ function createMockPrisma() {
     },
     activity: {
       create: vi.fn(),
+    },
+    orgWideDefault: {
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
+    sharingRule: {
+      findFirst: vi.fn().mockResolvedValue(null),
     },
     $transaction: vi.fn(async (fn: unknown) => (typeof fn === 'function' ? fn() : fn)),
     $disconnect: vi.fn(),
@@ -73,9 +91,9 @@ describe('deals routes', () => {
 
   it('GET /api/v1/deals/:id returns deal', async () => {
     const app = createTestApp(prisma, producer);
-    prisma.deal.findFirst.mockResolvedValue(dealFactory());
+    prisma.deal.findFirst.mockResolvedValue(dealFactory({ id: DEAL_ID }));
 
-    const res = await app.inject({ method: 'GET', url: '/api/v1/deals/dea_test' });
+    const res = await app.inject({ method: 'GET', url: `/api/v1/deals/${DEAL_ID}` });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.payload);
     expect(body.success).toBe(true);

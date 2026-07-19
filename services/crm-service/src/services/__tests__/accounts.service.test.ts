@@ -87,6 +87,7 @@ function buildPrismaMock() {
     contact: { count: vi.fn() },
     deal: { count: vi.fn() },
     fieldChangeLog: { createMany: vi.fn() },
+    validationRule: { findMany: vi.fn().mockResolvedValue([]) },
   };
 }
 

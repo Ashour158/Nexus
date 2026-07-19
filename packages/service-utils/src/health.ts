@@ -6,6 +6,7 @@ import {
   Counter,
   Histogram,
 } from 'prom-client';
+import type { EffectProbeRegistry } from './effect-probes.js';
 
 collectDefaultMetrics({ prefix: 'nexus_' });
 
@@ -52,6 +53,28 @@ export interface HealthResponse {
     responseTime?: number;
     message?: string;
   }[];
+}
+
+export interface VersionResponse {
+  service: string;
+  gitSha: string;
+  builtAt: string;
+}
+
+export function getVersionInfo(serviceName: string): VersionResponse {
+  return {
+    service: serviceName,
+    gitSha: process.env.GIT_SHA?.trim() || 'unknown',
+    builtAt: process.env.BUILT_AT?.trim() || 'unknown',
+  };
+}
+
+/** Register an unauthenticated release-identity endpoint for deployment verification. */
+export function registerVersionRoute(app: FastifyInstance, serviceName: string): void {
+  app.get('/version', async (_req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    return getVersionInfo(serviceName);
+  });
 }
 
 /** Minimal client shape for `SELECT 1` (any Prisma client). */
@@ -110,49 +133,60 @@ export async function checkKafka(kafka: Kafka): Promise<HealthCheck> {
 export function registerHealthRoutes(
   app: FastifyInstance,
   serviceName: string,
-  checkFns: Array<() => Promise<HealthCheck>>
+  checkFns: Array<() => Promise<HealthCheck>>,
+  effectProbes?: EffectProbeRegistry
 ): void {
   app.get('/health', async (_req, reply) => {
     const checks = await Promise.all(checkFns.map((fn) => fn()));
-    const hasFail = checks.some((c) => !c.ok);
+    if (effectProbes) await effectProbes.refresh();
+    const effects = effectProbes?.evaluate() ?? [];
+    const hasFail = checks.some((c) => !c.ok) || effects.some((e) => e.status === 'fail');
+    const hasWarn = effects.some((e) => e.status === 'warn');
     const payload: HealthResponse = {
-      status: hasFail ? 'degraded' : 'healthy',
+      status: hasFail || hasWarn ? 'degraded' : 'healthy',
       service: serviceName,
       version: process.env.npm_package_version ?? '0.0.0',
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
-      checks: checks.map((c) => ({
+      checks: [...checks.map((c) => ({
         name: c.name,
-        status: c.ok ? 'pass' : 'fail',
+        status: c.ok ? ('pass' as const) : ('fail' as const),
         responseTime: c.latencyMs,
         message: c.message,
-      })),
+      })), ...effects.map((e) => ({ name: `effect-${e.engine}`, status: e.status, message: e.message }))],
     };
     reply.code(hasFail ? 503 : 200).send(payload);
   });
 
   app.get('/ready', async (_req, reply) => {
     const checks = await Promise.all(checkFns.map((fn) => fn()));
+    if (effectProbes) await effectProbes.refresh();
+    const effects = effectProbes?.evaluate() ?? [];
     const failCount = checks.filter((c) => !c.ok).length;
     const status: HealthResponse['status'] =
-      failCount === 0 ? 'healthy' : failCount === checks.length ? 'unhealthy' : 'degraded';
+      failCount === 0 && !effects.some((e) => e.status === 'fail') ? (effects.some((e) => e.status === 'warn') ? 'degraded' : 'healthy') : failCount === checks.length && checks.length > 0 ? 'unhealthy' : 'degraded';
     const payload: HealthResponse = {
       status,
       service: serviceName,
       version: process.env.npm_package_version ?? '0.0.0',
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
-      checks: checks.map((c) => ({
+      checks: [...checks.map((c) => ({
         name: c.name,
-        status: c.ok ? 'pass' : 'fail',
+        status: c.ok ? ('pass' as const) : ('fail' as const),
         responseTime: c.latencyMs,
         message: c.message,
-      })),
+      })), ...effects.map((e) => ({ name: `effect-${e.engine}`, status: e.status, message: e.message }))],
     };
-    reply.code(status === 'healthy' ? 200 : 503).send(payload);
+    const readinessFail = failCount > 0 || effects.some((e) => e.status === 'fail');
+    reply.code(readinessFail ? 503 : 200).send(payload);
   });
 
   app.get('/metrics', async (_req, reply) => {
+    if (effectProbes) {
+      await effectProbes.refresh();
+      effectProbes.evaluate();
+    }
     reply.header('Content-Type', promRegister.contentType);
     return promRegister.metrics();
   });

@@ -30,7 +30,7 @@ rate_limit:
 
 subgraphs:
   auth:
-    routing_url: http://auth-service:3010/graphql
+    routing_url: http://auth-service:3000/graphql
     schema:
       subgraph_url: http://auth-service:3010/graphql
   # The services below are REST-only. They do not expose GraphQL endpoints.

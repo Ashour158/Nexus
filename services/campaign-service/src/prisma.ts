@@ -1,3 +1,4 @@
+import { getTenantId as getSharedTenantId } from '@nexus/service-utils/request-context';
 import { PrismaClient } from '../../../node_modules/.prisma/campaign-client/index.js';
 import { attachSlowQueryLog, buildDatabaseUrl } from '@nexus/service-utils/db';
 import { createTenantPrismaExtension } from '@nexus/service-utils/prisma-tenant';
@@ -19,7 +20,7 @@ function buildPrisma() {
   attachSlowQueryLog(base as any, 'campaign-service');
   return base.$extends(
     createTenantPrismaExtension(base as any, {
-      getTenantId: () => tenantAls.getStore()?.tenantId,
+      getTenantId: () => tenantAls.getStore()?.tenantId ?? getSharedTenantId(),
       skipModels: new Set(['OutboxMessage']),
     })
   );

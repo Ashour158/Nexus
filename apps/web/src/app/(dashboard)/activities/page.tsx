@@ -118,7 +118,7 @@ export default function ActivitiesPage() {
   const activitiesQuery = useActivities(filters);
   // Calendar view needs a broader, unfiltered window to place items across the
   // month; it shares the activities cache and only matters when calendar is on.
-  const calendarQuery = useActivities({ page: 1, limit: 200 });
+  const calendarQuery = useActivities({ page: 1, limit: 100 });
   const completeActivity = useCompleteActivity();
   const createActivity = useCreateActivity();
 

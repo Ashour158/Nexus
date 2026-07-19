@@ -80,7 +80,12 @@ export const ccKeys = {
 export function useJourneys() {
   return useQuery<Journey[]>({
     queryKey: ccKeys.journeys(),
-    queryFn: () => api.get<Journey[]>('/journeys'),
+    // The live endpoint returns a paged envelope { items, total, page, limit };
+    // coerce to the array this hook's consumers map over.
+    queryFn: () =>
+      api
+        .get<Journey[] | { items?: Journey[] }>('/journeys')
+        .then((d) => (Array.isArray(d) ? d : d?.items ?? [])),
   });
 }
 

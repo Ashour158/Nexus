@@ -1,3 +1,4 @@
+import { runCrossTenant } from '@nexus/service-utils/prisma-tenant';
 import type { PlanningPrisma } from '../prisma.js';
 import { createForecastRollupService } from '../services/forecast-rollup.service.js';
 
@@ -39,10 +40,10 @@ export function startForecastSnapshotPoller(
   };
 
   const startupTimer = setTimeout(() => {
-    void tick();
+    void runCrossTenant('daily forecast snapshot sweeps owners across all tenants', tick);
   }, startupDelayMs);
   const interval = setInterval(() => {
-    void tick();
+    void runCrossTenant('daily forecast snapshot sweeps owners across all tenants', tick);
   }, Math.max(60_000, intervalMs));
   // Do not keep the event loop alive solely for the poller.
   if (typeof interval.unref === 'function') interval.unref();

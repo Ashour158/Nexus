@@ -1,3 +1,4 @@
+import { runCrossTenant } from '@nexus/service-utils/prisma-tenant';
 import { Decimal } from 'decimal.js';
 import { NexusProducer, TOPICS } from '@nexus/kafka';
 import type { BillingPrisma } from '../prisma.js';
@@ -685,7 +686,7 @@ export function startSubscriptionPoller(
   };
 
   const timer = setInterval(() => {
-    void runOnce();
+    void runCrossTenant('subscription renewal/dunning sweep spans all tenants', runOnce);
   }, intervalMs);
   if (typeof timer.unref === 'function') timer.unref();
 

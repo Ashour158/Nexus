@@ -82,6 +82,7 @@ model StepExecution {
   executedAt   DateTime?
   result       String?
   variant      String            @default("A")
+  attempts     Int               @default(0)
   createdAt    DateTime          @default(now())
 
   @@index([enrollmentId])

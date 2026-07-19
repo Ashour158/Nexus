@@ -96,7 +96,11 @@ export const resolvers = {
     async createTenant(_parent: unknown, { input }: { input: Record<string, unknown> }, ctx: GraphQLContext) {
       const data = input as { name: string; domain?: string; settings?: string };
       const tenant = await ctx.prisma.tenant.create({
-        data: { name: data.name, slug: data.name.toLowerCase().replace(/\s+/g, '-'), domain: data.domain, settings: data.settings ? JSON.parse(data.settings) : {} },
+        data: {
+          name: data.name,
+          slug: data.domain ?? data.name.toLowerCase().replace(/\s+/g, '-'),
+          settings: data.settings ? JSON.parse(data.settings) : {},
+        },
       });
       ctx.loaders.tenantLoader.prime(tenant.id, tenant);
       return mapTenant(tenant);
@@ -105,7 +109,12 @@ export const resolvers = {
       const data = input as { name?: string; domain?: string; settings?: string; isActive?: boolean };
       const tenant = await ctx.prisma.tenant.update({
         where: { id },
-        data: { name: data.name, domain: data.domain, isActive: data.isActive },
+        data: {
+          name: data.name,
+          slug: data.domain,
+          settings: data.settings === undefined ? undefined : JSON.parse(data.settings),
+          isActive: data.isActive,
+        },
       });
       ctx.loaders.tenantLoader.clear(id).prime(id, tenant);
       return mapTenant(tenant);

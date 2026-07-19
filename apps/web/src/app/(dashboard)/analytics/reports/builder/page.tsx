@@ -2,8 +2,10 @@
 
 import { type ReactElement, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Play, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, Clock, Download, Play, Plus, Save, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { notify } from '@/lib/toast';
+import { ScheduleDialog } from '@/components/bi/schedule-dialog';
 import {
   AGG_FNS,
   DATASETS,
@@ -18,12 +20,14 @@ import {
   type TimeGrain,
 } from '@/lib/bi-types';
 import {
+  downloadReportExport,
   runAdHocReport,
   useCreateReport,
   useDeleteReport,
   useFieldCatalog,
   useReports,
 } from '@/hooks/use-bi';
+import type { ExportFormat } from '@/lib/bi-types';
 import { formatCurrency } from '@/lib/format';
 
 const selectCls =
@@ -45,6 +49,19 @@ export default function ReportBuilderPage(): ReactElement {
   const { data: reports } = useReports();
   const createReport = useCreateReport();
   const deleteReport = useDeleteReport();
+  const [scheduling, setScheduling] = useState<{ id: string; name: string } | null>(null);
+  const [exporting, setExporting] = useState<string | null>(null);
+
+  async function exportReport(id: string, reportName: string, format: ExportFormat) {
+    setExporting(`${id}:${format}`);
+    try {
+      await downloadReportExport(id, format, reportName);
+    } catch (err) {
+      notify.error((err as Error).message || 'Export failed');
+    } finally {
+      setExporting(null);
+    }
+  }
 
   const spec: ReportSpec | null = useMemo(() => {
     const validMeasures = measures.filter((m) => m.field);
@@ -221,14 +238,34 @@ export default function ReportBuilderPage(): ReactElement {
             ) : (
               <ul className="divide-y divide-outline-variant">
                 {reports.map((r) => (
-                  <li key={r.id} className="flex items-center justify-between py-2">
-                    <div>
-                      <p className="text-sm font-semibold text-on-surface">{r.name}</p>
+                  <li key={r.id} className="flex items-center justify-between gap-2 py-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-on-surface">{r.name}</p>
                       <p className="text-xs text-on-surface-variant">{r.spec.dataset}</p>
                     </div>
-                    <button onClick={() => deleteReport.mutate(r.id)} className="rounded-md p-1.5 text-on-surface-variant hover:bg-error-container hover:text-error" title="Delete">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex shrink-0 items-center gap-1">
+                      {(['csv', 'xlsx', 'pdf'] as ExportFormat[]).map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => exportReport(r.id, r.name, f)}
+                          disabled={exporting === `${r.id}:${f}`}
+                          className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-semibold uppercase text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface disabled:opacity-50"
+                          title={`Download ${f.toUpperCase()}`}
+                        >
+                          <Download className="h-3 w-3" /> {f}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => setScheduling({ id: r.id, name: r.name })}
+                        className="rounded-md p-1.5 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+                        title="Email schedules"
+                      >
+                        <Clock className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => deleteReport.mutate(r.id)} className="rounded-md p-1.5 text-on-surface-variant hover:bg-error-container hover:text-error" title="Delete">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -236,6 +273,14 @@ export default function ReportBuilderPage(): ReactElement {
           </div>
         </div>
       </div>
+
+      {scheduling && (
+        <ScheduleDialog
+          reportId={scheduling.id}
+          reportName={scheduling.name}
+          onClose={() => setScheduling(null)}
+        />
+      )}
     </main>
   );
 }

@@ -22,9 +22,10 @@ const mocks = vi.hoisted(() => {
     prismaHealth,
     prisma,
     producer,
-    startService: vi.fn(async (app: FastifyInstance, _port: number, cb: () => Promise<void>) => {
+    startService: vi.fn(async (app: FastifyInstance, _port: number, cb: (a: FastifyInstance) => Promise<void>) => {
       state.app = app;
-      await cb();
+      // Match the real startService contract: the callback receives the app.
+      await cb(app);
     }),
     startDealConsumer: vi.fn().mockResolvedValue(undefined),
     startActivityConsumer: vi.fn().mockResolvedValue(undefined),

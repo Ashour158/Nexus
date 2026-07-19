@@ -1,3 +1,4 @@
+import { runCrossTenant } from '@nexus/service-utils/prisma-tenant';
 import type { CommPrisma } from '../prisma.js';
 import type { createOutboxService } from '../services/outbox.service.js';
 
@@ -79,7 +80,7 @@ export function startOutboxPoller(
   };
 
   const timer = setInterval(() => {
-    void runOnce();
+    void runCrossTenant('comm email outbox drain spans all tenants', runOnce);
   }, intervalMs);
   if (typeof timer.unref === 'function') timer.unref();
 

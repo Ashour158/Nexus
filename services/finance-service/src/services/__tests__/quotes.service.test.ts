@@ -29,7 +29,7 @@ function makeQuote(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 function makePrisma() {
-  return {
+  const prisma = {
     quote: {
       findFirst: vi.fn(async ({ where }: { where: { id: string } }) => {
         if (where.id === 'sent') return makeQuote({ id: 'sent', status: 'SENT' });
@@ -46,7 +46,26 @@ function makePrisma() {
       ),
       updateMany: vi.fn(async () => ({ count: 2 })),
     },
+    quoteNumberConfig: {
+      findUnique: vi.fn(async () => ({
+        tenantId: TENANT,
+        prefix: 'QUO',
+        separator: '-',
+        includeYear: true,
+        padding: 5,
+        nextSequence: 1,
+        resetYearly: true,
+        lastYear: new Date().getUTCFullYear(),
+      })),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    $transaction: vi.fn(),
   };
+  prisma.$transaction.mockImplementation(async (fn: unknown) =>
+    (fn as (tx: typeof prisma) => Promise<unknown>)(prisma)
+  );
+  return prisma;
 }
 
 function makeProducer() {

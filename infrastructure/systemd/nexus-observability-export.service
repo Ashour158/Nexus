@@ -1,0 +1,14 @@
+[Unit]
+Description=Nexus off-host observability evidence export
+Wants=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+Environment=ENV_FILE=/etc/nexus/prod.env
+WorkingDirectory=/opt/nexus
+ExecStart=/bin/sh /opt/nexus/scripts/export-observability-evidence.sh
+UMask=0077
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

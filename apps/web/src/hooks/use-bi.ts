@@ -1,13 +1,17 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiClients } from '@/lib/api-client';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { BASE_URLS, apiClients } from '@/lib/api-client';
+import { useAuthStore } from '@/stores/auth.store';
 import type {
   BiDashboard,
   BiReport,
+  BiReportSchedule,
   BiWidget,
   ChartType,
   Dataset,
+  DrillDownSpec,
+  ExportFormat,
   FieldCatalog,
   QueryResult,
   ReportSpec,
@@ -30,6 +34,25 @@ export function useFieldCatalog(dataset: Dataset) {
 
 export function runQuery(spec: ReportSpec): Promise<QueryResult> {
   return analytics.post<QueryResult>('/query', spec);
+}
+
+/** Detail rows behind one aggregated chart point. */
+export function runDrillDown(spec: DrillDownSpec): Promise<QueryResult> {
+  return analytics.post<QueryResult>('/query/drilldown', spec);
+}
+
+/**
+ * Field catalogs for several datasets at once — used by the join picker so
+ * joined datasets' fields can appear (dotted) in the builder dropdowns.
+ */
+export function useFieldCatalogs(datasets: Dataset[]) {
+  return useQueries({
+    queries: datasets.map((dataset) => ({
+      queryKey: ['analytics', 'fields', dataset],
+      queryFn: () => analytics.get<FieldCatalog>('/query/fields', { params: { dataset } }),
+      staleTime: 5 * 60_000,
+    })),
+  });
 }
 
 /** Live-preview query. Disabled until `enabled` is true (e.g. spec is valid). */
@@ -163,4 +186,77 @@ export function useDeleteReport() {
 
 export function runAdHocReport(spec: ReportSpec): Promise<QueryResult> {
   return bi.post<QueryResult>('/reports/run', { spec });
+}
+
+// ---------------------------------------------------------------------------
+// Report schedules (recurring email delivery) + real file export
+// ---------------------------------------------------------------------------
+
+export function useReportSchedules(reportId: string | undefined) {
+  return useQuery<BiReportSchedule[]>({
+    queryKey: ['bi', 'schedules', reportId],
+    queryFn: () => bi.get<BiReportSchedule[]>(`/reports/${reportId}/schedules`),
+    enabled: Boolean(reportId),
+  });
+}
+
+export function useCreateReportSchedule(reportId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { cron: string; recipients: string[]; format?: string; subject?: string }) =>
+      bi.post<BiReportSchedule>(`/reports/${reportId}/schedules`, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bi', 'schedules', reportId] }),
+  });
+}
+
+export function useToggleReportSchedule(reportId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ scheduleId, isActive }: { scheduleId: string; isActive: boolean }) =>
+      bi.patch<BiReportSchedule>(`/schedules/${scheduleId}`, { isActive }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bi', 'schedules', reportId] }),
+  });
+}
+
+export function useDeleteReportSchedule(reportId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (scheduleId: string) => bi.delete<{ deleted: boolean }>(`/schedules/${scheduleId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bi', 'schedules', reportId] }),
+  });
+}
+
+/**
+ * Download a saved report as a real file (csv / xlsx / pdf). Binary-safe:
+ * fetches the bytes with the auth header and triggers a browser download —
+ * window.open cannot carry the Authorization header.
+ */
+export async function downloadReportExport(
+  reportId: string,
+  format: ExportFormat,
+  reportName: string
+): Promise<void> {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`${BASE_URLS.bi}/reports/${reportId}/export?format=${format}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!res.ok) {
+    let message = `Export failed (${res.status})`;
+    try {
+      const body = (await res.json()) as { error?: { message?: string } };
+      message = body.error?.message ?? message;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new Error(message);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${reportName.replace(/[^A-Za-z0-9._-]+/g, '-').slice(0, 60) || 'report'}.${format}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }

@@ -1,5 +1,13 @@
 import { NextRequest } from 'next/server';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const adminAuth = vi.hoisted(() => ({
+  requireAdmin: vi.fn(),
+}));
+
+vi.mock('@/lib/admin-auth', () => ({
+  requireAdmin: adminAuth.requireAdmin,
+}));
 
 function adminRequest(path: string, headers: Record<string, string> = {}) {
   return new NextRequest(`http://localhost${path}`, {
@@ -13,7 +21,18 @@ function adminRequest(path: string, headers: Record<string, string> = {}) {
 }
 
 describe('/api/admin/audit/internal-operations', () => {
+  beforeEach(() => {
+    adminAuth.requireAdmin.mockResolvedValue({
+      userId: 'admin-1',
+      role: 'admin',
+      roles: ['admin'],
+      tenantId: 'tenant-1',
+      permissions: ['*'],
+    });
+  });
+
   afterEach(() => {
+    adminAuth.requireAdmin.mockReset();
     vi.resetModules();
     vi.unstubAllGlobals();
     delete process.env.AUDIT_CONSUMER_URL;
@@ -21,6 +40,7 @@ describe('/api/admin/audit/internal-operations', () => {
   });
 
   it('rejects unauthorized users before calling audit-consumer', async () => {
+    adminAuth.requireAdmin.mockRejectedValue(new Error('Unauthorized'));
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     const route = await import('./route');

@@ -10,6 +10,7 @@ import { createRedisClient } from './redis.js';
 import { registerSwagger, isSwaggerEnabled } from './swagger.js';
 import { ValidationError } from './errors.js';
 import { flattenValidationError } from './validation.js';
+import { registerVersionRoute } from './health.js';
 import pino from 'pino';
 import * as Sentry from '@sentry/node';
 import { type KeyObject } from 'node:crypto';
@@ -83,7 +84,12 @@ function isInternalServiceRoute(url: string, headers: Record<string, unknown> | 
 /** Routes that skip JWT verification (Section 35 + public auth flows). */
 function isPublicRoute(url: string, method: string): boolean {
   const path = pathOnly(url);
-  if (path.startsWith('/health') || path.startsWith('/metrics') || path.startsWith('/ready')) {
+  if (
+    path.startsWith('/health') ||
+    path.startsWith('/metrics') ||
+    path.startsWith('/ready') ||
+    path === '/version'
+  ) {
     return true;
   }
   /** OpenAPI docs (RR-H17) — swagger-ui + generated document, no JWT. */
@@ -248,7 +254,12 @@ export async function createService(config: ServiceConfig): Promise<FastifyInsta
       // and marking the container unhealthy (→ restart loops under an orchestrator).
       allowList: (req: any) => {
         const path = pathOnly(req.url);
-        if (path.startsWith('/health') || path.startsWith('/metrics') || path.startsWith('/ready')) return true;
+        if (
+          path.startsWith('/health') ||
+          path.startsWith('/metrics') ||
+          path.startsWith('/ready') ||
+          path === '/version'
+        ) return true;
         // `/auth/login` is unauthenticated, so it can't be keyed per-user — it falls
         // back to per-IP. Behind the single-IP web BFF, every user's login shares one
         // bucket, so a login wave (mass onboarding, or the Monday-morning peak) trips
@@ -393,6 +404,8 @@ export async function createService(config: ServiceConfig): Promise<FastifyInsta
   if (isSwaggerEnabled()) {
     await registerSwagger(app as unknown as FastifyInstance, { name: config.name });
   }
+
+  registerVersionRoute(app as unknown as FastifyInstance, config.name);
 
   return app as unknown as FastifyInstance<RawServerDefault>;
 }

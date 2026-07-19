@@ -1,8 +1,8 @@
-import type { PrismaClient } from '@prisma/client';
 import DataLoader from 'dataloader';
+import type { IncentivePrisma } from '../prisma.js';
 
 export interface GraphQLContext {
-  prisma: PrismaClient;
+  prisma: IncentivePrisma;
   tenantId: string | null;
   userId: string | null;
   loaders: {
@@ -13,7 +13,7 @@ export interface GraphQLContext {
   };
 }
 
-function createLoaders(prisma: PrismaClient) {
+function createLoaders(prisma: IncentivePrisma) {
   const contestLoader = new DataLoader<string, any>(async (ids) => {
     const items = await prisma.contest.findMany({ where: { id: { in: [...ids] } } });
     const map = new Map(items.map((i: any) => [i.id, i]));
@@ -37,7 +37,7 @@ function createLoaders(prisma: PrismaClient) {
   return { contestLoader, entryLoader, badgeLoader, awardLoader };
 }
 
-export function buildContext(prisma: PrismaClient) {
+export function buildContext(prisma: IncentivePrisma) {
   return async function createContext({ request }: { request: Request }): Promise<GraphQLContext> {
     let tenantId: string | null = request.headers.get('x-tenant-id');
     let userId: string | null = null;

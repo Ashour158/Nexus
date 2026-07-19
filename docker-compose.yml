@@ -130,7 +130,7 @@ services:
     restart: unless-stopped
     command: ['start-dev']
     ports:
-      - '8080:8080'
+      - '127.0.0.1:8080:8080'
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
@@ -147,8 +147,8 @@ services:
     container_name: nexus-kong
     restart: unless-stopped
     ports:
-      - '8000:8000'  # Proxy port (public — the API gateway)
-      - '8443:8443'  # SSL proxy port (public)
+      - '127.0.0.1:8000:8000'  # Proxy port — loopback only; Caddy is the public edge.
+      - '127.0.0.1:8443:8443'  # SSL proxy port — loopback only; Caddy is the public edge.
       - '127.0.0.1:8001:8001'  # Admin API — loopback only (was internet-exposed)
       - '127.0.0.1:8444:8444'  # SSL admin API — loopback only
     environment:
@@ -178,7 +178,7 @@ services:
       - '127.0.0.1:3000:3000'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3000'
       APP_URL: http://localhost:3000
@@ -206,7 +206,7 @@ services:
       - '127.0.0.1:3001:3001'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       # Governance posture: when true, a field-security / validation / sharing
       # evaluation ERROR denies the operation (503) instead of silently allowing
       # it. Safe default for production; unconfigured tenants (no rules) still
@@ -251,7 +251,7 @@ services:
       - '127.0.0.1:3002:3002'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       CHROMIUM_PATH: /usr/bin/chromium
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_finance
@@ -534,7 +534,7 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       # Must equal crm-service's BLUEPRINT_SERVICE_TOKEN so the internal
       # validate-transition call authenticates (timingSafeEqual).
@@ -562,7 +562,7 @@ services:
       CLICKHOUSE_DB: default
       CRM_SERVICE_URL: http://crm-service:3001
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
     depends_on:
       kafka:
@@ -599,7 +599,7 @@ services:
       # Without them they fall back to localhost (unreachable in-container) and
       # every reporting/analytics/forecast/etc call 500'd. Internal DNS names.
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       AUTH_SERVICE_URL: http://auth-service:3000
       CRM_SERVICE_URL: http://crm-service:3001
@@ -636,7 +636,7 @@ services:
       QUOTES_SERVICE_URL: http://finance-service:3002
     restart: unless-stopped
     ports:
-      - '3100:3000'
+      - '127.0.0.1:3100:3000'
     depends_on:
       - auth-service
       - crm-service
@@ -654,7 +654,7 @@ services:
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
     restart: unless-stopped
     ports:
-      - '4000:4000'
+      - '127.0.0.1:4000:4000'
     volumes:
       - ./services/graphql-gateway/router.yaml:/dist/config/router.yaml:ro
       - ./services/graphql-gateway/supergraph.graphql:/dist/config/supergraph.graphql:ro
@@ -703,7 +703,7 @@ services:
       # the shared mesh token (x-service-token). Must match crm's value.
       CRM_SERVICE_URL: http://crm-service:3001
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
     depends_on:
       postgres:
@@ -748,7 +748,7 @@ services:
       - '127.0.0.1:3014:3014'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3014'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_approval
@@ -789,7 +789,7 @@ services:
       CAMPAIGN_SERVICE_URL: http://campaign-service:3025
       KNOWLEDGE_SERVICE_URL: http://knowledge-service:3023
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
     depends_on:
       postgres:
@@ -815,7 +815,7 @@ services:
       # this block entirely, so every DB query failed and /health returned 503.
       DOCUMENT_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_document
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
     depends_on:
       - finance-service
@@ -864,7 +864,7 @@ services:
       CRM_SERVICE_URL: http://crm-service:3001
       COMM_SERVICE_URL: http://comm-service:3009
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3018'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_cadence
@@ -888,9 +888,11 @@ services:
     ports:
       - '127.0.0.1:3019:3019'
     environment:
+      # Tenant-enforcement canary wave 1: fail-closed ON by default; the global
+      # env var remains the emergency kill-switch (set NEXUS_TENANT_ENFORCEMENT=off).
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       # crm calls POST /api/v1/internal/territories/assign with x-service-token.
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3019'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_territory
@@ -917,7 +919,7 @@ services:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_planning
       CRM_SERVICE_URL: http://crm-service:3001
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
@@ -950,7 +952,7 @@ services:
       # PDF export renders via document-service, which ships the headless Chromium.
       DOCUMENT_SERVICE_URL: http://document-service:3016
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
@@ -971,7 +973,7 @@ services:
       - '127.0.0.1:3022:3022'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3022'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_portal
@@ -1065,7 +1067,7 @@ services:
       - '127.0.0.1:3004:3004'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
@@ -1086,7 +1088,7 @@ services:
     container_name: nexus-router-coprocessor
     restart: unless-stopped
     ports:
-      - '4001:4001'
+      - '127.0.0.1:4001:4001'
     environment:
       KAFKA_BROKERS: kafka:29092
       JWT_SECRET: ${JWT_SECRET}
@@ -1185,8 +1187,8 @@ services:
     container_name: nexus-otel-collector
     restart: unless-stopped
     ports:
-      - '4317:4317'   # OTLP gRPC
-      - '4318:4318'   # OTLP HTTP
+      - '127.0.0.1:4317:4317'   # OTLP gRPC — loopback only.
+      - '127.0.0.1:4318:4318'   # OTLP HTTP — loopback only.
     volumes:
       - ./infrastructure/otel/otel-collector-config.yml:/etc/otelcol-contrib/config.yaml:ro
 
@@ -1217,8 +1219,10 @@ services:
     ports:
       - '127.0.0.1:3029:3029'
     environment:
+      # Tenant-enforcement canary wave 1: fail-closed ON by default; the global
+      # env var remains the emergency kill-switch (set NEXUS_TENANT_ENFORCEMENT=off).
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3029'
       TICKET_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_ticket
@@ -1242,8 +1246,10 @@ services:
     ports:
       - '127.0.0.1:3025:3025'
     environment:
+      # Tenant-enforcement canary wave 1: fail-closed ON by default; the global
+      # env var remains the emergency kill-switch (set NEXUS_TENANT_ENFORCEMENT=off).
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3025'
       CAMPAIGN_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_campaign

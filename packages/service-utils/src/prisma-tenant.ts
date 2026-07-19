@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 /**
  * Structural stand-in for a generated Prisma client.
  *
@@ -43,6 +45,54 @@ export class TenantContextError extends Error {
     );
     this.name = 'TenantContextError';
   }
+}
+
+/**
+ * Marks a call stack as DELIBERATELY cross-tenant. See {@link runCrossTenant}.
+ *
+ * Separate from the tenant ALS on purpose: a cross-tenant sweep has no tenant,
+ * and forcing one would mean inventing a fake tenantId — which is exactly the
+ * kind of lie that hides bugs.
+ */
+const crossTenantAls = new AsyncLocalStorage<{ reason: string }>();
+
+/**
+ * Run `fn` with tenant scoping intentionally disabled.
+ *
+ * WHY THIS EXISTS
+ * Some background work is legitimately cross-tenant: the rotten-deal sweep, SLA
+ * scanners, the outbox relay, subscription pollers. They must see every tenant's
+ * rows by design. Before this, such code "worked" only because tenant
+ * enforcement was globally OFF (18 services default
+ * `NEXUS_TENANT_ENFORCEMENT=off`), which meant a genuine missing-context BUG and
+ * a legitimate cross-tenant SWEEP were indistinguishable — both silently ran
+ * unscoped.
+ *
+ * The alternative design — forcing every poller to iterate tenant-by-tenant —
+ * was rejected: it changes query patterns and performance across ~10 services,
+ * and it does not actually make anything safer. A sweep that declares itself is
+ * safe; the danger is *implicit* unscoped access.
+ *
+ * So: unscoped access is now impossible EXCEPT inside this wrapper, which
+ * requires a written reason and is greppable. Auditing cross-tenant access is
+ * `grep -r runCrossTenant`, and every hit carries its justification.
+ *
+ * Use it ONLY for work that must span tenants. If you are reaching for it to
+ * silence a TenantContextError on a request path, that is the bug — seed the
+ * tenant context instead.
+ *
+ * @param reason short justification, e.g. 'rotten-deal sweep runs across all tenants'
+ */
+export function runCrossTenant<T>(reason: string, fn: () => Promise<T>): Promise<T> {
+  if (!reason || reason.trim().length === 0) {
+    throw new Error('runCrossTenant requires a non-empty reason (it is an audit record)');
+  }
+  return crossTenantAls.run({ reason }, fn);
+}
+
+/** True when the current call stack is inside {@link runCrossTenant}. */
+export function isCrossTenant(): boolean {
+  return crossTenantAls.getStore() !== undefined;
 }
 
 /**
@@ -198,6 +248,11 @@ export function createTenantPrismaExtension<T extends PrismaClientLike>(
           query: (a: unknown) => Promise<unknown>;
         }) {
           if (skip.has(model)) {
+            return query(args);
+          }
+          // Explicitly-declared cross-tenant work (see runCrossTenant). Checked
+          // BEFORE the tenantId lookup so a sweep does not need a fake tenant.
+          if (crossTenantAls.getStore()) {
             return query(args);
           }
           const tenantId = getTenantId();

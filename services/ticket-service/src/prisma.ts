@@ -1,3 +1,4 @@
+import { getTenantId as getSharedTenantId } from '@nexus/service-utils/request-context';
 import { PrismaClient } from '../../../node_modules/.prisma/ticket-client/index.js';
 import { createPrismaClientWithReplicas } from '@nexus/service-utils/prisma-client';
 import { createTenantPrismaExtension } from '@nexus/service-utils/prisma-tenant';
@@ -24,7 +25,7 @@ export function getPrisma(): TicketPrisma {
     rawPrisma = base;
     prisma = base.$extends(
       createTenantPrismaExtension(base as any, {
-        getTenantId: () => tenantAls.getStore()?.tenantId,
+        getTenantId: () => tenantAls.getStore()?.tenantId ?? getSharedTenantId(),
         // Global / cross-tenant tables the SLA poller scans without a tenant ctx.
         skipModels: new Set(['OutboxMessage']),
       })

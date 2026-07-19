@@ -13,6 +13,7 @@
 //    fail-open) so one bad record can't stall the tick.
 //  - batched + capped so a large backlog can't monopolise the DB.
 
+import { runCrossTenant } from '@nexus/service-utils/prisma-tenant';
 import type { CrmPrisma } from '../../prisma.js';
 import type { NexusProducer } from '@nexus/kafka';
 import { scoreDeal, scoreLead, detectAtRiskDeal } from './scoring.service.js';
@@ -79,7 +80,7 @@ export function startAiScoringPoller(
   };
 
   const timer = setInterval(() => {
-    void runOnce();
+    void runCrossTenant('AI re-scoring sweep scans records across all tenants', runOnce);
   }, intervalMs);
   if (typeof timer.unref === 'function') timer.unref();
 

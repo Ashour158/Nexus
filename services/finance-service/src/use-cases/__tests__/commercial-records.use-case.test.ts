@@ -152,7 +152,7 @@ function makeUseCase(overrides: Record<string, unknown> = {}) {
       create: vi.fn(async ({ data }) => ({ id: 'outbox_1', ...data })),
     },
     cpqTransitionLedger: {
-      findUnique: vi.fn(async () => null),
+      findFirst: vi.fn(async () => null),
       findMany: vi.fn(async () => []),
       create: vi.fn(async ({ data }) => ({ id: 'ledger_1', ...data })),
       update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
@@ -214,6 +214,20 @@ function makeUseCase(overrides: Record<string, unknown> = {}) {
       checkDiscountApproval,
     }),
   };
+}
+
+function expectOutboxEvent(
+  prisma: ReturnType<typeof makeUseCase>['prisma'],
+  eventType: string
+) {
+  expect(prisma.outboxMessage.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({
+        eventType,
+        status: 'PENDING',
+      }),
+    })
+  );
 }
 
 describe('commercial records use case', () => {
@@ -349,7 +363,7 @@ describe('commercial records use case', () => {
   });
 
   it('submits a draft RFQ for review through the transition ledger', async () => {
-    const { useCase, prisma, producer } = makeUseCase({
+    const { useCase, prisma } = makeUseCase({
       prisma: {
         rFQ: {
           findFirst: vi.fn(async () => ({
@@ -375,11 +389,11 @@ describe('commercial records use case', () => {
     expect(prisma.cpqTransitionLedger.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ entity: 'rfq', action: 'SUBMIT_FOR_REVIEW', idempotencyKey: 'rfq_submit_1' }),
     }));
-    expect(producer.publish).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ type: 'rfq.submitted_for_review' }));
+    expectOutboxEvent(prisma, 'rfq.submitted_for_review');
   });
 
   it('starts RFQ review only after submission', async () => {
-    const { useCase, producer } = makeUseCase({
+    const { useCase, prisma } = makeUseCase({
       prisma: {
         rFQ: {
           findFirst: vi.fn(async () => ({
@@ -401,7 +415,7 @@ describe('commercial records use case', () => {
     const result = await useCase.startRfqReview(ctx, 'rfq_1', { idempotencyKey: 'rfq_review_1' });
 
     expect(result.status).toBe('REVIEWING');
-    expect(producer.publish).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ type: 'rfq.review_started' }));
+    expectOutboxEvent(prisma, 'rfq.review_started');
   });
 
   it('rejects starting RFQ review from draft', async () => {
@@ -425,7 +439,7 @@ describe('commercial records use case', () => {
   });
 
   it('returns an RFQ for changes with a reason', async () => {
-    const { useCase, prisma, producer } = makeUseCase({
+    const { useCase, prisma } = makeUseCase({
       prisma: {
         rFQ: {
           findFirst: vi.fn(async () => ({
@@ -450,20 +464,20 @@ describe('commercial records use case', () => {
     expect(prisma.rFQ.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: 'DRAFT', internalNotes: expect.stringContaining('Missing technical requirement') }),
     }));
-    expect(producer.publish).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ type: 'rfq.returned' }));
+    expectOutboxEvent(prisma, 'rfq.returned');
   });
 
   it('marks an RFQ ready for quote from review', async () => {
-    const { useCase, producer } = makeUseCase();
+    const { useCase, prisma } = makeUseCase();
 
     const result = await useCase.markRfqReadyForQuote(ctx, 'rfq_1', { idempotencyKey: 'rfq_ready_1' });
 
     expect(result.status).toBe('RESPONDED');
-    expect(producer.publish).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ type: 'rfq.ready_for_quote' }));
+    expectOutboxEvent(prisma, 'rfq.ready_for_quote');
   });
 
   it('cancels an active RFQ but rejects cancel after conversion', async () => {
-    const { useCase, producer } = makeUseCase({
+    const { useCase, prisma } = makeUseCase({
       prisma: {
         rFQ: {
           findFirst: vi.fn(async () => ({
@@ -484,7 +498,7 @@ describe('commercial records use case', () => {
 
     const cancelled = await useCase.cancelRfq(ctx, 'rfq_1', 'Customer paused request', { idempotencyKey: 'rfq_cancel_1' });
     expect(cancelled.status).toBe('CANCELLED');
-    expect(producer.publish).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ type: 'rfq.cancelled' }));
+    expectOutboxEvent(prisma, 'rfq.cancelled');
 
     const converted = makeUseCase({
       prisma: {
@@ -532,7 +546,7 @@ describe('commercial records use case', () => {
   });
 
   it('submits a DRQ for approval through the CPQ transition ledger without changing quote totals', async () => {
-    const { useCase, prisma, producer } = makeUseCase({
+    const { useCase, prisma } = makeUseCase({
       prisma: {
         quote: {
           findFirst: vi.fn(async () => makeQuote({ status: 'DRAFT', total: new Prisma.Decimal(100) })),
@@ -572,7 +586,7 @@ describe('commercial records use case', () => {
       data: expect.objectContaining({ status: 'PENDING', approvalRequestId: 'approval_drq_1' }),
     }));
     expect(prisma.quote.update).not.toHaveBeenCalled();
-    expect(producer.publish).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ type: 'drq.requested' }));
+    expectOutboxEvent(prisma, 'drq.requested');
   });
 
   it('rejects order conversion when the quote revision is stale or superseded', async () => {
@@ -630,7 +644,7 @@ describe('commercial records use case', () => {
   });
 
   it('renders a quote document with default template variables and publishes an event', async () => {
-    const { useCase, prisma, producer } = makeUseCase();
+    const { useCase, prisma } = makeUseCase();
 
     const document = await useCase.renderQuoteDocument(ctx, 'quote_1', { format: 'HTML' });
 
@@ -643,7 +657,7 @@ describe('commercial records use case', () => {
         contentBase64: expect.any(String),
       }),
     }));
-    expect(producer.publish).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ type: 'quote.document.rendered' }));
+    expectOutboxEvent(prisma, 'quote.document.rendered');
     expect(prisma.outboxMessage.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         aggregateId: 'doc_1',
@@ -665,7 +679,7 @@ describe('commercial records use case', () => {
   });
 
   it('creates a signature envelope only after quote send and records audit trail', async () => {
-    const { useCase, prisma, producer } = makeUseCase({
+    const { useCase, prisma } = makeUseCase({
       prisma: {
         quote: {
           findFirst: vi.fn(async () => makeQuote({ status: 'SENT' })),
@@ -689,11 +703,11 @@ describe('commercial records use case', () => {
         auditTrail: expect.any(Array),
       }),
     }));
-    expect(producer.publish).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ type: 'quote.signature_requested' }));
+    expectOutboxEvent(prisma, 'quote.signature_requested');
   });
 
   it('accepts the quote when a signature envelope is signed', async () => {
-    const { useCase, prisma, producer } = makeUseCase({
+    const { useCase, prisma } = makeUseCase({
       prisma: {
         quoteESignEnvelope: {
           findFirst: vi.fn(async () => ({
@@ -723,11 +737,11 @@ describe('commercial records use case', () => {
       where: { id: 'quote_1' },
       data: expect.objectContaining({ status: 'ACCEPTED', acceptedAt: ctx.now }),
     }));
-    expect(producer.publish).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ type: 'quote.signed' }));
+    expectOutboxEvent(prisma, 'quote.signed');
   });
 
   it('approves a pending quote through the CPQ transition authority', async () => {
-    const { useCase, prisma, producer } = makeUseCase({
+    const { useCase, prisma } = makeUseCase({
       prisma: {
         quote: {
           findFirst: vi.fn(async () => makeQuote({ status: 'PENDING_APPROVAL', approvalRequired: true, approvalStatus: 'PENDING' })),
@@ -747,7 +761,7 @@ describe('commercial records use case', () => {
       where: { id: 'quote_1' },
       data: expect.objectContaining({ status: 'APPROVED', approvalStatus: 'APPROVED' }),
     }));
-    expect(producer.publish).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ type: 'quote.approved' }));
+    expectOutboxEvent(prisma, 'quote.approved');
   });
 
   it('rejects quote send when approval has not completed', async () => {
@@ -771,7 +785,7 @@ describe('commercial records use case', () => {
   });
 
   it('creates a new quote revision when approved DRQ is applied', async () => {
-    const { useCase, prisma, producer } = makeUseCase({
+    const { useCase, prisma } = makeUseCase({
       prisma: {
         quote: {
           findFirst: vi.fn(async () => makeQuote({ status: 'PENDING_APPROVAL', version: 1, discountAmount: new Prisma.Decimal(0), total: new Prisma.Decimal(100) })),
@@ -798,7 +812,7 @@ describe('commercial records use case', () => {
         reason: 'discount_request.approved',
       }),
     }));
-    expect(producer.publish).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ type: 'quote.revision_created' }));
+    expectOutboxEvent(prisma, 'quote.revision_created');
   });
 
   it('records successful CPQ transitions in the durable ledger', async () => {
@@ -844,7 +858,7 @@ describe('commercial records use case', () => {
     const { useCase, prisma } = makeUseCase({
       prisma: {
         cpqTransitionLedger: {
-          findUnique: vi.fn(async () => ({ id: 'ledger_1', status: 'SUCCEEDED', result: stored, error: null })),
+          findFirst: vi.fn(async () => ({ id: 'ledger_1', status: 'SUCCEEDED', result: stored, error: null })),
           create: vi.fn(),
           update: vi.fn(),
         },
@@ -870,7 +884,7 @@ describe('commercial records use case', () => {
     const { useCase } = makeUseCase({
       prisma: {
         cpqTransitionLedger: {
-          findUnique: vi.fn(async () => ({ id: 'ledger_started', status: 'STARTED', result: null, error: null })),
+          findFirst: vi.fn(async () => ({ id: 'ledger_started', status: 'STARTED', result: null, error: null })),
           create: vi.fn(),
           update: vi.fn(),
         },
@@ -913,7 +927,7 @@ describe('commercial records use case', () => {
     const { useCase, prisma } = makeUseCase({
       prisma: {
         cpqTransitionLedger: {
-          findUnique: vi.fn(async () => ({ id: 'ledger_order', status: 'SUCCEEDED', result: storedOrder, error: null })),
+          findFirst: vi.fn(async () => ({ id: 'ledger_order', status: 'SUCCEEDED', result: storedOrder, error: null })),
           create: vi.fn(),
           update: vi.fn(),
         },
@@ -964,7 +978,7 @@ describe('commercial records use case', () => {
     const { useCase, prisma } = makeUseCase({
       prisma: {
         cpqTransitionLedger: {
-          findUnique: vi.fn(async () => ({ id: 'ledger_accept', status: 'SUCCEEDED', result: stored, error: null })),
+          findFirst: vi.fn(async () => ({ id: 'ledger_accept', status: 'SUCCEEDED', result: stored, error: null })),
           create: vi.fn(),
           update: vi.fn(),
         },
@@ -1103,7 +1117,7 @@ describe('commercial records use case', () => {
     const { useCase, prisma } = makeUseCase({
       prisma: {
         cpqTransitionLedger: {
-          findUnique: vi.fn(async () => ({ id: 'ledger_expire', status: 'SUCCEEDED', result: stored, error: null })),
+          findFirst: vi.fn(async () => ({ id: 'ledger_expire', status: 'SUCCEEDED', result: stored, error: null })),
           findMany: vi.fn(async () => []),
           create: vi.fn(),
           update: vi.fn(),
@@ -1182,7 +1196,7 @@ describe('commercial records use case', () => {
     const { useCase, prisma } = makeUseCase({
       prisma: {
         cpqTransitionLedger: {
-          findUnique: vi.fn(async () => null),
+          findFirst: vi.fn(async () => null),
           findMany: vi.fn(async () => [{
             id: 'ledger_stuck',
             tenantId: 'tenant_1',
@@ -1224,7 +1238,7 @@ describe('commercial records use case', () => {
     const { useCase, prisma } = makeUseCase({
       prisma: {
         cpqTransitionLedger: {
-          findUnique: vi.fn(async () => null),
+          findFirst: vi.fn(async () => null),
           findMany: vi.fn(async () => []),
           create: vi.fn(),
           update: vi.fn(),

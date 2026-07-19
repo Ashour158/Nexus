@@ -23,9 +23,12 @@ export default function SsoPage() {
 
   const fetchConfig = () =>
     fetch('/api/auth/sso/config')
-      .then(async (r) => (await r.json()) as SsoConfig | null)
+      .then(async (r) => (await r.json()) as { success?: boolean; data?: SsoConfig } | SsoConfig | null)
       .then((d) => {
-        setConfig(d);
+        // 404/no-config returns an error envelope — treat anything without a
+        // provider as "not configured" rather than rendering the envelope.
+        const cfg = (d && 'data' in d ? d.data : d) as SsoConfig | null | undefined;
+        setConfig(cfg && cfg.provider ? cfg : null);
         setLoading(false);
       });
 

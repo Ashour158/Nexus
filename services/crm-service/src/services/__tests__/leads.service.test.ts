@@ -76,6 +76,7 @@ function buildPrismaMock() {
     fieldChangeLog: {
       createMany: vi.fn(),
     },
+    validationRule: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(),
   };
 }

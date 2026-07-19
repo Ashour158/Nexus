@@ -51,7 +51,8 @@ describe('Workflow Service', () => {
       { from: 'completed', to: 'active', valid: false },
     ];
     for (const t of transitions) {
-      const isValid = t.to !== 'completed' || t.from !== 'completed';
+      // 'completed' is a terminal state: no transition may leave it.
+      const isValid = t.from !== 'completed';
       expect(isValid).toBe(t.valid);
     }
   });

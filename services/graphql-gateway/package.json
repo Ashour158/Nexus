@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "compose": "rover supergraph compose --config supergraph.yaml --output supergraph.graphql",
+    "compose": "rover supergraph compose --config supergraph.yaml --output supergraph.graphql --elv2-license=accept",
     "dev": "rover dev --supergraph-config supergraph.yaml",
-    "build": "rover supergraph compose --config supergraph.yaml --output dist/supergraph.graphql --elv2-license=accept",
+    "build": "node -e \"const fs=require('fs');fs.mkdirSync('dist',{recursive:true});fs.copyFileSync('supergraph.graphql','dist/supergraph.graphql')\"",
     "typecheck": "echo 'No TypeScript files in gateway'",
     "test": "vitest run"
   },

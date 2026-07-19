@@ -6,6 +6,9 @@ const mocks = vi.hoisted(() => {
   const prisma = {
     quota: { findMany: vi.fn().mockResolvedValue([]) },
     forecast: { findMany: vi.fn().mockResolvedValue([]) },
+    // /health runs checkDatabase(prisma) -> $queryRaw; without it the mock
+    // rejects and the health endpoint reports 503.
+    $queryRaw: vi.fn().mockResolvedValue([{ ok: 1 }]),
     $disconnect: vi.fn().mockResolvedValue(undefined),
   };
   const producer = {

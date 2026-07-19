@@ -4,8 +4,10 @@ import { registerPipelinesRoutes } from './pipelines.routes.js';
 import { pipelineFactory } from '../test/factories/pipeline.factory.js';
 import { stageFactory } from '../test/factories/stage.factory.js';
 
+const PIPELINE_ID = 'cpipeline0000000000000001';
+
 function createMockPrisma() {
-  return {
+  const prisma = {
     pipeline: {
       findMany: vi.fn(),
       findFirst: vi.fn(),
@@ -25,9 +27,15 @@ function createMockPrisma() {
     deal: {
       count: vi.fn(),
     },
-    $transaction: vi.fn(async (fn: unknown) => (typeof fn === 'function' ? fn() : fn)),
+    $transaction: vi.fn(),
     $disconnect: vi.fn(),
   };
+  prisma.$transaction.mockImplementation(async (fn: unknown) =>
+    typeof fn === 'function'
+      ? (fn as (tx: typeof prisma) => unknown)(prisma)
+      : fn
+  );
+  return prisma;
 }
 
 function createTestApp(prisma: ReturnType<typeof createMockPrisma>) {
@@ -60,7 +68,7 @@ describe('pipelines routes', () => {
   it('POST /api/v1/pipelines creates pipeline', async () => {
     const app = createTestApp(prisma);
     prisma.pipeline.findFirst.mockResolvedValue(null);
-    prisma.pipeline.create.mockResolvedValue(pipelineFactory());
+    prisma.pipeline.create.mockResolvedValue(pipelineFactory({ id: PIPELINE_ID }));
 
     const res = await app.inject({
       method: 'POST',
@@ -74,9 +82,9 @@ describe('pipelines routes', () => {
 
   it('GET /api/v1/pipelines/:id returns pipeline', async () => {
     const app = createTestApp(prisma);
-    prisma.pipeline.findFirst.mockResolvedValue(pipelineFactory());
+    prisma.pipeline.findFirst.mockResolvedValue(pipelineFactory({ id: PIPELINE_ID }));
 
-    const res = await app.inject({ method: 'GET', url: '/api/v1/pipelines/pip_test' });
+    const res = await app.inject({ method: 'GET', url: `/api/v1/pipelines/${PIPELINE_ID}` });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.payload);
     expect(body.success).toBe(true);
@@ -84,10 +92,10 @@ describe('pipelines routes', () => {
 
   it('GET /api/v1/pipelines/:id/stages returns stages', async () => {
     const app = createTestApp(prisma);
-    prisma.pipeline.findFirst.mockResolvedValue(pipelineFactory());
+    prisma.pipeline.findFirst.mockResolvedValue(pipelineFactory({ id: PIPELINE_ID }));
     prisma.stage.findMany.mockResolvedValue([stageFactory()]);
 
-    const res = await app.inject({ method: 'GET', url: '/api/v1/pipelines/pip_test/stages' });
+    const res = await app.inject({ method: 'GET', url: `/api/v1/pipelines/${PIPELINE_ID}/stages` });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.payload);
     expect(body.success).toBe(true);

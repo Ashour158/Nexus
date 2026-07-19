@@ -12,7 +12,7 @@ import type { AuthPrisma } from '../prisma.js';
 import { loginWithKeycloak, loginWithPassword, refreshTokens, revokeSession } from '../services/session-auth.js';
 import { z } from 'zod';
 import type { JwksKeyStore } from '../lib/jwt.js';
-import type { NexusProducer } from '@nexus/kafka';
+import { TOPICS, type NexusProducer } from '@nexus/kafka';
 import type { UnifiedAuditLogger } from '../lib/unified-audit.js';
 import { setKeycloakUserPassword } from '../lib/keycloak-admin.js';
 import { clearLoginFailures, getLoginLock, recordLoginFailure } from '../lib/login-throttle.js';
@@ -184,12 +184,16 @@ export async function registerAuthRoutes(
             request.log.warn({ err, userId: user.id }, 'comm-service unreachable for password reset email');
           }
 
-          // Fallback: write to local outbox so a relay can pick it up later
+          // Fallback: write to the local outbox so the relay delivers it later.
+          // The topic and eventType must match what comm-service actually
+          // consumes (TOPICS.EMAIL_SEND / email.send.requested) — the previous
+          // 'comm.email.send' literal had no consumer, so a reset requested
+          // while comm-service was briefly down was silently lost.
           if (!emailQueued) {
             try {
               await prisma.outboxMessage.create({
                 data: {
-                  topic: 'comm.email.send',
+                  topic: TOPICS.EMAIL_SEND,
                   payload: {
                     to: user.email,
                     subject: 'Password reset requested',
@@ -197,6 +201,8 @@ export async function registerAuthRoutes(
                     tenantId: user.tenantId,
                   },
                   aggregateId: user.id,
+                  eventType: 'email.send.requested',
+                  headers: { eventType: 'email.send.requested', tenantId: user.tenantId },
                   status: 'PENDING',
                 },
               });

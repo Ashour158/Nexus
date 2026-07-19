@@ -10,6 +10,7 @@ export * from './prisma-tenant.js';
 export * from './request-context.js';
 export * from './redis.js';
 export * from './health.js';
+export * from './effect-probes.js';
 export * from './env.js';
 export * from './rbac.js';
 export * from './entitlement.js';

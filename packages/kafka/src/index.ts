@@ -74,9 +74,28 @@ export const TOPICS = {
   BLUEPRINT: 'nexus.blueprint.events',
   NOTIFICATIONS: 'nexus.platform.notifications',
   EMAILS: 'nexus.comms.emails',
+  /** Requests for comm-service to SEND an email (outbox fallback path). */
+  EMAIL_SEND: 'nexus.comms.email-send',
   CALLS: 'nexus.comms.calls',
   ANALYTICS: 'nexus.analytics.events',
   AUDIT: 'nexus.compliance.audit',
+  /**
+   * Low-code custom-field DEFINITION changes (schema, not record data).
+   *
+   * crm-service has mapped `CustomFieldDefinition` to this topic all along
+   * (src/prisma.ts MODEL_TOPIC_MAP) — but the topic was never registered here,
+   * so `validateTopic()` in @nexus/outbox threw on every write and the error was
+   * swallowed by the best-effort catch around the outbox publish. Result:
+   * customfield.created/updated/deleted has NEVER been emitted, silently, and
+   * the only evidence was a log line. Registering it makes the existing
+   * publisher work.
+   *
+   * Currently has no consumer (allowlisted in the event-contract guard with that
+   * reason). It is emitted because definition changes are domain-significant —
+   * a new searchable custom field should be able to trigger a search reindex,
+   * and schema changes belong in the audit trail.
+   */
+  CUSTOM_FIELDS: 'nexus.crm.custom-fields',
 } as const;
 
 export type TopicName = (typeof TOPICS)[keyof typeof TOPICS];

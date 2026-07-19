@@ -198,7 +198,7 @@ export default function DashboardPage() {
     data: dealsResult,
     isLoading: dealsLoading,
     isError: dealsError,
-  } = useDeals({ limit: 500 });
+  } = useDeals({ limit: 100 });
 
   const {
     data: activitiesResult,

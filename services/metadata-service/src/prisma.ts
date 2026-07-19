@@ -1,3 +1,4 @@
+import { getTenantId as getSharedTenantId } from '@nexus/service-utils/request-context';
 import { PrismaClient } from '../../../node_modules/.prisma/metadata-client/index.js';
 import { buildDatabaseUrl } from '@nexus/service-utils/db';
 import { createTenantPrismaExtension } from '@nexus/service-utils/prisma-tenant';
@@ -18,7 +19,7 @@ export function createMetadataPrisma() {
   // Prisma types (the extended client is a structural superset at runtime).
   return base.$extends(
     createTenantPrismaExtension(base as any, {
-      getTenantId: () => tenantAls.getStore()?.tenantId,
+      getTenantId: () => tenantAls.getStore()?.tenantId ?? getSharedTenantId(),
       skipModels: new Set(['DuplicateRecord']),
     })
   ) as unknown as PrismaClient;

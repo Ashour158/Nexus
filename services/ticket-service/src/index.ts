@@ -1,3 +1,4 @@
+import { runCrossTenant } from '@nexus/service-utils/prisma-tenant';
 import 'dotenv/config';
 import { startTracing } from '@nexus/service-utils/tracing';
 import {
@@ -77,7 +78,7 @@ const slaTimer = setInterval(async () => {
   if (slaRunning) return;
   slaRunning = true;
   try {
-    const flagged = await tickets.evaluateSlaBreaches();
+    const flagged = await runCrossTenant('ticket SLA breach scan spans all tenants', () => tickets.evaluateSlaBreaches());
     if (flagged > 0) app.log.info({ flagged }, 'SLA breach poller flagged tickets');
   } catch (err) {
     app.log.warn({ err }, 'SLA breach poller error');

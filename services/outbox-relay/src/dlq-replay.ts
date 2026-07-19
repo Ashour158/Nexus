@@ -21,7 +21,8 @@ export interface ReplayResult {
 
 export interface DLQTopicStats {
   topic: string;
-  lag: number;
+  /** Current retained backlog depth derived from Kafka low/high offsets. */
+  depth: number;
 }
 
 export interface DLQReplayMetrics {
@@ -255,11 +256,11 @@ export class DLQReplay {
       for (const topic of dlqTopics) {
         try {
           const offsets = await admin.fetchTopicOffsets(topic);
-          const lag = offsets.reduce(
+          const depth = offsets.reduce(
             (sum, o) => sum + (parseInt(o.high, 10) - parseInt(o.low, 10)),
             0
           );
-          stats.push({ topic, lag });
+          stats.push({ topic, depth });
         } catch (err) {
           this.log.warn({ err, topic }, 'Failed to fetch DLQ topic offsets');
         }

@@ -22,7 +22,7 @@ function clearAuthCookie() {
 
 const DEV_BFF_URL = process.env.NODE_ENV === 'development' ? 'http://localhost:3000/api' : undefined;
 
-const BASE_URLS: Record<string, string> = {
+export const BASE_URLS: Record<string, string> = {
   crm: DEV_BFF_URL ?? process.env.NEXT_PUBLIC_CRM_URL ?? 'http://localhost:3001/api/v1',
   finance: process.env.NEXT_PUBLIC_FINANCE_URL ?? 'http://localhost:3002/api/v1',
   comms: process.env.NEXT_PUBLIC_COMMS_URL ?? 'http://localhost:3009/api/v1',

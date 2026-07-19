@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Nexus off-host observability evidence export
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=30min
+AccuracySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

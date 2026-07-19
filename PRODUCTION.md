@@ -19,6 +19,10 @@ Before cutover, work the pre-launch sign-off:
   security, data, observability, DR, smoke tests, rollback, and sign-off.
 - [SLA.md](./SLA.md) - availability targets, P1-P4 response times,
   maintenance windows, and incident-response summary.
+- [ARCHITECTURE_RISKS.md](./ARCHITECTURE_RISKS.md) - honest single-host
+  topology, residual risks, and phased HA targets.
+- [docs/runbooks/DISASTER_RECOVERY.md](./docs/runbooks/DISASTER_RECOVERY.md) -
+  total droplet loss recovery sequence.
 
 The old runbook named `64.225.27.128`; the task brief names `159.65.32.72`.
 Treat both as unverified until the operator confirms the current droplet IP in
@@ -228,44 +232,98 @@ Generate strong values with `openssl rand -base64 48`.
 
 ## 8. Backups and Disaster Recovery
 
-Postgres is the system of record. The current backup flow writes droplet-local
-dumps; copy them off-box because a local backup does not survive droplet loss.
+Production backups are serialized, fail-loud, age-encrypted, and must upload to
+an off-host rclone prefix. A droplet-local artifact alone is failure. The
+workflow captures every non-template managed Postgres database through direct
+`BACKUP_PGHOST`/`BACKUP_PGPORT` credentials, ClickHouse application tables,
+Meilisearch dumps, and every MinIO bucket/object. Do not use PgBouncer port
+`6432` for backup, DDL, or restore.
 
 ```sh
-bash /opt/nexus/scripts/backup.sh
-( crontab -l 2>/dev/null; echo '15 3 * * * bash /opt/nexus/scripts/backup.sh >> /var/log/nexus-backup.log 2>&1' ) | crontab -
+cd /opt/nexus
+ENV_FILE=/etc/nexus/prod.env sh scripts/nexus-backup.sh --preflight
+ENV_FILE=/etc/nexus/prod.env BACKUP_AGE_IDENTITY_FILE=/root/.config/age/nexus-backup-age-identity.txt sh scripts/nexus-backup.sh
 ```
 
-Retention keeps the newest 14 dumps unless `BACKUP_RETAIN` is changed. Verify a
-backup monthly by restoring into a scratch environment. ClickHouse is a
-rebuildable analytics read model; after a Postgres restore, run the analytics
-rebuild endpoint if needed.
+`scripts/backup.sh` remains as a compatibility wrapper and delegates to
+`scripts/nexus-backup.sh`. Local retention is controlled by
+`BACKUP_LOCAL_RETENTION_DAYS`; remote retention is controlled by
+`BACKUP_REMOTE_RETENTION_DAYS` and is scoped to `BACKUP_RCLONE_DEST` with the
+`nexus-backup-*.tar.age` include.
 
-Single-database restore outline:
+Install the automated systemd schedule:
 
 ```sh
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file /etc/nexus/prod.env --profile prod stop crm-service finance-service
-gunzip -c /opt/nexus/backups/<db>-<date>.sql.gz | docker exec -i nexus-postgres psql -U postgres -d <db>
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file /etc/nexus/prod.env --profile prod start crm-service finance-service
-bash /opt/nexus/scripts/healthcheck.sh
+sudo sh scripts/install-backup-timer.sh
+systemctl list-timers nexus-backup.timer --no-pager
 ```
 
-Full host loss outline:
+The timer preflight requires `/etc/nexus/prod.env` to contain the direct backup
+credentials. Each Postgres dump is restored immediately into a resource-limited
+scratch Postgres container; the exact per-table counts written to the manifest
+come from that restored dump, so live application writes cannot make the
+manifest disagree with the artifact.
 
-1. Provision a new droplet and install Docker plus Compose.
-2. Clone the repo to `/opt/nexus`.
-3. Restore the age private key and decrypt `/etc/nexus/prod.env`.
-4. Start the stack with both Compose files and `--profile prod`.
-5. Restore Postgres dumps, run health checks, then repoint DNS.
+Run a restore drill against a real encrypted artifact before relying on a
+backup. The drill restores into scratch containers and scratch names only,
+compares component evidence, prints measured `RPO_SECONDS` and `RTO_SECONDS`,
+and writes a machine-readable report. These values are not estimated in this
+repo state.
+
+```sh
+ENV_FILE=/etc/nexus/prod.env BACKUP_AGE_IDENTITY_FILE=/root/.config/age/nexus-backup-age-identity.txt sh scripts/nexus-restore-drill.sh /path/to/nexus-backup-YYYYmmddTHHMMSSZ.tar.age
+```
+
+Total droplet loss is covered in
+[docs/runbooks/DISASTER_RECOVERY.md](./docs/runbooks/DISASTER_RECOVERY.md).
+Production restart always uses both Compose files and the prod profile:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file /etc/nexus/prod.env --profile prod up -d
+```
 
 Event backbone recovery: the outbox relay drains domain events queued in
 Postgres outbox tables to Kafka after restart, so events committed to Postgres
 replay once Kafka is available.
 
-## 9. Host Facts to Verify
+## 9. Capacity Alerts and Off-Host Evidence
+
+Install capacity checks with systemd timers, not crontab snippets:
+
+```sh
+sudo sh scripts/install-capacity-alerts.sh
+systemctl list-timers nexus-capacity-check.timer --no-pager
+ENV_FILE=/etc/nexus/prod.env sh scripts/check-capacity.sh --preflight
+```
+
+The capacity script checks byte and inode usage for `/` and Docker's data root,
+prints `docker system df`, posts to local Alertmanager
+(`ALERTMANAGER_URL=http://127.0.0.1:9093` by default), and requires an off-host
+Alertmanager-compatible endpoint or webhook relay by default. Set
+`CAPACITY_ALERT_WEBHOOK_REQUIRED=0` only after explicitly accepting local-only
+alert delivery.
+
+Install periodic off-host observability evidence export:
+
+```sh
+sudo sh scripts/install-observability-evidence.sh
+systemctl list-timers nexus-observability-export.timer --no-pager
+ENV_FILE=/etc/nexus/prod.env sh scripts/export-observability-evidence.sh --preflight
+```
+
+This captures recent Docker logs and a loopback Prometheus metric snapshot,
+client-side age-encrypts the bundle, uploads it under
+`$BACKUP_RCLONE_DEST/$OBS_EXPORT_RCLONE_PREFIX`, verifies remote size, and
+retains a short local spool. It is periodic off-host evidence export, not HA
+remote-write or live log replication. A later managed remote-write and log
+ingestion endpoint would reduce evidence loss windows and make alerting survive
+droplet loss.
+
+## 10. Host Facts to Verify
 
 - Current droplet public IP and DNS A record.
 - Runtime path, owner, and mode for `/etc/nexus/prod.env`.
 - UFW state after running `scripts/ufw-edge.sh`.
 - External TLS and direct-port results from `scripts/ssl-check.sh`.
-- Backup schedule, off-box copy target, and restore test evidence.
+- Backup schedule, off-box rclone target, restore drill evidence, and measured
+  RPO/RTO from `scripts/nexus-restore-drill.sh`.

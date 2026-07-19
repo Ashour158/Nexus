@@ -61,6 +61,11 @@ typecheck_output*.txt
 ~$*.docx
 *.backup-*
 
+# Local operational artifacts
+nexus-backup-*.tar.age
+nexus-observability-*.tar.age
+*.restore-drill.json
+
 # Local environment files - NEVER commit
 .env.local
 **/.env.local

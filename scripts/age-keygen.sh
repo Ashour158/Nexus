@@ -3,6 +3,24 @@ set -eu
 
 key_file=${AGE_KEY_FILE:-"$HOME/.config/sops/age/nexus-prod-keys.txt"}
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+  cat <<'EOF'
+Usage: scripts/age-keygen.sh
+
+Generate a new age identity outside the repository.
+
+Environment:
+  AGE_KEY_FILE  Absolute output path (default:
+                ~/.config/sops/age/nexus-prod-keys.txt)
+EOF
+  exit 0
+fi
+
+if [ "$#" -ne 0 ]; then
+  echo "ERROR: unexpected argument: $1 (use --help)." >&2
+  exit 2
+fi
+
 if ! command -v age-keygen >/dev/null 2>&1; then
   echo "ERROR: age-keygen is required." >&2
   exit 1

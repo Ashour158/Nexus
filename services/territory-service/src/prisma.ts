@@ -1,3 +1,4 @@
+import { getTenantId as getSharedTenantId } from '@nexus/service-utils/request-context';
 import { PrismaClient } from '../../../node_modules/.prisma/territory-client/index.js';
 import { createPrismaClientWithReplicas } from '@nexus/service-utils/prisma-client';
 import { createTenantPrismaExtension } from '@nexus/service-utils/prisma-tenant';
@@ -22,7 +23,7 @@ export function getPrisma(): TerritoryPrisma {
     );
     prisma = base.$extends(
       createTenantPrismaExtension(base as any, {
-        getTenantId: () => tenantAls.getStore()?.tenantId,
+        getTenantId: () => tenantAls.getStore()?.tenantId ?? getSharedTenantId(),
         skipModels: new Set(['TerritoryRule']),
       })
     ) as unknown as TerritoryPrisma;

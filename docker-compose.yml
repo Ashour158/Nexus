@@ -888,9 +888,11 @@ services:
     ports:
       - '127.0.0.1:3019:3019'
     environment:
+      # Tenant-enforcement canary wave 1: fail-closed ON by default; the global
+      # env var remains the emergency kill-switch (set NEXUS_TENANT_ENFORCEMENT=off).
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       # crm calls POST /api/v1/internal/territories/assign with x-service-token.
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3019'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_territory
@@ -1217,8 +1219,10 @@ services:
     ports:
       - '127.0.0.1:3029:3029'
     environment:
+      # Tenant-enforcement canary wave 1: fail-closed ON by default; the global
+      # env var remains the emergency kill-switch (set NEXUS_TENANT_ENFORCEMENT=off).
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3029'
       TICKET_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_ticket
@@ -1242,8 +1246,10 @@ services:
     ports:
       - '127.0.0.1:3025:3025'
     environment:
+      # Tenant-enforcement canary wave 1: fail-closed ON by default; the global
+      # env var remains the emergency kill-switch (set NEXUS_TENANT_ENFORCEMENT=off).
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       PORT: '3025'
       CAMPAIGN_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_campaign

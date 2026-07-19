@@ -1,3 +1,4 @@
+import { runCrossTenant } from '@nexus/service-utils/prisma-tenant';
 import type { ActivitiesPrisma } from '../prisma.js';
 import { ActivityStatus } from '../../../../node_modules/.prisma/activities-client/index.js';
 import { NexusProducer, TOPICS } from '@nexus/kafka';
@@ -187,7 +188,7 @@ export function startRemindersPoller(
   const timer = setInterval(() => {
     if (running) return; // reentrancy guard: skip overlapping ticks
     running = true;
-    void runOnce().finally(() => {
+    void runCrossTenant('activity reminder sweep scans due activities across all tenants', runOnce).finally(() => {
       running = false;
     });
   }, intervalMs);

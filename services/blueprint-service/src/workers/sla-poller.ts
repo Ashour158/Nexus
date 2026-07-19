@@ -1,3 +1,4 @@
+import { runCrossTenant } from '@nexus/service-utils/prisma-tenant';
 import { TOPICS, type NexusProducer } from '@nexus/kafka';
 import type { PrismaClient } from '../../../../node_modules/.prisma/blueprint-client/index.js';
 import {
@@ -134,7 +135,7 @@ export function startSlaPoller(
   }
 
   const timer = setInterval(() => {
-    void tick();
+    void runCrossTenant('blueprint SLA breach scan spans all tenants', tick);
   }, intervalMs);
   // Do not keep the event loop alive solely for the poller.
   if (typeof timer.unref === 'function') timer.unref();

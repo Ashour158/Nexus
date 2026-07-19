@@ -1,3 +1,4 @@
+import { runCrossTenant } from '@nexus/service-utils/prisma-tenant';
 import { createHash } from 'node:crypto';
 import { TOPICS, type NexusProducer } from '@nexus/kafka';
 import type { CadencePrisma } from '../prisma.js';
@@ -181,7 +182,7 @@ export function createQueueService(prisma: CadencePrisma, producer: NexusProduce
 
   function startQueueWorker() {
     const timer = setInterval(() => {
-      void processQueue().catch(() => undefined);
+      void runCrossTenant('cadence step runner processes due enrollments across all tenants', processQueue).catch(() => undefined);
     }, 5 * 60 * 1000);
     return () => clearInterval(timer);
   }

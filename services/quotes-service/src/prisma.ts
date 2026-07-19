@@ -1,3 +1,4 @@
+import { getTenantId as getSharedTenantId } from '@nexus/service-utils/request-context';
 import { PrismaClient } from '../../../node_modules/.prisma/quotes-client/index.js';
 import { createPrismaClientWithReplicas } from '@nexus/service-utils/prisma-client';
 import { createTenantPrismaExtension } from '@nexus/service-utils/prisma-tenant';
@@ -62,7 +63,7 @@ export function createQuotesPrisma() {
   }
 
   const tenantExt = createTenantPrismaExtension(base, {
-    getTenantId: () => tenantAls.getStore()?.tenantId,
+    getTenantId: () => tenantAls.getStore()?.tenantId ?? getSharedTenantId(),
   });
 
   return base.$extends(tenantExt).$extends({

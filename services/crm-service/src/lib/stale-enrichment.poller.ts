@@ -1,3 +1,4 @@
+import { runCrossTenant } from '@nexus/service-utils/prisma-tenant';
 import type { CrmPrisma } from '../prisma.js';
 import type { NexusProducer } from '@nexus/kafka';
 import { enrichAccount, enrichContact } from './enrichment.engine.js';
@@ -121,7 +122,7 @@ export function startStaleEnrichmentPoller(
   };
 
   const timer = setInterval(() => {
-    void runOnce();
+    void runCrossTenant('stale-enrichment sweep scans accounts/contacts across all tenants', runOnce);
   }, intervalMs);
   if (typeof timer.unref === 'function') timer.unref();
 

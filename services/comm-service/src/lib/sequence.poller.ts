@@ -1,3 +1,4 @@
+import { runCrossTenant } from '@nexus/service-utils/prisma-tenant';
 import type { CommPrisma } from '../prisma.js';
 import type { createSequencesService } from '../services/sequences.service.js';
 
@@ -76,7 +77,7 @@ export function startSequencePoller(
   };
 
   const timer = setInterval(() => {
-    void runOnce();
+    void runCrossTenant('sequence-step advance sweep spans all tenants', runOnce);
   }, intervalMs);
   if (typeof timer.unref === 'function') timer.unref();
 

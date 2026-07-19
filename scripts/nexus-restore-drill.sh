@@ -171,7 +171,9 @@ verify_clickhouse() {
     scratch_schema="$SCRATCH/clickhouse/${db}.${tbl}.scratch.sql"
     rewrite_clickhouse_schema "$SCRATCH/$schema_file" "$scratch_schema" "$db" "$tbl" "$scratch_db"
     docker exec -i "$ch_container" clickhouse-client --multiquery < "$scratch_schema" || die "ClickHouse schema restore failed for $db.$tbl"
-    docker exec -i "$ch_container" clickhouse-client --query "INSERT INTO \`$scratch_db\`.\`$tbl\` FORMAT Native" < "$SCRATCH/$data_file"
+    if [ -s "$SCRATCH/$data_file" ]; then
+      docker exec -i "$ch_container" clickhouse-client --query "INSERT INTO \`$scratch_db\`.\`$tbl\` FORMAT Native" < "$SCRATCH/$data_file"
+    fi
     stat=$(ch_checksum_scratch "$ch_container" "$scratch_db" "$tbl")
     [ "$first" = 1 ] || printf ',' >> "$actual"; first=0
     jq -nc --arg db "$db" --arg tbl "$tbl" --argjson stat "$stat" '{database:$db,table:$tbl,rows:$stat.rows,sum_cityhash64:$stat.sum_cityhash64,xor_cityhash64:$stat.xor_cityhash64}' >> "$actual"

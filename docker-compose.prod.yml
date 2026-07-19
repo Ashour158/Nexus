@@ -9,6 +9,16 @@
 x-release-metadata: &release-metadata
   GIT_SHA: ${GIT_SHA:-release-sha-required}
   BUILT_AT: ${BUILT_AT:-unknown}
+  # Per-(tenant,user) request ceiling. Applied here because this anchor is the
+  # only setting shared by every service, so the limiter can be tuned without
+  # rebuilding 39 images. The in-code default is the same value; this exists so
+  # it can be raised or lowered on a live incident.
+  #
+  # It must stay well above what one engaged human generates: a dashboard route
+  # fans out to 6-8 parallel calls, so the previous ceiling of 100/min was
+  # reached by ordinary browsing — and, because throttles were being reported as
+  # 500s, that surfaced as "random services are broken under load".
+  RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
 
 services:
   # ─── Infrastructure ─────────────────────────────────────────────────────

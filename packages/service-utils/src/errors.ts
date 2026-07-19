@@ -159,10 +159,17 @@ export function globalErrorHandler(
   // throttle as a server fault. @fastify/rate-limit's error reaches here WITHOUT a
   // usable statusCode, so detect it by code/message too (not just statusCode).
   const rlCode = (error as { code?: string }).code;
+  // Also inspect the nested envelope: a plugin's errorResponseBuilder may return
+  // a response-shaped object whose code/message live under `error.error`, in
+  // which case every top-level probe below reads undefined and the throttle
+  // would silently degrade into a 500.
+  const nested = (error as { error?: { code?: string; message?: string } }).error;
   const isRateLimit =
     (error as { statusCode?: number }).statusCode === 429 ||
     rlCode === 'FST_ERR_RATE_LIMIT' ||
-    /rate ?limit/i.test(error.message || '');
+    rlCode === 'RATE_LIMITED' ||
+    nested?.code === 'RATE_LIMITED' ||
+    /rate ?limit/i.test(error.message || nested?.message || '');
   if (isRateLimit) {
     reply.code(429).send({
       success: false,

@@ -244,7 +244,13 @@ export async function createService(config: ServiceConfig): Promise<FastifyInsta
   }
 
   // Rate limiting (Section 35) — memory store by default; Redis when available for distributed consistency
-  const rateLimitMax = parseInt(process.env.RATE_LIMIT_MAX ?? '100', 10);
+  // 600/min per (tenant,user). The old default of 100 was set as if one page
+  // view were one request, but a dashboard route here fans out to 6-8 parallel
+  // calls, so ~15 page views a minute — ordinary browsing — tripped the limit.
+  // This is an abuse ceiling, not a pacing mechanism; it must sit well above
+  // what an engaged human generates. Per-IP login flooding is handled
+  // separately by the per-email login-throttle (see allowList below).
+  const rateLimitMax = parseInt(process.env.RATE_LIMIT_MAX ?? '600', 10);
   const rateLimitWindow = process.env.RATE_LIMIT_WINDOW ?? '1 minute';
   try {
     const redis = process.env.REDIS_URL ? createRedisClient() : undefined;
@@ -293,13 +299,22 @@ export async function createService(config: ServiceConfig): Promise<FastifyInsta
         const headerTenant = req.headers['x-tenant-id'] as string | undefined;
         return headerTenant ? `${headerTenant}:${req.ip}` : req.ip;
       },
-      errorResponseBuilder: (_req: any, context: any) => ({
-        success: false,
-        error: {
+      // The returned object is THROWN and lands in globalErrorHandler, which
+      // decides the status from `statusCode` / `code` / `message` at the TOP
+      // level. Returning only the nested envelope left all three undefined, so
+      // every 429 check missed and throttles were served as 500 INTERNAL_ERROR
+      // — clients saw "server broken" instead of "back off", and days of audit
+      // reports blamed random services for what was one shared limiter.
+      errorResponseBuilder: (_req: any, context: any) => {
+        const message = `Rate limit exceeded. Retry after ${context.after}.`;
+        return {
+          statusCode: 429,
           code: 'RATE_LIMITED',
-          message: `Rate limit exceeded. Retry after ${context.after}.`,
-        },
-      }),
+          message,
+          success: false,
+          error: { code: 'RATE_LIMITED', message },
+        };
+      },
     });
   } catch (err) {
     app.log.warn({ err }, 'Failed to register rate-limit plugin; continuing without rate limiting');

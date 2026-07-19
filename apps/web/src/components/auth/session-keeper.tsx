@@ -18,14 +18,46 @@ import { useEffect } from 'react';
  * as a backstop; both funnel through the same single-flight server endpoint.
  */
 
-/** Refresh every 10 minutes — comfortably inside the ~15m token lifetime. */
+/** Renew when the last refresh is this old — comfortably inside the ~15m token lifetime. */
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000;
+/** How often to CHECK whether a renewal is due. Cheap: reads localStorage, no network. */
+const CHECK_INTERVAL_MS = 60 * 1000;
 /** Only refresh on focus if at least this long has passed since the last one. */
 const FOCUS_REFRESH_AFTER_MS = 5 * 60 * 1000;
 
+/**
+ * Where the last refresh time is remembered. It MUST outlive the component:
+ * `lastRefresh` and the interval are per-mount, and a full document load
+ * remounts and restarts both. A user who hard-navigates (opens records in new
+ * tabs, reloads, follows a plain link) more often than the interval therefore
+ * never refreshed once — the timer was perpetually reset before it could fire.
+ * Persisting the timestamp makes renewal depend on elapsed time, not on one
+ * page happening to stay mounted for 10 uninterrupted minutes.
+ */
+const LAST_REFRESH_KEY = 'nexus_last_session_refresh';
+
+function readLastRefresh(): number {
+  try {
+    const raw = window.localStorage.getItem(LAST_REFRESH_KEY);
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed) ? parsed : 0;
+  } catch {
+    // Private mode / storage disabled — treat as "never refreshed" so we err
+    // toward refreshing too often rather than letting the session lapse.
+    return 0;
+  }
+}
+
+function writeLastRefresh(at: number): void {
+  try {
+    window.localStorage.setItem(LAST_REFRESH_KEY, String(at));
+  } catch {
+    /* non-fatal: falls back to per-mount behaviour */
+  }
+}
+
 export function SessionKeeper() {
   useEffect(() => {
-    let lastRefresh = Date.now();
     let cancelled = false;
 
     const refresh = async () => {
@@ -35,15 +67,24 @@ export function SessionKeeper() {
       if (!document.cookie.includes('nexus_session=')) return;
       try {
         await fetch('/api/auth/session/refresh', { method: 'POST' });
-        lastRefresh = Date.now();
+        writeLastRefresh(Date.now());
       } catch {
         // Network blip — the interval and the 401 interceptor will retry.
       }
     };
 
-    const interval = setInterval(refresh, REFRESH_INTERVAL_MS);
+    /** Refresh now if enough time has passed, regardless of which page we are on. */
+    const refreshIfDue = () => {
+      if (Date.now() - readLastRefresh() >= REFRESH_INTERVAL_MS) void refresh();
+    };
+
+    // Catch up on mount: after a hard navigation this is the ONLY chance to
+    // renew, because the interval below starts from zero on every page load.
+    refreshIfDue();
+
+    const interval = setInterval(refreshIfDue, CHECK_INTERVAL_MS);
     const onFocus = () => {
-      if (Date.now() - lastRefresh >= FOCUS_REFRESH_AFTER_MS) void refresh();
+      if (Date.now() - readLastRefresh() >= FOCUS_REFRESH_AFTER_MS) void refresh();
     };
     window.addEventListener('focus', onFocus);
 

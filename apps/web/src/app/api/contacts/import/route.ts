@@ -44,7 +44,14 @@ export async function POST(req: NextRequest) {
 
   if (!res.ok) {
     const err = await res.text();
-    return NextResponse.json({ error: `CRM import failed: ${err}`, imported: 0 }, { status: 500 });
+    // Propagate the upstream status instead of hardcoding 500. A 401 (expired
+    // session) or 429 (throttled) reported as 500 tells the client "the server
+    // is broken" when the correct response is "re-authenticate" or "retry" —
+    // and it hides the real cause from every log and audit downstream.
+    return NextResponse.json(
+      { error: `CRM import failed: ${err}`, imported: 0 },
+      { status: res.status }
+    );
   }
 
   const result = (await res.json()) as { count?: number; errors?: unknown[] };

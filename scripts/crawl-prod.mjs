@@ -137,9 +137,30 @@ for (const [listPath, prefix] of DETAIL_SOURCES) {
 }
 
 // ---- Crawl ----
+// Record the ACTUAL failing requests per route, not just the "Request failed"
+// toast. Reporting only the toast text told us a page was degraded but never
+// which call broke, which left /contacts and /products unexplained across four
+// runs while every endpoint they call returned 200 when probed directly.
+const badResponses = [];
+page.on('response', (r) => {
+  const s = r.status();
+  if (s >= 400) {
+    const u = r.url().replace(BASE, '');
+    // Ignore asset noise; we care about API/BFF calls behind the page.
+    if (/\/(api|bff)\//.test(u)) badResponses.push(`${s} ${r.request().method()} ${u}`);
+  }
+});
+
+// Elapsed minutes are load-bearing evidence, not cosmetics: a crawl that goes
+// green→red at a fixed wall-clock point is a session/token lifetime problem,
+// not a per-page bug. Without this we kept blaming individual pages.
+const crawlStart = process.hrtime.bigint();
+const elapsedMin = () => Number(process.hrtime.bigint() - crawlStart) / 6e10;
+
 const results = [];
 for (const route of routes) {
   pageErrors.length = 0;
+  badResponses.length = 0;
   let status = 0;
   let marker = null;
   let toast = null;
@@ -163,10 +184,12 @@ for (const route of routes) {
     marker = `NAV FAILED: ${String(err).slice(0, 80)}`;
   }
   const errs = [...pageErrors];
+  const apiFails = [...new Set(badResponses)];
   const bad = status >= 400 || marker || errs.length > 0;
-  results.push({ route, status, marker, toast, errs });
+  results.push({ route, status, marker, toast, errs, apiFails });
   console.log(
-    `${bad ? 'FAIL' : ' ok '} ${status} ${route}` +
+    `${bad ? 'FAIL' : ' ok '} ${elapsedMin().toFixed(1).padStart(4)}m ${status} ${route}` +
+      (apiFails.length ? `  [api5xx: ${apiFails.length}]` : '') +
       (marker ? `  [${marker}]` : '') +
       (toast ? `  [toast: ${toast}]` : '') +
       (errs.length ? `  [jsErr: ${errs[0]}]` : '')
@@ -180,5 +203,10 @@ const failures = results.filter((r) => r.status >= 400 || r.marker || r.errs.len
 const toasts = results.filter((r) => r.toast && !failures.includes(r));
 console.log(`\n=== ${results.length} routes | ${failures.length} failures | ${toasts.length} degraded (failed API behind page)`);
 for (const f of failures) console.log(`FAIL ${f.status} ${f.route} ${f.marker ?? ''} ${f.errs[0] ?? ''}`);
-for (const t of toasts) console.log(`DEGRADED ${t.route} ${t.toast}`);
+for (const t of toasts) {
+  console.log(`DEGRADED ${t.route} ${t.toast}`);
+  // The whole point of the instrumentation: name the request that actually failed.
+  for (const f of t.apiFails) console.log(`          └─ ${f}`);
+  if (!t.apiFails.length) console.log(`          └─ (no 4xx/5xx API response captured — toast may be stale UI state)`);
+}
 process.exit(failures.length > 0 ? 1 : 0);

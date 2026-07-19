@@ -190,6 +190,19 @@ function createApiClient(baseURL: string): AxiosInstance {
         }
       }
 
+      // Throttled: back off once and retry rather than surfacing a generic
+      // failure toast. Bounded to a single retry (via the same `_retried` flag)
+      // so a sustained throttle still reports honestly instead of hammering.
+      if (status === 429 && originalRequest && !(originalRequest as { _retried?: boolean })._retried) {
+        const header = Number(error.response?.headers?.['retry-after']);
+        // `Retry-After` is in SECONDS. Clamp: a missing/absurd value must not
+        // hang the request for minutes behind an un-cancellable timer.
+        const waitMs = Math.min(Number.isFinite(header) && header > 0 ? header * 1000 : 1000, 5000);
+        (originalRequest as { _retried?: boolean })._retried = true;
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
+        return client.request(originalRequest);
+      }
+
       const message = isApiError(body)
         ? body.error.message
         : error.message || 'Network error';

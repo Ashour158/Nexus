@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,8 +12,106 @@ import {
   useRoles,
   useUpdateUser,
   useUsers,
+  type RoleRef,
 } from '@/hooks/use-users';
 import { formatDateTime } from '@/lib/format';
+
+/**
+ * Accessible multi-role assignment control. Users are many-to-many with roles;
+ * the backend `PATCH /users/:id/roles` replaces the whole set from `roleIds[]`,
+ * so each toggle submits the full selection.
+ */
+function RoleMultiSelect({
+  roles,
+  selectedIds,
+  onChange,
+  disabled,
+}: {
+  roles: RoleRef[];
+  selectedIds: string[];
+  onChange: (roleIds: string[]) => void;
+  disabled?: boolean;
+}): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const selectedNames = roles.filter((r) => selectedIds.includes(r.id)).map((r) => r.name);
+  const label = selectedNames.length ? selectedNames.join(', ') : 'No roles';
+
+  const toggle = (roleId: string, checked: boolean) => {
+    const next = checked
+      ? [...selectedIds, roleId]
+      : selectedIds.filter((id) => id !== roleId);
+    onChange(next);
+  };
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Assign roles"
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-8 min-w-[9rem] max-w-[16rem] items-center justify-between gap-2 rounded-md border border-outline-variant bg-surface px-2 text-xs text-on-surface disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <span className="truncate">{label}</span>
+        <span aria-hidden className="text-on-surface-variant">▾</span>
+      </button>
+      {open ? (
+        <div
+          role="listbox"
+          aria-label="Available roles"
+          aria-multiselectable="true"
+          className="absolute z-20 mt-1 max-h-56 w-56 overflow-auto rounded-md border border-outline-variant bg-surface p-1 shadow-lg"
+        >
+          {roles.length === 0 ? (
+            <p className="px-2 py-1.5 text-xs text-on-surface-variant">No roles available.</p>
+          ) : (
+            roles.map((r) => {
+              const checked = selectedIds.includes(r.id);
+              return (
+                <label
+                  key={r.id}
+                  role="option"
+                  aria-selected={checked}
+                  className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs text-on-surface hover:bg-surface-container-high"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => toggle(r.id, e.target.checked)}
+                    className="rounded border-outline-variant"
+                  />
+                  <span className="truncate">{r.name}</span>
+                </label>
+              );
+            })
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export default function SettingsUsersPage(): JSX.Element {
   const [search, setSearch] = useState('');
@@ -92,18 +190,12 @@ export default function SettingsUsersPage(): JSX.Element {
                   </td>
                   <td className="px-3 py-2">{u.email}</td>
                   <td className="px-3 py-2">
-                    <select
-                      value={u.roles?.[0]?.id ?? ''}
-                      onChange={(e) => assignRoles.mutate({ id: u.id, roleIds: [e.target.value] })}
-                      className="h-8 rounded-md border border-outline-variant bg-surface px-2 text-xs"
-                    >
-                      <option value="">No role</option>
-                      {roles.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.name}
-                        </option>
-                      ))}
-                    </select>
+                    <RoleMultiSelect
+                      roles={roles}
+                      selectedIds={(u.roles ?? []).map((r) => r.id)}
+                      onChange={(roleIds) => assignRoles.mutate({ id: u.id, roleIds })}
+                      disabled={assignRoles.isPending}
+                    />
                   </td>
                   <td className="px-3 py-2">
                     <span

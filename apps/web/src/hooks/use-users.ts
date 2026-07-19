@@ -14,11 +14,28 @@ export interface UserRef {
   lastName: string;
   email: string;
   isActive: boolean;
+  /**
+   * Flattened role list for UI gating/display. The auth service returns roles
+   * as `userRoles: [{ role: { id, name } }]`; `useUsers` normalizes that into
+   * this flat `roles` array so consumers (users table role column, account
+   * page) can read `user.roles[].id`/`.name` directly.
+   */
   roles?: Array<{ id: string; name: string }>;
+  /** Raw relation as returned by the API, before normalization. */
+  userRoles?: Array<{ role: { id: string; name: string } }>;
   phone?: string | null;
   timezone?: string | null;
   language?: string | null;
   lastLoginAt?: string | null;
+}
+
+/** Normalize the API's `userRoles` relation into a flat `roles` array. */
+function normalizeUserRoles(user: UserRef): UserRef {
+  if (user.roles && user.roles.length > 0) return user;
+  const flat = (user.userRoles ?? [])
+    .map((ur) => ur?.role)
+    .filter((r): r is { id: string; name: string } => Boolean(r && r.id));
+  return { ...user, roles: flat };
 }
 
 export interface RoleRef {
@@ -60,6 +77,12 @@ export function useUsers(filters: UserListFilters = {}) {
       }),
     staleTime: 60_000,
     placeholderData: (prev) => prev,
+    // Flatten `userRoles` → `roles` so the users table + account page can read
+    // roles off each record without knowing the API's nested relation shape.
+    select: (result) => ({
+      ...result,
+      data: (result.data ?? []).map(normalizeUserRoles),
+    }),
   });
 }
 

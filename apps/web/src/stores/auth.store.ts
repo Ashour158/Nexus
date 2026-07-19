@@ -76,6 +76,12 @@ export const useAuthStore = create<AuthState>()(
           permissions: [],
         }),
       hasPermission: (permission) => {
+        // Admins (SUPER_ADMIN / admin role, or the `*` wildcard) can do anything.
+        // Defer to isAdmin() FIRST so permission-gated buttons and nav never hide
+        // from an admin — e.g. after a hard refresh where the persisted
+        // `permissions` array hasn't rehydrated yet, or for an admin whose token
+        // carries the role but not an explicit `*` permission.
+        if (get().isAdmin()) return true;
         const owned = get().permissions;
         if (owned.length === 0) return false;
         if (owned.includes('*')) return true;

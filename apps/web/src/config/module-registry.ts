@@ -891,9 +891,24 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
   },
 ];
 
-export const CRM_MODULES = CRM_MODULE_GROUPS.flatMap((group) =>
-  group.modules.map((module) => ({ ...module, groupId: group.id, groupLabel: group.label }))
-);
+// A handful of modules are intentionally listed under more than one group in
+// CRM_MODULE_GROUPS (e.g. `/quotes`, `/approvals`, `/settings/quote-automation`
+// appear in both a domain group and an admin group). Flattening naively would
+// count and render those twice — the source of the "data duplicated in the UI"
+// report (duplicate system-map cards, inflated module totals). Dedupe by `href`,
+// keeping the first occurrence, so every distinct module surfaces exactly once.
+export const CRM_MODULES = (() => {
+  const seen = new Set<string>();
+  return CRM_MODULE_GROUPS.flatMap((group) =>
+    group.modules
+      .filter((module) => {
+        if (seen.has(module.href)) return false;
+        seen.add(module.href);
+        return true;
+      })
+      .map((module) => ({ ...module, groupId: group.id, groupLabel: group.label }))
+  );
+})();
 
 export const CRM_SERVICE_NAMES = [
   'accounts-service',

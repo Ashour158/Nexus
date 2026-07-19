@@ -1,17 +1,20 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { useRolePermissionsMatrix } from '@/hooks/use-roles';
 
-// Permission catalog mirrors the backend PERMISSIONS vocabulary (resource:action).
-// The backend also honours `*` and `resource:*` wildcards.
-const RESOURCES = [
+// Fallbacks used only until the backend permission matrix loads. The live
+// catalog (every module + action) is derived from GET /roles/permissions/matrix.
+const DEFAULT_RESOURCES = [
   'leads', 'contacts', 'accounts', 'deals', 'quotes', 'activities',
   'reports', 'documents', 'settings', 'users', 'roles', 'integrations',
   'workflows', 'invoices',
 ] as const;
-const ACTIONS = ['read', 'create', 'update', 'delete'] as const;
+const DEFAULT_ACTIONS = ['read', 'create', 'update', 'delete'] as const;
+// Canonical ordering so common CRUD actions line up left-to-right.
+const ACTION_ORDER = ['read', 'create', 'update', 'delete', 'manage', 'export', 'import', 'approve'];
 
 interface Role {
   id: string;
@@ -32,6 +35,33 @@ export default function AdminRolesPage() {
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const { confirm, ConfirmDialog } = useConfirm();
+  const matrixQuery = useRolePermissionsMatrix();
+
+  // Derive the full resource × action grid from the backend permission catalog
+  // so every module (not just the legacy 14) is selectable.
+  const { resources, actions } = useMemo(() => {
+    const perms = matrixQuery.data?.permissions ?? [];
+    const resSet = new Set<string>();
+    const actSet = new Set<string>();
+    for (const p of perms) {
+      const [res, act] = p.split(':');
+      if (!res || res === '*') continue;
+      resSet.add(res);
+      if (act && act !== '*') actSet.add(act);
+    }
+    const sortedActions = Array.from(actSet).sort((a, b) => {
+      const ia = ACTION_ORDER.indexOf(a);
+      const ib = ACTION_ORDER.indexOf(b);
+      if (ia === -1 && ib === -1) return a.localeCompare(b);
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+    return {
+      resources: resSet.size ? Array.from(resSet).sort() : [...DEFAULT_RESOURCES],
+      actions: actSet.size ? sortedActions : [...DEFAULT_ACTIONS],
+    };
+  }, [matrixQuery.data]);
 
   const authHeaders = useCallback(
     (): Record<string, string> => ({
@@ -218,16 +248,16 @@ export default function AdminRolesPage() {
                     <thead className="text-left uppercase tracking-wide text-on-surface-variant">
                       <tr>
                         <th className="px-3 py-2">Resource</th>
-                        {ACTIONS.map((a) => (
+                        {actions.map((a) => (
                           <th key={a} className="px-3 py-2 text-center">{a}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-outline-variant">
-                      {RESOURCES.map((res) => (
+                      {resources.map((res) => (
                         <tr key={res}>
                           <td className="px-3 py-2 font-medium capitalize">{res}</td>
-                          {ACTIONS.map((a) => {
+                          {actions.map((a) => {
                             const perm = `${res}:${a}`;
                             return (
                               <td key={a} className="px-3 py-2 text-center">

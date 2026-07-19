@@ -117,6 +117,7 @@ const ownerColors = ['bg-primary-container text-primary', 'bg-tertiary-container
 
 export default function ContactsPage(): ReactElement {
   const hasPermission = useAuthStore((s) => s.hasPermission);
+  const currentUserId = useAuthStore((s) => s.userId);
   const { confirm, ConfirmDialog } = useConfirm();
 
   const [search, setSearch] = useState('');
@@ -213,7 +214,9 @@ export default function ContactsPage(): ReactElement {
   const canDelete = hasPermission('contacts:delete');
 
   function openCreate() {
-    setDraft(EMPTY_DRAFT);
+    // Default the owner to the signed-in user so creation isn't blocked by an
+    // empty required Owner field (mirrors the lead-intake form).
+    setDraft({ ...EMPTY_DRAFT, ownerId: currentUserId ?? '' });
     setActive(null);
     setFieldErrors({});
     setDrawerMode('new');

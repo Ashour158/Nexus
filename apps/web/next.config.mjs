@@ -91,6 +91,19 @@ const nextConfig = {
       // Setup pages (Territories) + (Scheduled Jobs / Mapping Templates) call these.
       { source: '/bff/territory/:path*', destination: 'http://territory-service:3019/api/v1/:path*' },
       { source: '/bff/data/:path*', destination: 'http://data-service:3015/api/v1/:path*' },
+      // Browser-facing clients that previously fell back to localhost in prod
+      // (Cadences, Planning/Forecast, Reports, Portal, Knowledge, Incentives,
+      // Command Center, Telephony, low-code metadata). Every domain a client
+      // targets needs a same-origin rewrite so no localhost URL reaches a
+      // browser. (Quotes ride /bff/finance — consolidated onto finance-service.)
+      { source: '/bff/cadence/:path*', destination: 'http://cadence-service:3018/api/v1/:path*' },
+      { source: '/bff/planning/:path*', destination: 'http://planning-service:3020/api/v1/:path*' },
+      { source: '/bff/reporting/:path*', destination: 'http://reporting-service:3021/api/v1/:path*' },
+      { source: '/bff/portal/:path*', destination: 'http://portal-service:3022/:path*' },
+      { source: '/bff/knowledge/:path*', destination: 'http://knowledge-service:3023/api/v1/:path*' },
+      { source: '/bff/incentive/:path*', destination: 'http://incentive-service:3024/api/v1/:path*' },
+      { source: '/bff/command-center/:path*', destination: 'http://workflow-service:3007/api/v1/command-center/:path*' },
+      { source: '/bff/telephony/:path*', destination: 'http://comm-service:3009/api/v1/telephony/:path*' },
     ];
   },
   async headers() {

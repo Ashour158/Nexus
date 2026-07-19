@@ -18,10 +18,21 @@ import { resolveUserPermissions } from '../lib/permissions.js';
 import { hashPassword } from '@nexus/security';
 import { randomBytes } from 'node:crypto';
 
-/** User row with role assignments (Section 31.1 relations). */
+/**
+ * User row with role assignments (Section 31.1 relations), with the secret
+ * `passwordHash` column omitted. Every read that reaches an API response uses
+ * `SAFE_USER_ARGS` so the hash never leaves the data layer.
+ */
 export type UserWithRoles = Prisma.UserGetPayload<{
+  omit: { passwordHash: true };
   include: { userRoles: { include: { role: true } } };
 }>;
+
+/** Shared Prisma args: strip the password hash, include role assignments. */
+const SAFE_USER_ARGS = {
+  omit: { passwordHash: true },
+  include: { userRoles: { include: { role: true } } },
+} as const;
 
 /**
  * Whether invites provision a LOCAL account (temp password + forced change) rather
@@ -81,7 +92,7 @@ export function createUsersService(prisma: AuthPrisma) {
   async function getUserById(tenantId: string, id: string): Promise<UserWithRoles> {
     const row = await prisma.user.findFirst({
       where: { id, tenantId },
-      include: { userRoles: { include: { role: true } } },
+      ...SAFE_USER_ARGS,
     });
     if (!row) {
       throw new NotFoundError('User', id);
@@ -107,7 +118,7 @@ export function createUsersService(prisma: AuthPrisma) {
           skip: (page - 1) * limit,
           take: limit,
           orderBy: { createdAt: sortDir },
-          include: { userRoles: { include: { role: true } } },
+          ...SAFE_USER_ARGS,
         }),
       ]);
       return toPaginatedResult(rows, total, page, limit);
@@ -159,7 +170,7 @@ export function createUsersService(prisma: AuthPrisma) {
                 create: uniqueRoleIds.map((roleId) => ({ role: { connect: { id: roleId } } })),
               },
             },
-            include: { userRoles: { include: { role: true } } },
+            ...SAFE_USER_ARGS,
           })
         );
         return { ...user, temporaryPassword };
@@ -187,7 +198,7 @@ export function createUsersService(prisma: AuthPrisma) {
                 })),
               },
             },
-            include: { userRoles: { include: { role: true } } },
+            ...SAFE_USER_ARGS,
           });
         });
       } catch (err) {
@@ -212,7 +223,7 @@ export function createUsersService(prisma: AuthPrisma) {
       const updated = await prisma.user.update({
         where: { id_tenantId: { id, tenantId } },
         data,
-        include: { userRoles: { include: { role: true } } },
+        ...SAFE_USER_ARGS,
       });
       return updated;
     },

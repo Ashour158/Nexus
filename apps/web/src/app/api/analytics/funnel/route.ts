@@ -43,7 +43,13 @@ export async function GET(req: NextRequest) {
       },
       cache: 'no-store',
     });
-    return NextResponse.json(await res.json(), { status: res.status });
+    // The backend wraps the payload in { success, data }; the page consumes the
+    // bare FunnelData (stages at top level, matching the dev-preview shape
+    // above). Unwrap so `data.stages` is defined — otherwise the page's
+    // `data.stages.map(...)` throws on an HTTP-200 response.
+    const body = (await res.json()) as { data?: unknown } | unknown;
+    const payload = body && typeof body === 'object' && 'data' in body ? body.data : body;
+    return NextResponse.json(payload, { status: res.status });
   } catch (err: unknown) {
     return NextResponse.json(
       {

@@ -4,7 +4,11 @@ import type { NexusProducer } from '@nexus/kafka';
 import type { AuthPrisma } from '../prisma.js';
 
 function isAdmin(jwt: JwtPayload): boolean {
-  return jwt.roles.includes('admin') || jwt.roles.includes('ADMIN');
+  // The seeded super-admin role is `SUPER_ADMIN` (see seed-demo.mjs); the old
+  // check only accepted `admin`/`ADMIN`, so it denied the super admin on the
+  // governance routes. Accept any admin/super-admin role, case-insensitively.
+  const roles = (jwt.roles ?? []).map((r) => r.toLowerCase());
+  return roles.some((r) => r === 'admin' || r === 'super_admin' || r === 'superadmin');
 }
 
 export async function registerDataOwnershipRoutes(

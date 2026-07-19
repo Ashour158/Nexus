@@ -239,13 +239,19 @@ the incident.
 
 | Metric | Value |
 |---|---|
-| Last restore drill artifact | NOT MEASURED - run `ENV_FILE=/etc/nexus/prod.env BACKUP_AGE_IDENTITY_FILE=/root/.config/sops/age/nexus-prod-keys.txt sh scripts/nexus-restore-drill.sh /path/to/nexus-backup-YYYYmmddTHHMMSSZ.tar.age` |
-| RPO_SECONDS | NOT MEASURED - run the restore drill command above |
-| RTO_SECONDS | NOT MEASURED - run the restore drill command above |
-| Postgres evidence | NOT MEASURED - run the restore drill command above |
-| ClickHouse evidence | NOT MEASURED - run the restore drill command above |
-| Meilisearch evidence | NOT MEASURED - run the restore drill command above |
-| MinIO evidence | NOT MEASURED - run the restore drill command above |
+| Last restore drill artifact | `nexus-backup-20260719T030444Z.tar.age` (sha256 `1ae2a0e34d78185e5c196ffca541fe436f07107cc43477a1af2c800a7d4e931e`), drill run `nexus_drill_20260719T030608Z` on 2026-07-19, report at `/var/log/nexus/nexus_drill_20260719T030608Z.json` |
+| RPO_SECONDS | 84 (artifact captured 03:04:44Z, drill started 03:06:08Z) |
+| RTO_SECONDS | 87 (full decrypt + 4-store scratch restore + equality assertions, 03:06:08Z→03:07:35Z) |
+| Postgres evidence | verified: 33 databases pg_restore'd into scratch, per-table row counts equal to manifest |
+| ClickHouse evidence | verified: 22 tables restored from Native dumps; rows + cityHash64 checksums equal (FINAL view for Replacing-style engines) |
+| Meilisearch evidence | verified: dump imported into scratch v1.8, 7 index document counts equal |
+| MinIO evidence | verified: bucket round-trip via mc mirror, object manifest equal (nexus-files: 0 objects at capture time — truthful) |
+
+Measured on droplet 159.65.32.72 against DO managed Postgres (direct port
+25060, `BACKUP_PGDATABASE=defaultdb`, `PGSSLMODE=require`). Off-host copy
+currently lands on the `nexusoffsite` rclone alias
+(`/var/backups/nexus-offsite`); point `BACKUP_RCLONE_DEST` at a real remote
+(e.g. DO Spaces) for true off-host retention.
 
 ## Evidence and Sign-Off
 

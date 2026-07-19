@@ -20,8 +20,19 @@ import {
 import { useUsers } from '@/hooks/use-users';
 import { XIcon } from '@/components/ui/icons';
 import { TableSkeleton } from '@/components/ui/skeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { ColumnChooser, useColumnVisibility } from '@/components/ui/column-chooser';
+import {
+  CRMCard,
+  CRMEmptyState,
+  CRMErrorState,
+  CRMMetricCard,
+  CRMMetricGrid,
+  CRMPageHeader,
+  CRMSegmentedControl,
+  CRMStatusBadge,
+  CRMTableShell,
+  CRMToolbar,
+} from '@/components/ui/crm';
 import { EditableCell, EditableSelectCell } from '@/components/ui/editable-cell';
 import { BulkActionBar } from '@/components/crm/BulkActionBar';
 import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
@@ -42,16 +53,31 @@ type AccountWithGeo = Omit<Account, 'status'> & {
 
 const TIERS: Array<Account['tier']> = ['SMB', 'MID_MARKET', 'ENTERPRISE', 'STRATEGIC'];
 
-function tierColor(tier: Account['tier']): string {
+type BadgeTone = 'blue' | 'emerald' | 'amber' | 'orange' | 'rose' | 'slate';
+
+function tierTone(tier: Account['tier']): BadgeTone {
   switch (tier) {
     case 'STRATEGIC':
-      return 'bg-tertiary-container text-tertiary';
+      return 'orange';
     case 'ENTERPRISE':
-      return 'bg-primary-container text-primary';
+      return 'blue';
     case 'MID_MARKET':
-      return 'bg-success-container text-success';
+      return 'emerald';
     default:
-      return 'bg-surface-container-high text-on-surface';
+      return 'slate';
+  }
+}
+
+function statusTone(status: Account['status']): BadgeTone {
+  switch (status) {
+    case 'ACTIVE':
+      return 'emerald';
+    case 'AT_RISK':
+      return 'amber';
+    case 'CHURNED':
+      return 'rose';
+    default:
+      return 'slate';
   }
 }
 
@@ -146,90 +172,64 @@ export default function AccountsPage(): ReactElement {
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-lg border border-[#dbe7f3] bg-surface shadow-sm">
-        <div className="h-1.5 bg-gradient-to-r from-primary via-success to-warning" />
-        <div className="p-4 sm:p-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-sm shadow-primary/30">
-                <Building2 className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase text-primary">Customer foundation</p>
-                <h1 className="mt-1 text-2xl font-bold tracking-tight text-on-surface">Accounts command center</h1>
-                <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
-                  Govern companies, billing and shipping profiles, account health, ownership, contacts, territories, and customer hierarchy from one operating view.
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-        <ExportButton module="accounts" />
-        <SavedViewsControl
-          entityType="account"
-          currentFilters={{ search, industry, tier, ownerId }}
-          onApply={(filters) => {
-            setPage(1);
-            setSearch(typeof filters.search === 'string' ? filters.search : '');
-            setIndustry(typeof filters.industry === 'string' ? filters.industry : '');
-            setTier((filters.tier as AccountListFilters['tier']) ?? '');
-            setOwnerId(typeof filters.ownerId === 'string' ? filters.ownerId : '');
-          }}
+      <CRMPageHeader
+        eyebrow="Customer foundation"
+        icon={Building2}
+        title="Accounts command center"
+        description="Govern companies, billing and shipping profiles, account health, ownership, contacts, territories, and customer hierarchy from one operating view."
+        actions={
+          <>
+            <ExportButton module="accounts" />
+            <SavedViewsControl
+              entityType="account"
+              currentFilters={{ search, industry, tier, ownerId }}
+              onApply={(filters) => {
+                setPage(1);
+                setSearch(typeof filters.search === 'string' ? filters.search : '');
+                setIndustry(typeof filters.industry === 'string' ? filters.industry : '');
+                setTier((filters.tier as AccountListFilters['tier']) ?? '');
+                setOwnerId(typeof filters.ownerId === 'string' ? filters.ownerId : '');
+              }}
+            />
+            <Link
+              href="/accounts/duplicates"
+              className="inline-flex h-11 items-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 text-sm font-bold text-on-surface transition hover:bg-surface-container-low"
+            >
+              Duplicates
+            </Link>
+          </>
+        }
+        metrics={
+          <CRMMetricGrid>
+            <CRMMetricCard icon={TrendingUp} label="Visible ARR" value={formatCurrency(accountStats.totalArr, 'USD')} note="Filtered account value" />
+            <CRMMetricCard icon={ShieldCheck} label="Strategic" value={accountStats.strategic} note="High-priority accounts" tone="orange" />
+            <CRMMetricCard icon={Users} label="Active" value={accountStats.activeCount} note="Accounts in motion" tone="emerald" />
+            <CRMMetricCard icon={Building2} label="At Risk" value={accountStats.atRisk} note="Need attention" tone="amber" />
+          </CRMMetricGrid>
+        }
+      />
+
+      <CRMToolbar>
+        <CRMSegmentedControl<ViewMode>
+          value={viewMode}
+          options={[
+            { value: 'list', label: 'List', icon: List },
+            { value: 'map', label: 'Map', icon: MapIcon },
+          ]}
+          onChange={setViewMode}
         />
-        <Link
-          href="/accounts/duplicates"
-          className="inline-flex h-9 items-center gap-2 rounded-md border border-outline-variant px-3 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low"
-        >
-          Duplicates
-        </Link>
         <ColumnChooser
           allColumns={accountCols.allColumns}
           visibleKeys={accountCols.visibleKeys}
           onChange={accountCols.setVisibleKeys}
           onReset={accountCols.reset}
         />
-        <div className="inline-flex rounded-lg border border-outline-variant bg-surface-container-low p-1">
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={cn(
-              'inline-flex h-9 items-center gap-2 rounded-md px-3 text-xs font-bold transition',
-              viewMode === 'list'
-                ? 'bg-primary text-white shadow-sm'
-                : 'text-on-surface-variant hover:bg-surface'
-            )}
-          >
-            <List className="h-3.5 w-3.5" />
-            List
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('map')}
-            className={cn(
-              'inline-flex h-9 items-center gap-2 rounded-md px-3 text-xs font-bold transition',
-              viewMode === 'map'
-                ? 'bg-primary text-white shadow-sm'
-                : 'text-on-surface-variant hover:bg-surface'
-            )}
-          >
-            <MapIcon className="h-3.5 w-3.5" />
-            Map
-          </button>
-        </div>
-            </div>
-          </div>
+      </CRMToolbar>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Visible ARR" value={formatCurrency(accountStats.totalArr, 'USD')} note="Filtered account value" tone="blue" />
-            <StatCard icon={<ShieldCheck className="h-4 w-4" />} label="Strategic" value={String(accountStats.strategic)} note="High-priority accounts" tone="violet" />
-            <StatCard icon={<Users className="h-4 w-4" />} label="Active" value={String(accountStats.activeCount)} note="Accounts in motion" tone="emerald" />
-            <StatCard icon={<Building2 className="h-4 w-4" />} label="At Risk" value={String(accountStats.atRisk)} note="Need attention" tone="amber" />
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-lg border border-[#e7edf3] bg-surface p-4 shadow-sm">
+      <CRMCard>
         <div className="grid gap-3 lg:grid-cols-[minmax(260px,1.5fr)_repeat(3,minmax(160px,1fr))]">
         <label className="relative block">
+          <span className="sr-only">Search accounts</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
         <input
           type="search"
@@ -291,35 +291,43 @@ export default function AccountsPage(): ReactElement {
           ))}
         </select>
         </div>
-      </section>
+      </CRMCard>
 
       {isLoading ? (
-        <div className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
+        <CRMTableShell>
           <TableSkeleton rows={8} cols={7} />
-        </div>
+        </CRMTableShell>
       ) : isError ? (
-        <div className="rounded-lg border border-error/30 bg-error-container p-6 text-sm text-error">
-          Failed to load: {error instanceof Error ? error.message : 'Unknown error'}
-        </div>
+        <CRMErrorState
+          title="Failed to load accounts"
+          description={error instanceof Error ? error.message : 'Unknown error'}
+        />
       ) : accounts.length === 0 ? (
-        <div className="rounded-lg border border-outline-variant bg-surface">
-          <EmptyState
-            icon="🏢"
+        <CRMTableShell>
+          <CRMEmptyState
+            icon={Building2}
             title="No accounts yet"
-            description="Accounts represent the companies you sell to"
-            cta={{ label: '+ Add Account', href: '/accounts/new' }}
+            description="Accounts represent the companies you sell to."
+            action={
+              <Link
+                href="/accounts/new"
+                className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary transition hover:opacity-90"
+              >
+                Add Account
+              </Link>
+            }
           />
-        </div>
+        </CRMTableShell>
       ) : viewMode === 'map' ? (
-        <div className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
+        <CRMTableShell>
           <AccountMapView
             accounts={accounts as AccountWithGeo[]}
             mapAccount={mapAccount}
             onMapAccountChange={setMapAccount}
           />
-        </div>
+        </CRMTableShell>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-outline-variant bg-surface">
+        <CRMTableShell>
           <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-surface-container-low text-start text-xs uppercase tracking-wider text-on-surface-variant">
               <tr>
@@ -416,14 +424,7 @@ export default function AccountsPage(): ReactElement {
                         onSave={(v) => updateAccount.mutate({ id: a.id, data: { tier: v } })}
                         disabled={!canUpdate}
                       >
-                        <span
-                          className={cn(
-                            'rounded-full px-2 py-0.5 text-[11px]',
-                            tierColor(a.tier)
-                          )}
-                        >
-                          {a.tier}
-                        </span>
+                        <CRMStatusBadge tone={tierTone(a.tier)}>{a.tier}</CRMStatusBadge>
                       </EditableSelectCell>
                     </td>
                   ) : null}
@@ -452,9 +453,7 @@ export default function AccountsPage(): ReactElement {
                         onSave={(v) => updateAccount.mutate({ id: a.id, data: { status: v } })}
                         disabled={!canUpdate}
                       >
-                        <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[11px] text-on-surface">
-                          {a.status}
-                        </span>
+                        <CRMStatusBadge tone={statusTone(a.status)}>{a.status}</CRMStatusBadge>
                       </EditableSelectCell>
                     </td>
                   ) : null}
@@ -493,7 +492,7 @@ export default function AccountsPage(): ReactElement {
               </div>
             </div>
           ) : null}
-        </div>
+        </CRMTableShell>
       )}
 
       {active ? (
@@ -619,49 +618,3 @@ function InfoRow({
   );
 }
 
-function StatCard({
-  icon,
-  label,
-  value,
-  note,
-  tone,
-}: {
-  icon: ReactElement;
-  label: string;
-  value: string;
-  note: string;
-  tone: 'blue' | 'emerald' | 'amber' | 'violet';
-}): ReactElement {
-  const tones = {
-    blue: {
-      bar: 'from-primary to-info',
-      badge: 'border-primary/30 bg-primary-container text-primary',
-    },
-    emerald: {
-      bar: 'from-success to-success',
-      badge: 'border-success/30 bg-success-container text-success',
-    },
-    amber: {
-      bar: 'from-warning to-warning',
-      badge: 'border-warning/30 bg-warning-container text-warning',
-    },
-    violet: {
-      bar: 'from-tertiary to-primary',
-      badge: 'border-tertiary/30 bg-tertiary-container text-tertiary',
-    },
-  }[tone];
-
-  return (
-    <div className="overflow-hidden rounded-lg border border-[#e7edf3] bg-[#f9f9ff]">
-      <div className={cn('h-1.5 bg-gradient-to-r', tones.bar)} />
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <p className="text-xs font-semibold uppercase text-on-surface-variant">{label}</p>
-          <span className={cn('rounded-lg border p-2', tones.badge)}>{icon}</span>
-        </div>
-        <p className="mt-3 text-2xl font-bold text-on-surface">{value}</p>
-        <p className="mt-1 text-sm text-on-surface-variant">{note}</p>
-      </div>
-    </div>
-  );
-}

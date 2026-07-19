@@ -4,14 +4,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useConfirm } from '@/hooks/use-confirm';
 import Link from 'next/link';
 import type { Stage } from '@nexus/shared-types';
-import { Columns3, LayoutGrid, List, Trash2 } from 'lucide-react';
+import { Briefcase, CircleDollarSign, Columns3, LayoutGrid, List, Layers3, Trash2, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import { PipelineBoard } from '@/components/deals/pipeline-board';
 import { KanbanBoard } from '@/components/deals/KanbanBoard';
 import { ExportButton } from '@/components/export/ExportButton';
 import { ImportButton } from '@/components/export/ImportButton';
-import { EmptyState as SharedEmptyState } from '@/components/ui/EmptyState';
 import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
 import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -26,6 +25,16 @@ import { formatCurrency, formatDate } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { useColumnVisibility } from '@/components/ui/column-chooser';
 import { EditableCell, EditableSelectCell } from '@/components/ui/editable-cell';
+import {
+  CRMCard,
+  CRMEmptyState,
+  CRMErrorState,
+  CRMMetricCard,
+  CRMMetricGrid,
+  CRMPageHeader,
+  CRMSegmentedControl,
+  CRMToolbar,
+} from '@/components/ui/crm';
 
 const statusLabelMap: Record<string, string> = {
   OPEN: 'IN PROGRESS',
@@ -130,16 +139,59 @@ export default function DealsPage() {
 
   const isLoading = pipelinesQuery.isLoading || stagesQuery.isLoading || dealsQuery.isLoading;
 
+  // Presentation-only roll-ups over the deals already loaded for the current
+  // page/filters. Nothing here triggers a fetch.
+  const pageDeals = useMemo(() => dealsQuery.data?.data ?? [], [dealsQuery.data]);
+  const pageStats = useMemo(() => {
+    const pageValue = pageDeals.reduce((sum, deal) => sum + Number(deal.amount ?? 0), 0);
+    const open = pageDeals.filter((deal) => deal.status === 'OPEN').length;
+    const won = pageDeals.filter((deal) => deal.status === 'WON').length;
+    return { pageValue, open, won };
+  }, [pageDeals]);
+
   return (
-    <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8" style={{ backgroundColor: 'var(--bg-secondary)' }}>
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Deals</h1>
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            Manage your pipeline and track deal progress
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
+    <main className="min-h-screen space-y-6 bg-surface-container-low px-4 py-6 sm:px-6 lg:px-8">
+      <CRMPageHeader
+        eyebrow="Revenue pipeline"
+        icon={Briefcase}
+        title="Deals"
+        description="Manage your pipeline and track deal progress across stages, owners, and renewal windows."
+        actions={
+          <Link href="/deals/new">
+            <Button type="button">New deal</Button>
+          </Link>
+        }
+        metrics={
+          <CRMMetricGrid>
+            <CRMMetricCard
+              icon={Layers3}
+              label="Total deals"
+              value={(dealsQuery.data?.total ?? pageDeals.length).toLocaleString()}
+              note="matching filters"
+            />
+            <CRMMetricCard
+              icon={CircleDollarSign}
+              label="Page value"
+              value={formatCurrency(pageStats.pageValue, pageDeals[0]?.currency)}
+              note={`${pageDeals.length} shown`}
+            />
+            <CRMMetricCard icon={List} label="Open" value={pageStats.open} note="on this page" tone="amber" />
+            <CRMMetricCard icon={Trophy} label="Won" value={pageStats.won} note="on this page" tone="emerald" />
+          </CRMMetricGrid>
+        }
+      />
+
+      <CRMToolbar>
+        <CRMSegmentedControl<'pipeline' | 'board' | 'list'>
+          value={view}
+          options={[
+            { value: 'pipeline', label: 'Pipeline', icon: LayoutGrid },
+            { value: 'board', label: 'Board', icon: Columns3 },
+            { value: 'list', label: 'List', icon: List },
+          ]}
+          onChange={setView}
+        />
+        <div className="flex flex-wrap items-center gap-2">
           <ImportButton module="deals" onImported={() => void dealsQuery.refetch()} />
           <ExportButton module="deals" />
           <SavedViewsControl
@@ -152,61 +204,24 @@ export default function DealsPage() {
               setPage(1);
             }}
           />
-          <div className="inline-flex rounded-lg border p-0.5" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface)' }}>
-            <button
-              type="button"
-              onClick={() => setView('pipeline')}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
-                view === 'pipeline' ? 'bg-primary-light text-primary' : 'text-on-surface-variant hover:text-on-surface'
-              )}
-              aria-pressed={view === 'pipeline'}
-            >
-              <LayoutGrid className="h-4 w-4" /> Pipeline
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('board')}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
-                view === 'board' ? 'bg-primary-light text-primary' : 'text-on-surface-variant hover:text-on-surface'
-              )}
-              aria-pressed={view === 'board'}
-            >
-              <Columns3 className="h-4 w-4" /> Board
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('list')}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
-                view === 'list' ? 'bg-primary-light text-primary' : 'text-on-surface-variant hover:text-on-surface'
-              )}
-              aria-pressed={view === 'list'}
-            >
-              <List className="h-4 w-4" /> List
-            </button>
-          </div>
           {pipelines.length > 1 ? (
             <select
               value={resolvedPipelineId ?? ''}
+              aria-label="Select pipeline"
               onChange={(e) => setActivePipeline(e.target.value)}
-              className="h-9 rounded-lg border bg-transparent px-3 text-sm outline-none focus:border-primary"
-              style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+              className="h-11 rounded-lg border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface outline-none transition focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
             >
               {pipelines.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
           ) : null}
-          <Link href="/deals/new">
-            <Button type="button">New deal</Button>
-          </Link>
         </div>
-      </header>
+      </CRMToolbar>
 
       {view === 'list' ? (
         <div className="space-y-4">
+          <CRMCard>
           <FilterBar
             searchPlaceholder="Search deals..."
             searchValue={search}
@@ -228,7 +243,7 @@ export default function DealsPage() {
             ]}
           />
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="mt-4 flex flex-wrap items-center gap-2">
             <FilterChip
               active={renewalsOnly}
               onClick={() => { setRenewalsOnly((v) => !v); setPage(1); }}
@@ -242,6 +257,7 @@ export default function DealsPage() {
               Expiring in 90 days
             </FilterChip>
           </div>
+          </CRMCard>
 
           <DataTable
             data={dealsQuery.data?.data ?? []}
@@ -255,7 +271,7 @@ export default function DealsPage() {
                     value={row.name}
                     onSave={(v) => updateDeal.mutate({ id: row.id, data: { name: v } })}
                   >
-                    <Link href={`/deals/${row.id}`} className="font-medium hover:text-primary hover:underline" style={{ color: 'var(--text-primary)' }}>
+                    <Link href={`/deals/${row.id}`} className="font-medium text-on-surface hover:text-primary hover:underline">
                       {row.name}
                     </Link>
                   </EditableCell>
@@ -269,7 +285,7 @@ export default function DealsPage() {
                     <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-container-high text-[10px] font-bold text-on-surface-variant dark:bg-surface-container-high dark:text-on-surface-variant">
                       {(row as unknown as Record<string, string>)['accountName']?.[0] ?? 'C'}
                     </span>
-                    <span style={{ color: 'var(--text-secondary)' }}>{(row as unknown as Record<string, string>)['accountName'] ?? '—'}</span>
+                    <span className="text-on-surface-variant">{(row as unknown as Record<string, string>)['accountName'] ?? '—'}</span>
                   </div>
                 ),
               },
@@ -284,7 +300,7 @@ export default function DealsPage() {
                       options={stages.map((s) => ({ label: s.name, value: s.id }))}
                       onSave={(v) => updateDeal.mutate({ id: row.id, data: { stageId: v } })}
                     >
-                      <span style={{ color: 'var(--text-secondary)' }}>{stage?.name ?? '—'}</span>
+                      <span className="text-on-surface-variant">{stage?.name ?? '—'}</span>
                     </EditableSelectCell>
                   );
                 },
@@ -303,7 +319,7 @@ export default function DealsPage() {
                       }
                     }}
                   >
-                    <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{formatCurrency(row.amount, row.currency)}</span>
+                    <span className="font-semibold text-on-surface">{formatCurrency(row.amount, row.currency)}</span>
                   </EditableCell>
                 ),
               },
@@ -321,7 +337,7 @@ export default function DealsPage() {
                     >
                       <div className="flex items-center gap-2">
                         <Avatar name={name} size="sm" />
-                        <span style={{ color: 'var(--text-secondary)' }}>{name}</span>
+                        <span className="text-on-surface-variant">{name}</span>
                       </div>
                     </EditableSelectCell>
                   );
@@ -354,17 +370,22 @@ export default function DealsPage() {
                     value={row.expectedCloseDate ? new Date(row.expectedCloseDate).toISOString().slice(0, 10) : ''}
                     onSave={(v) => updateDeal.mutate({ id: row.id, data: { expectedCloseDate: v ? new Date(v).toISOString() : undefined } })}
                   >
-                    <span style={{ color: 'var(--text-muted)' }}>{formatDate(row.expectedCloseDate)}</span>
+                    <span className="text-on-surface-variant">{formatDate(row.expectedCloseDate)}</span>
                   </EditableCell>
                 ),
               },
             ]}
             loading={dealsQuery.isLoading}
             emptyState={
-              <SharedEmptyState
-                icon="🧭"
+              <CRMEmptyState
+                icon={Briefcase}
                 title="No deals found"
                 description="Try adjusting your filters or create a new deal."
+                action={
+                  <Link href="/deals/new">
+                    <Button type="button">New deal</Button>
+                  </Link>
+                }
               />
             }
             selectedIds={selectedIds}
@@ -416,33 +437,44 @@ export default function DealsPage() {
       ) : view === 'board' ? (
         <>
           {isLoading || boardDealsQuery.isLoading ? (
-            <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--border-color)' }}>
+            <CRMCard padded={false}>
               <TableSkeleton rows={6} cols={5} />
-            </div>
+            </CRMCard>
           ) : pipelinesQuery.isError ? (
             <ErrorBanner message="Failed to load pipelines. Try again." />
           ) : !resolvedPipelineId ? (
-            <SharedEmptyState
-              icon="🧭"
-              title="No pipelines configured yet"
-              description="Ask an administrator to create a pipeline in Settings."
-            />
+            <CRMCard padded={false}>
+              <CRMEmptyState
+                icon={LayoutGrid}
+                title="No pipelines configured yet"
+                description="Ask an administrator to create a pipeline in Settings."
+              />
+            </CRMCard>
           ) : stagesQuery.isError ? (
             <ErrorBanner message="Failed to load stages for this pipeline." />
           ) : stages.length === 0 ? (
-            <SharedEmptyState
-              icon="🧱"
-              title="This pipeline has no stages yet"
-              description="Add stages in pipeline settings to start tracking deals."
-            />
+            <CRMCard padded={false}>
+              <CRMEmptyState
+                icon={Columns3}
+                title="This pipeline has no stages yet"
+                description="Add stages in pipeline settings to start tracking deals."
+              />
+            </CRMCard>
           ) : boardDealsQuery.isError ? (
             <ErrorBanner message="Failed to load deals for this board." />
           ) : (boardDealsQuery.data?.data.length ?? 0) === 0 ? (
-            <SharedEmptyState
-              icon="🗂️"
-              title="No deals in this pipeline yet"
-              description="Create a deal to see it on the board."
-            />
+            <CRMCard padded={false}>
+              <CRMEmptyState
+                icon={Briefcase}
+                title="No deals in this pipeline yet"
+                description="Create a deal to see it on the board."
+                action={
+                  <Link href="/deals/new">
+                    <Button type="button">New deal</Button>
+                  </Link>
+                }
+              />
+            </CRMCard>
           ) : (
             <KanbanBoard
               stages={stages}
@@ -456,25 +488,29 @@ export default function DealsPage() {
       ) : (
         <>
           {isLoading ? (
-            <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--border-color)' }}>
+            <CRMCard padded={false}>
               <TableSkeleton rows={8} cols={5} />
-            </div>
+            </CRMCard>
           ) : pipelinesQuery.isError ? (
             <ErrorBanner message="Failed to load pipelines. Try again." />
           ) : !resolvedPipelineId ? (
-            <SharedEmptyState
-              icon="🧭"
-              title="No pipelines configured yet"
-              description="Ask an administrator to create a pipeline in Settings."
-            />
+            <CRMCard padded={false}>
+              <CRMEmptyState
+                icon={LayoutGrid}
+                title="No pipelines configured yet"
+                description="Ask an administrator to create a pipeline in Settings."
+              />
+            </CRMCard>
           ) : stagesQuery.isError ? (
             <ErrorBanner message="Failed to load stages for this pipeline." />
           ) : stages.length === 0 ? (
-            <SharedEmptyState
-              icon="🧱"
-              title="This pipeline has no stages yet"
-              description="Add stages in pipeline settings to start tracking deals."
-            />
+            <CRMCard padded={false}>
+              <CRMEmptyState
+                icon={Columns3}
+                title="This pipeline has no stages yet"
+                description="Add stages in pipeline settings to start tracking deals."
+              />
+            </CRMCard>
           ) : (
             <div className="-mx-4 overflow-x-auto px-4 rtl:flex-row-reverse" style={{ direction: 'inherit' }}>
               <div className="min-w-max pb-4">
@@ -506,8 +542,8 @@ function FilterChip({
       className={cn(
         'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition',
         active
-          ? 'border-primary bg-primary-light text-primary'
-          : 'border-[var(--border-color)] text-on-surface-variant hover:text-on-surface'
+          ? 'border-primary bg-primary-container text-on-primary-container'
+          : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface'
       )}
     >
       {children}
@@ -517,11 +553,8 @@ function FilterChip({
 
 function ErrorBanner({ message }: { message: string }) {
   return (
-    <div
-      role="alert"
-      className="rounded-md border border-error/40 bg-error-container p-4 text-sm text-on-error-container "
-    >
-      {message}
+    <div role="alert">
+      <CRMErrorState title="Unable to load data" description={message} />
     </div>
   );
 }

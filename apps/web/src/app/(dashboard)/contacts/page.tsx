@@ -45,7 +45,18 @@ import { BulkActionBar } from '@/components/crm/BulkActionBar';
 import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
 import { CsvImportDialog } from '@/components/import/csv-import-dialog';
 import { TableSkeleton } from '@/components/ui/skeleton';
-import { CRMModuleShell } from '@/components/ui/crm';
+import {
+  CRMCard,
+  CRMEmptyState,
+  CRMErrorState,
+  CRMMetricCard,
+  CRMMetricGrid,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMStatusBadge,
+  CRMTableShell,
+  CRMToolbar,
+} from '@/components/ui/crm';
 
 interface ContactDraft {
   firstName: string;
@@ -354,190 +365,184 @@ export default function ContactsPage(): ReactElement {
   }
 
   return (
-    <CRMModuleShell>
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          label="Total Contacts"
-          value={stats.total.toLocaleString()}
-          note={`${stats.newThisWeek} added this week`}
-          icon={<Users className="h-5 w-5 text-primary" />}
-        />
-        <KpiCard
-          label="Active Contacts"
-          value={stats.active.toLocaleString()}
-          note="Ready for sales engagement"
-          icon={<TrendingUp className="h-5 w-5 text-success" />}
-        />
-        <KpiCard
-          label="Email Coverage"
-          value={`${stats.withEmail}`}
-          note="Reachable contact records"
-          icon={<Mail className="h-5 w-5 text-warning" />}
-        />
-        <KpiCard
-          label="Consent Rate"
-          value={`${stats.consentRate}%`}
-          note="GDPR consent captured"
-          icon={<ShieldCheck className="h-5 w-5 text-tertiary" />}
-        />
-      </section>
-
-      <section className="grid grid-cols-12 gap-6">
-        <div className="col-span-12 rounded-xl border border-[#e7edf3] bg-surface p-6 lg:col-span-8">
-          <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h1 className="text-[22px] font-bold tracking-tight text-on-surface">Contacts Command Center</h1>
-              <p className="text-sm text-on-surface-variant">Clean customer relationships, owners, consent, and outreach readiness.</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
+    <CRMModuleShell className="space-y-6">
+      <CRMPageHeader
+        eyebrow="Relationships"
+        icon={Users}
+        title="Contacts"
+        description="Clean customer relationships, owners, consent, and outreach readiness in one command center."
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => setImportOpen(true)}
+              className="inline-flex h-11 items-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 text-sm font-bold text-on-surface transition hover:bg-surface-container-low"
+            >
+              <Upload className="h-4 w-4" />
+              Import
+            </button>
+            <ExportButton module="contacts" />
+            <SavedViewsControl
+              entityType="contact"
+              currentFilters={{ search, ownerId, sortBy }}
+              onApply={(filters) => {
+                setPage(1);
+                setSearch(typeof filters.search === 'string' ? filters.search : '');
+                setOwnerId(typeof filters.ownerId === 'string' ? filters.ownerId : '');
+                if (typeof filters.sortBy === 'string') {
+                  setSortBy(filters.sortBy as ContactListFilters['sortBy']);
+                }
+              }}
+            />
+            {canCreate ? (
               <button
                 type="button"
-                onClick={() => setImportOpen(true)}
-                className="inline-flex items-center gap-2 rounded-lg border border-outline-variant px-4 py-2 text-sm font-bold text-on-surface transition hover:bg-surface-container-low"
+                onClick={openCreate}
+                className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary transition active:scale-95"
               >
-                <Upload className="h-4 w-4" />
-                Import
+                <Plus className="h-4 w-4" />
+                Create New Contact
               </button>
-              <ExportButton module="contacts" />
-              <SavedViewsControl
-                entityType="contact"
-                currentFilters={{ search, ownerId, sortBy }}
-                onApply={(filters) => {
-                  setPage(1);
-                  setSearch(typeof filters.search === 'string' ? filters.search : '');
-                  setOwnerId(typeof filters.ownerId === 'string' ? filters.ownerId : '');
-                  if (typeof filters.sortBy === 'string') {
-                    setSortBy(filters.sortBy as ContactListFilters['sortBy']);
-                  }
-                }}
-              />
-              {canCreate ? (
-                <button
-                  type="button"
-                  onClick={openCreate}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#4f46e5] px-4 py-2 text-sm font-bold text-white transition active:scale-95"
-                >
-                  <Plus className="h-4 w-4" />
-                  Create New Contact
-                </button>
-              ) : null}
-            </div>
-          </div>
+            ) : null}
+          </>
+        }
+        metrics={
+          <CRMMetricGrid>
+            <CRMMetricCard
+              icon={Users}
+              label="Total contacts"
+              value={stats.total.toLocaleString()}
+              note={`${stats.newThisWeek} added this week`}
+            />
+            <CRMMetricCard
+              icon={TrendingUp}
+              label="Active"
+              value={stats.active.toLocaleString()}
+              note="ready for engagement"
+              tone="emerald"
+            />
+            <CRMMetricCard
+              icon={Mail}
+              label="Email coverage"
+              value={stats.withEmail}
+              note="reachable records"
+              tone="amber"
+            />
+            <CRMMetricCard
+              icon={ShieldCheck}
+              label="Consent rate"
+              value={`${stats.consentRate}%`}
+              note="GDPR consent captured"
+              tone="orange"
+            />
+          </CRMMetricGrid>
+        }
+      />
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center px-4">
-              <div className="absolute top-1/4 w-full border-b border-outline-variant" />
-              <div className="absolute top-2/4 w-full border-b border-outline-variant" />
-              <div className="absolute top-3/4 w-full border-b border-outline-variant" />
-            </div>
-            <div className="relative z-10 flex h-64 items-end justify-between gap-4 px-4">
-              {[
-                { label: 'Jan', value: 44, tone: 'bg-primary-container' },
-                { label: 'Feb', value: 58, tone: 'bg-primary-container' },
-                { label: 'Mar', value: 72, tone: 'bg-primary-container' },
-                { label: 'Apr', value: 88, tone: 'bg-[#4f46e5]' },
-                { label: 'May', value: 69, tone: 'bg-primary-container' },
-                { label: 'Jun', value: 80, tone: 'bg-primary' },
-              ].map((bar) => (
-                <div key={bar.label} className="group flex flex-1 flex-col items-center gap-2">
-                  <div
-                    className={cn('w-12 rounded-t-lg transition-all group-hover:brightness-95', bar.tone)}
-                    style={{ height: `${Math.round(bar.value * 2.3)}px` }}
-                  />
-                  <span className="text-xs font-medium text-on-surface-variant">{bar.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="col-span-12 rounded-xl border border-[#e7edf3] bg-surface p-6 lg:col-span-4">
-          <h2 className="mb-6 text-lg font-bold text-on-surface">Regional Breakdown</h2>
-          <div className="space-y-6">
-            {(countryBreakdown.length > 0 ? countryBreakdown : [{ label: 'No data', value: 0, pct: 0 }]).map((row, index) => (
+      <CRMCard
+        title="Regional breakdown"
+        description="Where the contacts in the current view are located."
+        actions={
+          <Link href="/accounts/map" className="text-sm font-bold text-primary hover:underline">
+            View detailed map
+          </Link>
+        }
+      >
+        {countryBreakdown.length === 0 ? (
+          <p className="text-sm text-on-surface-variant">No location data on the contacts in this view.</p>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {countryBreakdown.map((row) => (
               <div key={row.label} className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="font-medium text-on-surface">{row.label}</span>
-                  <span className="text-on-surface-variant">{row.pct}%</span>
+                  <span className="font-semibold text-on-surface">{row.label}</span>
+                  <span className="text-on-surface-variant">
+                    {row.value} · {row.pct}%
+                  </span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-surface-container-high">
-                  <div
-                    className={cn('h-full', ['bg-primary', 'bg-primary', 'bg-primary-container', 'bg-primary-container'][index % 4])}
-                    style={{ width: `${row.pct}%` }}
-                  />
+                  <div className="h-full bg-primary" style={{ width: `${row.pct}%` }} />
                 </div>
               </div>
             ))}
           </div>
-          <div className="mt-8 border-t border-outline-variant pt-6">
-            <Link href="/accounts/map" className="block text-center text-sm font-bold text-[#4f46e5] hover:underline">
-              View Detailed Map
-            </Link>
-          </div>
+        )}
+      </CRMCard>
+
+      <CRMToolbar>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => {
+              setPage(1);
+              setSearch(event.target.value);
+            }}
+            aria-label="Search contacts"
+            className="h-10 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-10 pr-4 text-sm text-on-surface outline-none transition focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30 xl:w-72"
+            placeholder="Search contacts..."
+          />
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={ownerId}
+            aria-label="Filter by owner"
+            onChange={(event) => {
+              setPage(1);
+              setOwnerId(event.target.value);
+            }}
+            className="h-10 rounded-lg border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface outline-none transition focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
+          >
+            <option value="">All owners</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>{user.firstName} {user.lastName}</option>
+            ))}
+          </select>
+          <select
+            value={sortBy}
+            aria-label="Sort contacts"
+            onChange={(event) => setSortBy(event.target.value as ContactListFilters['sortBy'])}
+            className="h-10 rounded-lg border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface outline-none transition focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
+          >
+            <option value="createdAt">Newest</option>
+            <option value="firstName">First name</option>
+            <option value="lastName">Last name</option>
+            <option value="email">Email</option>
+          </select>
+        </div>
+      </CRMToolbar>
 
-        <div className="col-span-12 overflow-hidden rounded-xl border border-[#e7edf3] bg-surface">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-outline-variant px-6 py-4">
-            <div>
-              <h2 className="text-lg font-bold text-on-surface">Recent High-Value Contacts</h2>
-              <p className="text-sm text-on-surface-variant">Decision makers and active stakeholders across open accounts.</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(event) => {
-                    setPage(1);
-                    setSearch(event.target.value);
-                  }}
-                  className="h-10 w-64 rounded-lg border-0 bg-surface-container-high pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary"
-                  placeholder="Search contacts..."
-                />
-              </div>
-              <select
-                value={ownerId}
-                aria-label="Filter by owner"
-                onChange={(event) => {
-                  setPage(1);
-                  setOwnerId(event.target.value);
-                }}
-                className="h-10 rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary"
-              >
-                <option value="">All owners</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>{user.firstName} {user.lastName}</option>
-                ))}
-              </select>
-              <select
-                value={sortBy}
-                aria-label="Sort contacts"
-                onChange={(event) => setSortBy(event.target.value as ContactListFilters['sortBy'])}
-                className="h-10 rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary"
-              >
-                <option value="createdAt">Newest</option>
-                <option value="firstName">First name</option>
-                <option value="lastName">Last name</option>
-                <option value="email">Email</option>
-              </select>
-            </div>
-          </div>
-
+      <CRMTableShell>
           {contactsQuery.isLoading ? (
             <TableSkeleton rows={8} cols={6} />
           ) : contactsQuery.isError ? (
-            <div className="p-8 text-sm text-error">
-              Failed to load contacts.
+            <div className="p-5">
+              <CRMErrorState
+                title="Unable to load contacts"
+                description="The contacts service did not respond. Try again in a moment."
+              />
             </div>
           ) : contacts.length === 0 ? (
-            <div className="p-10 text-center">
-              <Users className="mx-auto h-8 w-8 text-outline" />
-              <h3 className="mt-3 text-sm font-bold text-on-surface">No contacts found</h3>
-              <p className="mt-1 text-sm text-on-surface-variant">Adjust the filters or create a new contact.</p>
-            </div>
+            <CRMEmptyState
+              icon={Users}
+              title="No contacts found"
+              description="Adjust the filters or create a new contact."
+              action={
+                canCreate ? (
+                  <button
+                    type="button"
+                    onClick={openCreate}
+                    className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary transition active:scale-95"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create New Contact
+                  </button>
+                ) : undefined
+              }
+            />
           ) : (
-            <div className="overflow-x-auto">
+            <>
             <table className="w-full min-w-[720px]">
               <thead className="border-b border-outline-variant bg-surface-container-low">
                 <tr>
@@ -583,7 +588,7 @@ export default function ContactsPage(): ReactElement {
                           {initials(contact)}
                         </div>
                         <div>
-                          <Link href={`/contacts/${contact.id}`} className="text-sm font-semibold text-on-surface hover:text-[#4f46e5]">
+                          <Link href={`/contacts/${contact.id}`} className="text-sm font-semibold text-on-surface hover:text-primary">
                             {contact.firstName} {contact.lastName}
                           </Link>
                           <p className="text-xs text-on-surface-variant">{contact.accountId ? accountMap.get(contact.accountId) ?? contact.accountId : 'Unassigned account'}</p>
@@ -591,13 +596,11 @@ export default function ContactsPage(): ReactElement {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="rounded bg-primary-container px-2 py-1 text-[10px] font-bold uppercase text-primary">
-                        {contact.jobTitle ?? 'Stakeholder'}
-                      </span>
+                      <CRMStatusBadge tone="blue">{contact.jobTitle ?? 'Stakeholder'}</CRMStatusBadge>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-inverse-surface text-[10px] font-bold text-white">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-inverse-surface text-[10px] font-bold text-inverse-on-surface">
                           {(ownerMap.get(contact.ownerId) ?? 'NX').slice(0, 2).toUpperCase()}
                         </div>
                         <span className="text-sm text-on-surface-variant">{ownerMap.get(contact.ownerId) ?? contact.ownerId}</span>
@@ -614,7 +617,7 @@ export default function ContactsPage(): ReactElement {
                       <button
                         type="button"
                         onClick={() => setActive(contact)}
-                        className="rounded-lg p-1.5 text-on-surface-variant transition hover:bg-surface-container-high hover:text-[#4f46e5]"
+                        className="rounded-lg p-1.5 text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary"
                       >
                         <MoreVertical className="h-5 w-5" />
                       </button>
@@ -623,34 +626,33 @@ export default function ContactsPage(): ReactElement {
                 ))}
               </tbody>
             </table>
-            </div>
+            </>
           )}
+      </CRMTableShell>
 
-          {contactsQuery.data ? (
-            <div className="flex items-center justify-between border-t border-outline-variant px-6 py-3 text-xs text-on-surface-variant">
-              <span>Page {contactsQuery.data.page} of {contactsQuery.data.totalPages} - {contactsQuery.data.total} total</span>
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  className="rounded border border-outline-variant px-3 py-1.5 font-semibold disabled:opacity-40"
-                  disabled={!contactsQuery.data.hasPrevPage}
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                >
-                  Prev
-                </button>
-                <button
-                  type="button"
-                  className="rounded border border-outline-variant px-3 py-1.5 font-semibold disabled:opacity-40"
-                  disabled={!contactsQuery.data.hasNextPage}
-                  onClick={() => setPage((current) => current + 1)}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          ) : null}
+      {contactsQuery.data ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-outline-variant bg-surface px-4 py-3 text-xs text-on-surface-variant shadow-card">
+          <span>Page {contactsQuery.data.page} of {contactsQuery.data.totalPages} - {contactsQuery.data.total} total</span>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              className="rounded-lg border border-outline-variant px-3 py-1.5 font-semibold text-on-surface transition hover:bg-surface-container-low disabled:opacity-40"
+              disabled={!contactsQuery.data.hasPrevPage}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              Prev
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-outline-variant px-3 py-1.5 font-semibold text-on-surface transition hover:bg-surface-container-low disabled:opacity-40"
+              disabled={!contactsQuery.data.hasNextPage}
+              onClick={() => setPage((current) => current + 1)}
+            >
+              Next
+            </button>
+          </div>
         </div>
-      </section>
+      ) : null}
 
       {active ? (
         <ContactPanel
@@ -693,29 +695,6 @@ export default function ContactsPage(): ReactElement {
       />
       {ConfirmDialog}
     </CRMModuleShell>
-  );
-}
-
-function KpiCard({
-  label,
-  value,
-  note,
-  icon,
-}: {
-  label: string;
-  value: string;
-  note: string;
-  icon: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-2 rounded-xl border border-[#e7edf3] bg-surface p-6">
-      <div className="flex items-start justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">{label}</span>
-        {icon}
-      </div>
-      <p className="text-2xl font-bold text-on-surface">{value}</p>
-      <p className="text-xs font-medium text-on-surface-variant">{note}</p>
-    </div>
   );
 }
 
@@ -815,7 +794,7 @@ function ContactPanel({
         </div>
         <div className="flex gap-2 border-t border-outline-variant p-4">
           {canUpdate ? (
-            <button type="button" onClick={onEdit} className="flex-1 rounded-lg bg-[#4f46e5] px-4 py-2 text-sm font-bold text-white">
+            <button type="button" onClick={onEdit} className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-on-primary">
               Edit
             </button>
           ) : null}
@@ -948,7 +927,7 @@ function ContactFormPanel({
               required={requiredFields.has('ownerId')}
               value={draft.ownerId}
               onChange={(event) => onDraftChange({ ...draft, ownerId: event.target.value })}
-              className="mt-1 h-10 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary"
+              className="mt-1 h-10 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface focus:border-primary focus:bg-surface focus:ring-primary"
             >
               <option value="">Select owner</option>
               {users.map((user) => (
@@ -1000,7 +979,7 @@ function ContactFormPanel({
           <button type="button" onClick={onClose} className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-bold text-on-surface hover:bg-surface-container-low">
             Cancel
           </button>
-          <button type="submit" disabled={isSaving} className="rounded-lg bg-[#4f46e5] px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
+          <button type="submit" disabled={isSaving} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-on-primary disabled:opacity-60">
             {isSaving ? 'Saving...' : mode === 'edit' ? 'Save' : 'Create'}
           </button>
         </div>
@@ -1039,7 +1018,7 @@ function Field({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
-          'mt-1 h-10 w-full rounded-lg border text-sm focus:border-primary focus:ring-primary',
+          'mt-1 h-10 w-full rounded-lg border bg-surface-container-low px-3 text-sm text-on-surface focus:border-primary focus:bg-surface focus:ring-primary',
           error ? 'border-error' : 'border-outline-variant'
         )}
       />
@@ -1074,7 +1053,7 @@ function SelectField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
-          'mt-1 h-10 w-full rounded-lg border text-sm focus:border-primary focus:ring-primary',
+          'mt-1 h-10 w-full rounded-lg border bg-surface-container-low px-3 text-sm text-on-surface focus:border-primary focus:bg-surface focus:ring-primary',
           error ? 'border-error' : 'border-outline-variant'
         )}
       >
@@ -1130,7 +1109,7 @@ function PhotoUpload({
           <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Profile photo</p>
           <p className="mt-0.5 text-xs text-on-surface-variant">Upload JPG, PNG, or WebP. Stored with the contact preview.</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <label className="inline-flex h-9 cursor-pointer items-center rounded-lg bg-[#4f46e5] px-3 text-xs font-bold text-white hover:bg-primary">
+            <label className="inline-flex h-9 cursor-pointer items-center rounded-lg bg-primary px-3 text-xs font-bold text-on-primary hover:brightness-95">
               Upload image
               <input
                 type="file"

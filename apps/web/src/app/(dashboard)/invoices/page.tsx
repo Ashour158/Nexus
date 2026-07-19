@@ -2,12 +2,24 @@
 
 import { useState, type JSX } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CircleDollarSign, FileSpreadsheet, Receipt, Wallet } from 'lucide-react';
 import { apiClients } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { TableSkeleton } from '@/components/ui/skeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
 import { ExportButton } from '@/components/export/ExportButton';
+import {
+  CRMEmptyState,
+  CRMErrorState,
+  CRMFilterPills,
+  CRMMetricCard,
+  CRMMetricGrid,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMStatusBadge,
+  CRMTableShell,
+  CRMToolbar,
+} from '@/components/ui/crm';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { notify } from '@/lib/toast';
 
@@ -25,13 +37,17 @@ interface Invoice {
   createdAt: string;
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  DRAFT: 'bg-surface-container-high text-on-surface-variant',
-  SENT: 'bg-primary-container text-primary',
-  PAID: 'bg-success-container text-success',
-  VOID: 'bg-surface-container-high text-on-surface-variant line-through',
-  OVERDUE: 'bg-error-container text-error',
+type BadgeTone = 'blue' | 'emerald' | 'amber' | 'orange' | 'rose' | 'slate';
+
+const STATUS_TONES: Record<string, BadgeTone> = {
+  DRAFT: 'slate',
+  SENT: 'blue',
+  PAID: 'emerald',
+  VOID: 'slate',
+  OVERDUE: 'rose',
 };
+
+const STATUS_FILTERS = ['ALL', 'DRAFT', 'SENT', 'PAID', 'OVERDUE', 'VOID'] as const;
 
 export default function InvoicesPage(): JSX.Element {
   const qc = useQueryClient();
@@ -81,61 +97,69 @@ export default function InvoicesPage(): JSX.Element {
     .reduce((sum, i) => sum + parseFloat(i.total), 0);
 
   return (
-    <main className="space-y-4 p-4">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-on-surface">Invoices</h1>
-          <p className="text-sm text-on-surface-variant">{total} total invoices</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <ExportButton module="invoices" filters={{ status: statusFilter }} />
-          <SavedViewsControl
-            entityType="invoice"
-            currentFilters={{ status: statusFilter }}
-            onApply={(f) => setStatusFilter(typeof f.status === 'string' ? f.status : 'ALL')}
-          />
-        </div>
-      </header>
+    <CRMModuleShell className="space-y-6">
+      <CRMPageHeader
+        eyebrow="Billing"
+        icon={Receipt}
+        title="Invoices"
+        description="Track billing documents from draft through collection, and act on what is outstanding."
+        actions={
+          <>
+            <ExportButton module="invoices" filters={{ status: statusFilter }} />
+            <SavedViewsControl
+              entityType="invoice"
+              currentFilters={{ status: statusFilter }}
+              onApply={(f) => setStatusFilter(typeof f.status === 'string' ? f.status : 'ALL')}
+            />
+          </>
+        }
+        metrics={
+          <CRMMetricGrid>
+            <CRMMetricCard
+              icon={Wallet}
+              label="Outstanding"
+              value={formatCurrency(totalOutstanding)}
+              note="sent and overdue"
+              tone="amber"
+            />
+            <CRMMetricCard
+              icon={CircleDollarSign}
+              label="Collected"
+              value={formatCurrency(totalPaid)}
+              note="in this view"
+              tone="emerald"
+            />
+            <CRMMetricCard
+              icon={FileSpreadsheet}
+              label="Total invoices"
+              value={total}
+              note={statusFilter === 'ALL' ? 'all statuses' : `status ${statusFilter}`}
+            />
+          </CRMMetricGrid>
+        }
+      />
 
-      {/* Summary metrics */}
-      <section className="grid grid-cols-3 gap-4">
-        {[
-          { label: 'Outstanding', value: formatCurrency(totalOutstanding), color: 'text-warning' },
-          { label: 'Collected (this view)', value: formatCurrency(totalPaid), color: 'text-success' },
-          { label: 'Total invoices', value: String(total), color: 'text-on-surface' },
-        ].map((m) => (
-          <div key={m.label} className="rounded-lg border border-outline-variant bg-surface p-4">
-            <p className="text-xs uppercase tracking-wide text-on-surface-variant">{m.label}</p>
-            <p className={`mt-1 text-2xl font-bold ${m.color}`}>{m.value}</p>
-          </div>
-        ))}
-      </section>
+      <CRMToolbar>
+        <CRMFilterPills
+          value={statusFilter}
+          options={STATUS_FILTERS.map((s) => ({ value: s as string, label: s }))}
+          onChange={(value) => setStatusFilter(value)}
+        />
+      </CRMToolbar>
 
-      {/* Filters */}
-      <div className="flex gap-2">
-        {['ALL', 'DRAFT', 'SENT', 'PAID', 'OVERDUE', 'VOID'].map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setStatusFilter(s)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              statusFilter === s
-                ? 'bg-inverse-surface text-white'
-                : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
-
-      {/* Table */}
-      <section className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
+      <CRMTableShell>
         {invoicesQuery.isLoading ? (
           <TableSkeleton rows={8} cols={7} />
+        ) : invoicesQuery.isError ? (
+          <div className="p-5">
+            <CRMErrorState
+              title="Unable to load invoices"
+              description="The billing service did not respond. Try again in a moment."
+            />
+          </div>
         ) : invoices.length === 0 ? (
-          <EmptyState
-            icon="🧾"
+          <CRMEmptyState
+            icon={Receipt}
             title="No invoices found"
             description={
               statusFilter === 'ALL'
@@ -144,7 +168,7 @@ export default function InvoicesPage(): JSX.Element {
             }
           />
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[880px] text-sm">
             <thead className="bg-surface-container-low text-start text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
                 <th className="px-4 py-3">Invoice #</th>
@@ -166,9 +190,7 @@ export default function InvoicesPage(): JSX.Element {
                     {inv.accountId.slice(0, 10)}…
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLES[inv.status] ?? ''}`}>
-                      {inv.status}
-                    </span>
+                    <CRMStatusBadge tone={STATUS_TONES[inv.status] ?? 'slate'}>{inv.status}</CRMStatusBadge>
                   </td>
                   <td className="px-4 py-3 font-semibold text-on-surface">
                     {formatCurrency(parseFloat(inv.total), inv.currency)}
@@ -204,7 +226,7 @@ export default function InvoicesPage(): JSX.Element {
             </tbody>
           </table>
         )}
-      </section>
-    </main>
+      </CRMTableShell>
+    </CRMModuleShell>
   );
 }

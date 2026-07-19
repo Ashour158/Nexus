@@ -49,9 +49,20 @@ import { TableSkeleton } from '@/components/ui/skeleton';
 import { SavedViewsSidebar } from '@/components/saved-views-sidebar';
 import { ExportButton } from '@/components/export/ExportButton';
 import { ImportButton } from '@/components/export/ImportButton';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { ColumnChooser, useColumnVisibility } from '@/components/ui/column-chooser';
 import { EditableCell, EditableSelectCell } from '@/components/ui/editable-cell';
+import {
+  CRMEmptyState,
+  CRMErrorState,
+  CRMFilterPills,
+  CRMMetricCard,
+  CRMMetricGrid,
+  CRMPageHeader,
+  CRMSegmentedControl,
+  CRMStatusBadge,
+  CRMTableShell,
+  CRMToolbar,
+} from '@/components/ui/crm';
 
 const STATUS_COLUMNS: Array<{ id: LeadStatusLiteral; label: string; hint: string }> = [
   { id: 'NEW', label: 'New', hint: 'Fresh capture' },
@@ -74,12 +85,14 @@ function scoreColor(score: number): string {
   return 'bg-surface-container-highest text-on-surface-variant';
 }
 
-function statusClass(status: LeadStatusLiteral): string {
-  if (status === 'CONVERTED') return 'bg-success-container text-on-success-container ring-success/20';
-  if (status === 'QUALIFIED') return 'bg-primary-container text-on-primary-container ring-primary/20';
-  if (status === 'UNQUALIFIED') return 'bg-error-container text-on-error-container ring-error/20';
-  if (status === 'WORKING') return 'bg-warning-container text-on-warning-container ring-warning/20';
-  return 'bg-surface-container-high text-on-surface-variant ring-outline-variant';
+type BadgeTone = 'blue' | 'emerald' | 'amber' | 'orange' | 'rose' | 'slate';
+
+function statusTone(status: LeadStatusLiteral): BadgeTone {
+  if (status === 'CONVERTED') return 'emerald';
+  if (status === 'QUALIFIED') return 'blue';
+  if (status === 'UNQUALIFIED') return 'rose';
+  if (status === 'WORKING') return 'amber';
+  return 'slate';
 }
 
 function displayName(lead: Lead): string {
@@ -324,35 +337,34 @@ export default function LeadsPage(): ReactElement {
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-card">
-        <div className="grid lg:grid-cols-[1fr_360px]">
-          <div className="p-6 sm:p-8">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center gap-2 rounded-lg bg-primary-container px-3 py-2 text-xs font-bold uppercase tracking-wider text-primary">
-                <Target className="h-4 w-4" />
-                Lead command center
-              </span>
-              <span className="rounded-lg bg-surface-container-high px-3 py-2 text-xs font-semibold text-on-surface-variant">
-                Codes, routing, scoring, conversion
-              </span>
-            </div>
-            <h1 className="mt-5 text-3xl font-black tracking-tight text-on-surface sm:text-4xl">
-              Leads
-            </h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-on-surface-variant sm:text-base">
-              Capture prospects, qualify intent, assign ownership, and convert cleanly into accounts, contacts, and deals.
-            </p>
-          </div>
-          <div className="border-t border-outline-variant bg-surface-container-low p-5 lg:border-l lg:border-t-0">
-            <div className="grid grid-cols-2 gap-3">
-              <MetricCard icon={Users} label="Total leads" value={stats.total.toLocaleString()} note={`${leads.length} visible`} />
-              <MetricCard icon={CheckCircle2} label="Qualified" value={stats.qualified.toLocaleString()} note="ready handoff" />
-              <MetricCard icon={ListChecks} label="Working" value={stats.working.toLocaleString()} note="active follow-up" />
-              <MetricCard icon={Sparkles} label="Avg score" value={String(stats.averageScore)} note={`${stats.converted} converted`} />
-            </div>
-          </div>
-        </div>
-      </section>
+      <CRMPageHeader
+        eyebrow="Lead command center"
+        icon={Target}
+        title="Leads"
+        description="Capture prospects, qualify intent, assign ownership, and convert cleanly into accounts, contacts, and deals."
+        badges={
+          <span className="rounded-lg bg-surface-container-high px-3 py-2 text-xs font-semibold text-on-surface-variant">
+            Codes, routing, scoring, conversion
+          </span>
+        }
+        actions={
+          <Link
+            href="/leads/new"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary transition hover:opacity-90"
+          >
+            <UserPlus className="h-4 w-4" />
+            New Lead
+          </Link>
+        }
+        metrics={
+          <CRMMetricGrid>
+            <CRMMetricCard icon={Users} label="Total leads" value={stats.total.toLocaleString()} note={`${leads.length} visible`} />
+            <CRMMetricCard icon={CheckCircle2} label="Qualified" value={stats.qualified.toLocaleString()} note="ready handoff" tone="emerald" />
+            <CRMMetricCard icon={ListChecks} label="Working" value={stats.working.toLocaleString()} note="active follow-up" tone="amber" />
+            <CRMMetricCard icon={Sparkles} label="Avg score" value={String(stats.averageScore)} note={`${stats.converted} converted`} />
+          </CRMMetricGrid>
+        }
+      />
 
       <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="hidden xl:block">
@@ -368,119 +380,99 @@ export default function LeadsPage(): ReactElement {
         </aside>
 
         <div className="min-w-0 space-y-5">
-          <section className="rounded-xl border border-outline-variant bg-surface p-4 shadow-card">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter('ALL')}
-                  className={cn(
-                    'rounded-lg px-4 py-2 text-sm font-bold transition',
-                    statusFilter === 'ALL'
-                      ? 'bg-primary text-on-primary'
-                      : 'border border-outline-variant bg-surface text-on-surface-variant hover:bg-primary-container hover:text-primary'
-                  )}
-                >
-                  All
-                </button>
-                {STATUS_COLUMNS.map((status) => (
-                  <button
-                    key={status.id}
-                    type="button"
-                    onClick={() => setStatusFilter(status.id)}
-                    className={cn(
-                      'rounded-lg px-4 py-2 text-sm font-bold transition',
-                      statusFilter === status.id
-                        ? 'bg-primary text-on-primary'
-                        : 'border border-outline-variant bg-surface text-on-surface-variant hover:bg-primary-container hover:text-primary'
-                    )}
-                  >
-                    {status.label}
-                  </button>
-                ))}
-              </div>
+          <CRMToolbar>
+            <CRMFilterPills<'ALL' | LeadStatusLiteral>
+              value={statusFilter}
+              options={[
+                { value: 'ALL', label: 'All' },
+                ...STATUS_COLUMNS.map((status) => ({ value: status.id, label: status.label })),
+              ]}
+              onChange={setStatusFilter}
+            />
 
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                <label className="relative block min-w-0 lg:w-80">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
-                  <input
-                    type="search"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search name, company, email, code..."
-                    className="h-11 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-10 pr-3 text-sm outline-none transition focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
-                  />
-                </label>
-                <div className="flex flex-wrap items-center gap-2">
-                  <ColumnChooser
-                    allColumns={leadCols.allColumns}
-                    visibleKeys={leadCols.visibleKeys}
-                    onChange={leadCols.setVisibleKeys}
-                    onReset={leadCols.reset}
-                  />
-                  <ImportButton module="leads" onImported={() => void refetch()} />
-                  <ExportButton module="leads" filters={{ search, status: statusFilter }} />
-                  <Link
-                    href="/leads/new"
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary transition hover:opacity-90"
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    New Lead
-                  </Link>
-                </div>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+              <label className="relative block min-w-0 lg:w-80">
+                <span className="sr-only">Search leads</span>
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search name, company, email, code..."
+                  className="h-11 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-10 pr-3 text-sm text-on-surface outline-none transition focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
+                />
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <ColumnChooser
+                  allColumns={leadCols.allColumns}
+                  visibleKeys={leadCols.visibleKeys}
+                  onChange={leadCols.setVisibleKeys}
+                  onReset={leadCols.reset}
+                />
+                <ImportButton module="leads" onImported={() => void refetch()} />
+                <ExportButton module="leads" filters={{ search, status: statusFilter }} />
               </div>
             </div>
+          </CRMToolbar>
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant pt-4">
-              <div className="inline-flex overflow-hidden rounded-lg border border-outline-variant bg-surface">
-                <button
-                  type="button"
-                  className={cn(
-                    'inline-flex h-10 items-center gap-2 px-4 text-sm font-bold',
-                    viewMode === 'table' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container-low'
-                  )}
-                  onClick={() => setViewMode('table')}
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  Table
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    'inline-flex h-10 items-center gap-2 px-4 text-sm font-bold',
-                    viewMode === 'kanban' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container-low'
-                  )}
-                  onClick={() => setViewMode('kanban')}
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                  Kanban
-                </button>
-              </div>
-              <div className="inline-flex items-center gap-2 rounded-lg bg-surface-container-low px-3 py-2 text-xs font-semibold text-on-surface-variant">
-                <Filter className="h-4 w-4" />
-                {statusFilter === 'ALL' ? 'All statuses' : STATUS_COLUMNS.find((item) => item.id === statusFilter)?.label}
-              </div>
+          <CRMToolbar>
+            <CRMSegmentedControl<'table' | 'kanban'>
+              value={viewMode}
+              options={[
+                { value: 'table', label: 'Table', icon: BarChart3 },
+                { value: 'kanban', label: 'Kanban', icon: LayoutGrid },
+              ]}
+              onChange={setViewMode}
+            />
+            <div className="inline-flex items-center gap-2 rounded-lg bg-surface-container-low px-3 py-2 text-xs font-semibold text-on-surface-variant">
+              <Filter className="h-4 w-4" />
+              {statusFilter === 'ALL' ? 'All statuses' : STATUS_COLUMNS.find((item) => item.id === statusFilter)?.label}
             </div>
-          </section>
+          </CRMToolbar>
 
           {isLoading ? (
-            <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-card">
+            <CRMTableShell>
               <TableSkeleton rows={8} cols={8} />
-            </div>
+            </CRMTableShell>
           ) : isError ? (
-            <div className="rounded-xl border border-error/30 bg-error-container p-6 text-sm text-on-error-container">
-              Failed to load leads: {error instanceof Error ? error.message : 'Unknown error'}
-            </div>
+            <CRMErrorState
+              title="Failed to load leads"
+              description={error instanceof Error ? error.message : 'Unknown error'}
+              action={
+                <button
+                  type="button"
+                  onClick={() => void refetch()}
+                  className="inline-flex h-10 items-center rounded-lg border border-outline-variant bg-surface px-4 text-sm font-bold text-on-surface transition hover:bg-surface-container-low"
+                >
+                  Try again
+                </button>
+              }
+            />
           ) : leads.length === 0 ? (
-            <div className="rounded-xl border border-outline-variant bg-surface shadow-card">
-              <EmptyState
-                icon="target"
+            <CRMTableShell>
+              <CRMEmptyState
+                icon={Target}
                 title="No leads match this view"
                 description="Adjust the filters, import leads, or create a new lead to start the pipeline."
-                cta={{ label: 'Add Lead', href: '/leads/new' }}
-                secondaryCta={{ label: 'Import CSV', href: '/settings/migration' }}
+                action={
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <Link
+                      href="/leads/new"
+                      className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-on-primary transition hover:opacity-90"
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      Add Lead
+                    </Link>
+                    <Link
+                      href="/settings/migration"
+                      className="inline-flex h-11 items-center rounded-lg border border-outline-variant bg-surface px-4 text-sm font-bold text-on-surface transition hover:bg-surface-container-low"
+                    >
+                      Import CSV
+                    </Link>
+                  </div>
+                }
               />
-            </div>
+            </CRMTableShell>
           ) : viewMode === 'kanban' ? (
             <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
               <div className="flex gap-4 overflow-x-auto rounded-xl border border-outline-variant bg-surface p-4 shadow-card">
@@ -553,29 +545,6 @@ export default function LeadsPage(): ReactElement {
   );
 }
 
-function MetricCard({
-  icon: Icon,
-  label,
-  value,
-  note,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  note: string;
-}) {
-  return (
-    <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-card">
-      <div className="mb-3 inline-flex rounded-lg bg-primary-container p-2 text-primary">
-        <Icon className="h-4 w-4" />
-      </div>
-      <p className="text-2xl font-black text-on-surface">{value}</p>
-      <p className="mt-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant">{label}</p>
-      <p className="mt-1 text-xs text-on-surface-variant">{note}</p>
-    </div>
-  );
-}
-
 function LeadTable({
   leads,
   selectedSet,
@@ -634,8 +603,7 @@ function LeadTable({
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-card">
-        <div className="overflow-x-auto">
+      <CRMTableShell>
           <table className="w-full min-w-[1080px] text-left text-sm">
             <thead className="bg-surface-container-low text-xs font-bold uppercase tracking-wider text-on-surface-variant">
               <tr>
@@ -716,9 +684,7 @@ function LeadTable({
                         options={STATUS_OPTIONS}
                         onSave={(value) => updateLead(lead.id, { status: value as LeadStatusLiteral })}
                       >
-                        <span className={cn('inline-flex rounded px-2.5 py-1 text-xs font-bold ring-1', statusClass(lead.status))}>
-                          {lead.status}
-                        </span>
+                        <CRMStatusBadge tone={statusTone(lead.status)}>{lead.status}</CRMStatusBadge>
                       </EditableSelectCell>
                     </td>
                   ) : null}
@@ -763,8 +729,7 @@ function LeadTable({
               ))}
             </tbody>
           </table>
-        </div>
-      </div>
+      </CRMTableShell>
     </div>
   );
 }

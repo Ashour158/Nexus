@@ -19,6 +19,10 @@ interface SetSessionPayload {
   refreshToken?: string;
   userId: string;
   tenantId: string;
+  /** Non-secret identity metadata (same class as roles) used for UI display. */
+  email?: string;
+  /** Human-readable name shown in greetings/profile — never the raw user id. */
+  displayName?: string;
   roles?: string[];
   permissions?: string[];
 }
@@ -28,6 +32,8 @@ interface AuthState {
   refreshToken: string | null;
   userId: string | null;
   tenantId: string | null;
+  email: string | null;
+  displayName: string | null;
   roles: string[];
   permissions: string[];
   setSession: (payload: SetSessionPayload) => void;
@@ -55,14 +61,27 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       userId: null,
       tenantId: null,
+      email: null,
+      displayName: null,
       roles: [],
       permissions: [],
-      setSession: ({ accessToken, refreshToken, userId, tenantId, roles, permissions }) =>
+      setSession: ({
+        accessToken,
+        refreshToken,
+        userId,
+        tenantId,
+        email,
+        displayName,
+        roles,
+        permissions,
+      }) =>
         set({
           accessToken,
           refreshToken: refreshToken ?? get().refreshToken,
           userId,
           tenantId,
+          email: email ?? null,
+          displayName: displayName ?? null,
           roles: roles ?? [],
           permissions: permissions ?? [],
         }),
@@ -72,6 +91,8 @@ export const useAuthStore = create<AuthState>()(
           accessToken: null,
           userId: null,
           tenantId: null,
+          email: null,
+          displayName: null,
           roles: [],
           permissions: [],
         }),
@@ -119,6 +140,8 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         userId: state.userId,
         tenantId: state.tenantId,
+        email: state.email,
+        displayName: state.displayName,
         roles: state.roles,
         permissions: state.permissions,
       }),

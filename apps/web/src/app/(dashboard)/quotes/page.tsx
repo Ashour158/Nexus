@@ -2,10 +2,23 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { Archive, CheckCircle2, FileSignature, FileText, Hourglass } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePrompt } from '@/hooks/use-confirm';
 import { Input } from '@/components/ui/input';
 import { TableSkeleton } from '@/components/ui/skeleton';
+import {
+  CRMEmptyState,
+  CRMErrorState,
+  CRMMetricCard,
+  CRMMetricGrid,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMSegmentedControl,
+  CRMStatusBadge,
+  CRMTableShell,
+  CRMToolbar,
+} from '@/components/ui/crm';
 import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
 import { ExportButton } from '@/components/export/ExportButton';
 import {
@@ -88,6 +101,14 @@ export default function QuotesPage(): JSX.Element {
   }, [usersQuery.data]);
   const short = (id: string) => `${id.slice(0, 8)}…`;
 
+  // Page-local status counts for the header metrics. Cheap enough (<=25 rows)
+  // that memoizing would only add a dependency on a freshly-built array.
+  const rowStats = {
+    pendingApproval: rows.filter((q) => q.status === 'PENDING_APPROVAL').length,
+    accepted: rows.filter((q) => q.status === 'ACCEPTED').length,
+    draft: rows.filter((q) => q.status === 'DRAFT').length,
+  };
+
   const statusOptions = useMemo(
     () => ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'VOID'] as const,
     []
@@ -99,61 +120,78 @@ export default function QuotesPage(): JSX.Element {
 
   if (!isHydrated) {
     return (
-      <main className="space-y-4 px-6 py-6">
-        <TableSkeleton rows={8} cols={10} />
-      </main>
+      <CRMModuleShell className="space-y-6">
+        <CRMTableShell>
+          <TableSkeleton rows={8} cols={10} />
+        </CRMTableShell>
+      </CRMModuleShell>
     );
   }
 
   return (
-    <main className="space-y-4 px-6 py-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-on-surface">Quotes</h1>
-          <p className="text-sm text-on-surface-variant">Finance quote lifecycle and actions.</p>
-        </div>
-        <div className="inline-flex overflow-hidden rounded-md border border-outline-variant">
-          <button
-            type="button"
-            onClick={() => { setView('active'); setPage(1); }}
-            className={`px-3 py-1.5 text-sm font-medium ${view === 'active' ? 'bg-inverse-surface text-white' : 'bg-surface text-on-surface-variant hover:bg-surface-container-low'}`}
-          >
-            Active
-          </button>
-          <button
-            type="button"
-            onClick={() => { setView('archived'); setPage(1); }}
-            className={`px-3 py-1.5 text-sm font-medium ${view === 'archived' ? 'bg-inverse-surface text-white' : 'bg-surface text-on-surface-variant hover:bg-surface-container-low'}`}
-          >
-            Archived
-          </button>
-        </div>
-        <ExportButton module="quotes" filters={{ status, ownerId }} />
-        <SavedViewsControl
-          entityType="quote"
-          currentFilters={{ status, ownerId, dateFrom, dateTo }}
-          onApply={(f) => {
-            setStatus(typeof f.status === 'string' ? (f.status as Quote['status'] | '') : '');
-            setOwnerId(typeof f.ownerId === 'string' ? f.ownerId : '');
-            setDateFrom(typeof f.dateFrom === 'string' ? f.dateFrom : '');
-            setDateTo(typeof f.dateTo === 'string' ? f.dateTo : '');
+    <CRMModuleShell className="space-y-6">
+      <CRMPageHeader
+        eyebrow="Commercial"
+        icon={FileSignature}
+        title="Quotes"
+        description="The finance quote lifecycle — approve, send, duplicate, and void priced offers."
+        badges={
+          view === 'archived' ? (
+            <span className="rounded-lg bg-surface-container-high px-3 py-2 text-xs font-semibold text-on-surface-variant">
+              Viewing archived quotes
+            </span>
+          ) : null
+        }
+        actions={
+          <>
+            <ExportButton module="quotes" filters={{ status, ownerId }} />
+            <SavedViewsControl
+              entityType="quote"
+              currentFilters={{ status, ownerId, dateFrom, dateTo }}
+              onApply={(f) => {
+                setStatus(typeof f.status === 'string' ? (f.status as Quote['status'] | '') : '');
+                setOwnerId(typeof f.ownerId === 'string' ? f.ownerId : '');
+                setDateFrom(typeof f.dateFrom === 'string' ? f.dateFrom : '');
+                setDateTo(typeof f.dateTo === 'string' ? f.dateTo : '');
+                setPage(1);
+              }}
+            />
+            {canUseStandaloneQuoteBuilder ? (
+              <Link href="/quotes/new">
+                <Button type="button">Admin quote builder</Button>
+              </Link>
+            ) : (
+              <Link href="/rfqs">
+                <Button type="button">Start from RFQ</Button>
+              </Link>
+            )}
+          </>
+        }
+        metrics={
+          <CRMMetricGrid>
+            <CRMMetricCard icon={FileText} label="Total quotes" value={total} note="matching filters" />
+            <CRMMetricCard icon={Hourglass} label="Pending approval" value={rowStats.pendingApproval} note="on this page" tone="amber" />
+            <CRMMetricCard icon={CheckCircle2} label="Accepted" value={rowStats.accepted} note="on this page" tone="emerald" />
+            <CRMMetricCard icon={Archive} label="Drafts" value={rowStats.draft} note="on this page" tone="slate" />
+          </CRMMetricGrid>
+        }
+      />
+
+      <CRMToolbar>
+        <CRMSegmentedControl
+          value={view}
+          onChange={(next) => {
+            setView(next);
             setPage(1);
           }}
+          options={[
+            { value: 'active' as const, label: 'Active', icon: FileText },
+            { value: 'archived' as const, label: 'Archived', icon: Archive },
+          ]}
         />
-        {canUseStandaloneQuoteBuilder ? (
-          <Link href="/quotes/new">
-            <Button type="button">Admin quote builder</Button>
-          </Link>
-        ) : (
-          <Link href="/rfqs">
-            <Button type="button">Start from RFQ</Button>
-          </Link>
-        )}
-      </header>
 
-      <section className="rounded-lg border border-outline-variant bg-surface p-4">
-        <div className="grid gap-3 md:grid-cols-4">
-          <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
+        <div className="grid w-full gap-3 md:grid-cols-4 xl:max-w-3xl">
+          <label className="space-y-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
             <span>Status</span>
             <select
               value={status}
@@ -161,7 +199,7 @@ export default function QuotesPage(): JSX.Element {
                 setStatus(e.target.value as Quote['status'] | '');
                 setPage(1);
               }}
-              className="h-9 w-full rounded-md border border-outline-variant bg-surface px-3 text-sm normal-case text-on-surface"
+              className="h-10 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 text-sm normal-case text-on-surface outline-none transition focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
             >
               <option value="">All</option>
               {statusOptions.map((s) => (
@@ -172,28 +210,39 @@ export default function QuotesPage(): JSX.Element {
             </select>
           </label>
 
-          <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
+          <label className="space-y-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
             <span>Owner ID</span>
             <Input value={ownerId} onChange={(e) => setOwnerId(e.target.value)} placeholder="cuid..." />
           </label>
 
-          <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
+          <label className="space-y-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
             <span>Date from</span>
             <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
           </label>
 
-          <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
+          <label className="space-y-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
             <span>Date to</span>
             <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </label>
         </div>
-      </section>
+      </CRMToolbar>
 
-      <section className="overflow-x-auto rounded-lg border border-outline-variant bg-surface">
+      <CRMTableShell>
         {query.isLoading ? (
           <TableSkeleton rows={8} cols={10} />
         ) : query.isError ? (
-          <div className="p-4 text-sm text-error">Failed to load quotes.</div>
+          <div className="p-5">
+            <CRMErrorState
+              title="Unable to load quotes"
+              description="The finance service did not respond. Try again in a moment."
+            />
+          </div>
+        ) : rows.length === 0 ? (
+          <CRMEmptyState
+            icon={FileSignature}
+            title="No quotes found"
+            description="No quotes match the current filters. Adjust the status, owner, or date range."
+          />
         ) : (
           <table className="min-w-full text-sm">
             <thead className="bg-surface-container-low text-xs uppercase tracking-wide text-on-surface-variant">
@@ -214,20 +263,20 @@ export default function QuotesPage(): JSX.Element {
               {rows.map((q) => (
                 <tr key={q.id} className="border-t border-outline-variant">
                   <td className="px-3 py-2 font-medium">
-                    <Link href={`/quotes/${q.id}`} className="text-brand-700 hover:underline">
+                    <Link href={`/quotes/${q.id}`} className="font-semibold text-primary hover:underline">
                       {q.quoteNumber || q.id.slice(0, 8)}
                     </Link>
                   </td>
                   <td className="px-3 py-2">
                     {q.accountId ? (
-                      <Link href={`/accounts/${q.accountId}`} className="text-brand-700 hover:underline">
+                      <Link href={`/accounts/${q.accountId}`} className="font-semibold text-primary hover:underline">
                         {accountName.get(q.accountId) ?? short(q.accountId)}
                       </Link>
                     ) : '—'}
                   </td>
                   <td className="px-3 py-2">
                     {(q as { contactId?: string }).contactId ? (
-                      <Link href={`/contacts/${(q as { contactId?: string }).contactId}`} className="text-brand-700 hover:underline">
+                      <Link href={`/contacts/${(q as { contactId?: string }).contactId}`} className="font-semibold text-primary hover:underline">
                         {contactName.get((q as { contactId: string }).contactId) ?? short((q as { contactId: string }).contactId)}
                       </Link>
                     ) : <span className="text-on-surface-variant">—</span>}
@@ -277,20 +326,13 @@ export default function QuotesPage(): JSX.Element {
                   </td>
                 </tr>
               ))}
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-3 py-10 text-center text-sm text-on-surface-variant">
-                    No quotes found for current filters.
-                  </td>
-                </tr>
-              ) : null}
             </tbody>
           </table>
         )}
-      </section>
+      </CRMTableShell>
 
       {PromptDialog}
-      <footer className="flex items-center justify-between text-sm">
+      <footer className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-outline-variant bg-surface px-4 py-3 text-sm shadow-card">
         <p className="text-on-surface-variant">
           {rows.length} shown / {total} total
         </p>
@@ -311,7 +353,7 @@ export default function QuotesPage(): JSX.Element {
           </Button>
         </div>
       </footer>
-    </main>
+    </CRMModuleShell>
   );
 }
 
@@ -321,31 +363,24 @@ function ApprovalCell({ quote }: { quote: Quote }) {
   const cur = q.approvalLevel ?? 0;
   if (!req && !q.approvalRequired) return <span className="text-xs text-on-surface-variant">—</span>;
   if (req && cur >= req) {
-    return <span className="rounded-full bg-success-container px-2 py-0.5 text-xs font-semibold text-on-success-container">Approved</span>;
+    return <CRMStatusBadge tone="emerald">Approved</CRMStatusBadge>;
   }
-  return (
-    <span className="rounded-full bg-warning-container px-2 py-0.5 text-xs font-semibold text-on-warning-container">
-      {req ? `L${cur}/${req} pending` : 'Pending'}
-    </span>
-  );
+  return <CRMStatusBadge tone="amber">{req ? `L${cur}/${req} pending` : 'Pending'}</CRMStatusBadge>;
 }
 
+const QUOTE_STATUS_TONES: Record<Quote['status'], 'blue' | 'emerald' | 'amber' | 'orange' | 'rose' | 'slate'> = {
+  DRAFT: 'slate',
+  SENT: 'blue',
+  ACCEPTED: 'emerald',
+  REJECTED: 'rose',
+  EXPIRED: 'amber',
+  VOID: 'slate',
+  PENDING_APPROVAL: 'amber',
+  APPROVED: 'emerald',
+  VIEWED: 'orange',
+  CONVERTED: 'blue',
+};
+
 function StatusPill({ status }: { status: Quote['status'] }) {
-  const cls: Record<Quote['status'], string> = {
-    DRAFT: 'bg-surface-container-high text-on-surface',
-    SENT: 'bg-primary-container text-on-primary-container',
-    ACCEPTED: 'bg-success-container text-on-success-container',
-    REJECTED: 'bg-error-container text-on-error-container',
-    EXPIRED: 'bg-warning-container text-on-warning-container',
-    VOID: 'bg-surface-container-highest text-on-surface',
-    PENDING_APPROVAL: 'bg-warning-container text-on-warning-container',
-    APPROVED: 'bg-success-container text-on-success-container',
-    VIEWED: 'bg-info-container text-on-info-container',
-    CONVERTED: 'bg-primary-container text-on-primary-container',
-  };
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${cls[status]}`}>
-      {status}
-    </span>
-  );
+  return <CRMStatusBadge tone={QUOTE_STATUS_TONES[status] ?? 'slate'}>{status}</CRMStatusBadge>;
 }

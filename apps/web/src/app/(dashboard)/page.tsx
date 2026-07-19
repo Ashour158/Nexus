@@ -177,7 +177,10 @@ function Panel({
 }
 
 export default function DashboardPage() {
-  const userId = useAuthStore((s) => s.userId) ?? 'teammate';
+  // Greet with a human-readable identity — never the opaque `userId` cuid.
+  const displayName = useAuthStore((s) => s.displayName);
+  const email = useAuthStore((s) => s.email);
+  const greetingName = displayName || email || 'there';
 
   const {
     data: stats,
@@ -433,7 +436,7 @@ export default function DashboardPage() {
             Sales Overview
           </h1>
           <p className="mt-2 text-base text-on-surface-variant">
-            Welcome back, {userId.split(/[._-]/)[0]} — live pipeline &amp; revenue insights
+            Welcome back, {greetingName} — live pipeline &amp; revenue insights
           </p>
         </div>
         <Link

@@ -29,6 +29,8 @@ type NavItem = {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   adminOnly?: boolean;
+  /** True when the System Map classifies this module as `preview`. */
+  preview?: boolean;
 };
 
 type NavGroup = {
@@ -36,6 +38,23 @@ type NavGroup = {
   icon: React.ComponentType<{ className?: string }>;
   items: NavItem[];
 };
+
+/**
+ * Quiet lifecycle label distinguishing Preview modules from operationally-ready
+ * ones. Deliberately subdued — tertiary tonal pair rather than warning/error —
+ * because this is information, not an alarm. The literal word "Preview" is part
+ * of the accessible name, so the meaning is never colour-only (WCAG 1.4.1).
+ */
+function PreviewPill() {
+  return (
+    <span
+      className="pill shrink-0 bg-tertiary-container px-1.5 py-0 text-[10px] font-medium uppercase tracking-wide text-on-tertiary-container opacity-80"
+      title="Preview — not yet operationally complete"
+    >
+      Preview
+    </span>
+  );
+}
 
 // Admin consolidation: the many leaf links that used to live under the
 // "Administration" and "Configuration & Data" groups now live inside the single
@@ -54,6 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
         label: module.label,
         icon: module.icon,
         adminOnly: module.adminOnly,
+        preview: module.status === 'preview',
       })),
   })),
   {
@@ -70,8 +90,11 @@ const NAV_GROUPS: NavGroup[] = [
 export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps): ReactElement {
   const pathname = usePathname() ?? '/';
   const toggle = useUiStore((s) => s.toggleSidebar);
-  const userId = useAuthStore((s) => s.userId);
+  const displayName = useAuthStore((s) => s.displayName);
+  const email = useAuthStore((s) => s.email);
   const tenantId = useAuthStore((s) => s.tenantId);
+  // Human-readable identity only — never the opaque `userId` cuid.
+  const identityLabel = displayName || email || 'User';
   // Admin nav visibility must accept SUPER_ADMIN (and the `*` permission), not
   // just a literal 'admin' role — otherwise the super admin loses admin nav.
   const userIsAdmin = useAuthStore((s) => s.isAdmin)();
@@ -79,10 +102,29 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps): ReactEleme
   const isActive = (href: string) =>
     pathname === href || (href !== '/' && pathname.startsWith(`${href}/`));
 
+  /**
+   * Progressive disclosure: a first-time user should not meet all 60+ modules
+   * at once. Default expansion is therefore narrow — a group opens by default
+   * ONLY when it contains the active route. Everything else (including any
+   * group made up entirely of Preview modules, which is never a starting point)
+   * stays collapsed until the user opens it. No navigation is removed; this is
+   * purely the default disclosure state, and every group is one click away.
+   */
+  const defaultExpanded = (group: NavGroup): boolean => {
+    // The group holding the active route always wins — the user is already
+    // there, so it must be expanded (this outranks the preview rule below,
+    // otherwise the current location would be hidden from its own nav).
+    if (group.items.some((item) => isActive(item.href))) return true;
+    // An all-Preview group is never a sensible starting point: stays collapsed.
+    if (group.items.every((item) => item.preview)) return false;
+    // Every other group collapses by default too.
+    return false;
+  };
+
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     NAV_GROUPS.forEach((g) => {
-      initial[g.label] = g.items.some((item) => isActive(item.href));
+      initial[g.label] = defaultExpanded(g);
     });
     return initial;
   });
@@ -201,7 +243,8 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps): ReactEleme
                         aria-current={active ? 'page' : undefined}
                       >
                         <Icon className="h-4 w-4 shrink-0" />
-                        {item.label}
+                        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                        {item.preview ? <PreviewPill /> : null}
                       </Link>
                     );
                   })}
@@ -220,11 +263,9 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps): ReactEleme
             New Record
           </Link>
           <div className="mt-6 flex items-center gap-3 px-2">
-            <Avatar name={userId ?? 'User'} size="md" />
+            <Avatar name={identityLabel} size="md" />
             <div className="min-w-0 overflow-hidden">
-              <p className="truncate text-sm font-bold text-on-surface">
-                {userId ?? 'User'}
-              </p>
+              <p className="truncate text-sm font-bold text-on-surface">{identityLabel}</p>
               <p className="truncate text-xs text-on-surface-variant">
                 {userIsAdmin ? 'Administrator' : tenantId ?? 'Default Tenant'}
               </p>

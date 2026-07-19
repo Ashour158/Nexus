@@ -2,10 +2,20 @@
 
 import { useMemo, useState } from 'react';
 import { Calendar, CalendarDays, CheckCircle2, FileText, List, Mail, MessageSquare, Phone, Clock, AlertCircle, Plus } from 'lucide-react';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { ActivityCalendar } from '@/components/activities/ActivityCalendar';
+import {
+  CRMEmptyState,
+  CRMErrorState,
+  CRMFilterPills,
+  CRMMetricCard,
+  CRMMetricGrid,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMSegmentedControl,
+  CRMStatusBadge,
+  CRMToolbar,
+} from '@/components/ui/crm';
 import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
-import { cn } from '@/lib/cn';
 import { ExportButton } from '@/components/export/ExportButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -77,17 +87,20 @@ const TYPE_LABELS: Record<string, string> = {
   TASK: 'Task',
 };
 
-const PRIORITY_COLORS: Record<string, string> = {
-  HIGH: 'bg-error-container text-error',
-  NORMAL: 'bg-primary-container text-primary',
-  LOW: 'bg-surface-container-high text-on-surface',
+type BadgeTone = 'blue' | 'emerald' | 'amber' | 'orange' | 'rose' | 'slate';
+
+const PRIORITY_TONES: Record<string, BadgeTone> = {
+  URGENT: 'rose',
+  HIGH: 'rose',
+  NORMAL: 'blue',
+  LOW: 'slate',
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  TODO: 'bg-surface-container-high text-on-surface-variant',
-  IN_PROGRESS: 'bg-warning-container text-warning',
-  DONE: 'bg-success-container text-success',
-  CANCELLED: 'bg-surface-container-high text-on-surface-variant',
+const STATUS_TONES: Record<string, BadgeTone> = {
+  TODO: 'slate',
+  IN_PROGRESS: 'amber',
+  DONE: 'emerald',
+  CANCELLED: 'slate',
 };
 
 function isOverdue(activity: ActivityItem): boolean {
@@ -126,6 +139,16 @@ export default function ActivitiesPage() {
   const calendarActivities = useMemo(
     () => (calendarQuery.data?.data ?? []) as ActivityItem[],
     [calendarQuery.data]
+  );
+
+  const stats = useMemo(
+    () => ({
+      shown: activities.length,
+      overdue: activities.filter((a) => isOverdue(a)).length,
+      done: activities.filter((a) => a.status === 'DONE').length,
+      open: activities.filter((a) => a.status !== 'DONE' && a.status !== 'CANCELLED').length,
+    }),
+    [activities]
   );
 
   const openCreate = () => {
@@ -174,54 +197,55 @@ export default function ActivitiesPage() {
     }
   };
 
-  const tabs: { id: ActivityTab; label: string; icon: React.ReactNode }[] = [
-    { id: 'all', label: 'All', icon: <FileText className="h-3.5 w-3.5" /> },
-    { id: 'mine', label: 'My Activities', icon: <MessageSquare className="h-3.5 w-3.5" /> },
-    { id: 'overdue', label: 'Overdue', icon: <AlertCircle className="h-3.5 w-3.5" /> },
-    { id: 'upcoming', label: 'Upcoming (7d)', icon: <Clock className="h-3.5 w-3.5" /> },
+  const tabs: { value: ActivityTab; label: string }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'mine', label: 'My Activities' },
+    { value: 'overdue', label: 'Overdue' },
+    { value: 'upcoming', label: 'Upcoming (7d)' },
   ];
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-on-surface">Activity Feed</h1>
-        <div className="flex items-center gap-3">
-          <div className="inline-flex rounded-lg border border-outline-variant p-0.5">
-            <button
-              type="button"
-              onClick={() => setView('list')}
-              aria-pressed={view === 'list'}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
-                view === 'list' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'
-              )}
-            >
-              <List className="h-4 w-4" /> List
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('calendar')}
-              aria-pressed={view === 'calendar'}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
-                view === 'calendar' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'
-              )}
-            >
-              <CalendarDays className="h-4 w-4" /> Calendar
-            </button>
-          </div>
-          <ExportButton module="activities" />
-          <SavedViewsControl
-            entityType="activity"
-            currentFilters={{ tab }}
-            onApply={(f) => setTab((f.tab as ActivityTab) ?? 'all')}
-          />
-          <Button onClick={openCreate}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            New activity
-          </Button>
-        </div>
-      </div>
+    <CRMModuleShell className="mx-auto max-w-5xl space-y-6">
+      <CRMPageHeader
+        eyebrow="Engagement"
+        icon={CalendarDays}
+        title="Activity Feed"
+        description="Calls, emails, meetings, and tasks across your records — with what is overdue surfaced first."
+        actions={
+          <>
+            <ExportButton module="activities" />
+            <SavedViewsControl
+              entityType="activity"
+              currentFilters={{ tab }}
+              onApply={(f) => setTab((f.tab as ActivityTab) ?? 'all')}
+            />
+            <Button onClick={openCreate}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              New activity
+            </Button>
+          </>
+        }
+        metrics={
+          <CRMMetricGrid>
+            <CRMMetricCard icon={FileText} label="In view" value={stats.shown} note="current filter" />
+            <CRMMetricCard icon={Clock} label="Open" value={stats.open} note="not yet closed" tone="blue" />
+            <CRMMetricCard icon={AlertCircle} label="Overdue" value={stats.overdue} note="past due date" tone="rose" />
+            <CRMMetricCard icon={CheckCircle2} label="Completed" value={stats.done} note="marked done" tone="emerald" />
+          </CRMMetricGrid>
+        }
+      />
+
+      <CRMToolbar>
+        <CRMSegmentedControl
+          value={view}
+          onChange={setView}
+          options={[
+            { value: 'list' as const, label: 'List', icon: List },
+            { value: 'calendar' as const, label: 'Calendar', icon: CalendarDays },
+          ]}
+        />
+        {view === 'list' ? <CRMFilterPills value={tab} options={tabs} onChange={setTab} /> : null}
+      </CRMToolbar>
 
       {view === 'calendar' ? (
         <ActivityCalendar
@@ -240,27 +264,17 @@ export default function ActivitiesPage() {
         />
       ) : (
         <>
-      <div className="mb-4 flex flex-wrap gap-2">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-              tab === t.id ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'
-            }`}
-          >
-            {t.icon}
-            {t.label}
-          </button>
-        ))}
-      </div>
-
       {activitiesQuery.isLoading ? (
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="h-20 animate-pulse rounded-xl bg-surface-container-high" />
           ))}
         </div>
+      ) : activitiesQuery.isError ? (
+        <CRMErrorState
+          title="Unable to load activities"
+          description="The activity service did not respond. Try again in a moment."
+        />
       ) : (
         <div className="space-y-3">
           {activities.map((act) => {
@@ -277,18 +291,10 @@ export default function ActivitiesPage() {
                 <div className="mt-0.5 rounded-lg bg-surface-container-low p-2">{icon}</div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium text-on-surface">{act.subject}</p>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${PRIORITY_COLORS[act.priority] ?? PRIORITY_COLORS.NORMAL}`}>
-                      {act.priority}
-                    </span>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${STATUS_COLORS[act.status] ?? STATUS_COLORS.TODO}`}>
-                      {act.status}
-                    </span>
-                    {overdue && (
-                      <span className="rounded-full bg-error-container px-2 py-0.5 text-[10px] font-semibold text-error">
-                        Overdue
-                      </span>
-                    )}
+                    <p className="text-sm font-semibold text-on-surface">{act.subject}</p>
+                    <CRMStatusBadge tone={PRIORITY_TONES[act.priority] ?? 'blue'}>{act.priority}</CRMStatusBadge>
+                    <CRMStatusBadge tone={STATUS_TONES[act.status] ?? 'slate'}>{act.status}</CRMStatusBadge>
+                    {overdue && <CRMStatusBadge tone="rose">Overdue</CRMStatusBadge>}
                   </div>
                   <p className="mt-1 text-xs text-on-surface-variant">
                     {typeLabel}
@@ -326,11 +332,19 @@ export default function ActivitiesPage() {
             );
           })}
           {activities.length === 0 && (
-            <EmptyState
-              icon="📋"
-              title="No activities found"
-              description={tab === 'overdue' ? 'Nothing overdue — great job!' : 'Log calls, emails, and meetings to track your engagement.'}
-            />
+            <div className="rounded-xl border border-outline-variant bg-surface shadow-card">
+              <CRMEmptyState
+                icon={CalendarDays}
+                title="No activities found"
+                description={tab === 'overdue' ? 'Nothing overdue — great job!' : 'Log calls, emails, and meetings to track your engagement.'}
+                action={
+                  <Button onClick={openCreate}>
+                    <Plus className="mr-1.5 h-4 w-4" />
+                    New activity
+                  </Button>
+                }
+              />
+            </div>
           )}
         </div>
       )}
@@ -422,6 +436,6 @@ export default function ActivitiesPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </CRMModuleShell>
   );
 }

@@ -6,6 +6,7 @@ import { Toaster } from 'sonner';
 import { useUiStore } from '@/stores/ui.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { connectSocket, disconnectSocket } from '@/lib/socket';
+import { SessionKeeper } from '@/components/auth/session-keeper';
 
 /**
  * Top-level client providers — React Query + global toast rendering.
@@ -30,6 +31,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <DevAuthBootstrap />
+      <SessionKeeper />
       <RealtimeBridge />
       {children}
       <Toaster
@@ -82,6 +84,8 @@ function DevAuthBootstrap() {
       accessToken: 'dev-preview-token',
       userId: 'dev.admin@nexus.local',
       tenantId: 'default',
+      email: 'dev.admin@nexus.local',
+      displayName: 'Dev Admin',
       roles: ['admin'],
       permissions: ['*'],
     });

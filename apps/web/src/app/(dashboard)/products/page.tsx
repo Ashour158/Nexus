@@ -2,12 +2,24 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Boxes, CheckCircle2, Factory, Layers, Package, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { ExportButton } from '@/components/export/ExportButton';
+import {
+  CRMCard,
+  CRMEmptyState,
+  CRMErrorState,
+  CRMMetricCard,
+  CRMMetricGrid,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMSegmentedControl,
+  CRMStatusBadge,
+  CRMTableShell,
+  CRMToolbar,
+} from '@/components/ui/crm';
 
 type Product = {
   id: string;
@@ -169,6 +181,7 @@ export default function ProductsPage(): JSX.Element {
   const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
   const kits = useMemo(() => kitsQuery.data ?? [], [kitsQuery.data]);
   const vendors = useMemo(() => vendorsQuery.data ?? [], [vendorsQuery.data]);
+  const activeProducts = useMemo(() => products.filter((p) => p.isActive ?? true).length, [products]);
 
   function openCreate() {
     setEditing(null);
@@ -221,34 +234,46 @@ export default function ProductsPage(): JSX.Element {
   }
 
   return (
-    <main className="space-y-4 p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-on-surface">Catalog</h1>
-        <div className="flex items-center gap-2">
-          {tab === 'products' ? <ExportButton module="products" /> : null}
-          {tab === 'products' && canCreate ? (
-            <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" /> New Product
-            </Button>
-          ) : null}
-        </div>
-      </div>
-      <div className="flex gap-2">
-        {(['products', 'kits', 'vendors'] as const).map((key) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`rounded-lg px-3 py-1.5 text-sm ${
-              tab === key ? 'bg-primary text-white' : 'bg-surface-container-high'
-            }`}
-          >
-            {key === 'products' ? 'Products' : key === 'kits' ? 'Kits' : 'Vendors'}
-          </button>
-        ))}
-      </div>
+    <CRMModuleShell className="space-y-6">
+      <CRMPageHeader
+        eyebrow="Catalog"
+        icon={Package}
+        title="Catalog"
+        description="Priced products, bundled kits, and supplying vendors that quotes and orders draw from."
+        actions={
+          <>
+            {tab === 'products' ? <ExportButton module="products" /> : null}
+            {tab === 'products' && canCreate ? (
+              <Button onClick={openCreate}>
+                <Plus className="h-4 w-4" /> New Product
+              </Button>
+            ) : null}
+          </>
+        }
+        metrics={
+          <CRMMetricGrid>
+            <CRMMetricCard icon={Boxes} label="Products" value={products.length} note="in catalog" />
+            <CRMMetricCard icon={CheckCircle2} label="Active" value={activeProducts} note="sellable items" tone="emerald" />
+            <CRMMetricCard icon={Layers} label="Kits" value={kits.length} note="bundled offers" tone="orange" />
+            <CRMMetricCard icon={Factory} label="Vendors" value={vendors.length} note="supplying partners" tone="amber" />
+          </CRMMetricGrid>
+        }
+      />
+
+      <CRMToolbar>
+        <CRMSegmentedControl
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'products', label: 'Products', icon: Boxes },
+            { value: 'kits', label: 'Kits', icon: Layers },
+            { value: 'vendors', label: 'Vendors', icon: Factory },
+          ]}
+        />
+      </CRMToolbar>
 
       {tab === 'products' ? (
-        <section className="overflow-x-auto rounded-xl border border-outline-variant bg-surface">
+        <CRMTableShell>
           {productsQuery.isLoading ? (
             <div className="space-y-2 p-4">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -256,11 +281,16 @@ export default function ProductsPage(): JSX.Element {
               ))}
             </div>
           ) : productsQuery.isError ? (
-            <div className="p-6 text-center text-sm text-error">
-              Could not load products.{' '}
-              <button className="underline" onClick={() => void productsQuery.refetch()}>
-                Retry
-              </button>
+            <div className="p-5">
+              <CRMErrorState
+                title="Unable to load products"
+                description="The catalog service did not respond."
+                action={
+                  <Button variant="secondary" onClick={() => void productsQuery.refetch()}>
+                    Retry
+                  </Button>
+                }
+              />
             </div>
           ) : (
             <table className="min-w-full text-sm">
@@ -290,7 +320,11 @@ export default function ProductsPage(): JSX.Element {
                     <td className="px-3 py-2">
                       {p.currency} {Number(p.listPrice ?? 0).toFixed(2)}
                     </td>
-                    <td className="px-3 py-2">{(p.isActive ?? true) ? 'Active' : 'Archived'}</td>
+                    <td className="px-3 py-2">
+                      <CRMStatusBadge tone={(p.isActive ?? true) ? 'emerald' : 'slate'}>
+                        {(p.isActive ?? true) ? 'Active' : 'Archived'}
+                      </CRMStatusBadge>
+                    </td>
                     {canUpdate || canDelete ? (
                       <td className="px-3 py-2">
                         <div className="flex items-center justify-end gap-1">
@@ -319,12 +353,18 @@ export default function ProductsPage(): JSX.Element {
                 ))}
                 {products.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8">
-                      <EmptyState
-                        icon="📦"
+                    <td colSpan={5}>
+                      <CRMEmptyState
+                        icon={Package}
                         title="No products yet"
                         description="Build your catalog so quotes and orders can reference priced items."
-                        cta={canCreate ? { label: 'Add your first product', onClick: openCreate } : undefined}
+                        action={
+                          canCreate ? (
+                            <Button onClick={openCreate}>
+                              <Plus className="h-4 w-4" /> Add your first product
+                            </Button>
+                          ) : undefined
+                        }
                       />
                     </td>
                   </tr>
@@ -332,35 +372,44 @@ export default function ProductsPage(): JSX.Element {
               </tbody>
             </table>
           )}
-        </section>
+        </CRMTableShell>
       ) : null}
 
       {tab === 'kits' ? (
-        <section className="rounded-xl border border-outline-variant bg-surface">
-          <ul>
-            {kits.map((k) => (
-              <li key={k.id} className="border-t px-4 py-3 first:border-t-0">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{k.name}</span>
-                  <span className="text-xs text-on-surface-variant">{k.currency} {Number(k.listPrice ?? 0).toFixed(2)} · {(k.items as unknown[])?.length ?? 0} items</span>
-                </div>
-              </li>
-            ))}
-            {kits.length === 0 ? <li className="px-4 py-6 text-center text-sm text-on-surface-variant">No product kits found.</li> : null}
-          </ul>
-        </section>
+        <CRMCard title="Product kits" description="Bundled offers priced as a single catalog item." padded={false}>
+          {kits.length === 0 ? (
+            <CRMEmptyState
+              icon={Layers}
+              title="No product kits found"
+              description="Kits group several products into one priced bundle."
+            />
+          ) : (
+            <ul className="divide-y divide-outline-variant">
+              {kits.map((k) => (
+                <li key={k.id} className="px-5 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-semibold text-on-surface">{k.name}</span>
+                    <span className="text-xs text-on-surface-variant">
+                      {k.currency} {Number(k.listPrice ?? 0).toFixed(2)} · {(k.items as unknown[])?.length ?? 0} items
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CRMCard>
       ) : null}
 
       {tab === 'vendors' ? (
-        <section className="overflow-x-auto rounded-xl border border-outline-variant bg-surface">
+        <CRMTableShell>
           <table className="min-w-full text-sm">
             <thead className="bg-surface-container-low text-start text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
-                <th className="px-3 py-2">Vendor</th>
-                <th className="px-3 py-2">Code</th>
-                <th className="px-3 py-2">Currency</th>
-                <th className="px-3 py-2">Products</th>
-                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2 text-start">Vendor</th>
+                <th className="px-3 py-2 text-start">Code</th>
+                <th className="px-3 py-2 text-start">Currency</th>
+                <th className="px-3 py-2 text-start">Products</th>
+                <th className="px-3 py-2 text-start">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -370,19 +419,27 @@ export default function ProductsPage(): JSX.Element {
                   <td className="px-3 py-2">{vendor.code ?? '-'}</td>
                   <td className="px-3 py-2">{vendor.currency}</td>
                   <td className="px-3 py-2">{vendor.products?.length ?? 0}</td>
-                  <td className="px-3 py-2">{vendor.isActive ? 'Active' : 'Inactive'}</td>
+                  <td className="px-3 py-2">
+                    <CRMStatusBadge tone={vendor.isActive ? 'emerald' : 'slate'}>
+                      {vendor.isActive ? 'Active' : 'Inactive'}
+                    </CRMStatusBadge>
+                  </td>
                 </tr>
               ))}
               {vendors.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-on-surface-variant">
-                    No vendors found.
+                  <td colSpan={5}>
+                    <CRMEmptyState
+                      icon={Factory}
+                      title="No vendors found"
+                      description="Vendors supply the products you resell through quotes and orders."
+                    />
                   </td>
                 </tr>
               ) : null}
             </tbody>
           </table>
-        </section>
+        </CRMTableShell>
       ) : null}
 
       <Modal
@@ -506,7 +563,7 @@ export default function ProductsPage(): JSX.Element {
           </div>
         </div>
       </Modal>
-    </main>
+    </CRMModuleShell>
   );
 }
 

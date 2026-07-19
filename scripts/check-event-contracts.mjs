@@ -732,7 +732,6 @@ export async function run(argv = process.argv.slice(2)) {
   const sourceRoot = resolve(options.root, 'services');
   const files = (await walk(sourceRoot)).filter((file) =>
     /\.[cm]?[jt]sx?$/.test(file) &&
-    !file.includes(`${sep}analytics-service${sep}`) &&
     !/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file));
   const extracted = [];
   const constantsByService = new Map();

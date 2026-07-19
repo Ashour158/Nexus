@@ -146,6 +146,19 @@ test('accepts a positive direct boot contract', async () => {
   await rm(directory, { recursive: true, force: true });
 });
 
+test('includes analytics-service in the repository contract scan', async () => {
+  const { directory, result } = await runFixture({
+    'services/producer/src/index.ts': `producer.publish(TOPICS.PAYMENTS, { type: 'analytics.payment', tenantId: 't' });\n`,
+    'services/analytics-service/src/index.ts': `
+      const consumer = new NexusConsumer('analytics');
+      consumer.on('analytics.payment', async () => undefined);
+      await consumer.subscribe([TOPICS.PAYMENTS]);
+    `,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  await rm(directory, { recursive: true, force: true });
+});
+
 test('extracts a transactional outbox row using a TOPICS constant', async () => {
   const { directory, result } = await runFixture({
     'services/producer/src/index.ts': `

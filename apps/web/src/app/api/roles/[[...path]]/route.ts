@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL ?? 'http://localhost:3000/api/v1';
+// Server-side: reach auth-service by its internal URL (NEXT_PUBLIC_AUTH_URL is
+// the browser-relative `/bff/auth` in prod and would fail a server fetch).
+const AUTH_URL = process.env.AUTH_SERVICE_URL
+  ? `${process.env.AUTH_SERVICE_URL}/api/v1`
+  : process.env.NEXT_PUBLIC_AUTH_URL ?? 'http://localhost:3000/api/v1';
 
 async function proxy(req: NextRequest, { params }: { params: { path?: string[] } }, method: string) {
   const auth = req.headers.get('authorization');

@@ -8,7 +8,9 @@ import {
   validateDevObject,
 } from '@/lib/server/dev-preview-data';
 
-const CRM_URL = process.env.NEXT_PUBLIC_CRM_URL ?? 'http://localhost:3001/api/v1';
+const CRM_URL = process.env.CRM_SERVICE_URL
+  ? `${process.env.CRM_SERVICE_URL}/api/v1`
+  : process.env.NEXT_PUBLIC_CRM_URL ?? 'http://localhost:3001/api/v1';
 
 function parseCsv(text: string) {
   const rows: string[][] = [];

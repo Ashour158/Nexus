@@ -16,7 +16,14 @@ import {
  * flow through the existing deals/leads proxies and are NOT handled here.
  */
 
-const CRM_URL = process.env.NEXT_PUBLIC_CRM_URL ?? 'http://localhost:3001/api/v1';
+// This handler runs SERVER-SIDE, so it must reach crm-service by its internal
+// URL. NEXT_PUBLIC_CRM_URL is `/bff/crm` in prod — a browser-relative path with
+// no host — and a server-side fetch to it throws (→ 502 on /api/ai/models).
+// Prefer the server-only CRM_SERVICE_URL (docker network name); fall back to the
+// public/localhost value only for local dev.
+const CRM_URL = process.env.CRM_SERVICE_URL
+  ? `${process.env.CRM_SERVICE_URL}/api/v1`
+  : process.env.NEXT_PUBLIC_CRM_URL ?? 'http://localhost:3001/api/v1';
 
 type RouteContext = { params: { path?: string[] } };
 

@@ -166,7 +166,25 @@ export async function startTriggerConsumer(deps: TriggerConsumerDeps): Promise<N
     await deps.outbox.processQueue(tenantId);
   });
 
-  await consumer.subscribe([TOPICS.QUOTES, TOPICS.DEALS, TOPICS.ACTIVITIES]);
+  // Direct send requests (e.g. auth password-reset fallback outbox). Queue
+  // through the durable comm outbox so the send survives restarts and shows
+  // up in the operator-visible outbox state.
+  consumer.on('email.send.requested', async (event) => {
+    const { tenantId } = event;
+    const payload = event.payload as { to?: string; subject?: string; htmlBody?: string };
+    if (!payload.to || !payload.subject || !payload.htmlBody) {
+      deps.log.warn({ tenantId }, 'email.send.requested: missing to/subject/htmlBody; dropping');
+      return;
+    }
+    await deps.outbox.queueEmail(tenantId, {
+      to: payload.to,
+      subject: payload.subject,
+      htmlBody: payload.htmlBody,
+    });
+    await deps.outbox.processQueue(tenantId);
+  });
+
+  await consumer.subscribe([TOPICS.QUOTES, TOPICS.DEALS, TOPICS.ACTIVITIES, TOPICS.EMAIL_SEND]);
   await consumer.start();
   deps.log.info('comm-service trigger consumer running');
   return consumer;

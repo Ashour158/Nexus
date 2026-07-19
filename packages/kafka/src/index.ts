@@ -74,6 +74,8 @@ export const TOPICS = {
   BLUEPRINT: 'nexus.blueprint.events',
   NOTIFICATIONS: 'nexus.platform.notifications',
   EMAILS: 'nexus.comms.emails',
+  /** Requests for comm-service to SEND an email (outbox fallback path). */
+  EMAIL_SEND: 'nexus.comms.email-send',
   CALLS: 'nexus.comms.calls',
   ANALYTICS: 'nexus.analytics.events',
   AUDIT: 'nexus.compliance.audit',

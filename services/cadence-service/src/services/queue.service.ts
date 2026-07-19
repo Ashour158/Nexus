@@ -90,7 +90,10 @@ export function createQueueService(prisma: CadencePrisma, producer: NexusProduce
             status = 'SKIPPED';
             result = 'no email found for contact/lead';
           } else {
-            await fetch(`${process.env.COMM_SERVICE_URL}/api/v1/internal/outbox/email-broadcast`, {
+            // A customer-facing effect must not be reported as done when the
+            // send failed: a swallowed error here used to advance the sequence
+            // as if the email went out.
+            const res = await fetch(`${process.env.COMM_SERVICE_URL}/api/v1/internal/outbox/email-broadcast`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -102,7 +105,10 @@ export function createQueueService(prisma: CadencePrisma, producer: NexusProduce
                 subject: payload.subject ?? 'Cadence email',
                 htmlBody: payload.body ?? '',
               }),
-            }).catch(() => undefined);
+            });
+            if (!res.ok) {
+              throw new Error(`email dispatch failed: comm-service ${res.status}`);
+            }
           }
 
           await prisma.stepExecution.update({
@@ -114,7 +120,7 @@ export function createQueueService(prisma: CadencePrisma, producer: NexusProduce
           // guarded, tenant taken from the body) — this is the supported
           // service-to-service write path; the plain /api/v1/activities route is
           // end-user-JWT gated and would 401 for a service caller.
-          await fetch(`${process.env.CRM_SERVICE_URL}/api/v1/internal/automation/activities`, {
+          const res = await fetch(`${process.env.CRM_SERVICE_URL}/api/v1/internal/automation/activities`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -131,7 +137,10 @@ export function createQueueService(prisma: CadencePrisma, producer: NexusProduce
               priority: 'NORMAL',
               customFields: { source: 'cadence', cadenceId: enrollment.cadenceId, enrollmentId: enrollment.id },
             }),
-          }).catch(() => undefined);
+          });
+          if (!res.ok) {
+            throw new Error(`task creation failed: crm-service ${res.status}`);
+          }
         } else if (step.type === 'SMS') {
           status = 'SKIPPED';
           result = 'sms not integrated';
@@ -139,6 +148,44 @@ export function createQueueService(prisma: CadencePrisma, producer: NexusProduce
       } catch (err) {
         status = 'FAILED';
         result = err instanceof Error ? err.message : String(err);
+      }
+
+      // A failed effect retries with backoff instead of advancing the
+      // sequence; after MAX_ATTEMPTS it stays FAILED (operator-visible via the
+      // execution status and the cadence.step.failed event) and the enrollment
+      // does not move on — the sequence must never claim delivery it didn't make.
+      const MAX_ATTEMPTS = 3;
+      if (status === 'FAILED') {
+        const attempts = (execution.attempts ?? 0) + 1;
+        if (attempts < MAX_ATTEMPTS) {
+          const backoffMs = 10 * 60 * 1000 * 4 ** (attempts - 1); // 10m, 40m
+          await prisma.stepExecution.update({
+            where: { id: execution.id },
+            data: {
+              status: 'PENDING',
+              attempts,
+              scheduledAt: new Date(Date.now() + backoffMs),
+              result: `retry ${attempts}/${MAX_ATTEMPTS} scheduled: ${result}`,
+            },
+          });
+        } else {
+          await prisma.stepExecution.update({
+            where: { id: execution.id },
+            data: { status: 'FAILED', attempts, executedAt: new Date(), result },
+          });
+          await producer.publish(TOPICS.WORKFLOWS, {
+            type: 'cadence.step.failed',
+            tenantId: enrollment.tenantId,
+            payload: {
+              enrollmentId: enrollment.id,
+              cadenceId: enrollment.cadenceId,
+              stepPosition: execution.stepPosition,
+              stepType: execution.stepType,
+              error: result,
+            },
+          });
+        }
+        continue;
       }
 
       await prisma.stepExecution.update({

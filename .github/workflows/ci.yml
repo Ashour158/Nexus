@@ -14,7 +14,9 @@ concurrency:
 
 env:
   NODE_VERSION: '20'
-  PNPM_VERSION: '9'
+  # Must match package.json "packageManager" exactly — pnpm/action-setup@v4
+  # hard-fails on any mismatch, which kills every job at setup.
+  PNPM_VERSION: '9.1.0'
 
 jobs:
   quality:

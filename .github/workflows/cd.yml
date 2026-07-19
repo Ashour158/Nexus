@@ -68,7 +68,8 @@ concurrency:
 
 env:
   NODE_VERSION: '20'
-  PNPM_VERSION: '9'
+  # Must match package.json "packageManager" exactly (see ci.yml).
+  PNPM_VERSION: '9.1.0'
   REGISTRY: ${{ secrets.REGISTRY || 'ghcr.io' }}
   IMAGE_OWNER: ${{ vars.GHCR_OWNER || github.repository_owner }}
   # Releases always deploy the immutable source commit. `latest` is published

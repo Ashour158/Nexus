@@ -20,19 +20,28 @@ import { randomBytes } from 'node:crypto';
 
 /**
  * User row with role assignments (Section 31.1 relations), with the secret
- * `passwordHash` column omitted. Every read that reaches an API response uses
- * `SAFE_USER_ARGS` so the hash never leaves the data layer.
+ * `passwordHash` column stripped. Every read that reaches an API response runs
+ * through `stripHash` so the hash never leaves the data layer.
+ *
+ * NOTE: we sanitize in code rather than via Prisma query-level `omit` because
+ * the auth-client is generated on Prisma 5.22 without the `omitApi` preview
+ * feature — passing `omit` there throws `Unknown argument \`omit\`` at runtime.
  */
-export type UserWithRoles = Prisma.UserGetPayload<{
-  omit: { passwordHash: true };
+type FullUserWithRoles = Prisma.UserGetPayload<{
   include: { userRoles: { include: { role: true } } };
 }>;
+export type UserWithRoles = Omit<FullUserWithRoles, 'passwordHash'>;
 
-/** Shared Prisma args: strip the password hash, include role assignments. */
+/** Shared Prisma args: include role assignments (hash stripped afterwards). */
 const SAFE_USER_ARGS = {
-  omit: { passwordHash: true },
   include: { userRoles: { include: { role: true } } },
 } as const;
+
+/** Drop the secret `passwordHash` column from a user row before it leaves the service. */
+function stripHash<T extends { passwordHash?: unknown }>(row: T): Omit<T, 'passwordHash'> {
+  const { passwordHash: _passwordHash, ...safe } = row;
+  return safe;
+}
 
 /**
  * Whether invites provision a LOCAL account (temp password + forced change) rather
@@ -97,7 +106,7 @@ export function createUsersService(prisma: AuthPrisma) {
     if (!row) {
       throw new NotFoundError('User', id);
     }
-    return row;
+    return stripHash(row);
   }
 
   return {
@@ -121,7 +130,7 @@ export function createUsersService(prisma: AuthPrisma) {
           ...SAFE_USER_ARGS,
         }),
       ]);
-      return toPaginatedResult(rows, total, page, limit);
+      return toPaginatedResult(rows.map(stripHash), total, page, limit);
     },
 
     getUserById,
@@ -173,7 +182,7 @@ export function createUsersService(prisma: AuthPrisma) {
             ...SAFE_USER_ARGS,
           })
         );
-        return { ...user, temporaryPassword };
+        return { ...stripHash(user), temporaryPassword };
       }
 
       const keycloakId = await createKeycloakRealmUser({

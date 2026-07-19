@@ -38,7 +38,8 @@ export default function WinLossPage() {
         return r.json();
       })
       .then((d) => {
-        setData(d);
+        // Unwrap the { success, data } envelope; tolerate a bare payload.
+        setData(d?.data ?? d);
         setError(null);
         setLoading(false);
       })
@@ -48,7 +49,9 @@ export default function WinLossPage() {
       });
   }, [period]);
 
-  const maxLostCount = data ? Math.max(...data.lostReasons.map((r) => r.count), 1) : 1;
+  const maxLostCount = data?.lostReasons?.length
+    ? Math.max(...data.lostReasons.map((r) => r.count), 1)
+    : 1;
 
   return (
     <div className="mx-auto max-w-5xl p-6">

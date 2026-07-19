@@ -16,7 +16,11 @@
  * Serial on purpose: the droplet is load-fragile (one browser, one page,
  * small settle between routes).
  */
-import { chromium } from '@playwright/test';
+import { createRequire } from 'module';
+// Resolve playwright through apps/web's node_modules (pnpm does not hoist it
+// to the repo root, and ESM resolution starts from this file's location).
+const require = createRequire(new URL('../apps/web/package.json', import.meta.url));
+const { chromium } = require('@playwright/test');
 
 const BASE = process.argv[2] ?? 'https://159-65-32-72.sslip.io';
 const EMAIL = process.env.CRAWL_EMAIL ?? 'admin@demo.com';
@@ -94,13 +98,26 @@ const pageErrors = [];
 page.on('pageerror', (err) => pageErrors.push(String(err).slice(0, 200)));
 
 // ---- Login through the real form ----
-await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
-await page.fill('input[type="email"]', EMAIL);
-await page.fill('input[type="password"]', PASSWORD);
-await Promise.all([
-  page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 30_000 }),
-  page.click('button[type="submit"]'),
-]);
+// The form is a React client component: clicking before hydration falls back
+// to a native GET submit that goes nowhere. Settle first, then retry.
+let loggedIn = false;
+for (let attempt = 1; attempt <= 3 && !loggedIn; attempt++) {
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1500);
+  await page.fill('input[type="email"]', EMAIL);
+  await page.fill('input[type="password"]', PASSWORD);
+  await page.click('button[type="submit"]');
+  try {
+    await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 15_000 });
+    loggedIn = true;
+  } catch {
+    console.log(`login attempt ${attempt} did not navigate; retrying`);
+  }
+}
+if (!loggedIn) {
+  console.error('LOGIN FAILED after 3 attempts');
+  process.exit(2);
+}
 console.log(`logged in → ${page.url()}`);
 
 // ---- Resolve a few real detail-route IDs via the app's own BFF ----

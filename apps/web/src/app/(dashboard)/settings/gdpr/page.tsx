@@ -21,9 +21,10 @@ export default function GdprPage() {
 
   const fetchRequests = () =>
     fetch('/api/auth/gdpr/erasure')
-      .then(async (r) => (await r.json()) as { data?: ErasureRequest[] })
+      .then(async (r) => (await r.json()) as { data?: ErasureRequest[] | { rows?: ErasureRequest[] } })
       .then((d) => {
-        setRequests(d.data || []);
+        // Live API returns { data: { rows, total, ... } }; tolerate a bare array.
+        setRequests(Array.isArray(d.data) ? d.data : d.data?.rows ?? []);
         setLoading(false);
       });
 

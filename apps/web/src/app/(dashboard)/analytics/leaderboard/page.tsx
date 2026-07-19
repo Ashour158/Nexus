@@ -31,7 +31,8 @@ export default function LeaderboardPage() {
         return r.json();
       })
       .then((d) => {
-        setReps(d.data || []);
+        // Live API returns { data: { rows, period } }; older mock returned a bare array.
+        setReps(Array.isArray(d.data) ? d.data : d.data?.rows ?? []);
         setError(null);
         setLoading(false);
       })

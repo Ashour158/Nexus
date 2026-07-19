@@ -28,12 +28,15 @@ function createMockPrisma() {
   };
 }
 
-function createTestApp(prisma: ReturnType<typeof createMockPrisma>) {
+async function createTestApp(prisma: ReturnType<typeof createMockPrisma>) {
   const app = Fastify();
   app.addHook('preHandler', async (request) => {
     (request as any).user = { tenantId: 'ten_test', sub: 'usr_test', email: 'test@example.com', roles: ['ADMIN'], permissions: ['*'] };
   });
-  registerUsersRoutes(app, prisma as any, { log: async () => {} } as any);
+  // Must be awaited: registerUsersRoutes awaits app.register() internally and
+  // registers another route after that await. Left un-awaited it races avvio's
+  // boot from app.inject() and the instance never becomes ready (inject hangs).
+  await registerUsersRoutes(app, prisma as any, { log: async () => {} } as any);
   return app;
 }
 
@@ -45,7 +48,7 @@ describe('users routes', () => {
   });
 
   it('GET /api/v1/users returns paginated list', async () => {
-    const app = createTestApp(prisma);
+    const app = await createTestApp(prisma);
     prisma.user.count.mockResolvedValue(0);
     prisma.user.findMany.mockResolvedValue([]);
 
@@ -57,11 +60,12 @@ describe('users routes', () => {
   });
 
   it('GET /api/v1/users/:id returns user', async () => {
-    const app = createTestApp(prisma);
-    const user = userFactory();
+    const app = await createTestApp(prisma);
+    // IdParamSchema requires a cuid — an id like 'usr_123' fails validation.
+    const user = userFactory({ id: 'clw0000000000000000000000' });
     prisma.user.findFirst.mockResolvedValue(user);
 
-    const res = await app.inject({ method: 'GET', url: '/api/v1/users/usr_123' });
+    const res = await app.inject({ method: 'GET', url: `/api/v1/users/${user.id}` });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.payload);
     expect(body.success).toBe(true);
@@ -69,7 +73,7 @@ describe('users routes', () => {
   });
 
   it('GET /api/v1/users/:id/availability returns slots', async () => {
-    const app = createTestApp(prisma);
+    const app = await createTestApp(prisma);
     const user = userFactory({ isActive: true, email: 'test@example.com' });
     prisma.user.findFirst.mockResolvedValue(user);
 

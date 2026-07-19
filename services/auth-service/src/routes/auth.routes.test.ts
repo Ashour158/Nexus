@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Fastify from 'fastify';
+
+// mfa.service.ts (imported transitively via ./auth.js → session-auth) throws at
+// module load when neither MFA_ENCRYPTION_KEY nor a >=32-char JWT_SECRET is
+// set. vi.hoisted runs before the static imports below, so the env is in place
+// before that module-level check executes.
+vi.hoisted(() => {
+  process.env.JWT_SECRET ??= 'test-jwt-secret-0123456789abcdef0123456789';
+});
+
 import { registerAuthRoutes } from './auth.js';
 import { JwksKeyStore } from '../lib/jwt.js';
 
@@ -12,6 +21,8 @@ function createMockPrisma() {
     user: {
       upsert: vi.fn(),
       findUnique: vi.fn(),
+      // forgot-password looks the account up with findFirst
+      findFirst: vi.fn(),
     },
     session: {
       create: vi.fn(),

@@ -5,6 +5,9 @@ const mocks = vi.hoisted(() => {
   const state: { app?: FastifyInstance } = {};
   const prisma = {
     cadenceEnrollment: { findMany: vi.fn().mockResolvedValue([]) },
+    // /health runs checkDatabase(prisma) -> $queryRaw; without it the mock
+    // rejects and the health endpoint reports 503.
+    $queryRaw: vi.fn().mockResolvedValue([{ ok: 1 }]),
     $disconnect: vi.fn().mockResolvedValue(undefined),
   };
   const producer = {

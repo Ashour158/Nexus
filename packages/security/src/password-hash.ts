@@ -14,7 +14,8 @@ export interface HashResult {
 
 /**
  * Hash a password using scrypt with a random salt.
- * Returns a composite string: cost$salt$hash (base64url)
+ * Returns a composite string: scrypt$cost$salt$hash (base64url).
+ * (Legacy hashes without the algorithm tag — cost$salt$hash — still verify.)
  */
 export async function hashPassword(plaintext: string): Promise<string> {
   if (!plaintext || plaintext.length < 8) {
@@ -26,16 +27,29 @@ export async function hashPassword(plaintext: string): Promise<string> {
 
   const saltB64 = salt.toString('base64url');
   const hashB64 = (derived as Buffer).toString('base64url');
-  return `${COST_FACTOR}$${saltB64}$${hashB64}`;
+  return `scrypt$${COST_FACTOR}$${saltB64}$${hashB64}`;
 }
 
 /**
  * Verify a plaintext password against a stored scrypt hash.
+ *
+ * Accepts the tagged format `scrypt$cost$salt$hash` and the legacy untagged
+ * `cost$salt$hash`. Throws for any other recognized-but-unsupported algorithm
+ * tag (e.g. `bcrypt$...`) so a foreign hash is a loud error, not a silent
+ * login failure.
  */
 export async function verifyPassword(plaintext: string, storedHash: string): Promise<boolean> {
   if (!plaintext || !storedHash) return false;
 
-  const parts = storedHash.split('$');
+  let parts = storedHash.split('$');
+
+  if (parts.length >= 2 && !/^\d+$/.test(parts[0])) {
+    if (parts[0] !== 'scrypt') {
+      throw new Error(`Unsupported hash algorithm: ${parts[0]}`);
+    }
+    parts = parts.slice(1);
+  }
+
   if (parts.length !== 3) return false;
 
   const cost = Number(parts[0]);

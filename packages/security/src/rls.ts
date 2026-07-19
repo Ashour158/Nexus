@@ -47,9 +47,11 @@ export function setRlsContext(ctx: RlsContext): void {
   rlsStorage.enterWith(ctx);
 }
 
-/** @deprecated No-op with AsyncLocalStorage; context is scoped automatically */
+/** @deprecated Prefer runWithRls, which scopes context automatically. Clears
+ *  any context set via setRlsContext for the remainder of the current async
+ *  execution flow (getRlsContext() returns undefined afterwards). */
 export function clearRlsContext(): void {
-  // No-op: AsyncLocalStorage contexts are automatically cleaned up
+  rlsStorage.enterWith(undefined as unknown as RlsContext);
 }
 
 /** Execute a function within an RLS-bound async context. */

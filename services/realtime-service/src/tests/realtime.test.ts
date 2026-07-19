@@ -48,9 +48,23 @@ vi.mock('@nexus/service-utils', async (importOriginal) => {
   };
 });
 
-vi.mock('@socket.io/redis-adapter', () => ({
-  createAdapter: vi.fn(() => vi.fn()),
-}));
+vi.mock('@socket.io/redis-adapter', () => {
+  // socket.io's Namespace calls `new (server.adapter())(nsp)` and then
+  // `adapter.init()`; a bare vi.fn() has no init and crashes the import.
+  // Substitute a minimal in-memory adapter class with the lifecycle methods
+  // socket.io invokes.
+  class FakeAdapter {
+    rooms = new Map<string, Set<string>>();
+    sids = new Map<string, Set<string>>();
+    constructor(public nsp: unknown) {}
+    init(): void {}
+    close(): void {}
+    serverCount(): Promise<number> {
+      return Promise.resolve(1);
+    }
+  }
+  return { createAdapter: vi.fn(() => FakeAdapter) };
+});
 
 vi.mock('../socket/auth.middleware.js', () => ({
   socketAuthMiddleware: vi.fn(() => vi.fn()),

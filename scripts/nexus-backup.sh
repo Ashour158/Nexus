@@ -173,7 +173,7 @@ clickhouse_backup() {
     case "$db.$tbl" in *[!A-Za-z0-9_.$-]*) die "unsafe ClickHouse identifier in inventory: $db.$tbl";; esac
     schema="$STAGE/clickhouse/${db}.${tbl}.schema.sql"
     data="$STAGE/clickhouse/${db}.${tbl}.native"
-    docker exec "$ch_container" clickhouse-client --query "SHOW CREATE TABLE \`$db\`.\`$tbl\`" > "$schema"
+    docker exec "$ch_container" clickhouse-client --query "SHOW CREATE TABLE \`$db\`.\`$tbl\` FORMAT TSVRaw" > "$schema"
     grep -Eq 'CREATE TABLE|ATTACH TABLE' "$schema" || die "unsupported ClickHouse schema for $db.$tbl"
     run_low docker exec "$ch_container" clickhouse-client --query "SELECT * FROM \`$db\`.\`$tbl\` FORMAT Native" > "$data"
     stat=$(clickhouse_checksum "$ch_container" "$db" "$tbl")

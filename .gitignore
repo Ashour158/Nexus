@@ -22,6 +22,7 @@ coverage/
 secrets/*.txt
 secrets/*.pem
 secrets/*.key
+secrets/prod.env
 
 # Env
 .env

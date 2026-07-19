@@ -46,7 +46,18 @@ export function middleware(request: NextRequest) {
   // optimistic client-set header) — otherwise every
   // reporting/analytics/finance/etc call 401s. This is the BFF's server-side
   // token-attach point: the token never transits through client JavaScript.
-  if (pathname === '/api' || pathname.startsWith('/api/')) {
+  //
+  // /bff/* (the next.config rewrite proxies every prod service call rides on)
+  // needs the same attach: after a hard reload the in-memory store token is
+  // gone by design, and without this every /bff call 401s → the axios
+  // interceptor force-logs the user out. Modified request headers propagate
+  // through rewrites, so the upstream service receives the Bearer.
+  if (
+    pathname === '/api' ||
+    pathname.startsWith('/api/') ||
+    pathname === '/bff' ||
+    pathname.startsWith('/bff/')
+  ) {
     const token = request.cookies.get('nexus_token')?.value;
     if (token) {
       const headers = new Headers(request.headers);

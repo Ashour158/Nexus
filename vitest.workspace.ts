@@ -333,12 +333,4 @@ export default defineWorkspace([
       include: ['src/**/*.test.ts'],
     },
   },
-  {
-    extends: 'tools/event-contract/vitest.config.ts',
-    test: {
-      name: 'event-contract',
-      root: './tools/event-contract',
-      include: ['*.test.ts'],
-    },
-  },
 ]);

@@ -8,6 +8,8 @@
     "test": "vitest run --workspace vitest.workspace.ts",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
+    "events:check": "node scripts/check-event-contracts.mjs --check",
+    "events:test": "node --test scripts/check-event-contracts.test.mjs",
     "db:generate": "turbo db:generate",
     "db:migrate": "turbo db:migrate",
     "db:create-missing": "docker compose exec -T postgres psql -U nexus -f /dev/stdin < scripts/create-missing-dbs.sql",

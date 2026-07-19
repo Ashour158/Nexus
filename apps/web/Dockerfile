@@ -43,5 +43,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
 USER nextjs
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=10s CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1
+# Probe /health, not /api/health: the latter is a 404 (no such route), so the
+# container reported "unhealthy" permanently while serving every page fine. A
+# health signal that is always red is worse than none — it makes a real outage
+# indistinguishable from the false negative, and any restart-on-unhealthy policy
+# would flap a working container.
+HEALTHCHECK --interval=30s --timeout=10s CMD wget -qO- http://127.0.0.1:3000/health || exit 1
 CMD ["node", "apps/web/server.js"]

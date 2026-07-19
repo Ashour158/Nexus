@@ -1,3 +1,12 @@
+# RATE_LIMIT_MAX appears in every *-service `environment:` block below. It is
+# repeated rather than shared because a container only receives variables its
+# own block declares, and this stack runs from THIS file alone (no overlay), so
+# an anchor in docker-compose.prod.yml would never reach the running services.
+#
+# It is the per-(tenant,user) request ceiling — an abuse limit, not a pacing
+# mechanism. Keep it well above what one engaged human generates: a dashboard
+# route fans out to 6-8 parallel calls, so the former 100/min was reached by
+# ordinary browsing. Override in .env to tune without rebuilding images.
 services:
   # ─── Infrastructure ─────────────────────────────────────────────────────────
   postgres:
@@ -177,6 +186,7 @@ services:
     ports:
       - '127.0.0.1:3000:3000'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
@@ -205,6 +215,7 @@ services:
     ports:
       - '127.0.0.1:3001:3001'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       # Governance posture: when true, a field-security / validation / sharing
@@ -250,6 +261,7 @@ services:
     ports:
       - '127.0.0.1:3002:3002'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
@@ -277,6 +289,7 @@ services:
     ports:
       - '127.0.0.1:3011:3011'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       PORT: '3011'
       BILLING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_billing
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
@@ -333,6 +346,7 @@ services:
     ports:
       - '127.0.0.1:3043:3043'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       PORT: '3043'
       ACTIVITIES_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_activities
       KAFKA_BROKERS: kafka:29092
@@ -363,6 +377,7 @@ services:
     ports:
       - '127.0.0.1:3032:3032'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       PORT: '3032'
       NOTES_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_notes
       KAFKA_BROKERS: kafka:29092
@@ -399,6 +414,7 @@ services:
     ports:
       - '127.0.0.1:3003:3003'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_notification
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
@@ -417,6 +433,7 @@ services:
       dockerfile: ./services/realtime-service/Dockerfile
     container_name: nexus-realtime
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       KAFKA_BROKERS: kafka:29092
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
@@ -439,6 +456,7 @@ services:
     ports:
       - '127.0.0.1:3006:3006'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       PORT: '3006'
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
@@ -474,6 +492,7 @@ services:
     ports:
       - '127.0.0.1:3007:3007'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_workflow
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
@@ -505,6 +524,7 @@ services:
     ports:
       - '127.0.0.1:3012:3012'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_integration
       INTEGRATION_SECRET_KEY: nexus_integration_secret_key_32b
       KAFKA_BROKERS: kafka:29092
@@ -527,6 +547,7 @@ services:
     ports:
       - '127.0.0.1:3013:3013'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_blueprint
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
@@ -554,6 +575,7 @@ services:
     ports:
       - '127.0.0.1:3008:3008'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       KAFKA_BROKERS: kafka:29092
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
@@ -692,6 +714,7 @@ services:
     ports:
       - '127.0.0.1:3009:3009'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_comm
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
@@ -720,6 +743,7 @@ services:
     ports:
       - '127.0.0.1:3010:3010'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       MINIO_ENDPOINT: minio
       MINIO_PORT: '9000'
       # Must carry the SAME defaults as the minio service (nexus / nexus-minio),
@@ -747,6 +771,7 @@ services:
     ports:
       - '127.0.0.1:3014:3014'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
@@ -772,6 +797,7 @@ services:
     ports:
       - '127.0.0.1:3015:3015'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       PORT: '3015'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_data
       KAFKA_BROKERS: kafka:29092
@@ -806,6 +832,7 @@ services:
     ports:
       - '127.0.0.1:3016:3016'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
@@ -829,6 +856,7 @@ services:
     ports:
       - '127.0.0.1:3017:3017'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://:${REDIS_PASSWORD:-nexus}@redis:6379
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
@@ -854,6 +882,7 @@ services:
     ports:
       - '127.0.0.1:3018:3018'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       # crm calls POST /api/v1/internal/cadence/auto-enroll; the step-runner calls
       # crm's /internal/automation/activities — both use x-service-token.
       # These two URLs were documented by the comment above but never set: the
@@ -888,6 +917,7 @@ services:
     ports:
       - '127.0.0.1:3019:3019'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       # Tenant-enforcement canary wave 1: fail-closed ON by default; the global
       # env var remains the emergency kill-switch (set NEXUS_TENANT_ENFORCEMENT=off).
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
@@ -915,6 +945,7 @@ services:
     ports:
       - '127.0.0.1:3020:3020'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       PORT: '3020'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_planning
       CRM_SERVICE_URL: http://crm-service:3001
@@ -941,6 +972,7 @@ services:
     ports:
       - '127.0.0.1:3021:3021'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       PORT: '3021'
       REPORTING_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_reporting
       CRM_SERVICE_URL: http://crm-service:3001
@@ -972,6 +1004,7 @@ services:
     ports:
       - '127.0.0.1:3022:3022'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
@@ -999,6 +1032,7 @@ services:
     ports:
       - '127.0.0.1:3023:3023'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       PORT: '3023'
       # Required for /api/v1/internal/* : createService only bypasses its JWT
       # preHandler when x-service-token matches this, so without it search's
@@ -1023,6 +1057,7 @@ services:
     ports:
       - '127.0.0.1:3024:3024'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       PORT: '3024'
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_incentive
       KAFKA_BROKERS: kafka:29092
@@ -1045,6 +1080,7 @@ services:
     ports:
       - '127.0.0.1:3026:3026'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       EMAIL_SYNC_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_email_sync
       KAFKA_BROKERS: kafka:29092
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
@@ -1066,6 +1102,7 @@ services:
     ports:
       - '127.0.0.1:3004:3004'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
@@ -1222,6 +1259,7 @@ services:
     ports:
       - '127.0.0.1:3029:3029'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       # Tenant-enforcement canary wave 1: fail-closed ON by default; the global
       # env var remains the emergency kill-switch (set NEXUS_TENANT_ENFORCEMENT=off).
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
@@ -1249,6 +1287,7 @@ services:
     ports:
       - '127.0.0.1:3025:3025'
     environment:
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       # Tenant-enforcement canary wave 1: fail-closed ON by default; the global
       # env var remains the emergency kill-switch (set NEXUS_TENANT_ENFORCEMENT=off).
       NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}

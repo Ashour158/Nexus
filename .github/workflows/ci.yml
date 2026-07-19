@@ -13,7 +13,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20'
+  # Node 22: @sparticuz/chromium needs >=22.17 and posthog-node >=22.22;
+  # setup-node '22' resolves the latest 22.x which satisfies both.
+  NODE_VERSION: '22'
   # Must match package.json "packageManager" exactly — pnpm/action-setup@v4
   # hard-fails on any mismatch, which kills every job at setup.
   PNPM_VERSION: '9.1.0'

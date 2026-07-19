@@ -150,8 +150,12 @@ rewrite_clickhouse_schema() {
 
 ch_checksum_scratch() {
   container=$1; db=$2; tbl=$3
+  final=""
+  engine=$(docker exec "$container" clickhouse-client --query \
+    "select engine from system.tables where database = '$db' and name = '$tbl'")
+  case "$engine" in *Replacing*|*Summing*|*Aggregating*|*Collapsing*) final=" FINAL";; esac
   docker exec "$container" clickhouse-client --format JSONEachRow --query \
-    "SELECT count() AS rows, toString(sum(cityHash64(*))) AS sum_cityhash64, toString(groupBitXor(cityHash64(*))) AS xor_cityhash64 FROM \`$db\`.\`$tbl\`"
+    "SELECT count() AS rows, toString(sum(cityHash64(*))) AS sum_cityhash64, toString(groupBitXor(cityHash64(*))) AS xor_cityhash64 FROM \`$db\`.\`$tbl\`$final"
 }
 
 verify_clickhouse() {

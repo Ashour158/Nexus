@@ -37,6 +37,12 @@ RUN pnpm --filter @nexus/web run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
+# Next's standalone server listens on process.env.HOSTNAME. Docker sets HOSTNAME
+# to the container ID, which resolves to the container's eth0 address, so the
+# server bound ONLY to 172.x.x.x — and the healthcheck's 127.0.0.1 probe got
+# "connection refused" no matter which path it asked for. Pin it to 0.0.0.0 so
+# loopback works too.
+ENV HOSTNAME=0.0.0.0
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static

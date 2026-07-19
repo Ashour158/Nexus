@@ -81,6 +81,10 @@ const nextConfig = {
       // NOT /api/v1/storage — the extra segment 404s every upload/list call.
       { source: '/bff/storage/:path*', destination: 'http://storage-service:3010/api/v1/:path*' },
       { source: '/bff/analytics/:path*', destination: 'http://analytics-service:3008/api/v1/analytics/:path*' },
+      // Saved BI definitions (dashboards/reports/schedules/export) live on
+      // reporting-service under /api/v1/bi. Binary exports (xlsx/pdf) stream
+      // through this rewrite untouched — do NOT route them via a JSON handler.
+      { source: '/bff/bi/:path*', destination: 'http://reporting-service:3021/api/v1/bi/:path*' },
       { source: '/bff/integration/:path*', destination: 'http://integration-service:3012/api/v1/:path*' },
       { source: '/bff/tickets/:path*', destination: 'http://ticket-service:3029/api/v1/:path*' },
       { source: '/bff/campaign/:path*', destination: 'http://campaign-service:3025/api/v1/:path*' },

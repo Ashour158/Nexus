@@ -7,19 +7,22 @@ import {
   AGG_FNS,
   CHART_TYPES,
   DATASETS,
+  DATASET_KEY,
   FILTER_OPS,
   QUICK_CALCS,
   TIME_GRAINS,
   type AggFn,
   type ChartType,
   type Dataset,
+  type FieldDef,
   type FilterOp,
   type QuickCalc,
   type ReportSpec,
   type ReportSpecFilter,
+  type ReportSpecJoin,
   type TimeGrain,
 } from '@/lib/bi-types';
-import { useFieldCatalog, useQueryPreview } from '@/hooks/use-bi';
+import { useFieldCatalog, useFieldCatalogs, useQueryPreview } from '@/hooks/use-bi';
 import { WidgetChart } from './widget-chart';
 
 export interface WidgetDraft {
@@ -78,11 +81,15 @@ export function WidgetBuilder({
       ?.filter((m) => typeof m.formula === 'string')
       .map((m) => ({ alias: m.alias ?? '', formula: m.formula ?? '' })) ?? []
   );
+  const [joins, setJoins] = useState<Array<{ dataset: Dataset; on: string }>>(
+    initial?.spec.joins?.map((j) => ({ dataset: j.dataset, on: j.on })) ?? []
+  );
   const [limit, setLimit] = useState<string>(
     initial?.spec.limit ? String(initial.spec.limit) : ''
   );
 
   const { data: catalog, isLoading: catalogLoading } = useFieldCatalog(dataset);
+  const joinedCatalogs = useFieldCatalogs(joins.map((j) => j.dataset));
 
   // Reset field selections when dataset changes (unless restoring initial for same dataset).
   useEffect(() => {
@@ -91,6 +98,7 @@ export function WidgetBuilder({
     setDimensions([]);
     setFilters([]);
     setCalcs([]);
+    setJoins([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataset]);
 
@@ -104,8 +112,12 @@ export function WidgetBuilder({
     const validMeasures = measures.filter((m) => m.field);
     const validCalcs = calcs.filter((c) => c.alias.trim() && c.formula.trim());
     if (validMeasures.length === 0) return null;
+    const validJoins: ReportSpecJoin[] = joins
+      .filter((j) => j.dataset && j.on)
+      .map((j) => ({ dataset: j.dataset, on: j.on }));
     const built: ReportSpec = {
       dataset,
+      ...(validJoins.length > 0 ? { joins: validJoins } : {}),
       measures: [
         ...validMeasures.map((m) => ({
           field: m.field,
@@ -126,15 +138,29 @@ export function WidgetBuilder({
     };
     if (limit && Number(limit) > 0) built.limit = Number(limit);
     return built;
-  }, [dataset, measures, calcs, dimensions, filters, limit]);
+  }, [dataset, joins, measures, calcs, dimensions, filters, limit]);
 
   const preview = useQueryPreview(spec, Boolean(spec));
 
   const canSave = Boolean(spec) && title.trim().length > 0;
 
-  const measureOpts = catalog?.measures ?? [];
-  const dimensionOpts = catalog?.dimensions ?? [];
-  const filterOpts = catalog?.filters ?? [];
+  // Base fields + each joined dataset's fields (dotted "<dataset>.<field>",
+  // labelled "Accounts › Industry") so cross-object reports can be built.
+  const dottedFields = (list: (c: { measures: FieldDef[]; dimensions: FieldDef[]; filters: FieldDef[] }) => FieldDef[]): FieldDef[] =>
+    joins.flatMap((j, i) => {
+      const cat = joinedCatalogs[i]?.data;
+      if (!cat) return [];
+      const dsLabel = DATASETS.find((d) => d.value === j.dataset)?.label ?? j.dataset;
+      return list(cat).map((f) => ({ ...f, key: `${j.dataset}.${f.key}`, label: `${dsLabel} › ${f.label}` }));
+    });
+  const measureOpts = [...(catalog?.measures ?? []), ...dottedFields((c) => c.measures)];
+  const dimensionOpts = [...(catalog?.dimensions ?? []), ...dottedFields((c) => c.dimensions)];
+  const filterOpts = [...(catalog?.filters ?? []), ...dottedFields((c) => c.filters)];
+
+  // Candidate join keys on the BASE dataset: its *_id fields.
+  const joinKeyOpts = [...(catalog?.dimensions ?? []), ...(catalog?.filters ?? [])]
+    .filter((f, i, arr) => f.key.endsWith('_id') && arr.findIndex((x) => x.key === f.key) === i);
+  const joinableDatasets = DATASETS.filter((d) => d.value !== dataset);
 
   function dimIsDate(field: string) {
     return dimensionOpts.find((d) => d.key === field)?.type === 'date';
@@ -197,6 +223,70 @@ export function WidgetBuilder({
               <p className="text-sm text-on-surface-variant">Loading fields…</p>
             ) : (
               <>
+                {/* Joins */}
+                <Section
+                  title="Joined datasets"
+                  onAdd={() =>
+                    setJoins((prev) => {
+                      if (prev.length >= 4) return prev;
+                      const ds = joinableDatasets[0]?.value ?? 'accounts';
+                      const defaultOn =
+                        joinKeyOpts.find((f) => f.key === DATASET_KEY[ds])?.key ?? joinKeyOpts[0]?.key ?? '';
+                      return [...prev, { dataset: ds, on: defaultOn }];
+                    })
+                  }
+                >
+                  {joins.length === 0 && (
+                    <p className="text-xs text-on-surface-variant">
+                      Optional. Join another object to group or filter by its fields (e.g. deals by
+                      account industry). Max 4.
+                    </p>
+                  )}
+                  {joins.map((j, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <select
+                        value={j.dataset}
+                        onChange={(e) =>
+                          setJoins((prev) =>
+                            prev.map((row, i) => {
+                              if (i !== index) return row;
+                              const ds = e.target.value as Dataset;
+                              const on =
+                                joinKeyOpts.find((f) => f.key === DATASET_KEY[ds])?.key ?? row.on;
+                              return { dataset: ds, on };
+                            })
+                          )
+                        }
+                        className={cn(selectCls, 'flex-1')}
+                      >
+                        {joinableDatasets.map((d) => (
+                          <option key={d.value} value={d.value}>
+                            {d.label}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-xs text-on-surface-variant">on</span>
+                      <select
+                        value={j.on}
+                        onChange={(e) =>
+                          setJoins((prev) =>
+                            prev.map((row, i) => (i === index ? { ...row, on: e.target.value } : row))
+                          )
+                        }
+                        title="Join key on the base dataset"
+                        className={selectCls}
+                      >
+                        {joinKeyOpts.map((f) => (
+                          <option key={f.key} value={f.key}>
+                            {f.label}
+                          </option>
+                        ))}
+                      </select>
+                      <RemoveBtn onClick={() => setJoins((p) => p.filter((_, i) => i !== index))} />
+                    </div>
+                  ))}
+                </Section>
+
                 {/* Measures */}
                 <Section
                   title="Measures"

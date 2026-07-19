@@ -116,17 +116,27 @@ function fmt(value: unknown, type?: string): string {
   return String(value);
 }
 
+export interface ChartPointClick {
+  /** The dimension column key the chart is grouped by. */
+  dimKey: string;
+  /** The RAW (unformatted) dimension value of the clicked point. */
+  value: unknown;
+}
+
 export function WidgetChart({
   chartType,
   result: rawResult,
   height = 260,
   measures,
+  onPointClick,
 }: {
   chartType: ChartType;
   result: QueryResult;
   height?: number;
   /** Spec measures — used to apply per-measure quick calcs (% of total, …). */
   measures?: ReportSpecMeasure[];
+  /** Drill-down: called with the clicked point's raw dimension value. */
+  onPointClick?: (point: ChartPointClick) => void;
 }): ReactElement {
   const result = useMemo(() => applyQuickCalcs(rawResult, measures), [rawResult, measures]);
   const { columns, rows } = result;
@@ -141,11 +151,29 @@ export function WidgetChart({
     () =>
       rows.map((row) => {
         const out: Record<string, unknown> = { ...row };
-        if (dimCol) out[dimCol.key] = fmt(row[dimCol.key], dimCol.type);
+        if (dimCol) {
+          // Keep the raw value for drill-down; the display key gets formatted.
+          out.__rawDim = row[dimCol.key];
+          out[dimCol.key] = fmt(row[dimCol.key], dimCol.type);
+        }
         return out;
       }),
     [rows, dimCol]
   );
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const emitPoint = (payload: any): void => {
+    if (!onPointClick || !dimCol || payload == null) return;
+    const raw = (payload.payload ?? payload).__rawDim;
+    if (raw === undefined) return;
+    onPointClick({ dimKey: dimCol.key, value: raw });
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const emitFromChartState = (state: any): void => {
+    emitPoint(state?.activePayload?.[0]?.payload);
+  };
+  const clickable = Boolean(onPointClick && dimCol);
+  const seriesCursor = clickable ? ('pointer' as const) : undefined;
 
   if (!rows.length) {
     return (
@@ -298,6 +326,8 @@ export function WidgetChart({
             cy="50%"
             outerRadius={height / 2.8}
             label
+            onClick={emitPoint}
+            cursor={seriesCursor}
           >
             {data.map((_, index) => (
               <Cell key={index} fill={PALETTE[index % PALETTE.length]} />
@@ -314,7 +344,7 @@ export function WidgetChart({
       <ResponsiveContainer width="100%" height={height}>
         <FunnelChart>
           <Tooltip formatter={tooltipFormatter} />
-          <Funnel dataKey={primaryMeasure?.key} data={data} isAnimationActive>
+          <Funnel dataKey={primaryMeasure?.key} data={data} isAnimationActive onClick={emitPoint} cursor={seriesCursor}>
             <LabelList position="right" fill="#0f172a" stroke="none" dataKey={dimCol?.key} />
             {data.map((_, index) => (
               <Cell key={index} fill={PALETTE[index % PALETTE.length]} />
@@ -329,7 +359,7 @@ export function WidgetChart({
   if (chartType === 'line') {
     return (
       <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={data} margin={{ top: 8, right: 12, bottom: 4, left: 4 }}>
+        <LineChart data={data} margin={{ top: 8, right: 12, bottom: 4, left: 4 }} onClick={clickable ? emitFromChartState : undefined} style={clickable ? { cursor: 'pointer' } : undefined}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
           <XAxis dataKey={dimCol?.key} tick={{ fontSize: 11 }} />
           <YAxis tick={{ fontSize: 11 }} />
@@ -355,7 +385,7 @@ export function WidgetChart({
   if (chartType === 'area') {
     return (
       <ResponsiveContainer width="100%" height={height}>
-        <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 4, left: 4 }}>
+        <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 4, left: 4 }} onClick={clickable ? emitFromChartState : undefined} style={clickable ? { cursor: 'pointer' } : undefined}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
           <XAxis dataKey={dimCol?.key} tick={{ fontSize: 11 }} />
           <YAxis tick={{ fontSize: 11 }} />
@@ -393,6 +423,8 @@ export function WidgetChart({
             innerRadius={height / 5}
             outerRadius={height / 2.8}
             paddingAngle={2}
+            onClick={emitPoint}
+            cursor={seriesCursor}
           >
             {data.map((_, index) => (
               <Cell key={index} fill={PALETTE[index % PALETTE.length]} />
@@ -541,6 +573,8 @@ export function WidgetChart({
             fill={PALETTE[index % PALETTE.length]}
             radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]}
             stackId={stacked ? 'a' : undefined}
+            onClick={emitPoint}
+            cursor={seriesCursor}
           />
         ))}
       </BarChart>

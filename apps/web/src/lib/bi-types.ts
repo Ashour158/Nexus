@@ -56,11 +56,39 @@ export interface ReportSpecFilter {
   op: FilterOp;
   value: unknown;
 }
+/**
+ * Cross-object join: attach another dataset's latest attributes to the base
+ * rows. `on` is the foreign-key field on the BASE dataset (e.g. 'account_id');
+ * joined fields are referenced as "<dataset>.<field>" (alias defaults to the
+ * dataset name).
+ */
+export interface ReportSpecJoin {
+  dataset: Dataset;
+  on: string;
+  alias?: string;
+}
 export interface ReportSpec {
   dataset: Dataset;
+  joins?: ReportSpecJoin[];
   measures: ReportSpecMeasure[];
   dimensions: ReportSpecDimension[];
   filters?: ReportSpecFilter[];
+  sort?: Array<{ field: string; dir: 'asc' | 'desc' }>;
+  limit?: number;
+}
+
+/** One clicked chart coordinate, for drill-down into the underlying rows. */
+export interface DrillPoint {
+  field: string;
+  timeGrain?: TimeGrain;
+  value: unknown;
+}
+export interface DrillDownSpec {
+  dataset: Dataset;
+  joins?: ReportSpecJoin[];
+  filters?: ReportSpecFilter[];
+  at?: DrillPoint[];
+  columns?: string[];
   sort?: Array<{ field: string; dir: 'asc' | 'desc' }>;
   limit?: number;
 }
@@ -118,6 +146,44 @@ export interface BiReport {
   createdAt: string;
   updatedAt: string;
 }
+
+/** Recurring email delivery of a saved BI report (reporting-service cron runner). */
+export interface BiReportSchedule {
+  id: string;
+  reportId: string;
+  cron: string;
+  recipients: string[];
+  format: string;
+  subject?: string | null;
+  isActive: boolean;
+  lastRunAt?: string | null;
+  lastError?: string | null;
+  nextRunAt?: string | null;
+  createdAt: string;
+}
+
+export type ExportFormat = 'csv' | 'xlsx' | 'pdf';
+export const EXPORT_FORMATS: ExportFormat[] = ['csv', 'xlsx', 'pdf'];
+
+/**
+ * The entity-identity column per dataset (mirrors the analytics compiler's
+ * DATASET_KEY). Used to suggest which base fields can be a join key.
+ */
+export const DATASET_KEY: Record<Dataset, string> = {
+  deals: 'deal_id',
+  leads: 'lead_id',
+  activities: 'activity_id',
+  revenue: 'deal_id',
+  quotes: 'quote_id',
+  contacts: 'contact_id',
+  accounts: 'account_id',
+  orders: 'order_id',
+  invoices: 'invoice_id',
+  tickets: 'ticket_id',
+  campaigns: 'campaign_id',
+  subscriptions: 'subscription_id',
+  commissions: 'commission_id',
+};
 
 export const DATASETS: Array<{ value: Dataset; label: string }> = [
   { value: 'deals', label: 'Deals' },

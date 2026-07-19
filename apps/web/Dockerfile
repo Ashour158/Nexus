@@ -23,6 +23,7 @@ ENV NEXT_PUBLIC_AUTH_URL=/bff/auth \
     NEXT_PUBLIC_SEARCH_URL=/bff/search \
     NEXT_PUBLIC_STORAGE_URL=/bff/storage \
     NEXT_PUBLIC_ANALYTICS_URL=/bff/analytics \
+    NEXT_PUBLIC_BI_URL=/bff/bi \
     NEXT_PUBLIC_INTEGRATION_URL=/bff/integration \
     NEXT_PUBLIC_TICKET_URL=/bff/tickets \
     NEXT_PUBLIC_CAMPAIGN_URL=/bff/campaign

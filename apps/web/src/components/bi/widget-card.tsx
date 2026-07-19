@@ -1,11 +1,12 @@
 'use client';
 
-import { type ReactElement } from 'react';
+import { type ReactElement, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react';
-import type { BiWidget } from '@/lib/bi-types';
+import type { BiWidget, DrillDownSpec } from '@/lib/bi-types';
 import { runQuery } from '@/hooks/use-bi';
 import { WidgetChart } from './widget-chart';
+import { DrilldownDrawer } from './drilldown-drawer';
 
 export function WidgetCard({
   widget,
@@ -31,6 +32,23 @@ export function WidgetCard({
     queryFn: () => runQuery(widget.spec),
     retry: false,
   });
+
+  const [drill, setDrill] = useState<DrillDownSpec | null>(null);
+
+  // Click a chart point → the individual rows behind it. The first dimension
+  // is what the chart is grouped by; its original field reference (which may
+  // be a dotted joined field) and time grain define the drill coordinate.
+  function handlePointClick({ value }: { dimKey: string; value: unknown }) {
+    const dim = widget.spec.dimensions?.[0];
+    if (!dim) return;
+    setDrill({
+      dataset: widget.spec.dataset,
+      joins: widget.spec.joins,
+      filters: widget.spec.filters,
+      at: [{ field: dim.field, ...(dim.timeGrain ? { timeGrain: dim.timeGrain } : {}), value }],
+      limit: 100,
+    });
+  }
 
   return (
     <div className="flex flex-col rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
@@ -69,9 +87,19 @@ export function WidgetCard({
             {(error as Error).message || 'Failed to run widget'}
           </div>
         ) : data ? (
-          <WidgetChart chartType={widget.chartType} result={data} height={240} measures={widget.spec?.measures} />
+          <WidgetChart
+            chartType={widget.chartType}
+            result={data}
+            height={240}
+            measures={widget.spec?.measures}
+            onPointClick={widget.spec.dimensions?.length ? handlePointClick : undefined}
+          />
         ) : null}
       </div>
+
+      {drill && (
+        <DrilldownDrawer title={widget.title} spec={drill} onClose={() => setDrill(null)} />
+      )}
     </div>
   );
 }

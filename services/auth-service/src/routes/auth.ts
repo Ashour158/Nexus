@@ -9,7 +9,7 @@ import {
 } from '@nexus/validation';
 import { hashPassword, validatePasswordStrength, verifyPassword } from '@nexus/security';
 import type { AuthPrisma } from '../prisma.js';
-import { loginWithKeycloak, loginWithPassword, refreshTokens, revokeSession } from '../services/session-auth.js';
+import { listWorkspacesForEmail, loginWithKeycloak, loginWithPassword, refreshTokens, registerWorkspace, revokeSession } from '../services/session-auth.js';
 import { z } from 'zod';
 import type { JwksKeyStore } from '../lib/jwt.js';
 import { TOPICS, type NexusProducer } from '@nexus/kafka';
@@ -20,6 +20,16 @@ import { clearLoginFailures, getLoginLock, recordLoginFailure } from '../lib/log
 const PasswordLoginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  /** Optional workspace slug for multi-workspace accounts (login picker). */
+  workspaceSlug: z.string().min(1).max(60).optional(),
+});
+
+const RegisterSchema = z.object({
+  companyName: z.string().min(2).max(120),
+  email: z.string().email(),
+  password: z.string().min(1),
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
 });
 
 /**
@@ -59,7 +69,8 @@ export async function registerAuthRoutes(
           try {
             result = await loginWithPassword(
               keyStore, prisma, request, pw.data.email, pw.data.password,
-              { userAgent: request.headers['user-agent'], ip: request.ip }
+              { userAgent: request.headers['user-agent'], ip: request.ip },
+              pw.data.workspaceSlug
             );
           } catch (err) {
             await recordLoginFailure(pw.data.email);
@@ -109,6 +120,38 @@ export async function registerAuthRoutes(
           }
         } catch { /* non-blocking */ }
         return reply.send({ success: true, data: result });
+      });
+
+      /**
+       * Self-service workspace signup (public). Creates a new tenant + its
+       * built-in roles + the first SUPER_ADMIN user, then signs the caller in.
+       */
+      r.post('/auth/register', async (request, reply) => {
+        const parsed = RegisterSchema.safeParse(request.body);
+        if (!parsed.success) {
+          throw new ValidationError('Invalid body', parsed.error.flatten());
+        }
+        const result = await registerWorkspace(keyStore, prisma, request, parsed.data, {
+          userAgent: request.headers['user-agent'],
+          ip: request.ip,
+        });
+        return reply.code(201).send({ success: true, data: result });
+      });
+
+      /**
+       * Public workspace lookup by email — the login form calls this to decide
+       * whether to show a workspace picker. Always 200 with a (possibly empty)
+       * list; never reveals whether a specific email exists in a way that aids
+       * enumeration beyond what login already does.
+       */
+      r.get('/auth/workspaces', async (request, reply) => {
+        const email = (request.query as { email?: string }).email ?? '';
+        const parsedEmail = z.string().email().safeParse(email);
+        if (!parsedEmail.success) {
+          return reply.send({ success: true, data: { workspaces: [] } });
+        }
+        const workspaces = await listWorkspacesForEmail(prisma, parsedEmail.data);
+        return reply.send({ success: true, data: { workspaces } });
       });
 
       r.post('/auth/refresh', async (request, reply) => {

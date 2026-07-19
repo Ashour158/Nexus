@@ -22,6 +22,7 @@ coverage/
 secrets/*.txt
 secrets/*.pem
 secrets/*.key
+secrets/prod.env
 
 # Env
 .env
@@ -59,6 +60,11 @@ typecheck_output*.txt
 **/tsc-output.txt
 ~$*.docx
 *.backup-*
+
+# Local operational artifacts
+nexus-backup-*.tar.age
+nexus-observability-*.tar.age
+*.restore-drill.json
 
 # Local environment files - NEVER commit
 .env.local

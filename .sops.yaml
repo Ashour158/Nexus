@@ -1,13 +1,6 @@
-# SOPS creation rules — encrypts secrets/*.sops.* to the age recipient(s) below.
-#
-# SETUP (you do this once, keeping the PRIVATE key secret):
-#   1. Install sops + age.
-#   2. age-keygen -o ~/.config/sops/age/keys.txt      # prints a public key "age1..."
-#   3. Replace REPLACE_WITH_YOUR_AGE_PUBLIC_KEY below with that public key.
-#   4. On the droplet + in CI (GitHub secret SOPS_AGE_KEY), install the SAME private key file.
-#   5. sops secrets/prod.env.sops.yaml   # create/edit encrypted secrets (see the .example)
-#
-# The encrypted files are safe to commit; only holders of the age PRIVATE key can decrypt.
+# SOPS creation rules. The age recipient below is public and safe to commit.
+# Replace the placeholder before encrypting. For recipient/key rotation, SOPS
+# accepts multiple age recipients as a comma-separated string in this field.
 creation_rules:
-  - path_regex: secrets/.*\.sops\.(yaml|env|json)$
+  - path_regex: secrets/prod\.env\.sops\.env$
     age: 'REPLACE_WITH_YOUR_AGE_PUBLIC_KEY'

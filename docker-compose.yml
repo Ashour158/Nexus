@@ -130,7 +130,7 @@ services:
     restart: unless-stopped
     command: ['start-dev']
     ports:
-      - '8080:8080'
+      - '127.0.0.1:8080:8080'
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
@@ -147,8 +147,8 @@ services:
     container_name: nexus-kong
     restart: unless-stopped
     ports:
-      - '8000:8000'  # Proxy port (public — the API gateway)
-      - '8443:8443'  # SSL proxy port (public)
+      - '127.0.0.1:8000:8000'  # Proxy port — loopback only; Caddy is the public edge.
+      - '127.0.0.1:8443:8443'  # SSL proxy port — loopback only; Caddy is the public edge.
       - '127.0.0.1:8001:8001'  # Admin API — loopback only (was internet-exposed)
       - '127.0.0.1:8444:8444'  # SSL admin API — loopback only
     environment:
@@ -636,7 +636,7 @@ services:
       QUOTES_SERVICE_URL: http://finance-service:3002
     restart: unless-stopped
     ports:
-      - '3100:3000'
+      - '127.0.0.1:3100:3000'
     depends_on:
       - auth-service
       - crm-service
@@ -654,7 +654,7 @@ services:
       AUTH_JWKS_URL: http://auth-service:3000/.well-known/jwks.json
     restart: unless-stopped
     ports:
-      - '4000:4000'
+      - '127.0.0.1:4000:4000'
     volumes:
       - ./services/graphql-gateway/router.yaml:/dist/config/router.yaml:ro
       - ./services/graphql-gateway/supergraph.graphql:/dist/config/supergraph.graphql:ro
@@ -1088,7 +1088,7 @@ services:
     container_name: nexus-router-coprocessor
     restart: unless-stopped
     ports:
-      - '4001:4001'
+      - '127.0.0.1:4001:4001'
     environment:
       KAFKA_BROKERS: kafka:29092
       JWT_SECRET: ${JWT_SECRET}
@@ -1187,8 +1187,8 @@ services:
     container_name: nexus-otel-collector
     restart: unless-stopped
     ports:
-      - '4317:4317'   # OTLP gRPC
-      - '4318:4318'   # OTLP HTTP
+      - '127.0.0.1:4317:4317'   # OTLP gRPC — loopback only.
+      - '127.0.0.1:4318:4318'   # OTLP HTTP — loopback only.
     volumes:
       - ./infrastructure/otel/otel-collector-config.yml:/etc/otelcol-contrib/config.yaml:ro
 

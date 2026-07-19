@@ -329,12 +329,17 @@ jobs:
       - name: Run Trivy vulnerability scanner
         # Old un-prefixed tags (0.24.0) were removed upstream; current tags
         # are v-prefixed.
-        uses: aquasecurity/trivy-action@v0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
           format: 'sarif'
           output: 'trivy-results.sarif'
+        env:
+          # The default ghcr.io DB endpoint rate-limits shared runners, which
+          # kills the scan before it produces any SARIF. Use the ECR mirrors.
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db
+          TRIVY_JAVA_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-java-db
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         if: always()

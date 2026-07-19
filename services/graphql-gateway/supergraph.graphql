@@ -1,0 +1,4759 @@
+schema
+  @link(url: "https://specs.apollo.dev/link/v1.0")
+  @link(url: "https://specs.apollo.dev/join/v0.3", for: EXECUTION)
+{
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
+
+directive @join__enumValue(graph: join__Graph!) repeatable on ENUM_VALUE
+
+directive @join__field(graph: join__Graph, requires: join__FieldSet, provides: join__FieldSet, type: String, external: Boolean, override: String, usedOverridden: Boolean) repeatable on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+
+directive @join__graph(name: String!, url: String!) on ENUM_VALUE
+
+directive @join__implements(graph: join__Graph!, interface: String!) repeatable on OBJECT | INTERFACE
+
+directive @join__type(graph: join__Graph!, key: join__FieldSet, extension: Boolean! = false, resolvable: Boolean! = true, isInterfaceObject: Boolean! = false) repeatable on OBJECT | INTERFACE | UNION | ENUM | INPUT_OBJECT | SCALAR
+
+directive @join__unionMember(graph: join__Graph!, member: String!) repeatable on UNION
+
+directive @link(url: String, as: String, for: link__Purpose, import: [link__Import]) repeatable on SCHEMA
+
+type Account
+  @join__type(graph: CRM, key: "id")
+  @join__type(graph: FINANCE, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  ownerId: ID! @join__field(graph: CRM)
+  parentAccountId: ID @join__field(graph: CRM)
+  name: String! @join__field(graph: CRM)
+  website: String @join__field(graph: CRM)
+  phone: String @join__field(graph: CRM)
+  email: String @join__field(graph: CRM)
+  industry: String @join__field(graph: CRM)
+  type: String! @join__field(graph: CRM)
+  tier: String!
+  status: String! @join__field(graph: CRM)
+  annualRevenue: Float
+  employeeCount: Int @join__field(graph: CRM)
+  country: String @join__field(graph: CRM)
+  city: String @join__field(graph: CRM)
+  address: String @join__field(graph: CRM)
+  zipCode: String @join__field(graph: CRM)
+  linkedInUrl: String @join__field(graph: CRM)
+  description: String @join__field(graph: CRM)
+  sicCode: String @join__field(graph: CRM)
+  naicsCode: String @join__field(graph: CRM)
+  healthScore: Int @join__field(graph: CRM)
+  npsScore: Int @join__field(graph: CRM)
+  customFields: JSON @join__field(graph: CRM)
+  lat: Float @join__field(graph: CRM)
+  lng: Float @join__field(graph: CRM)
+  tags: [String!]! @join__field(graph: CRM)
+  dataQualityScore: Int @join__field(graph: CRM)
+  deletedAt: DateTime @join__field(graph: CRM)
+  createdAt: DateTime! @join__field(graph: CRM)
+  updatedAt: DateTime!
+}
+
+type Activity
+  @join__type(graph: CRM, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  ownerId: ID!
+  type: String!
+  subject: String!
+  description: String
+  status: String!
+  priority: String!
+  dueDate: DateTime
+  startDate: DateTime
+  endDate: DateTime
+  duration: Int
+  outcome: String
+  leadId: ID
+  contactId: ID
+  accountId: ID
+  dealId: ID
+  customFields: JSON
+  deletedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type ActivityAnalytics
+  @join__type(graph: ANALYTICS, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  ownerId: String
+  totalActivities: Int!
+  emailsSent: Int!
+  callsMade: Int!
+  meetingsHeld: Int!
+  tasksCompleted: Int!
+  updatedAt: DateTime!
+}
+
+type ApprovalPolicy
+  @join__type(graph: APPROVAL, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  module: String!
+  conditions: JSON!
+  steps: JSON!
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  requests: [ApprovalRequest!]!
+}
+
+type ApprovalRequest
+  @join__type(graph: APPROVAL, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  policyId: String!
+  policy: ApprovalPolicy!
+  module: String!
+  recordId: String!
+  requestedBy: String!
+  status: ApprovalStatus!
+  currentStep: Int!
+  data: JSON!
+  comment: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  steps: [ApprovalStep!]!
+}
+
+enum ApprovalStatus
+  @join__type(graph: APPROVAL)
+{
+  PENDING @join__enumValue(graph: APPROVAL)
+  APPROVED @join__enumValue(graph: APPROVAL)
+  REJECTED @join__enumValue(graph: APPROVAL)
+  ESCALATED @join__enumValue(graph: APPROVAL)
+  CANCELLED @join__enumValue(graph: APPROVAL)
+}
+
+type ApprovalStep
+  @join__type(graph: APPROVAL)
+{
+  id: ID!
+  requestId: String!
+  order: Int!
+  approverId: String!
+  status: StepStatus!
+  comment: String
+  actionedAt: DateTime
+  createdAt: DateTime!
+}
+
+enum ArticleStatus
+  @join__type(graph: KNOWLEDGE)
+{
+  DRAFT @join__enumValue(graph: KNOWLEDGE)
+  PUBLISHED @join__enumValue(graph: KNOWLEDGE)
+  ARCHIVED @join__enumValue(graph: KNOWLEDGE)
+}
+
+type AuthResponse
+  @join__type(graph: AUTH)
+{
+  accessToken: String!
+  refreshToken: String!
+  user: User!
+  expiresIn: Int!
+  mfaRequired: Boolean
+  mfaToken: String
+}
+
+type Badge
+  @join__type(graph: INCENTIVE, key: "id")
+{
+  id: ID!
+  tenantId: String
+  key: String!
+  name: String!
+  description: String!
+  icon: String!
+  condition: JSON!
+  awardedTo: [BadgeAward!]!
+}
+
+type BadgeAward
+  @join__type(graph: INCENTIVE, key: "id")
+{
+  id: ID!
+  badgeId: String!
+  badge: Badge
+  tenantId: String!
+  ownerId: String!
+  awardedAt: DateTime!
+}
+
+input BroadcastInput
+  @join__type(graph: REALTIME)
+{
+  room: String!
+  event: String!
+  payload: JSON!
+}
+
+type CadenceEnrollment
+  @join__type(graph: CADENCE, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  cadenceId: String!
+  cadence: CadenceTemplate!
+  objectType: ObjectType!
+  objectId: String!
+  ownerId: String!
+  status: EnrollmentStatus!
+  currentStep: Int!
+  enrolledAt: DateTime!
+  exitReason: String
+  exitedAt: DateTime
+  executions: [StepExecution!]!
+}
+
+type CadenceStep
+  @join__type(graph: CADENCE)
+{
+  id: ID!
+  cadenceId: String!
+  cadence: CadenceTemplate!
+  position: Int!
+  type: StepType!
+  delayDays: Int!
+  subject: String
+  body: String
+  taskTitle: String
+  variantB: JSON
+  createdAt: DateTime!
+}
+
+type CadenceTemplate
+  @join__type(graph: CADENCE, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  description: String
+  objectType: ObjectType!
+  isActive: Boolean!
+  exitOnReply: Boolean!
+  exitOnMeeting: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  steps: [CadenceStep!]!
+  enrollments: [CadenceEnrollment!]!
+}
+
+enum Channel
+  @join__type(graph: CHATBOT)
+{
+  WHATSAPP @join__enumValue(graph: CHATBOT)
+  TELEGRAM @join__enumValue(graph: CHATBOT)
+}
+
+type CommOutbox
+  @join__type(graph: COMM, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  channel: String!
+  to: String!
+  subject: String
+  body: String!
+  status: String!
+  templateId: String
+  entityType: String
+  entityId: String
+  sentAt: DateTime
+  openedAt: DateTime
+  clickedAt: DateTime
+  errorMessage: String
+  createdAt: DateTime!
+}
+
+type Contact
+  @join__type(graph: CRM, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  ownerId: ID!
+  accountId: ID
+  firstName: String!
+  lastName: String!
+  email: String
+  phone: String
+  mobile: String
+  jobTitle: String
+  department: String
+  linkedInUrl: String
+  twitterHandle: String
+  country: String
+  city: String
+  address: String
+  timezone: String
+  preferredChannel: String
+  doNotEmail: Boolean!
+  doNotCall: Boolean!
+  gdprConsent: Boolean!
+  gdprConsentAt: DateTime
+  lastContactedAt: DateTime
+  customFields: JSON
+  tags: [String!]!
+  isActive: Boolean!
+  dataQualityScore: Int
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Contest
+  @join__type(graph: INCENTIVE, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  description: String
+  metric: ContestMetric!
+  targetValue: String
+  startDate: DateTime!
+  endDate: DateTime!
+  prizeDescription: String
+  isActive: Boolean!
+  createdAt: DateTime!
+  entries: [ContestEntry!]!
+}
+
+type ContestEntry
+  @join__type(graph: INCENTIVE, key: "id")
+{
+  id: ID!
+  contestId: String!
+  contest: Contest
+  tenantId: String!
+  ownerId: String!
+  currentValue: String!
+  rank: Int
+  updatedAt: DateTime!
+}
+
+enum ContestMetric
+  @join__type(graph: INCENTIVE)
+{
+  DEALS_WON_COUNT @join__enumValue(graph: INCENTIVE)
+  DEALS_WON_REVENUE @join__enumValue(graph: INCENTIVE)
+  ACTIVITIES_COMPLETED @join__enumValue(graph: INCENTIVE)
+  LEADS_CONVERTED @join__enumValue(graph: INCENTIVE)
+  NEW_LOGOS @join__enumValue(graph: INCENTIVE)
+}
+
+type Contract
+  @join__type(graph: FINANCE, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  accountId: ID!
+  ownerId: ID!
+  contractNumber: String!
+  name: String!
+  status: String!
+  startDate: DateTime
+  endDate: DateTime
+  autoRenew: Boolean!
+  renewalTermDays: Int!
+  currency: String!
+  totalValue: Float!
+  signedAt: DateTime
+  signedById: ID
+  signatureData: JSON
+  terms: String
+  lineItems: JSON
+  customFields: JSON
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Conversation
+  @join__type(graph: CHATBOT, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  channel: Channel!
+  externalId: String!
+  state: ConversationState!
+  contactId: String
+  draftQuoteId: String
+  context: JSON!
+  lastMessageAt: DateTime!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  messages: [ConversationMessage!]!
+}
+
+type ConversationMessage
+  @join__type(graph: CHATBOT, key: "id")
+{
+  id: ID!
+  conversationId: String!
+  conversation: Conversation
+  direction: Direction!
+  body: String!
+  metadata: JSON!
+  createdAt: DateTime!
+}
+
+enum ConversationState
+  @join__type(graph: CHATBOT)
+{
+  IDLE @join__enumValue(graph: CHATBOT)
+  GREETING @join__enumValue(graph: CHATBOT)
+  COLLECTING_INFO @join__enumValue(graph: CHATBOT)
+  PRODUCT_SEARCH @join__enumValue(graph: CHATBOT)
+  QUOTE_BUILDING @join__enumValue(graph: CHATBOT)
+  QUOTE_REVIEW @join__enumValue(graph: CHATBOT)
+  QUOTE_SENT @join__enumValue(graph: CHATBOT)
+  COMPLETE @join__enumValue(graph: CHATBOT)
+}
+
+input CreateAccountInput
+  @join__type(graph: CRM)
+{
+  tenantId: ID!
+  ownerId: ID!
+  parentAccountId: ID
+  name: String!
+  website: String
+  phone: String
+  email: String
+  industry: String
+  type: String
+  tier: String
+  status: String
+  annualRevenue: Float
+  employeeCount: Int
+  country: String
+  city: String
+  address: String
+  zipCode: String
+  linkedInUrl: String
+  description: String
+  sicCode: String
+  naicsCode: String
+  customFields: JSON
+  lat: Float
+  lng: Float
+  tags: [String!]
+}
+
+input CreateActivityInput
+  @join__type(graph: CRM)
+{
+  tenantId: ID!
+  ownerId: ID!
+  type: String!
+  subject: String!
+  description: String
+  status: String
+  priority: String
+  dueDate: DateTime
+  startDate: DateTime
+  endDate: DateTime
+  duration: Int
+  outcome: String
+  leadId: ID
+  contactId: ID
+  accountId: ID
+  dealId: ID
+  customFields: JSON
+}
+
+input CreateApprovalPolicyInput
+  @join__type(graph: APPROVAL)
+{
+  tenantId: String!
+  name: String!
+  module: String!
+  conditions: JSON
+  steps: JSON
+  isActive: Boolean
+}
+
+input CreateApprovalRequestInput
+  @join__type(graph: APPROVAL)
+{
+  tenantId: String!
+  policyId: ID!
+  module: String!
+  recordId: String!
+  requestedBy: String!
+  status: ApprovalStatus
+  currentStep: Int
+  data: JSON
+  comment: String
+}
+
+input CreateApprovalStepInput
+  @join__type(graph: APPROVAL)
+{
+  requestId: ID!
+  order: Int!
+  approverId: String!
+  status: StepStatus
+  comment: String
+  actionedAt: DateTime
+}
+
+input CreateBadgeAwardInput
+  @join__type(graph: INCENTIVE)
+{
+  badgeId: String!
+  tenantId: String!
+  ownerId: String!
+}
+
+input CreateBadgeInput
+  @join__type(graph: INCENTIVE)
+{
+  tenantId: String
+  key: String!
+  name: String!
+  description: String!
+  icon: String!
+  condition: JSON!
+}
+
+input CreateCadenceEnrollmentInput
+  @join__type(graph: CADENCE)
+{
+  tenantId: String!
+  cadenceId: ID!
+  objectType: ObjectType!
+  objectId: String!
+  ownerId: String!
+  status: EnrollmentStatus
+  currentStep: Int
+  enrolledAt: DateTime
+  exitReason: String
+  exitedAt: DateTime
+}
+
+input CreateCadenceStepInput
+  @join__type(graph: CADENCE)
+{
+  cadenceId: ID!
+  position: Int!
+  type: StepType!
+  delayDays: Int
+  subject: String
+  body: String
+  taskTitle: String
+  variantB: JSON
+}
+
+input CreateCadenceTemplateInput
+  @join__type(graph: CADENCE)
+{
+  tenantId: String!
+  name: String!
+  description: String
+  objectType: ObjectType
+  isActive: Boolean
+  exitOnReply: Boolean
+  exitOnMeeting: Boolean
+}
+
+input CreateCommOutboxInput
+  @join__type(graph: COMM)
+{
+  tenantId: String!
+  channel: String!
+  to: String!
+  subject: String
+  body: String!
+  templateId: String
+  entityType: String
+  entityId: String
+}
+
+input CreateContactInput
+  @join__type(graph: CRM)
+{
+  tenantId: ID!
+  ownerId: ID!
+  accountId: ID
+  firstName: String!
+  lastName: String!
+  email: String
+  phone: String
+  mobile: String
+  jobTitle: String
+  department: String
+  linkedInUrl: String
+  twitterHandle: String
+  country: String
+  city: String
+  address: String
+  timezone: String
+  preferredChannel: String
+  customFields: JSON
+  tags: [String!]
+}
+
+input CreateContestEntryInput
+  @join__type(graph: INCENTIVE)
+{
+  contestId: String!
+  tenantId: String!
+  ownerId: String!
+  currentValue: String
+}
+
+input CreateContestInput
+  @join__type(graph: INCENTIVE)
+{
+  tenantId: String!
+  name: String!
+  description: String
+  metric: ContestMetric!
+  targetValue: String
+  startDate: DateTime!
+  endDate: DateTime!
+  prizeDescription: String
+}
+
+input CreateContractInput
+  @join__type(graph: FINANCE)
+{
+  tenantId: ID!
+  accountId: ID!
+  ownerId: ID!
+  contractNumber: String!
+  name: String!
+  status: String
+  startDate: DateTime
+  endDate: DateTime
+  autoRenew: Boolean
+  renewalTermDays: Int
+  currency: String
+  totalValue: Float!
+  signedById: ID
+  signatureData: JSON
+  terms: String
+  lineItems: JSON
+  customFields: JSON
+}
+
+input CreateConversationInput
+  @join__type(graph: CHATBOT)
+{
+  tenantId: String!
+  channel: Channel!
+  externalId: String!
+  contactId: String
+  draftQuoteId: String
+  context: JSON
+}
+
+input CreateConversationMessageInput
+  @join__type(graph: CHATBOT)
+{
+  conversationId: String!
+  direction: Direction!
+  body: String!
+  metadata: JSON
+}
+
+input CreateCurrencyInput
+  @join__type(graph: FINANCE)
+{
+  tenantId: ID!
+  code: String!
+  name: String!
+  symbol: String!
+  isBase: Boolean
+  isActive: Boolean
+  decimalPlaces: Int
+}
+
+input CreateCustomFieldDefinitionInput
+  @join__type(graph: METADATA)
+{
+  tenantId: String!
+  entityType: String!
+  name: String!
+  apiKey: String!
+  fieldType: String!
+  options: JSON
+  required: Boolean
+  showOnCard: Boolean
+  position: Int
+}
+
+input CreateDashboardInput
+  @join__type(graph: REPORTING)
+{
+  tenantId: String!
+  name: String!
+  ownerId: String!
+  isShared: Boolean
+  isPinned: Boolean
+}
+
+input CreateDashboardWidgetInput
+  @join__type(graph: REPORTING)
+{
+  tenantId: String!
+  dashboardId: ID!
+  title: String!
+  widgetType: String!
+  reportId: ID
+  config: JSON
+  position: Int
+  width: Int
+  height: Int
+}
+
+input CreateDealInput
+  @join__type(graph: CRM)
+{
+  tenantId: ID!
+  ownerId: ID!
+  accountId: ID!
+  pipelineId: ID!
+  stageId: ID!
+  name: String!
+  amount: Float
+  currency: String
+  probability: Int
+  expectedCloseDate: DateTime
+  status: String
+  forecastCategory: String
+  source: String
+  campaignId: ID
+  customFields: JSON
+  tags: [String!]
+}
+
+input CreateDealTemplateInput
+  @join__type(graph: BLUEPRINT)
+{
+  tenantId: String!
+  name: String!
+  description: String
+  pipelineId: String
+  fields: JSON
+}
+
+input CreateDocumentInput
+  @join__type(graph: DOCUMENT)
+{
+  tenantId: String!
+  ownerId: String!
+  name: String!
+  description: String
+  mimeType: String!
+  sizeBytes: Int!
+  storageKey: String!
+  folderId: String
+  tags: [String!]
+}
+
+input CreateDocumentPermissionInput
+  @join__type(graph: DOCUMENT)
+{
+  documentId: String!
+  userId: String!
+  role: String!
+}
+
+input CreateDocumentVersionInput
+  @join__type(graph: DOCUMENT)
+{
+  documentId: String!
+  versionNumber: Int!
+  storageKey: String!
+  sizeBytes: Int!
+  createdById: String!
+}
+
+input CreateDuplicateGroupInput
+  @join__type(graph: METADATA)
+{
+  tenantId: String!
+  entityType: String!
+  masterRecordId: String
+}
+
+input CreateEmailConnectionInput
+  @join__type(graph: EMAIL_SYNC)
+{
+  tenantId: String!
+  userId: String!
+  provider: String!
+  email: String!
+  accessToken: String!
+  refreshToken: String
+  tokenExpiry: DateTime
+}
+
+input CreateEmailMessageInput
+  @join__type(graph: EMAIL_SYNC)
+{
+  tenantId: String!
+  userId: String!
+  provider: String!
+  messageId: String!
+  threadId: String!
+  subject: String!
+  from: String!
+  to: String!
+  snippet: String
+  body: String!
+  isRead: Boolean
+  isInbound: Boolean!
+  sentAt: DateTime!
+  contactId: String
+  dealId: String
+}
+
+input CreateEmailSequenceInput
+  @join__type(graph: COMM)
+{
+  tenantId: String!
+  name: String!
+  triggerType: String!
+}
+
+input CreateEmailTemplateInput
+  @join__type(graph: COMM)
+{
+  tenantId: String!
+  name: String!
+  subject: String!
+  htmlBody: String!
+  textBody: String!
+  variables: [String!]
+  category: String
+}
+
+input CreateFieldAuditLogInput
+  @join__type(graph: DATA)
+{
+  tenantId: String!
+  module: String!
+  recordId: String!
+  fieldName: String!
+  oldValue: String
+  newValue: String
+  changedBy: String!
+}
+
+input CreateFieldChangeLogInput
+  @join__type(graph: METADATA)
+{
+  tenantId: String!
+  objectType: String!
+  objectId: String!
+  fieldName: String!
+  oldValue: String
+  newValue: String
+  changedBy: String!
+  changedByName: String
+}
+
+input CreateFieldPermissionInput
+  @join__type(graph: METADATA)
+{
+  tenantId: String!
+  objectType: String!
+  fieldName: String!
+  allowedRoles: JSON!
+}
+
+input CreateFileAttachmentInput
+  @join__type(graph: STORAGE)
+{
+  tenantId: String!
+  uploadedBy: String!
+  entityType: String!
+  entityId: String!
+  filename: String!
+  storedKey: String!
+  mimeType: String!
+  sizeBytes: Int!
+  url: String
+}
+
+input CreateFolderInput
+  @join__type(graph: DOCUMENT)
+{
+  tenantId: String!
+  name: String!
+  parentId: String
+}
+
+input CreateForecastOverrideInput
+  @join__type(graph: PLANNING)
+{
+  tenantId: String!
+  periodKey: String!
+  repId: String!
+  managerId: String!
+  originalValue: String!
+  overrideValue: String!
+  note: String
+  scopePipelineId: String
+}
+
+input CreateForecastReviewInput
+  @join__type(graph: PLANNING)
+{
+  submissionId: String!
+  reviewerId: String!
+  adjustedCommit: String
+  adjustedBest: String
+  note: String
+}
+
+input CreateForecastSubmissionInput
+  @join__type(graph: PLANNING)
+{
+  tenantId: String!
+  ownerId: String!
+  period: String!
+  commitAmount: String!
+  bestCaseAmount: String!
+  pipelineAmount: String!
+  commentary: String
+}
+
+input CreateGeocodedAccountInput
+  @join__type(graph: INTEGRATION)
+{
+  tenantId: String!
+  accountId: String!
+  lat: Float!
+  lng: Float!
+}
+
+input CreateImportJobInput
+  @join__type(graph: DATA)
+{
+  tenantId: String!
+  module: String!
+  fileName: String!
+  fieldMap: JSON
+  createdBy: String!
+}
+
+input CreateInvoiceInput
+  @join__type(graph: FINANCE)
+{
+  tenantId: ID!
+  accountId: ID!
+  subscriptionId: ID
+  contractId: ID
+  invoiceNumber: String!
+  status: String
+  currency: String
+  subtotal: Float!
+  taxAmount: Float
+  discountAmount: Float
+  total: Float!
+  dueDate: DateTime
+  lineItems: JSON
+  notes: String
+  customFields: JSON
+}
+
+input CreateJourneyEnrollmentInput
+  @join__type(graph: WORKFLOW)
+{
+  tenantId: String!
+  journeyId: ID!
+  contactId: String!
+  currentNodeId: String
+  status: EnrollmentStatus
+  enteredAt: DateTime
+  exitedAt: DateTime
+  exitReason: String
+  metadata: JSON
+}
+
+input CreateJourneyInput
+  @join__type(graph: WORKFLOW)
+{
+  tenantId: String!
+  name: String!
+  description: String
+  status: JourneyStatus
+  entryTrigger: String!
+  entryConfig: JSON
+  nodes: JSON!
+  edges: JSON!
+  settings: JSON
+}
+
+input CreateKbArticleInput
+  @join__type(graph: KNOWLEDGE)
+{
+  categoryId: String
+  title: String!
+  slug: String!
+  body: String!
+  tags: [String!]
+  status: ArticleStatus
+  authorId: String!
+  dealStages: [String!]
+}
+
+input CreateKbCategoryInput
+  @join__type(graph: KNOWLEDGE)
+{
+  name: String!
+  icon: String
+  position: Int
+  parentCategoryId: String
+}
+
+input CreateKbViewInput
+  @join__type(graph: KNOWLEDGE)
+{
+  articleId: String!
+  viewedBy: String!
+  dealStage: String
+}
+
+input CreateLeadInput
+  @join__type(graph: CRM)
+{
+  tenantId: ID!
+  ownerId: ID!
+  firstName: String!
+  lastName: String!
+  email: String
+  phone: String
+  company: String
+  jobTitle: String
+  source: String
+  status: String
+  rating: String
+  industry: String
+  website: String
+  annualRevenue: Float
+  employeeCount: Int
+  country: String
+  city: String
+  address: String
+  linkedInUrl: String
+  twitterHandle: String
+  customFields: JSON
+  tags: [String!]
+}
+
+input CreateLeadRoutingLogInput
+  @join__type(graph: TERRITORY)
+{
+  tenantId: String!
+  leadId: String!
+  matchedTerritoryId: ID
+  assignedOwnerId: String
+  routedAt: DateTime
+}
+
+input CreateNoteInput
+  @join__type(graph: CRM)
+{
+  tenantId: ID!
+  authorId: ID!
+  content: String!
+  isPinned: Boolean
+  leadId: ID
+  contactId: ID
+  accountId: ID
+  dealId: ID
+}
+
+input CreateNotificationInput
+  @join__type(graph: NOTIFICATION)
+{
+  tenantId: String!
+  userId: String!
+  type: String!
+  title: String!
+  body: String!
+  entityType: String
+  entityId: String
+  actionUrl: String
+  channel: String
+  metadata: JSON
+}
+
+input CreateOAuthConnectionInput
+  @join__type(graph: INTEGRATION)
+{
+  tenantId: String!
+  userId: String!
+  provider: String!
+  scope: String!
+  accessToken: String!
+  refreshToken: String
+  expiresAt: DateTime
+  email: String
+}
+
+input CreatePaymentInput
+  @join__type(graph: FINANCE)
+{
+  tenantId: ID!
+  invoiceId: ID!
+  amount: Float!
+  currency: String
+  method: String!
+  status: String
+  reference: String
+  gateway: String
+  gatewayRef: String
+  notes: String
+  paidAt: DateTime
+}
+
+input CreatePipelineInput
+  @join__type(graph: CRM)
+{
+  tenantId: ID!
+  name: String!
+  type: String
+  currency: String
+  isDefault: Boolean
+  isActive: Boolean
+  description: String
+  ownedBy: String
+}
+
+input CreatePipelineSnapshotInput
+  @join__type(graph: REPORTING)
+{
+  tenantId: String!
+  pipelineId: String!
+  snapshotDate: DateTime!
+  stage: String!
+  dealCount: Int
+  totalValue: String
+  dealIds: JSON
+}
+
+input CreatePlaybookInput
+  @join__type(graph: BLUEPRINT)
+{
+  tenantId: String!
+  name: String!
+  description: String
+  pipelineId: String
+}
+
+input CreatePlaybookStageInput
+  @join__type(graph: BLUEPRINT)
+{
+  tenantId: String!
+  playbookId: String!
+  stageId: String!
+  stageName: String!
+  position: Int!
+  entryActions: JSON
+  exitCriteria: JSON
+  requiredFields: [String!]
+  talkingPoints: [String!]
+  resources: JSON
+}
+
+input CreatePortalAuditLogInput
+  @join__type(graph: PORTAL)
+{
+  tenantId: String!
+  token: String!
+  entityType: String!
+  entityId: String!
+  action: String!
+  ipAddress: String
+  userAgent: String
+}
+
+input CreatePortalTokenInput
+  @join__type(graph: PORTAL)
+{
+  tenantId: String!
+  entityType: EntityType!
+  entityId: String!
+  expiresAt: DateTime!
+  createdBy: String!
+}
+
+input CreatePriceTierInput
+  @join__type(graph: FINANCE)
+{
+  tenantId: ID!
+  productId: ID!
+  name: String!
+  minQty: Int
+  maxQty: Int
+  unitPrice: Float!
+}
+
+input CreateProductInput
+  @join__type(graph: FINANCE)
+{
+  tenantId: ID!
+  sku: String!
+  name: String!
+  nameAr: String
+  description: String
+  descriptionAr: String
+  unitAr: String
+  type: String
+  category: String
+  currency: String
+  listPrice: Float!
+  cost: Float
+  billingType: String
+  billingPeriod: String
+  taxable: Boolean
+  taxCode: String
+  isActive: Boolean
+  pricingRules: JSON
+  customFields: JSON
+}
+
+input CreatePromoCodeInput
+  @join__type(graph: FINANCE)
+{
+  tenantId: ID!
+  code: String!
+  description: String
+  discountPercent: Float
+  isActive: Boolean
+  validFrom: DateTime
+  validUntil: DateTime
+  maxUses: Int
+  applicableProductIds: [String!]
+}
+
+input CreateQuotaPlanInput
+  @join__type(graph: PLANNING)
+{
+  tenantId: String!
+  name: String!
+  year: Int!
+  quarter: Int
+  type: QuotaType
+  currency: String
+}
+
+input CreateQuotaTargetInput
+  @join__type(graph: PLANNING)
+{
+  planId: String!
+  tenantId: String!
+  ownerId: String!
+  targetValue: String!
+  currency: String
+}
+
+input CreateQuoteInput
+  @join__type(graph: FINANCE)
+{
+  tenantId: ID!
+  dealId: ID!
+  accountId: ID!
+  ownerId: ID!
+  quoteNumber: String!
+  name: String!
+  status: String
+  currency: String
+  subtotal: Float
+  discountAmount: Float
+  taxAmount: Float
+  total: Float
+  validUntil: DateTime
+  expiresAt: DateTime
+  approvalRequired: Boolean
+  paymentTerms: String
+  terms: String
+  notes: String
+  appliedPromos: [String!]
+  lineItems: JSON
+  pricingBreakdown: JSON
+  customFields: JSON
+  baseCurrency: String
+  baseTotal: Float
+  exchangeRate: Float
+  taxZoneId: ID
+  taxBreakdown: JSON
+  templateId: ID
+  rfqId: ID
+  marginTotal: Float
+  priceBookId: ID
+  vendorTaxReg: String
+  buyerTaxReg: String
+  dueDate: DateTime
+}
+
+input CreateRecentRecordInput
+  @join__type(graph: DATA)
+{
+  tenantId: String!
+  userId: String!
+  module: String!
+  recordId: String!
+}
+
+input CreateRecycleBinItemInput
+  @join__type(graph: DATA)
+{
+  tenantId: String!
+  module: String!
+  recordId: String!
+  recordSnapshot: JSON!
+  deletedBy: String!
+  expiresAt: DateTime!
+}
+
+input CreateReportScheduleInput
+  @join__type(graph: REPORTING)
+{
+  tenantId: String!
+  reportId: ID!
+  cron: String!
+  format: String
+  recipients: [String!]
+  subject: String
+  lastRunAt: DateTime
+  nextRunAt: DateTime
+  isActive: Boolean
+}
+
+input CreateRoundRobinStateInput
+  @join__type(graph: TERRITORY)
+{
+  tenantId: String!
+  territoryId: String!
+  lastIndex: Int
+}
+
+input CreateSavedReportInput
+  @join__type(graph: REPORTING)
+{
+  tenantId: String!
+  name: String!
+  description: String
+  objectType: String!
+  columns: JSON
+  filters: JSON
+  groupBy: String
+  sortBy: String
+  sortDir: String
+  isShared: Boolean
+  ownerId: String!
+  folderId: ID
+}
+
+input CreateSavedViewInput
+  @join__type(graph: DATA)
+{
+  tenantId: String!
+  userId: String!
+  module: String!
+  name: String!
+  filters: JSON
+  columns: JSON
+  sortBy: String
+  sortDir: String
+  isDefault: Boolean
+}
+
+input CreateSequenceEnrollmentInput
+  @join__type(graph: COMM)
+{
+  tenantId: String!
+  sequenceId: String!
+  contactId: String!
+  nextSendAt: DateTime
+}
+
+input CreateSequenceStepInput
+  @join__type(graph: COMM)
+{
+  sequenceId: String!
+  stepNumber: Int!
+  delayDays: Int
+  templateId: String!
+}
+
+input CreateSmsTemplateInput
+  @join__type(graph: COMM)
+{
+  tenantId: String!
+  name: String!
+  body: String!
+  variables: [String!]
+}
+
+input CreateStageInput
+  @join__type(graph: CRM)
+{
+  tenantId: ID!
+  pipelineId: ID!
+  name: String!
+  order: Int!
+  probability: Int
+  rottenDays: Int
+  requiredFields: JSON
+  entryConditions: JSON
+  color: String
+  isWon: Boolean
+  isLost: Boolean
+}
+
+input CreateStageTransitionRuleInput
+  @join__type(graph: BLUEPRINT)
+{
+  tenantId: String!
+  pipelineId: String!
+  fromStageId: String!
+  toStageId: String!
+  rules: JSON!
+}
+
+input CreateStepExecutionInput
+  @join__type(graph: CADENCE)
+{
+  enrollmentId: ID!
+  stepPosition: Int!
+  stepType: StepType!
+  status: ExecutionStatus
+  scheduledAt: DateTime!
+  executedAt: DateTime
+  result: String
+  variant: String
+}
+
+input CreateSubscriptionInput
+  @join__type(graph: FINANCE)
+{
+  tenantId: ID!
+  accountId: ID!
+  contractId: ID
+  productId: ID!
+  planName: String!
+  status: String
+  quantity: Int
+  unitPrice: Float!
+  currency: String
+  billingPeriod: String
+  billingDay: Int
+  startDate: DateTime!
+  endDate: DateTime
+  trialEndDate: DateTime
+  cancelledAt: DateTime
+  cancelReason: String
+  mrr: Float!
+  arr: Float!
+  nextBillingDate: DateTime
+  customFields: JSON
+}
+
+input CreateSyncedCalendarEventInput
+  @join__type(graph: INTEGRATION)
+{
+  tenantId: String!
+  activityId: String!
+  provider: String!
+  externalId: String!
+  etag: String
+}
+
+input CreateSyncJobInput
+  @join__type(graph: INTEGRATION)
+{
+  tenantId: String!
+  connectionId: String!
+  jobType: String!
+}
+
+input CreateTagInput
+  @join__type(graph: METADATA)
+{
+  tenantId: String!
+  name: String!
+  color: String
+  entityType: String
+}
+
+input CreateTaxRateInput
+  @join__type(graph: FINANCE)
+{
+  tenantId: ID!
+  zoneId: ID!
+  name: String!
+  code: String!
+  rate: Float!
+  taxType: String
+  isDefault: Boolean
+  isActive: Boolean
+}
+
+input CreateTaxZoneInput
+  @join__type(graph: FINANCE)
+{
+  tenantId: ID!
+  name: String!
+  country: String
+  isActive: Boolean
+}
+
+input CreateTenantInput
+  @join__type(graph: AUTH)
+{
+  name: String!
+  domain: String
+  settings: JSON
+}
+
+input CreateTerritoryInput
+  @join__type(graph: TERRITORY)
+{
+  tenantId: String!
+  name: String!
+  description: String
+  type: TerritoryType
+  ownerIds: [String!]
+  teamId: String
+  priority: Int
+  isActive: Boolean
+  currency: String
+}
+
+input CreateTerritoryRuleInput
+  @join__type(graph: TERRITORY)
+{
+  territoryId: ID!
+  field: String!
+  operator: String!
+  value: String!
+}
+
+input CreateUserInput
+  @join__type(graph: AUTH)
+{
+  email: String!
+  password: String!
+  firstName: String
+  lastName: String
+  roleId: ID!
+  tenantId: ID!
+}
+
+input CreateValidationRuleInput
+  @join__type(graph: METADATA)
+{
+  tenantId: String!
+  objectType: String!
+  name: String!
+  condition: JSON!
+  requirement: JSON!
+  errorMessage: String!
+}
+
+input CreateWebhookSubscriptionInput
+  @join__type(graph: INTEGRATION)
+{
+  tenantId: String!
+  name: String!
+  targetUrl: String!
+  secret: String!
+  events: [String!]
+}
+
+input CreateWhatsAppMessageInput
+  @join__type(graph: COMM)
+{
+  tenantId: String!
+  contactId: String
+  dealId: String
+  direction: String!
+  from: String!
+  to: String!
+  body: String!
+  status: String!
+  externalId: String
+  sentBy: String
+}
+
+input CreateWorkflowExecutionInput
+  @join__type(graph: WORKFLOW)
+{
+  tenantId: String!
+  workflowId: ID!
+  triggerType: String!
+  triggerPayload: JSON!
+  status: ExecutionStatus
+  currentNodeId: String
+  resumeAt: DateTime
+  startedAt: DateTime
+  completedAt: DateTime
+  error: String
+  parentForkId: String
+  parentExecId: String
+}
+
+input CreateWorkflowTemplateInput
+  @join__type(graph: WORKFLOW)
+{
+  tenantId: String!
+  name: String!
+  description: String
+  trigger: String!
+  triggerConditions: JSON
+  nodes: JSON!
+  edges: JSON!
+  isActive: Boolean
+}
+
+type Currency
+  @join__type(graph: FINANCE, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  code: String!
+  name: String!
+  symbol: String!
+  isBase: Boolean!
+  isActive: Boolean!
+  decimalPlaces: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type CustomFieldDefinition
+  @join__type(graph: METADATA, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  entityType: String!
+  name: String!
+  apiKey: String!
+  fieldType: String!
+  options: JSON!
+  required: Boolean!
+  showOnCard: Boolean!
+  position: Int!
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Dashboard
+  @join__type(graph: REPORTING, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  ownerId: String!
+  isShared: Boolean!
+  isPinned: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  widgets: [DashboardWidget!]!
+}
+
+type DashboardWidget
+  @join__type(graph: REPORTING)
+{
+  id: ID!
+  tenantId: String!
+  dashboardId: String!
+  dashboard: Dashboard!
+  title: String!
+  widgetType: String!
+  reportId: String
+  config: JSON!
+  position: Int!
+  width: Int!
+  height: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+scalar DateTime
+  @join__type(graph: ANALYTICS)
+  @join__type(graph: APPROVAL)
+  @join__type(graph: AUTH)
+  @join__type(graph: BLUEPRINT)
+  @join__type(graph: CADENCE)
+  @join__type(graph: CHATBOT)
+  @join__type(graph: COMM)
+  @join__type(graph: CRM)
+  @join__type(graph: DATA)
+  @join__type(graph: DOCUMENT)
+  @join__type(graph: EMAIL_SYNC)
+  @join__type(graph: FINANCE)
+  @join__type(graph: INCENTIVE)
+  @join__type(graph: INTEGRATION)
+  @join__type(graph: KNOWLEDGE)
+  @join__type(graph: METADATA)
+  @join__type(graph: NOTIFICATION)
+  @join__type(graph: PLANNING)
+  @join__type(graph: PORTAL)
+  @join__type(graph: REALTIME)
+  @join__type(graph: REPORTING)
+  @join__type(graph: SEARCH)
+  @join__type(graph: STORAGE)
+  @join__type(graph: TERRITORY)
+  @join__type(graph: WORKFLOW)
+
+type Deal
+  @join__type(graph: CRM, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  ownerId: ID!
+  accountId: ID!
+  pipelineId: ID!
+  stageId: ID!
+  name: String!
+  amount: Float!
+  currency: String!
+  probability: Int!
+  expectedCloseDate: DateTime
+  actualCloseDate: DateTime
+  status: String!
+  lostReason: String
+  lostDetail: String
+  forecastCategory: String!
+  meddicicScore: Int!
+  meddicicData: JSON
+  aiWinProbability: Float
+  aiInsights: JSON
+  competitors: [String!]!
+  source: String
+  campaignId: ID
+  customFields: JSON
+  tags: [String!]!
+  version: Int!
+  closeReason: String
+  dataQualityScore: Int
+  deletedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type DealTemplate
+  @join__type(graph: BLUEPRINT, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  description: String
+  pipelineId: String
+  fields: JSON!
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+enum DeliveryStatus
+  @join__type(graph: INTEGRATION)
+{
+  PENDING @join__enumValue(graph: INTEGRATION)
+  DELIVERED @join__enumValue(graph: INTEGRATION)
+  FAILED @join__enumValue(graph: INTEGRATION)
+  RETRYING @join__enumValue(graph: INTEGRATION)
+}
+
+enum Direction
+  @join__type(graph: CHATBOT)
+{
+  INBOUND @join__enumValue(graph: CHATBOT)
+  OUTBOUND @join__enumValue(graph: CHATBOT)
+}
+
+type Document
+  @join__type(graph: DOCUMENT, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  ownerId: String!
+  name: String!
+  description: String
+  mimeType: String!
+  sizeBytes: Int!
+  storageKey: String!
+  folderId: String
+  folder: Folder
+  versions: [DocumentVersion!]!
+  permissions: [DocumentPermission!]!
+  tags: [String!]!
+  isDeleted: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type DocumentPermission
+  @join__type(graph: DOCUMENT, key: "id")
+{
+  id: ID!
+  documentId: String!
+  document: Document
+  userId: String!
+  role: String!
+  createdAt: DateTime!
+}
+
+type DocumentVersion
+  @join__type(graph: DOCUMENT, key: "id")
+{
+  id: ID!
+  documentId: String!
+  document: Document
+  versionNumber: Int!
+  storageKey: String!
+  sizeBytes: Int!
+  createdById: String!
+  createdAt: DateTime!
+}
+
+type DuplicateGroup
+  @join__type(graph: METADATA, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  entityType: String!
+  status: String!
+  masterRecordId: String
+  createdAt: DateTime!
+  resolvedAt: DateTime
+  resolvedBy: String
+  records: [DuplicateRecord!]!
+}
+
+type DuplicateRecord
+  @join__type(graph: METADATA, key: "id")
+{
+  id: ID!
+  groupId: String!
+  group: DuplicateGroup
+  recordId: String!
+  score: Float!
+  isMaster: Boolean!
+  snapshot: JSON!
+}
+
+type EmailConnection
+  @join__type(graph: EMAIL_SYNC, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  userId: String!
+  provider: String!
+  email: String!
+  accessToken: String!
+  refreshToken: String
+  tokenExpiry: DateTime
+  syncEnabled: Boolean!
+  lastSyncAt: DateTime
+  createdAt: DateTime!
+}
+
+type EmailMessage
+  @join__type(graph: EMAIL_SYNC, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  userId: String!
+  provider: String!
+  messageId: String!
+  threadId: String!
+  subject: String!
+  from: String!
+  to: String!
+  snippet: String
+  body: String!
+  isRead: Boolean!
+  isInbound: Boolean!
+  sentAt: DateTime!
+  contactId: String
+  dealId: String
+  createdAt: DateTime!
+}
+
+type EmailSequence
+  @join__type(graph: COMM, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  triggerType: String!
+  isActive: Boolean!
+  steps: [SequenceStep!]!
+  enrollments: [SequenceEnrollment!]!
+  createdAt: DateTime!
+}
+
+type EmailTemplate
+  @join__type(graph: COMM, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  subject: String!
+  htmlBody: String!
+  textBody: String!
+  variables: [String!]!
+  category: String!
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type EmailThread
+  @join__type(graph: EMAIL_SYNC, key: "id")
+{
+  id: ID!
+  userId: String!
+  subject: String!
+  from: String!
+  snippet: String
+  sentAt: DateTime!
+  isRead: Boolean!
+  messageCount: Int!
+  dealId: String
+  contactId: String
+}
+
+enum EnrollmentStatus
+  @join__type(graph: CADENCE)
+  @join__type(graph: WORKFLOW)
+{
+  ACTIVE @join__enumValue(graph: CADENCE) @join__enumValue(graph: WORKFLOW)
+  PAUSED @join__enumValue(graph: CADENCE) @join__enumValue(graph: WORKFLOW)
+  COMPLETED @join__enumValue(graph: CADENCE) @join__enumValue(graph: WORKFLOW)
+  EXITED @join__enumValue(graph: CADENCE) @join__enumValue(graph: WORKFLOW)
+}
+
+enum EntityType
+  @join__type(graph: PORTAL)
+{
+  QUOTE @join__enumValue(graph: PORTAL)
+  CONTRACT @join__enumValue(graph: PORTAL)
+  INVOICE @join__enumValue(graph: PORTAL)
+  ACCOUNT @join__enumValue(graph: PORTAL)
+}
+
+enum ExecutionStatus
+  @join__type(graph: CADENCE)
+  @join__type(graph: WORKFLOW)
+{
+  PENDING @join__enumValue(graph: CADENCE) @join__enumValue(graph: WORKFLOW)
+  EXECUTED @join__enumValue(graph: CADENCE) @join__enumValue(graph: WORKFLOW)
+  SKIPPED @join__enumValue(graph: CADENCE) @join__enumValue(graph: WORKFLOW)
+  FAILED @join__enumValue(graph: CADENCE) @join__enumValue(graph: WORKFLOW)
+  RUNNING @join__enumValue(graph: CADENCE) @join__enumValue(graph: WORKFLOW)
+  PAUSED @join__enumValue(graph: CADENCE) @join__enumValue(graph: WORKFLOW)
+  COMPLETED @join__enumValue(graph: CADENCE) @join__enumValue(graph: WORKFLOW)
+  CANCELLED @join__enumValue(graph: CADENCE) @join__enumValue(graph: WORKFLOW)
+}
+
+type FieldAuditLog
+  @join__type(graph: DATA, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  module: String!
+  recordId: String!
+  fieldName: String!
+  oldValue: String
+  newValue: String
+  changedBy: String!
+  changedAt: DateTime!
+}
+
+type FieldChangeLog
+  @join__type(graph: METADATA, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  objectType: String!
+  objectId: String!
+  fieldName: String!
+  oldValue: String
+  newValue: String
+  changedBy: String!
+  changedByName: String
+  changedAt: DateTime!
+}
+
+type FieldPermission
+  @join__type(graph: METADATA, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  objectType: String!
+  fieldName: String!
+  allowedRoles: JSON!
+  createdAt: DateTime!
+}
+
+type FileAttachment
+  @join__type(graph: STORAGE, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  uploadedBy: String!
+  entityType: String!
+  entityId: String!
+  filename: String!
+  storedKey: String!
+  mimeType: String!
+  sizeBytes: Int!
+  url: String
+  createdAt: DateTime!
+}
+
+type Folder
+  @join__type(graph: DOCUMENT, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  parentId: String
+  parent: Folder
+  children: [Folder!]!
+  documents: [Document!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type ForecastAnalytics
+  @join__type(graph: ANALYTICS, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  period: String!
+  weightedForecast: String!
+  bestCaseForecast: String!
+  commitForecast: String!
+  pipelineCoverage: String!
+  updatedAt: DateTime!
+}
+
+type ForecastOverride
+  @join__type(graph: PLANNING, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  periodKey: String!
+  repId: String!
+  managerId: String!
+  originalValue: String!
+  overrideValue: String!
+  note: String
+  scopePipelineId: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type ForecastReview
+  @join__type(graph: PLANNING, key: "id")
+{
+  id: ID!
+  submissionId: String!
+  submission: ForecastSubmission
+  reviewerId: String!
+  adjustedCommit: String
+  adjustedBest: String
+  note: String
+  reviewedAt: DateTime!
+}
+
+type ForecastSubmission
+  @join__type(graph: PLANNING, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  ownerId: String!
+  period: String!
+  commitAmount: String!
+  bestCaseAmount: String!
+  pipelineAmount: String!
+  commentary: String
+  submittedAt: DateTime!
+  reviews: [ForecastReview!]!
+}
+
+type GeocodedAccount
+  @join__type(graph: INTEGRATION, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  accountId: String!
+  lat: Float!
+  lng: Float!
+  geocodedAt: DateTime!
+}
+
+type Health
+  @join__type(graph: ANALYTICS)
+  @join__type(graph: REALTIME)
+  @join__type(graph: SEARCH)
+{
+  status: String!
+  service: String!
+}
+
+type ImportJob
+  @join__type(graph: DATA, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  module: String!
+  status: ImportStatus!
+  fileName: String!
+  totalRows: Int!
+  imported: Int!
+  failed: Int!
+  errors: JSON!
+  fieldMap: JSON!
+  createdBy: String!
+  createdAt: DateTime!
+  completedAt: DateTime
+}
+
+enum ImportStatus
+  @join__type(graph: DATA)
+{
+  PENDING @join__enumValue(graph: DATA)
+  PROCESSING @join__enumValue(graph: DATA)
+  COMPLETED @join__enumValue(graph: DATA)
+  FAILED @join__enumValue(graph: DATA)
+}
+
+input IndexDocumentInput
+  @join__type(graph: SEARCH)
+{
+  index: String!
+  documentId: String!
+  data: JSON!
+}
+
+type Invoice
+  @join__type(graph: FINANCE, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  accountId: ID!
+  subscriptionId: ID
+  contractId: ID
+  invoiceNumber: String!
+  status: String!
+  currency: String!
+  subtotal: Float!
+  taxAmount: Float!
+  discountAmount: Float!
+  total: Float!
+  dueDate: DateTime
+  paidAt: DateTime
+  paidAmount: Float
+  lineItems: JSON
+  notes: String
+  customFields: JSON
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+scalar join__FieldSet
+
+enum join__Graph {
+  ANALYTICS @join__graph(name: "analytics", url: "http://analytics-service:3008/graphql")
+  APPROVAL @join__graph(name: "approval", url: "http://approval-service:3014/graphql")
+  AUTH @join__graph(name: "auth", url: "http://auth-service:3000/graphql")
+  BLUEPRINT @join__graph(name: "blueprint", url: "http://blueprint-service:3013/graphql")
+  CADENCE @join__graph(name: "cadence", url: "http://cadence-service:3018/graphql")
+  CHATBOT @join__graph(name: "chatbot", url: "http://chatbot-service:3017/graphql")
+  COMM @join__graph(name: "comm", url: "http://comm-service:3009/graphql")
+  CRM @join__graph(name: "crm", url: "http://crm-service:3001/graphql")
+  DATA @join__graph(name: "data", url: "http://data-service:3015/graphql")
+  DOCUMENT @join__graph(name: "document", url: "http://document-service:3016/graphql")
+  EMAIL_SYNC @join__graph(name: "email-sync", url: "http://email-sync-service:3026/graphql")
+  FINANCE @join__graph(name: "finance", url: "http://finance-service:3002/graphql")
+  INCENTIVE @join__graph(name: "incentive", url: "http://incentive-service:3024/graphql")
+  INTEGRATION @join__graph(name: "integration", url: "http://integration-service:3012/graphql")
+  KNOWLEDGE @join__graph(name: "knowledge", url: "http://knowledge-service:3023/graphql")
+  METADATA @join__graph(name: "metadata", url: "http://metadata-service:3004/graphql")
+  NOTIFICATION @join__graph(name: "notification", url: "http://notification-service:3003/graphql")
+  PLANNING @join__graph(name: "planning", url: "http://planning-service:3020/graphql")
+  PORTAL @join__graph(name: "portal", url: "http://portal-service:3022/graphql")
+  REALTIME @join__graph(name: "realtime", url: "http://realtime-service:3005/graphql")
+  REPORTING @join__graph(name: "reporting", url: "http://reporting-service:3021/graphql")
+  SEARCH @join__graph(name: "search", url: "http://search-service:3006/graphql")
+  STORAGE @join__graph(name: "storage", url: "http://storage-service:3010/graphql")
+  TERRITORY @join__graph(name: "territory", url: "http://territory-service:3019/graphql")
+  WORKFLOW @join__graph(name: "workflow", url: "http://workflow-service:3007/graphql")
+}
+
+type Journey
+  @join__type(graph: WORKFLOW, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  description: String
+  status: JourneyStatus!
+  entryTrigger: String!
+  entryConfig: JSON!
+  nodes: JSON!
+  edges: JSON!
+  settings: JSON!
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  enrollments: [JourneyEnrollment!]!
+}
+
+type JourneyEnrollment
+  @join__type(graph: WORKFLOW, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  journeyId: String!
+  journey: Journey!
+  contactId: String!
+  currentNodeId: String
+  status: EnrollmentStatus!
+  enteredAt: DateTime!
+  exitedAt: DateTime
+  exitReason: String
+  metadata: JSON!
+}
+
+enum JourneyStatus
+  @join__type(graph: WORKFLOW)
+{
+  DRAFT @join__enumValue(graph: WORKFLOW)
+  ACTIVE @join__enumValue(graph: WORKFLOW)
+  PAUSED @join__enumValue(graph: WORKFLOW)
+  ARCHIVED @join__enumValue(graph: WORKFLOW)
+}
+
+scalar JSON
+  @join__type(graph: ANALYTICS)
+  @join__type(graph: APPROVAL)
+  @join__type(graph: AUTH)
+  @join__type(graph: BLUEPRINT)
+  @join__type(graph: CADENCE)
+  @join__type(graph: CHATBOT)
+  @join__type(graph: COMM)
+  @join__type(graph: CRM)
+  @join__type(graph: DATA)
+  @join__type(graph: DOCUMENT)
+  @join__type(graph: EMAIL_SYNC)
+  @join__type(graph: FINANCE)
+  @join__type(graph: INCENTIVE)
+  @join__type(graph: INTEGRATION)
+  @join__type(graph: KNOWLEDGE)
+  @join__type(graph: METADATA)
+  @join__type(graph: NOTIFICATION)
+  @join__type(graph: PLANNING)
+  @join__type(graph: PORTAL)
+  @join__type(graph: REALTIME)
+  @join__type(graph: REPORTING)
+  @join__type(graph: SEARCH)
+  @join__type(graph: STORAGE)
+  @join__type(graph: TERRITORY)
+  @join__type(graph: WORKFLOW)
+
+type KbArticle
+  @join__type(graph: KNOWLEDGE, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  categoryId: String
+  category: KbCategory
+  title: String!
+  slug: String!
+  body: String!
+  tags: [String!]!
+  status: ArticleStatus!
+  authorId: String!
+  version: Int!
+  viewCount: Int!
+  dealStages: [String!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  views: [KbView!]!
+}
+
+type KbCategory
+  @join__type(graph: KNOWLEDGE, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  icon: String
+  position: Int!
+  parentCategoryId: String
+  parent: KbCategory
+  children: [KbCategory!]!
+  articles: [KbArticle!]!
+}
+
+type KbView
+  @join__type(graph: KNOWLEDGE, key: "id")
+{
+  id: ID!
+  articleId: String!
+  article: KbArticle
+  viewedBy: String!
+  dealStage: String
+  viewedAt: DateTime!
+}
+
+type Lead
+  @join__type(graph: CRM, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  ownerId: ID!
+  firstName: String!
+  lastName: String!
+  email: String
+  phone: String
+  company: String
+  jobTitle: String
+  source: String!
+  status: String!
+  score: Int!
+  aiScore: Float
+  aiScoreReason: String
+  rating: String!
+  industry: String
+  website: String
+  annualRevenue: Float
+  employeeCount: Int
+  country: String
+  city: String
+  address: String
+  linkedInUrl: String
+  twitterHandle: String
+  utmSource: String
+  utmMedium: String
+  utmCampaign: String
+  utmContent: String
+  utmTerm: String
+  convertedAt: DateTime
+  convertedToId: ID
+  customFields: JSON
+  tags: [String!]!
+  doNotContact: Boolean!
+  gdprConsent: Boolean!
+  gdprConsentAt: DateTime
+  territoryId: ID
+  assignedTo: String
+  priority: String
+  dataQualityScore: Int
+  deletedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type LeadRoutingLog
+  @join__type(graph: TERRITORY, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  leadId: String!
+  matchedTerritoryId: String
+  territory: Territory
+  assignedOwnerId: String
+  routedAt: DateTime!
+}
+
+scalar link__Import
+
+enum link__Purpose {
+  """
+  `SECURITY` features provide metadata necessary to securely resolve fields.
+  """
+  SECURITY
+
+  """
+  `EXECUTION` features provide metadata necessary for operation execution.
+  """
+  EXECUTION
+}
+
+type Mutation
+  @join__type(graph: ANALYTICS)
+  @join__type(graph: APPROVAL)
+  @join__type(graph: AUTH)
+  @join__type(graph: BLUEPRINT)
+  @join__type(graph: CADENCE)
+  @join__type(graph: CHATBOT)
+  @join__type(graph: COMM)
+  @join__type(graph: CRM)
+  @join__type(graph: DATA)
+  @join__type(graph: DOCUMENT)
+  @join__type(graph: EMAIL_SYNC)
+  @join__type(graph: FINANCE)
+  @join__type(graph: INCENTIVE)
+  @join__type(graph: INTEGRATION)
+  @join__type(graph: KNOWLEDGE)
+  @join__type(graph: METADATA)
+  @join__type(graph: NOTIFICATION)
+  @join__type(graph: PLANNING)
+  @join__type(graph: PORTAL)
+  @join__type(graph: REALTIME)
+  @join__type(graph: REPORTING)
+  @join__type(graph: SEARCH)
+  @join__type(graph: STORAGE)
+  @join__type(graph: TERRITORY)
+  @join__type(graph: WORKFLOW)
+{
+  trackEvent(input: TrackEventInput!): Boolean! @join__field(graph: ANALYTICS)
+  createApprovalPolicy(input: CreateApprovalPolicyInput!): ApprovalPolicy! @join__field(graph: APPROVAL)
+  updateApprovalPolicy(id: ID!, input: UpdateApprovalPolicyInput!): ApprovalPolicy! @join__field(graph: APPROVAL)
+  deleteApprovalPolicy(id: ID!): Boolean! @join__field(graph: APPROVAL)
+  createApprovalRequest(input: CreateApprovalRequestInput!): ApprovalRequest! @join__field(graph: APPROVAL)
+  updateApprovalRequest(id: ID!, input: UpdateApprovalRequestInput!): ApprovalRequest! @join__field(graph: APPROVAL)
+  deleteApprovalRequest(id: ID!): Boolean! @join__field(graph: APPROVAL)
+  createApprovalStep(input: CreateApprovalStepInput!): ApprovalStep! @join__field(graph: APPROVAL)
+  updateApprovalStep(id: ID!, input: UpdateApprovalStepInput!): ApprovalStep! @join__field(graph: APPROVAL)
+  deleteApprovalStep(id: ID!): Boolean! @join__field(graph: APPROVAL)
+  login(email: String!, password: String!): AuthResponse! @join__field(graph: AUTH)
+  logout: Boolean! @join__field(graph: AUTH)
+  refreshToken: AuthResponse! @join__field(graph: AUTH)
+  createUser(input: CreateUserInput!): User! @join__field(graph: AUTH)
+  updateUser(id: ID!, input: UpdateUserInput!): User! @join__field(graph: AUTH)
+  deleteUser(id: ID!): Boolean! @join__field(graph: AUTH)
+  createTenant(input: CreateTenantInput!): Tenant! @join__field(graph: AUTH)
+  updateTenant(id: ID!, input: UpdateTenantInput!): Tenant! @join__field(graph: AUTH)
+  createPlaybook(input: CreatePlaybookInput!): Playbook! @join__field(graph: BLUEPRINT)
+  updatePlaybook(id: ID!, input: UpdatePlaybookInput!): Playbook! @join__field(graph: BLUEPRINT)
+  deletePlaybook(id: ID!): Boolean! @join__field(graph: BLUEPRINT)
+  createPlaybookStage(input: CreatePlaybookStageInput!): PlaybookStage! @join__field(graph: BLUEPRINT)
+  updatePlaybookStage(id: ID!, input: UpdatePlaybookStageInput!): PlaybookStage! @join__field(graph: BLUEPRINT)
+  deletePlaybookStage(id: ID!): Boolean! @join__field(graph: BLUEPRINT)
+  createDealTemplate(input: CreateDealTemplateInput!): DealTemplate! @join__field(graph: BLUEPRINT)
+  updateDealTemplate(id: ID!, input: UpdateDealTemplateInput!): DealTemplate! @join__field(graph: BLUEPRINT)
+  deleteDealTemplate(id: ID!): Boolean! @join__field(graph: BLUEPRINT)
+  createStageTransitionRule(input: CreateStageTransitionRuleInput!): StageTransitionRule! @join__field(graph: BLUEPRINT)
+  updateStageTransitionRule(id: ID!, input: UpdateStageTransitionRuleInput!): StageTransitionRule! @join__field(graph: BLUEPRINT)
+  deleteStageTransitionRule(id: ID!): Boolean! @join__field(graph: BLUEPRINT)
+  createCadenceTemplate(input: CreateCadenceTemplateInput!): CadenceTemplate! @join__field(graph: CADENCE)
+  updateCadenceTemplate(id: ID!, input: UpdateCadenceTemplateInput!): CadenceTemplate! @join__field(graph: CADENCE)
+  deleteCadenceTemplate(id: ID!): Boolean! @join__field(graph: CADENCE)
+  createCadenceStep(input: CreateCadenceStepInput!): CadenceStep! @join__field(graph: CADENCE)
+  updateCadenceStep(id: ID!, input: UpdateCadenceStepInput!): CadenceStep! @join__field(graph: CADENCE)
+  deleteCadenceStep(id: ID!): Boolean! @join__field(graph: CADENCE)
+  createCadenceEnrollment(input: CreateCadenceEnrollmentInput!): CadenceEnrollment! @join__field(graph: CADENCE)
+  updateCadenceEnrollment(id: ID!, input: UpdateCadenceEnrollmentInput!): CadenceEnrollment! @join__field(graph: CADENCE)
+  deleteCadenceEnrollment(id: ID!): Boolean! @join__field(graph: CADENCE)
+  createStepExecution(input: CreateStepExecutionInput!): StepExecution! @join__field(graph: CADENCE)
+  updateStepExecution(id: ID!, input: UpdateStepExecutionInput!): StepExecution! @join__field(graph: CADENCE)
+  deleteStepExecution(id: ID!): Boolean! @join__field(graph: CADENCE)
+  createConversation(input: CreateConversationInput!): Conversation! @join__field(graph: CHATBOT)
+  updateConversation(id: ID!, input: UpdateConversationInput!): Conversation! @join__field(graph: CHATBOT)
+  deleteConversation(id: ID!): Boolean! @join__field(graph: CHATBOT)
+  createConversationMessage(input: CreateConversationMessageInput!): ConversationMessage! @join__field(graph: CHATBOT)
+  createEmailTemplate(input: CreateEmailTemplateInput!): EmailTemplate! @join__field(graph: COMM)
+  updateEmailTemplate(id: ID!, input: UpdateEmailTemplateInput!): EmailTemplate! @join__field(graph: COMM)
+  deleteEmailTemplate(id: ID!): Boolean! @join__field(graph: COMM)
+  createSmsTemplate(input: CreateSmsTemplateInput!): SmsTemplate! @join__field(graph: COMM)
+  updateSmsTemplate(id: ID!, input: UpdateSmsTemplateInput!): SmsTemplate! @join__field(graph: COMM)
+  deleteSmsTemplate(id: ID!): Boolean! @join__field(graph: COMM)
+  createEmailSequence(input: CreateEmailSequenceInput!): EmailSequence! @join__field(graph: COMM)
+  updateEmailSequence(id: ID!, input: UpdateEmailSequenceInput!): EmailSequence! @join__field(graph: COMM)
+  deleteEmailSequence(id: ID!): Boolean! @join__field(graph: COMM)
+  createSequenceStep(input: CreateSequenceStepInput!): SequenceStep! @join__field(graph: COMM)
+  deleteSequenceStep(id: ID!): Boolean! @join__field(graph: COMM)
+  createSequenceEnrollment(input: CreateSequenceEnrollmentInput!): SequenceEnrollment! @join__field(graph: COMM)
+  updateSequenceEnrollment(id: ID!, input: UpdateSequenceEnrollmentInput!): SequenceEnrollment! @join__field(graph: COMM)
+  deleteSequenceEnrollment(id: ID!): Boolean! @join__field(graph: COMM)
+  createCommOutbox(input: CreateCommOutboxInput!): CommOutbox! @join__field(graph: COMM)
+  updateCommOutbox(id: ID!, input: UpdateCommOutboxInput!): CommOutbox! @join__field(graph: COMM)
+  deleteCommOutbox(id: ID!): Boolean! @join__field(graph: COMM)
+  createWhatsAppMessage(input: CreateWhatsAppMessageInput!): WhatsAppMessage! @join__field(graph: COMM)
+  createContact(input: CreateContactInput!): Contact! @join__field(graph: CRM)
+  updateContact(id: ID!, input: UpdateContactInput!): Contact! @join__field(graph: CRM)
+  deleteContact(id: ID!): Boolean! @join__field(graph: CRM)
+  createAccount(input: CreateAccountInput!): Account! @join__field(graph: CRM)
+  updateAccount(id: ID!, input: UpdateAccountInput!): Account! @join__field(graph: CRM)
+  deleteAccount(id: ID!): Boolean! @join__field(graph: CRM)
+  createDeal(input: CreateDealInput!): Deal! @join__field(graph: CRM)
+  updateDeal(id: ID!, input: UpdateDealInput!): Deal! @join__field(graph: CRM)
+  deleteDeal(id: ID!): Boolean! @join__field(graph: CRM)
+  createActivity(input: CreateActivityInput!): Activity! @join__field(graph: CRM)
+  updateActivity(id: ID!, input: UpdateActivityInput!): Activity! @join__field(graph: CRM)
+  deleteActivity(id: ID!): Boolean! @join__field(graph: CRM)
+  createPipeline(input: CreatePipelineInput!): Pipeline! @join__field(graph: CRM)
+  updatePipeline(id: ID!, input: UpdatePipelineInput!): Pipeline! @join__field(graph: CRM)
+  deletePipeline(id: ID!): Boolean! @join__field(graph: CRM)
+  createStage(input: CreateStageInput!): Stage! @join__field(graph: CRM)
+  updateStage(id: ID!, input: UpdateStageInput!): Stage! @join__field(graph: CRM)
+  deleteStage(id: ID!): Boolean! @join__field(graph: CRM)
+  createNote(input: CreateNoteInput!): Note! @join__field(graph: CRM)
+  updateNote(id: ID!, input: UpdateNoteInput!): Note! @join__field(graph: CRM)
+  deleteNote(id: ID!): Boolean! @join__field(graph: CRM)
+  createLead(input: CreateLeadInput!): Lead! @join__field(graph: CRM)
+  updateLead(id: ID!, input: UpdateLeadInput!): Lead! @join__field(graph: CRM)
+  deleteLead(id: ID!): Boolean! @join__field(graph: CRM)
+  createRecycleBinItem(input: CreateRecycleBinItemInput!): RecycleBinItem! @join__field(graph: DATA)
+  deleteRecycleBinItem(id: ID!): Boolean! @join__field(graph: DATA)
+  createFieldAuditLog(input: CreateFieldAuditLogInput!): FieldAuditLog! @join__field(graph: DATA)
+  createSavedView(input: CreateSavedViewInput!): SavedView! @join__field(graph: DATA)
+  updateSavedView(id: ID!, input: UpdateSavedViewInput!): SavedView! @join__field(graph: DATA)
+  deleteSavedView(id: ID!): Boolean! @join__field(graph: DATA)
+  createRecentRecord(input: CreateRecentRecordInput!): RecentRecord! @join__field(graph: DATA)
+  deleteRecentRecord(id: ID!): Boolean! @join__field(graph: DATA)
+  createImportJob(input: CreateImportJobInput!): ImportJob! @join__field(graph: DATA)
+  updateImportJob(id: ID!, input: UpdateImportJobInput!): ImportJob! @join__field(graph: DATA)
+  createDocument(input: CreateDocumentInput!): Document! @join__field(graph: DOCUMENT)
+  updateDocument(id: ID!, input: UpdateDocumentInput!): Document! @join__field(graph: DOCUMENT)
+  deleteDocument(id: ID!): Boolean! @join__field(graph: DOCUMENT)
+  createFolder(input: CreateFolderInput!): Folder! @join__field(graph: DOCUMENT)
+  updateFolder(id: ID!, input: UpdateFolderInput!): Folder! @join__field(graph: DOCUMENT)
+  deleteFolder(id: ID!): Boolean! @join__field(graph: DOCUMENT)
+  createDocumentVersion(input: CreateDocumentVersionInput!): DocumentVersion! @join__field(graph: DOCUMENT)
+  createDocumentPermission(input: CreateDocumentPermissionInput!): DocumentPermission! @join__field(graph: DOCUMENT)
+  deleteDocumentPermission(id: ID!): Boolean! @join__field(graph: DOCUMENT)
+  createEmailConnection(input: CreateEmailConnectionInput!): EmailConnection! @join__field(graph: EMAIL_SYNC)
+  updateEmailConnection(id: ID!, input: UpdateEmailConnectionInput!): EmailConnection! @join__field(graph: EMAIL_SYNC)
+  deleteEmailConnection(id: ID!): Boolean! @join__field(graph: EMAIL_SYNC)
+  createEmailMessage(input: CreateEmailMessageInput!): EmailMessage! @join__field(graph: EMAIL_SYNC)
+  updateEmailMessage(id: ID!, input: UpdateEmailMessageInput!): EmailMessage! @join__field(graph: EMAIL_SYNC)
+  deleteEmailMessage(id: ID!): Boolean! @join__field(graph: EMAIL_SYNC)
+  createProduct(input: CreateProductInput!): Product! @join__field(graph: FINANCE)
+  updateProduct(id: ID!, input: UpdateProductInput!): Product! @join__field(graph: FINANCE)
+  deleteProduct(id: ID!): Boolean! @join__field(graph: FINANCE)
+  createPriceTier(input: CreatePriceTierInput!): PriceTier! @join__field(graph: FINANCE)
+  updatePriceTier(id: ID!, input: UpdatePriceTierInput!): PriceTier! @join__field(graph: FINANCE)
+  deletePriceTier(id: ID!): Boolean! @join__field(graph: FINANCE)
+  createPromoCode(input: CreatePromoCodeInput!): PromoCode! @join__field(graph: FINANCE)
+  updatePromoCode(id: ID!, input: UpdatePromoCodeInput!): PromoCode! @join__field(graph: FINANCE)
+  deletePromoCode(id: ID!): Boolean! @join__field(graph: FINANCE)
+  createQuote(input: CreateQuoteInput!): Quote! @join__field(graph: FINANCE)
+  updateQuote(id: ID!, input: UpdateQuoteInput!): Quote! @join__field(graph: FINANCE)
+  deleteQuote(id: ID!): Boolean! @join__field(graph: FINANCE)
+  createInvoice(input: CreateInvoiceInput!): Invoice! @join__field(graph: FINANCE)
+  updateInvoice(id: ID!, input: UpdateInvoiceInput!): Invoice! @join__field(graph: FINANCE)
+  deleteInvoice(id: ID!): Boolean! @join__field(graph: FINANCE)
+  createContract(input: CreateContractInput!): Contract! @join__field(graph: FINANCE)
+  updateContract(id: ID!, input: UpdateContractInput!): Contract! @join__field(graph: FINANCE)
+  deleteContract(id: ID!): Boolean! @join__field(graph: FINANCE)
+  createSubscription(input: CreateSubscriptionInput!): Subscription! @join__field(graph: FINANCE)
+  updateSubscription(id: ID!, input: UpdateSubscriptionInput!): Subscription! @join__field(graph: FINANCE)
+  deleteSubscription(id: ID!): Boolean! @join__field(graph: FINANCE)
+  createPayment(input: CreatePaymentInput!): Payment! @join__field(graph: FINANCE)
+  updatePayment(id: ID!, input: UpdatePaymentInput!): Payment! @join__field(graph: FINANCE)
+  deletePayment(id: ID!): Boolean! @join__field(graph: FINANCE)
+  createCurrency(input: CreateCurrencyInput!): Currency! @join__field(graph: FINANCE)
+  updateCurrency(id: ID!, input: UpdateCurrencyInput!): Currency! @join__field(graph: FINANCE)
+  deleteCurrency(id: ID!): Boolean! @join__field(graph: FINANCE)
+  createTaxZone(input: CreateTaxZoneInput!): TaxZone! @join__field(graph: FINANCE)
+  updateTaxZone(id: ID!, input: UpdateTaxZoneInput!): TaxZone! @join__field(graph: FINANCE)
+  deleteTaxZone(id: ID!): Boolean! @join__field(graph: FINANCE)
+  createTaxRate(input: CreateTaxRateInput!): TaxRate! @join__field(graph: FINANCE)
+  updateTaxRate(id: ID!, input: UpdateTaxRateInput!): TaxRate! @join__field(graph: FINANCE)
+  deleteTaxRate(id: ID!): Boolean! @join__field(graph: FINANCE)
+  createContest(input: CreateContestInput!): Contest! @join__field(graph: INCENTIVE)
+  updateContest(id: ID!, input: UpdateContestInput!): Contest! @join__field(graph: INCENTIVE)
+  deleteContest(id: ID!): Boolean! @join__field(graph: INCENTIVE)
+  createContestEntry(input: CreateContestEntryInput!): ContestEntry! @join__field(graph: INCENTIVE)
+  updateContestEntry(id: ID!, input: UpdateContestEntryInput!): ContestEntry! @join__field(graph: INCENTIVE)
+  deleteContestEntry(id: ID!): Boolean! @join__field(graph: INCENTIVE)
+  createBadge(input: CreateBadgeInput!): Badge! @join__field(graph: INCENTIVE)
+  updateBadge(id: ID!, input: UpdateBadgeInput!): Badge! @join__field(graph: INCENTIVE)
+  deleteBadge(id: ID!): Boolean! @join__field(graph: INCENTIVE)
+  createBadgeAward(input: CreateBadgeAwardInput!): BadgeAward! @join__field(graph: INCENTIVE)
+  deleteBadgeAward(id: ID!): Boolean! @join__field(graph: INCENTIVE)
+  createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSubscription! @join__field(graph: INTEGRATION)
+  updateWebhookSubscription(id: ID!, input: UpdateWebhookSubscriptionInput!): WebhookSubscription! @join__field(graph: INTEGRATION)
+  deleteWebhookSubscription(id: ID!): Boolean! @join__field(graph: INTEGRATION)
+  createOAuthConnection(input: CreateOAuthConnectionInput!): OAuthConnection! @join__field(graph: INTEGRATION)
+  updateOAuthConnection(id: ID!, input: UpdateOAuthConnectionInput!): OAuthConnection! @join__field(graph: INTEGRATION)
+  deleteOAuthConnection(id: ID!): Boolean! @join__field(graph: INTEGRATION)
+  createSyncJob(input: CreateSyncJobInput!): SyncJob! @join__field(graph: INTEGRATION)
+  updateSyncJob(id: ID!, input: UpdateSyncJobInput!): SyncJob! @join__field(graph: INTEGRATION)
+  deleteSyncJob(id: ID!): Boolean! @join__field(graph: INTEGRATION)
+  createSyncedCalendarEvent(input: CreateSyncedCalendarEventInput!): SyncedCalendarEvent! @join__field(graph: INTEGRATION)
+  deleteSyncedCalendarEvent(id: ID!): Boolean! @join__field(graph: INTEGRATION)
+  createGeocodedAccount(input: CreateGeocodedAccountInput!): GeocodedAccount! @join__field(graph: INTEGRATION)
+  updateGeocodedAccount(id: ID!, input: UpdateGeocodedAccountInput!): GeocodedAccount! @join__field(graph: INTEGRATION)
+  deleteGeocodedAccount(id: ID!): Boolean! @join__field(graph: INTEGRATION)
+  createKbCategory(input: CreateKbCategoryInput!): KbCategory! @join__field(graph: KNOWLEDGE)
+  updateKbCategory(id: ID!, input: UpdateKbCategoryInput!): KbCategory! @join__field(graph: KNOWLEDGE)
+  deleteKbCategory(id: ID!): Boolean! @join__field(graph: KNOWLEDGE)
+  createKbArticle(input: CreateKbArticleInput!): KbArticle! @join__field(graph: KNOWLEDGE)
+  updateKbArticle(id: ID!, input: UpdateKbArticleInput!): KbArticle! @join__field(graph: KNOWLEDGE)
+  deleteKbArticle(id: ID!): Boolean! @join__field(graph: KNOWLEDGE)
+  createKbView(input: CreateKbViewInput!): KbView! @join__field(graph: KNOWLEDGE)
+  createCustomFieldDefinition(input: CreateCustomFieldDefinitionInput!): CustomFieldDefinition! @join__field(graph: METADATA)
+  updateCustomFieldDefinition(id: ID!, input: UpdateCustomFieldDefinitionInput!): CustomFieldDefinition! @join__field(graph: METADATA)
+  deleteCustomFieldDefinition(id: ID!): Boolean! @join__field(graph: METADATA)
+  createFieldPermission(input: CreateFieldPermissionInput!): FieldPermission! @join__field(graph: METADATA)
+  deleteFieldPermission(id: ID!): Boolean! @join__field(graph: METADATA)
+  createValidationRule(input: CreateValidationRuleInput!): ValidationRule! @join__field(graph: METADATA)
+  updateValidationRule(id: ID!, input: UpdateValidationRuleInput!): ValidationRule! @join__field(graph: METADATA)
+  deleteValidationRule(id: ID!): Boolean! @join__field(graph: METADATA)
+  createFieldChangeLog(input: CreateFieldChangeLogInput!): FieldChangeLog! @join__field(graph: METADATA)
+  createDuplicateGroup(input: CreateDuplicateGroupInput!): DuplicateGroup! @join__field(graph: METADATA)
+  updateDuplicateGroup(id: ID!, input: UpdateDuplicateGroupInput!): DuplicateGroup! @join__field(graph: METADATA)
+  deleteDuplicateGroup(id: ID!): Boolean! @join__field(graph: METADATA)
+  createTag(input: CreateTagInput!): Tag! @join__field(graph: METADATA)
+  updateTag(id: ID!, input: UpdateTagInput!): Tag! @join__field(graph: METADATA)
+  deleteTag(id: ID!): Boolean! @join__field(graph: METADATA)
+  createNotification(input: CreateNotificationInput!): Notification! @join__field(graph: NOTIFICATION)
+  markNotificationRead(id: ID!): Notification! @join__field(graph: NOTIFICATION)
+  markAllNotificationsRead: Boolean! @join__field(graph: NOTIFICATION)
+  deleteNotification(id: ID!): Boolean! @join__field(graph: NOTIFICATION)
+  createQuotaPlan(input: CreateQuotaPlanInput!): QuotaPlan! @join__field(graph: PLANNING)
+  updateQuotaPlan(id: ID!, input: UpdateQuotaPlanInput!): QuotaPlan! @join__field(graph: PLANNING)
+  deleteQuotaPlan(id: ID!): Boolean! @join__field(graph: PLANNING)
+  createQuotaTarget(input: CreateQuotaTargetInput!): QuotaTarget! @join__field(graph: PLANNING)
+  updateQuotaTarget(id: ID!, input: UpdateQuotaTargetInput!): QuotaTarget! @join__field(graph: PLANNING)
+  deleteQuotaTarget(id: ID!): Boolean! @join__field(graph: PLANNING)
+  createForecastSubmission(input: CreateForecastSubmissionInput!): ForecastSubmission! @join__field(graph: PLANNING)
+  updateForecastSubmission(id: ID!, input: UpdateForecastSubmissionInput!): ForecastSubmission! @join__field(graph: PLANNING)
+  deleteForecastSubmission(id: ID!): Boolean! @join__field(graph: PLANNING)
+  createForecastReview(input: CreateForecastReviewInput!): ForecastReview! @join__field(graph: PLANNING)
+  createForecastOverride(input: CreateForecastOverrideInput!): ForecastOverride! @join__field(graph: PLANNING)
+  updateForecastOverride(id: ID!, input: UpdateForecastOverrideInput!): ForecastOverride! @join__field(graph: PLANNING)
+  deleteForecastOverride(id: ID!): Boolean! @join__field(graph: PLANNING)
+  createPortalToken(input: CreatePortalTokenInput!): PortalToken! @join__field(graph: PORTAL)
+  revokePortalToken(id: ID!): Boolean! @join__field(graph: PORTAL)
+  updatePortalBranding(tenantId: String!, input: UpdatePortalBrandingInput!): PortalBranding! @join__field(graph: PORTAL)
+  createPortalAuditLog(input: CreatePortalAuditLogInput!): PortalAuditLog! @join__field(graph: PORTAL)
+  broadcast(input: BroadcastInput!): Boolean! @join__field(graph: REALTIME)
+  createSavedReport(input: CreateSavedReportInput!): SavedReport! @join__field(graph: REPORTING)
+  updateSavedReport(id: ID!, input: UpdateSavedReportInput!): SavedReport! @join__field(graph: REPORTING)
+  deleteSavedReport(id: ID!): Boolean! @join__field(graph: REPORTING)
+  createReportSchedule(input: CreateReportScheduleInput!): ReportSchedule! @join__field(graph: REPORTING)
+  updateReportSchedule(id: ID!, input: UpdateReportScheduleInput!): ReportSchedule! @join__field(graph: REPORTING)
+  deleteReportSchedule(id: ID!): Boolean! @join__field(graph: REPORTING)
+  createDashboard(input: CreateDashboardInput!): Dashboard! @join__field(graph: REPORTING)
+  updateDashboard(id: ID!, input: UpdateDashboardInput!): Dashboard! @join__field(graph: REPORTING)
+  deleteDashboard(id: ID!): Boolean! @join__field(graph: REPORTING)
+  createDashboardWidget(input: CreateDashboardWidgetInput!): DashboardWidget! @join__field(graph: REPORTING)
+  updateDashboardWidget(id: ID!, input: UpdateDashboardWidgetInput!): DashboardWidget! @join__field(graph: REPORTING)
+  deleteDashboardWidget(id: ID!): Boolean! @join__field(graph: REPORTING)
+  createPipelineSnapshot(input: CreatePipelineSnapshotInput!): PipelineSnapshot! @join__field(graph: REPORTING)
+  updatePipelineSnapshot(id: ID!, input: UpdatePipelineSnapshotInput!): PipelineSnapshot! @join__field(graph: REPORTING)
+  deletePipelineSnapshot(id: ID!): Boolean! @join__field(graph: REPORTING)
+  indexDocument(input: IndexDocumentInput!): Boolean! @join__field(graph: SEARCH)
+  deleteSearchDocument(index: String!, documentId: String!): Boolean! @join__field(graph: SEARCH)
+  createFileAttachment(input: CreateFileAttachmentInput!): FileAttachment! @join__field(graph: STORAGE)
+  deleteFileAttachment(id: ID!): Boolean! @join__field(graph: STORAGE)
+  createTerritory(input: CreateTerritoryInput!): Territory! @join__field(graph: TERRITORY)
+  updateTerritory(id: ID!, input: UpdateTerritoryInput!): Territory! @join__field(graph: TERRITORY)
+  deleteTerritory(id: ID!): Boolean! @join__field(graph: TERRITORY)
+  createTerritoryRule(input: CreateTerritoryRuleInput!): TerritoryRule! @join__field(graph: TERRITORY)
+  updateTerritoryRule(id: ID!, input: UpdateTerritoryRuleInput!): TerritoryRule! @join__field(graph: TERRITORY)
+  deleteTerritoryRule(id: ID!): Boolean! @join__field(graph: TERRITORY)
+  createLeadRoutingLog(input: CreateLeadRoutingLogInput!): LeadRoutingLog! @join__field(graph: TERRITORY)
+  updateLeadRoutingLog(id: ID!, input: UpdateLeadRoutingLogInput!): LeadRoutingLog! @join__field(graph: TERRITORY)
+  deleteLeadRoutingLog(id: ID!): Boolean! @join__field(graph: TERRITORY)
+  createRoundRobinState(input: CreateRoundRobinStateInput!): RoundRobinState! @join__field(graph: TERRITORY)
+  updateRoundRobinState(id: ID!, input: UpdateRoundRobinStateInput!): RoundRobinState! @join__field(graph: TERRITORY)
+  deleteRoundRobinState(id: ID!): Boolean! @join__field(graph: TERRITORY)
+  createWorkflowTemplate(input: CreateWorkflowTemplateInput!): WorkflowTemplate! @join__field(graph: WORKFLOW)
+  updateWorkflowTemplate(id: ID!, input: UpdateWorkflowTemplateInput!): WorkflowTemplate! @join__field(graph: WORKFLOW)
+  deleteWorkflowTemplate(id: ID!): Boolean! @join__field(graph: WORKFLOW)
+  createWorkflowExecution(input: CreateWorkflowExecutionInput!): WorkflowExecution! @join__field(graph: WORKFLOW)
+  updateWorkflowExecution(id: ID!, input: UpdateWorkflowExecutionInput!): WorkflowExecution! @join__field(graph: WORKFLOW)
+  deleteWorkflowExecution(id: ID!): Boolean! @join__field(graph: WORKFLOW)
+  createJourney(input: CreateJourneyInput!): Journey! @join__field(graph: WORKFLOW)
+  updateJourney(id: ID!, input: UpdateJourneyInput!): Journey! @join__field(graph: WORKFLOW)
+  deleteJourney(id: ID!): Boolean! @join__field(graph: WORKFLOW)
+  createJourneyEnrollment(input: CreateJourneyEnrollmentInput!): JourneyEnrollment! @join__field(graph: WORKFLOW)
+  updateJourneyEnrollment(id: ID!, input: UpdateJourneyEnrollmentInput!): JourneyEnrollment! @join__field(graph: WORKFLOW)
+  deleteJourneyEnrollment(id: ID!): Boolean! @join__field(graph: WORKFLOW)
+}
+
+type Note
+  @join__type(graph: CRM, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  authorId: ID!
+  content: String!
+  isPinned: Boolean!
+  leadId: ID
+  contactId: ID
+  accountId: ID
+  dealId: ID
+  deletedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Notification
+  @join__type(graph: NOTIFICATION, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  userId: String!
+  type: String!
+  title: String!
+  body: String!
+  entityType: String
+  entityId: String
+  actionUrl: String
+  channel: String!
+  isRead: Boolean!
+  readAt: DateTime
+  metadata: JSON!
+  createdAt: DateTime!
+}
+
+type OAuthConnection
+  @join__type(graph: INTEGRATION, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  userId: String!
+  provider: String!
+  scope: String!
+  accessToken: String!
+  refreshToken: String
+  expiresAt: DateTime
+  email: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  syncJobs: [SyncJob!]!
+}
+
+enum ObjectType
+  @join__type(graph: CADENCE)
+{
+  CONTACT @join__enumValue(graph: CADENCE)
+  LEAD @join__enumValue(graph: CADENCE)
+}
+
+type Payment
+  @join__type(graph: FINANCE, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  invoiceId: ID!
+  amount: Float!
+  currency: String!
+  method: String!
+  status: String!
+  reference: String
+  gateway: String
+  gatewayRef: String
+  notes: String
+  paidAt: DateTime
+  failedAt: DateTime
+  failureReason: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Pipeline
+  @join__type(graph: CRM, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  name: String!
+  type: String!
+  currency: String!
+  isDefault: Boolean!
+  isActive: Boolean!
+  description: String
+  ownedBy: String
+  deletedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type PipelineAnalytics
+  @join__type(graph: ANALYTICS, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  pipelineId: String
+  totalDeals: Int!
+  totalValue: String!
+  avgDealSize: String!
+  winRate: String!
+  avgSalesCycleDays: Int!
+  stageBreakdown: JSON!
+  updatedAt: DateTime!
+}
+
+type PipelineSnapshot
+  @join__type(graph: REPORTING, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  pipelineId: String!
+  snapshotDate: DateTime!
+  stage: String!
+  dealCount: Int!
+  totalValue: String!
+  dealIds: JSON!
+  createdAt: DateTime!
+}
+
+type Playbook
+  @join__type(graph: BLUEPRINT, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  description: String
+  pipelineId: String
+  isActive: Boolean!
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  stages: [PlaybookStage!]!
+}
+
+type PlaybookStage
+  @join__type(graph: BLUEPRINT, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  playbookId: String!
+  playbook: Playbook
+  stageId: String!
+  stageName: String!
+  position: Int!
+  entryActions: JSON!
+  exitCriteria: JSON!
+  requiredFields: [String!]!
+  talkingPoints: [String!]!
+  resources: JSON!
+}
+
+type PortalAuditLog
+  @join__type(graph: PORTAL, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  token: String!
+  entityType: String!
+  entityId: String!
+  action: String!
+  ipAddress: String
+  userAgent: String
+  createdAt: DateTime!
+}
+
+type PortalBranding
+  @join__type(graph: PORTAL, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  logoUrl: String
+  primaryColor: String!
+  companyName: String
+  updatedAt: DateTime!
+}
+
+type PortalToken
+  @join__type(graph: PORTAL, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  token: String!
+  entityType: EntityType!
+  entityId: String!
+  expiresAt: DateTime!
+  viewCount: Int!
+  createdBy: String!
+  createdAt: DateTime!
+}
+
+type PriceTier
+  @join__type(graph: FINANCE, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  productId: ID!
+  name: String!
+  minQty: Int!
+  maxQty: Int
+  unitPrice: Float!
+  createdAt: DateTime!
+}
+
+type Product
+  @join__type(graph: FINANCE, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  sku: String!
+  name: String!
+  nameAr: String
+  description: String
+  descriptionAr: String
+  unitAr: String
+  type: String!
+  category: String
+  currency: String!
+  listPrice: Float!
+  cost: Float
+  billingType: String!
+  billingPeriod: String
+  taxable: Boolean!
+  taxCode: String
+  isActive: Boolean!
+  pricingRules: JSON
+  customFields: JSON
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type PromoCode
+  @join__type(graph: FINANCE, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  code: String!
+  description: String
+  discountPercent: Float!
+  isActive: Boolean!
+  validFrom: DateTime
+  validUntil: DateTime
+  maxUses: Int
+  uses: Int!
+  applicableProductIds: [String!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Query
+  @join__type(graph: ANALYTICS)
+  @join__type(graph: APPROVAL)
+  @join__type(graph: AUTH)
+  @join__type(graph: BLUEPRINT)
+  @join__type(graph: CADENCE)
+  @join__type(graph: CHATBOT)
+  @join__type(graph: COMM)
+  @join__type(graph: CRM)
+  @join__type(graph: DATA)
+  @join__type(graph: DOCUMENT)
+  @join__type(graph: EMAIL_SYNC)
+  @join__type(graph: FINANCE)
+  @join__type(graph: INCENTIVE)
+  @join__type(graph: INTEGRATION)
+  @join__type(graph: KNOWLEDGE)
+  @join__type(graph: METADATA)
+  @join__type(graph: NOTIFICATION)
+  @join__type(graph: PLANNING)
+  @join__type(graph: PORTAL)
+  @join__type(graph: REALTIME)
+  @join__type(graph: REPORTING)
+  @join__type(graph: SEARCH)
+  @join__type(graph: STORAGE)
+  @join__type(graph: TERRITORY)
+  @join__type(graph: WORKFLOW)
+{
+  pipelineAnalytics(tenantId: String!, pipelineId: String): PipelineAnalytics @join__field(graph: ANALYTICS)
+  revenueAnalytics(tenantId: String!, period: String!): RevenueAnalytics @join__field(graph: ANALYTICS)
+  activityAnalytics(tenantId: String!, ownerId: String): ActivityAnalytics @join__field(graph: ANALYTICS)
+  forecastAnalytics(tenantId: String!, period: String!): ForecastAnalytics @join__field(graph: ANALYTICS)
+  analyticsHealth: Health! @join__field(graph: ANALYTICS)
+  approvalPolicies(limit: Int, offset: Int): [ApprovalPolicy!]! @join__field(graph: APPROVAL)
+  approvalPolicy(id: ID!): ApprovalPolicy @join__field(graph: APPROVAL)
+  approvalRequests(limit: Int, offset: Int): [ApprovalRequest!]! @join__field(graph: APPROVAL)
+  approvalRequest(id: ID!): ApprovalRequest @join__field(graph: APPROVAL)
+  approvalSteps(limit: Int, offset: Int): [ApprovalStep!]! @join__field(graph: APPROVAL)
+  approvalStep(id: ID!): ApprovalStep @join__field(graph: APPROVAL)
+  me: User @join__field(graph: AUTH)
+  users(limit: Int, offset: Int): [User!]! @join__field(graph: AUTH)
+  user(id: ID!): User @join__field(graph: AUTH)
+  tenants: [Tenant!]! @join__field(graph: AUTH)
+  tenant(id: ID!): Tenant @join__field(graph: AUTH)
+  playbooks(limit: Int, offset: Int): [Playbook!]! @join__field(graph: BLUEPRINT)
+  playbook(id: ID!): Playbook @join__field(graph: BLUEPRINT)
+  playbookStages(playbookId: ID!): [PlaybookStage!]! @join__field(graph: BLUEPRINT)
+  dealTemplates(limit: Int, offset: Int): [DealTemplate!]! @join__field(graph: BLUEPRINT)
+  dealTemplate(id: ID!): DealTemplate @join__field(graph: BLUEPRINT)
+  stageTransitionRules(limit: Int, offset: Int): [StageTransitionRule!]! @join__field(graph: BLUEPRINT)
+  stageTransitionRule(id: ID!): StageTransitionRule @join__field(graph: BLUEPRINT)
+  cadenceTemplates(limit: Int, offset: Int): [CadenceTemplate!]! @join__field(graph: CADENCE)
+  cadenceTemplate(id: ID!): CadenceTemplate @join__field(graph: CADENCE)
+  cadenceSteps(limit: Int, offset: Int): [CadenceStep!]! @join__field(graph: CADENCE)
+  cadenceStep(id: ID!): CadenceStep @join__field(graph: CADENCE)
+  cadenceEnrollments(limit: Int, offset: Int): [CadenceEnrollment!]! @join__field(graph: CADENCE)
+  cadenceEnrollment(id: ID!): CadenceEnrollment @join__field(graph: CADENCE)
+  stepExecutions(limit: Int, offset: Int): [StepExecution!]! @join__field(graph: CADENCE)
+  stepExecution(id: ID!): StepExecution @join__field(graph: CADENCE)
+  conversations(limit: Int, offset: Int, channel: String): [Conversation!]! @join__field(graph: CHATBOT)
+  conversation(id: ID!): Conversation @join__field(graph: CHATBOT)
+  conversationMessages(conversationId: ID!): [ConversationMessage!]! @join__field(graph: CHATBOT)
+  emailTemplates(limit: Int, offset: Int): [EmailTemplate!]! @join__field(graph: COMM)
+  emailTemplate(id: ID!): EmailTemplate @join__field(graph: COMM)
+  smsTemplates(limit: Int, offset: Int): [SmsTemplate!]! @join__field(graph: COMM)
+  smsTemplate(id: ID!): SmsTemplate @join__field(graph: COMM)
+  emailSequences(limit: Int, offset: Int): [EmailSequence!]! @join__field(graph: COMM)
+  emailSequence(id: ID!): EmailSequence @join__field(graph: COMM)
+  sequenceSteps(sequenceId: ID!): [SequenceStep!]! @join__field(graph: COMM)
+  sequenceEnrollments(limit: Int, offset: Int): [SequenceEnrollment!]! @join__field(graph: COMM)
+  sequenceEnrollment(id: ID!): SequenceEnrollment @join__field(graph: COMM)
+  commOutbox(limit: Int, offset: Int): [CommOutbox!]! @join__field(graph: COMM)
+  commOutboxItem(id: ID!): CommOutbox @join__field(graph: COMM)
+  whatsAppMessages(limit: Int, offset: Int): [WhatsAppMessage!]! @join__field(graph: COMM)
+  whatsAppMessage(id: ID!): WhatsAppMessage @join__field(graph: COMM)
+  contacts(limit: Int, offset: Int): [Contact!]! @join__field(graph: CRM)
+  contact(id: ID!): Contact @join__field(graph: CRM)
+  accounts(limit: Int, offset: Int): [Account!]! @join__field(graph: CRM) @join__field(graph: FINANCE)
+  account(id: ID!): Account @join__field(graph: CRM) @join__field(graph: FINANCE)
+  deals(limit: Int, offset: Int): [Deal!]! @join__field(graph: CRM)
+  deal(id: ID!): Deal @join__field(graph: CRM)
+  activities(limit: Int, offset: Int): [Activity!]! @join__field(graph: CRM)
+  activity(id: ID!): Activity @join__field(graph: CRM)
+  pipelines(limit: Int, offset: Int): [Pipeline!]! @join__field(graph: CRM)
+  pipeline(id: ID!): Pipeline @join__field(graph: CRM)
+  stages(pipelineId: ID!): [Stage!]! @join__field(graph: CRM)
+  stage(id: ID!): Stage @join__field(graph: CRM)
+  notes(limit: Int, offset: Int): [Note!]! @join__field(graph: CRM)
+  note(id: ID!): Note @join__field(graph: CRM)
+  leads(limit: Int, offset: Int): [Lead!]! @join__field(graph: CRM)
+  lead(id: ID!): Lead @join__field(graph: CRM)
+  recycleBinItems(limit: Int, offset: Int): [RecycleBinItem!]! @join__field(graph: DATA)
+  recycleBinItem(id: ID!): RecycleBinItem @join__field(graph: DATA)
+  fieldAuditLogs(limit: Int, offset: Int): [FieldAuditLog!]! @join__field(graph: DATA)
+  fieldAuditLog(id: ID!): FieldAuditLog @join__field(graph: DATA)
+  savedViews(limit: Int, offset: Int): [SavedView!]! @join__field(graph: DATA)
+  savedView(id: ID!): SavedView @join__field(graph: DATA)
+  recentRecords(limit: Int, offset: Int): [RecentRecord!]! @join__field(graph: DATA)
+  recentRecord(id: ID!): RecentRecord @join__field(graph: DATA)
+  importJobs(limit: Int, offset: Int): [ImportJob!]! @join__field(graph: DATA)
+  importJob(id: ID!): ImportJob @join__field(graph: DATA)
+  documents(limit: Int, offset: Int, folderId: String): [Document!]! @join__field(graph: DOCUMENT)
+  document(id: ID!): Document @join__field(graph: DOCUMENT)
+  folders(limit: Int, offset: Int, parentId: String): [Folder!]! @join__field(graph: DOCUMENT)
+  folder(id: ID!): Folder @join__field(graph: DOCUMENT)
+  documentVersions(documentId: ID!): [DocumentVersion!]! @join__field(graph: DOCUMENT)
+  documentPermissions(documentId: ID!): [DocumentPermission!]! @join__field(graph: DOCUMENT)
+  emailConnections(limit: Int, offset: Int): [EmailConnection!]! @join__field(graph: EMAIL_SYNC)
+  emailConnection(id: ID!): EmailConnection @join__field(graph: EMAIL_SYNC)
+  emailConnectionByUser(userId: String!): EmailConnection @join__field(graph: EMAIL_SYNC)
+  emailMessages(limit: Int, offset: Int, userId: String, threadId: String): [EmailMessage!]! @join__field(graph: EMAIL_SYNC)
+  emailMessage(id: ID!): EmailMessage @join__field(graph: EMAIL_SYNC)
+  emailThreads(userId: String!, limit: Int, offset: Int): [EmailThread!]! @join__field(graph: EMAIL_SYNC)
+  products(limit: Int, offset: Int): [Product!]! @join__field(graph: FINANCE)
+  product(id: ID!): Product @join__field(graph: FINANCE)
+  priceTiers(productId: ID, limit: Int, offset: Int): [PriceTier!]! @join__field(graph: FINANCE)
+  priceTier(id: ID!): PriceTier @join__field(graph: FINANCE)
+  promoCodes(limit: Int, offset: Int): [PromoCode!]! @join__field(graph: FINANCE)
+  promoCode(id: ID!): PromoCode @join__field(graph: FINANCE)
+  quotes(limit: Int, offset: Int): [Quote!]! @join__field(graph: FINANCE)
+  quote(id: ID!): Quote @join__field(graph: FINANCE)
+  invoices(limit: Int, offset: Int): [Invoice!]! @join__field(graph: FINANCE)
+  invoice(id: ID!): Invoice @join__field(graph: FINANCE)
+  contracts(limit: Int, offset: Int): [Contract!]! @join__field(graph: FINANCE)
+  contract(id: ID!): Contract @join__field(graph: FINANCE)
+  subscriptions(limit: Int, offset: Int): [Subscription!]! @join__field(graph: FINANCE)
+  subscription(id: ID!): Subscription @join__field(graph: FINANCE)
+  payments(limit: Int, offset: Int): [Payment!]! @join__field(graph: FINANCE)
+  payment(id: ID!): Payment @join__field(graph: FINANCE)
+  currencies(limit: Int, offset: Int): [Currency!]! @join__field(graph: FINANCE)
+  currency(id: ID!): Currency @join__field(graph: FINANCE)
+  taxZones(limit: Int, offset: Int): [TaxZone!]! @join__field(graph: FINANCE)
+  taxZone(id: ID!): TaxZone @join__field(graph: FINANCE)
+  taxRates(limit: Int, offset: Int): [TaxRate!]! @join__field(graph: FINANCE)
+  taxRate(id: ID!): TaxRate @join__field(graph: FINANCE)
+  contests(limit: Int, offset: Int): [Contest!]! @join__field(graph: INCENTIVE)
+  contest(id: ID!): Contest @join__field(graph: INCENTIVE)
+  contestEntries(contestId: ID!): [ContestEntry!]! @join__field(graph: INCENTIVE)
+  badges(limit: Int, offset: Int): [Badge!]! @join__field(graph: INCENTIVE)
+  badge(id: ID!): Badge @join__field(graph: INCENTIVE)
+  badgeAwards(badgeId: ID!): [BadgeAward!]! @join__field(graph: INCENTIVE)
+  webhookSubscriptions(limit: Int, offset: Int): [WebhookSubscription!]! @join__field(graph: INTEGRATION)
+  webhookSubscription(id: ID!): WebhookSubscription @join__field(graph: INTEGRATION)
+  webhookDeliveries(subscriptionId: ID!): [WebhookDelivery!]! @join__field(graph: INTEGRATION)
+  oAuthConnections(limit: Int, offset: Int): [OAuthConnection!]! @join__field(graph: INTEGRATION)
+  oAuthConnection(id: ID!): OAuthConnection @join__field(graph: INTEGRATION)
+  syncJobs(limit: Int, offset: Int): [SyncJob!]! @join__field(graph: INTEGRATION)
+  syncJob(id: ID!): SyncJob @join__field(graph: INTEGRATION)
+  syncedCalendarEvents(limit: Int, offset: Int): [SyncedCalendarEvent!]! @join__field(graph: INTEGRATION)
+  syncedCalendarEvent(id: ID!): SyncedCalendarEvent @join__field(graph: INTEGRATION)
+  geocodedAccounts(limit: Int, offset: Int): [GeocodedAccount!]! @join__field(graph: INTEGRATION)
+  geocodedAccount(id: ID!): GeocodedAccount @join__field(graph: INTEGRATION)
+  kbCategories(limit: Int, offset: Int): [KbCategory!]! @join__field(graph: KNOWLEDGE)
+  kbCategory(id: ID!): KbCategory @join__field(graph: KNOWLEDGE)
+  kbArticles(limit: Int, offset: Int, status: String): [KbArticle!]! @join__field(graph: KNOWLEDGE)
+  kbArticle(id: ID!): KbArticle @join__field(graph: KNOWLEDGE)
+  kbViews(articleId: ID!): [KbView!]! @join__field(graph: KNOWLEDGE)
+  customFieldDefinitions(limit: Int, offset: Int, entityType: String): [CustomFieldDefinition!]! @join__field(graph: METADATA)
+  customFieldDefinition(id: ID!): CustomFieldDefinition @join__field(graph: METADATA)
+  fieldPermissions(limit: Int, offset: Int): [FieldPermission!]! @join__field(graph: METADATA)
+  fieldPermission(id: ID!): FieldPermission @join__field(graph: METADATA)
+  validationRules(limit: Int, offset: Int, objectType: String): [ValidationRule!]! @join__field(graph: METADATA)
+  validationRule(id: ID!): ValidationRule @join__field(graph: METADATA)
+  fieldChangeLogs(limit: Int, offset: Int): [FieldChangeLog!]! @join__field(graph: METADATA)
+  fieldChangeLog(id: ID!): FieldChangeLog @join__field(graph: METADATA)
+  duplicateGroups(limit: Int, offset: Int): [DuplicateGroup!]! @join__field(graph: METADATA)
+  duplicateGroup(id: ID!): DuplicateGroup @join__field(graph: METADATA)
+  tags(limit: Int, offset: Int, entityType: String): [Tag!]! @join__field(graph: METADATA)
+  tag(id: ID!): Tag @join__field(graph: METADATA)
+  notifications(limit: Int, offset: Int, isRead: Boolean): [Notification!]! @join__field(graph: NOTIFICATION)
+  notification(id: ID!): Notification @join__field(graph: NOTIFICATION)
+  quotaPlans(limit: Int, offset: Int): [QuotaPlan!]! @join__field(graph: PLANNING)
+  quotaPlan(id: ID!): QuotaPlan @join__field(graph: PLANNING)
+  quotaTargets(planId: ID!): [QuotaTarget!]! @join__field(graph: PLANNING)
+  quotaTarget(id: ID!): QuotaTarget @join__field(graph: PLANNING)
+  forecastSubmissions(limit: Int, offset: Int): [ForecastSubmission!]! @join__field(graph: PLANNING)
+  forecastSubmission(id: ID!): ForecastSubmission @join__field(graph: PLANNING)
+  forecastReviews(submissionId: ID!): [ForecastReview!]! @join__field(graph: PLANNING)
+  forecastOverrides(limit: Int, offset: Int): [ForecastOverride!]! @join__field(graph: PLANNING)
+  forecastOverride(id: ID!): ForecastOverride @join__field(graph: PLANNING)
+  portalTokens(limit: Int, offset: Int): [PortalToken!]! @join__field(graph: PORTAL)
+  portalToken(id: ID!): PortalToken @join__field(graph: PORTAL)
+  portalBranding(tenantId: String!): PortalBranding @join__field(graph: PORTAL)
+  portalAuditLogs(limit: Int, offset: Int): [PortalAuditLog!]! @join__field(graph: PORTAL)
+  portalAuditLog(id: ID!): PortalAuditLog @join__field(graph: PORTAL)
+  realtimeHealth: Health! @join__field(graph: REALTIME)
+  connectedUsers: Int! @join__field(graph: REALTIME)
+  savedReports(limit: Int, offset: Int): [SavedReport!]! @join__field(graph: REPORTING)
+  savedReport(id: ID!): SavedReport @join__field(graph: REPORTING)
+  reportSchedules(limit: Int, offset: Int): [ReportSchedule!]! @join__field(graph: REPORTING)
+  reportSchedule(id: ID!): ReportSchedule @join__field(graph: REPORTING)
+  dashboards(limit: Int, offset: Int): [Dashboard!]! @join__field(graph: REPORTING)
+  dashboard(id: ID!): Dashboard @join__field(graph: REPORTING)
+  dashboardWidgets(limit: Int, offset: Int): [DashboardWidget!]! @join__field(graph: REPORTING)
+  dashboardWidget(id: ID!): DashboardWidget @join__field(graph: REPORTING)
+  pipelineSnapshots(limit: Int, offset: Int): [PipelineSnapshot!]! @join__field(graph: REPORTING)
+  pipelineSnapshot(id: ID!): PipelineSnapshot @join__field(graph: REPORTING)
+  search(query: String!, index: String, limit: Int, offset: Int): SearchResult! @join__field(graph: SEARCH)
+  searchHealth: Health! @join__field(graph: SEARCH)
+  fileAttachments(limit: Int, offset: Int, entityType: String, entityId: String): [FileAttachment!]! @join__field(graph: STORAGE)
+  fileAttachment(id: ID!): FileAttachment @join__field(graph: STORAGE)
+  territories(limit: Int, offset: Int): [Territory!]! @join__field(graph: TERRITORY)
+  territory(id: ID!): Territory @join__field(graph: TERRITORY)
+  territoryRules(limit: Int, offset: Int): [TerritoryRule!]! @join__field(graph: TERRITORY)
+  territoryRule(id: ID!): TerritoryRule @join__field(graph: TERRITORY)
+  leadRoutingLogs(limit: Int, offset: Int): [LeadRoutingLog!]! @join__field(graph: TERRITORY)
+  leadRoutingLog(id: ID!): LeadRoutingLog @join__field(graph: TERRITORY)
+  roundRobinStates(limit: Int, offset: Int): [RoundRobinState!]! @join__field(graph: TERRITORY)
+  roundRobinState(id: ID!): RoundRobinState @join__field(graph: TERRITORY)
+  workflowTemplates(limit: Int, offset: Int): [WorkflowTemplate!]! @join__field(graph: WORKFLOW)
+  workflowTemplate(id: ID!): WorkflowTemplate @join__field(graph: WORKFLOW)
+  workflowExecutions(limit: Int, offset: Int): [WorkflowExecution!]! @join__field(graph: WORKFLOW)
+  workflowExecution(id: ID!): WorkflowExecution @join__field(graph: WORKFLOW)
+  journeys(limit: Int, offset: Int): [Journey!]! @join__field(graph: WORKFLOW)
+  journey(id: ID!): Journey @join__field(graph: WORKFLOW)
+  journeyEnrollments(limit: Int, offset: Int): [JourneyEnrollment!]! @join__field(graph: WORKFLOW)
+  journeyEnrollment(id: ID!): JourneyEnrollment @join__field(graph: WORKFLOW)
+}
+
+type QuotaPlan
+  @join__type(graph: PLANNING, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  year: Int!
+  quarter: Int
+  type: QuotaType!
+  currency: String!
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  targets: [QuotaTarget!]!
+}
+
+type QuotaTarget
+  @join__type(graph: PLANNING, key: "id")
+{
+  id: ID!
+  planId: String!
+  plan: QuotaPlan
+  tenantId: String!
+  ownerId: String!
+  targetValue: String!
+  currency: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+enum QuotaType
+  @join__type(graph: PLANNING)
+{
+  REVENUE @join__enumValue(graph: PLANNING)
+  DEAL_COUNT @join__enumValue(graph: PLANNING)
+  ACTIVITY_COUNT @join__enumValue(graph: PLANNING)
+  NEW_LOGOS @join__enumValue(graph: PLANNING)
+}
+
+type Quote
+  @join__type(graph: FINANCE, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  dealId: ID!
+  accountId: ID!
+  ownerId: ID!
+  quoteNumber: String!
+  name: String!
+  status: String!
+  currency: String!
+  subtotal: Float!
+  discountAmount: Float!
+  taxAmount: Float!
+  total: Float!
+  validUntil: DateTime
+  expiresAt: DateTime
+  approvalRequired: Boolean!
+  approvalStatus: String
+  approvedById: ID
+  approvedAt: DateTime
+  sentAt: DateTime
+  viewedAt: DateTime
+  acceptedAt: DateTime
+  rejectedAt: DateTime
+  rejectionReason: String
+  voidedAt: DateTime
+  voidReason: String
+  paymentTerms: String
+  terms: String
+  notes: String
+  appliedPromos: [String!]!
+  lineItems: JSON
+  pricingBreakdown: JSON
+  customFields: JSON
+  baseCurrency: String
+  baseTotal: Float
+  exchangeRate: Float
+  taxZoneId: ID
+  taxBreakdown: JSON
+  templateId: ID
+  rfqId: ID
+  acceptanceToken: String
+  marginTotal: Float
+  priceBookId: ID
+  vendorTaxReg: String
+  buyerTaxReg: String
+  dueDate: DateTime
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type RecentRecord
+  @join__type(graph: DATA, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  userId: String!
+  module: String!
+  recordId: String!
+  viewedAt: DateTime!
+}
+
+type RecycleBinItem
+  @join__type(graph: DATA, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  module: String!
+  recordId: String!
+  recordSnapshot: JSON!
+  deletedBy: String!
+  deletedAt: DateTime!
+  expiresAt: DateTime!
+}
+
+type ReportSchedule
+  @join__type(graph: REPORTING, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  reportId: String!
+  report: SavedReport!
+  cron: String!
+  format: String!
+  recipients: [String!]!
+  subject: String
+  lastRunAt: DateTime
+  nextRunAt: DateTime
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type RevenueAnalytics
+  @join__type(graph: ANALYTICS, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  period: String!
+  revenue: String!
+  newRevenue: String!
+  expansionRevenue: String!
+  churnedRevenue: String!
+  netRevenueRetention: String!
+  updatedAt: DateTime!
+}
+
+type Role
+  @join__type(graph: AUTH)
+{
+  id: ID!
+  name: String!
+  permissions: [String!]!
+}
+
+type RoundRobinState
+  @join__type(graph: TERRITORY, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  territoryId: String!
+  lastIndex: Int!
+  updatedAt: DateTime!
+}
+
+type SavedReport
+  @join__type(graph: REPORTING, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  description: String
+  objectType: String!
+  columns: JSON!
+  filters: JSON!
+  groupBy: String
+  sortBy: String!
+  sortDir: String!
+  isShared: Boolean!
+  ownerId: String!
+  folderId: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  schedules: [ReportSchedule!]!
+}
+
+type SavedView
+  @join__type(graph: DATA, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  userId: String!
+  module: String!
+  name: String!
+  filters: JSON!
+  columns: JSON!
+  sortBy: String
+  sortDir: String!
+  isDefault: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type SearchHit
+  @join__type(graph: SEARCH, key: "id")
+{
+  id: ID!
+  objectID: String!
+  entityType: String!
+  title: String!
+  snippet: String
+  metadata: JSON!
+}
+
+type SearchResult
+  @join__type(graph: SEARCH, key: "id")
+{
+  id: ID!
+  query: String!
+  index: String
+  hits: [SearchHit!]!
+  totalHits: Int!
+  processingTimeMs: Int!
+}
+
+type SequenceEnrollment
+  @join__type(graph: COMM, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  sequenceId: String!
+  sequence: EmailSequence
+  contactId: String!
+  currentStep: Int!
+  status: String!
+  enrolledAt: DateTime!
+  nextSendAt: DateTime
+}
+
+type SequenceStep
+  @join__type(graph: COMM, key: "id")
+{
+  id: ID!
+  sequenceId: String!
+  sequence: EmailSequence
+  stepNumber: Int!
+  delayDays: Int!
+  templateId: String!
+}
+
+type SmsTemplate
+  @join__type(graph: COMM, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  body: String!
+  variables: [String!]!
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Stage
+  @join__type(graph: CRM, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  pipelineId: ID!
+  name: String!
+  order: Int!
+  probability: Int!
+  rottenDays: Int!
+  requiredFields: JSON
+  entryConditions: JSON
+  color: String!
+  isWon: Boolean!
+  isLost: Boolean!
+  deletedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type StageTransitionRule
+  @join__type(graph: BLUEPRINT, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  pipelineId: String!
+  fromStageId: String!
+  toStageId: String!
+  rules: JSON!
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type StepExecution
+  @join__type(graph: CADENCE)
+{
+  id: ID!
+  enrollmentId: String!
+  enrollment: CadenceEnrollment!
+  stepPosition: Int!
+  stepType: StepType!
+  status: ExecutionStatus!
+  scheduledAt: DateTime!
+  executedAt: DateTime
+  result: String
+  variant: String!
+  createdAt: DateTime!
+}
+
+enum StepStatus
+  @join__type(graph: APPROVAL)
+  @join__type(graph: WORKFLOW)
+{
+  PENDING @join__enumValue(graph: APPROVAL) @join__enumValue(graph: WORKFLOW)
+  APPROVED @join__enumValue(graph: APPROVAL) @join__enumValue(graph: WORKFLOW)
+  REJECTED @join__enumValue(graph: APPROVAL) @join__enumValue(graph: WORKFLOW)
+  SKIPPED @join__enumValue(graph: APPROVAL) @join__enumValue(graph: WORKFLOW)
+  DELEGATED @join__enumValue(graph: APPROVAL) @join__enumValue(graph: WORKFLOW)
+  RUNNING @join__enumValue(graph: APPROVAL) @join__enumValue(graph: WORKFLOW)
+  COMPLETED @join__enumValue(graph: APPROVAL) @join__enumValue(graph: WORKFLOW)
+  FAILED @join__enumValue(graph: APPROVAL) @join__enumValue(graph: WORKFLOW)
+}
+
+enum StepType
+  @join__type(graph: CADENCE)
+{
+  EMAIL @join__enumValue(graph: CADENCE)
+  CALL_TASK @join__enumValue(graph: CADENCE)
+  LINKEDIN_TASK @join__enumValue(graph: CADENCE)
+  SMS @join__enumValue(graph: CADENCE)
+  WAIT @join__enumValue(graph: CADENCE)
+}
+
+type Subscription
+  @join__type(graph: FINANCE, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  accountId: ID!
+  contractId: ID
+  productId: ID!
+  planName: String!
+  status: String!
+  quantity: Int!
+  unitPrice: Float!
+  currency: String!
+  billingPeriod: String!
+  billingDay: Int!
+  startDate: DateTime!
+  endDate: DateTime
+  trialEndDate: DateTime
+  cancelledAt: DateTime
+  cancelReason: String
+  mrr: Float!
+  arr: Float!
+  nextBillingDate: DateTime
+  customFields: JSON
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type SyncedCalendarEvent
+  @join__type(graph: INTEGRATION, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  activityId: String!
+  provider: String!
+  externalId: String!
+  etag: String
+  syncedAt: DateTime!
+}
+
+type SyncJob
+  @join__type(graph: INTEGRATION, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  connectionId: String!
+  connection: OAuthConnection
+  jobType: String!
+  status: SyncStatus!
+  totalRecords: Int!
+  processedRecords: Int!
+  errorCount: Int!
+  errorLog: JSON!
+  startedAt: DateTime
+  completedAt: DateTime
+  createdAt: DateTime!
+}
+
+enum SyncStatus
+  @join__type(graph: INTEGRATION)
+{
+  PENDING @join__enumValue(graph: INTEGRATION)
+  RUNNING @join__enumValue(graph: INTEGRATION)
+  COMPLETED @join__enumValue(graph: INTEGRATION)
+  FAILED @join__enumValue(graph: INTEGRATION)
+  CANCELED @join__enumValue(graph: INTEGRATION)
+}
+
+type Tag
+  @join__type(graph: METADATA, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  color: String!
+  entityType: String
+  usageCount: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type TaxRate
+  @join__type(graph: FINANCE, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  zoneId: ID!
+  name: String!
+  code: String!
+  rate: Float!
+  taxType: String!
+  isDefault: Boolean!
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type TaxZone
+  @join__type(graph: FINANCE, key: "id")
+{
+  id: ID!
+  tenantId: ID!
+  name: String!
+  country: String
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Tenant
+  @join__type(graph: AUTH, key: "id")
+{
+  id: ID!
+  name: String!
+  domain: String
+  logo: String
+  settings: JSON
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Territory
+  @join__type(graph: TERRITORY, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  description: String
+  type: TerritoryType!
+  ownerIds: [String!]!
+  teamId: String
+  priority: Int!
+  isActive: Boolean!
+  currency: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  rules: [TerritoryRule!]!
+  routingLogs: [LeadRoutingLog!]!
+}
+
+type TerritoryRule
+  @join__type(graph: TERRITORY)
+{
+  id: ID!
+  territoryId: String!
+  territory: Territory!
+  field: String!
+  operator: String!
+  value: String!
+  createdAt: DateTime!
+}
+
+enum TerritoryType
+  @join__type(graph: TERRITORY)
+{
+  GEOGRAPHIC @join__enumValue(graph: TERRITORY)
+  INDUSTRY @join__enumValue(graph: TERRITORY)
+  ACCOUNT_SIZE @join__enumValue(graph: TERRITORY)
+  CUSTOM @join__enumValue(graph: TERRITORY)
+}
+
+input TrackEventInput
+  @join__type(graph: ANALYTICS)
+{
+  tenantId: String!
+  eventType: String!
+  entityType: String
+  entityId: String
+  metadata: JSON
+}
+
+input UpdateAccountInput
+  @join__type(graph: CRM)
+{
+  ownerId: ID
+  parentAccountId: ID
+  name: String
+  website: String
+  phone: String
+  email: String
+  industry: String
+  type: String
+  tier: String
+  status: String
+  annualRevenue: Float
+  employeeCount: Int
+  country: String
+  city: String
+  address: String
+  zipCode: String
+  linkedInUrl: String
+  description: String
+  sicCode: String
+  naicsCode: String
+  healthScore: Int
+  npsScore: Int
+  customFields: JSON
+  lat: Float
+  lng: Float
+  tags: [String!]
+  dataQualityScore: Int
+}
+
+input UpdateActivityInput
+  @join__type(graph: CRM)
+{
+  type: String
+  subject: String
+  description: String
+  status: String
+  priority: String
+  dueDate: DateTime
+  startDate: DateTime
+  endDate: DateTime
+  duration: Int
+  outcome: String
+  leadId: ID
+  contactId: ID
+  accountId: ID
+  dealId: ID
+  customFields: JSON
+}
+
+input UpdateApprovalPolicyInput
+  @join__type(graph: APPROVAL)
+{
+  name: String
+  module: String
+  conditions: JSON
+  steps: JSON
+  isActive: Boolean
+}
+
+input UpdateApprovalRequestInput
+  @join__type(graph: APPROVAL)
+{
+  policyId: ID
+  module: String
+  recordId: String
+  requestedBy: String
+  status: ApprovalStatus
+  currentStep: Int
+  data: JSON
+  comment: String
+}
+
+input UpdateApprovalStepInput
+  @join__type(graph: APPROVAL)
+{
+  order: Int
+  approverId: String
+  status: StepStatus
+  comment: String
+  actionedAt: DateTime
+}
+
+input UpdateBadgeInput
+  @join__type(graph: INCENTIVE)
+{
+  name: String
+  description: String
+  icon: String
+  condition: JSON
+}
+
+input UpdateCadenceEnrollmentInput
+  @join__type(graph: CADENCE)
+{
+  cadenceId: ID
+  objectType: ObjectType
+  objectId: String
+  ownerId: String
+  status: EnrollmentStatus
+  currentStep: Int
+  enrolledAt: DateTime
+  exitReason: String
+  exitedAt: DateTime
+}
+
+input UpdateCadenceStepInput
+  @join__type(graph: CADENCE)
+{
+  cadenceId: ID
+  position: Int
+  type: StepType
+  delayDays: Int
+  subject: String
+  body: String
+  taskTitle: String
+  variantB: JSON
+}
+
+input UpdateCadenceTemplateInput
+  @join__type(graph: CADENCE)
+{
+  name: String
+  description: String
+  objectType: ObjectType
+  isActive: Boolean
+  exitOnReply: Boolean
+  exitOnMeeting: Boolean
+}
+
+input UpdateCommOutboxInput
+  @join__type(graph: COMM)
+{
+  status: String
+  sentAt: DateTime
+  openedAt: DateTime
+  clickedAt: DateTime
+  errorMessage: String
+}
+
+input UpdateContactInput
+  @join__type(graph: CRM)
+{
+  ownerId: ID
+  accountId: ID
+  firstName: String
+  lastName: String
+  email: String
+  phone: String
+  mobile: String
+  jobTitle: String
+  department: String
+  linkedInUrl: String
+  twitterHandle: String
+  country: String
+  city: String
+  address: String
+  timezone: String
+  preferredChannel: String
+  doNotEmail: Boolean
+  doNotCall: Boolean
+  gdprConsent: Boolean
+  customFields: JSON
+  tags: [String!]
+  isActive: Boolean
+}
+
+input UpdateContestEntryInput
+  @join__type(graph: INCENTIVE)
+{
+  currentValue: String
+  rank: Int
+}
+
+input UpdateContestInput
+  @join__type(graph: INCENTIVE)
+{
+  name: String
+  description: String
+  metric: ContestMetric
+  targetValue: String
+  startDate: DateTime
+  endDate: DateTime
+  prizeDescription: String
+  isActive: Boolean
+}
+
+input UpdateContractInput
+  @join__type(graph: FINANCE)
+{
+  accountId: ID
+  ownerId: ID
+  contractNumber: String
+  name: String
+  status: String
+  startDate: DateTime
+  endDate: DateTime
+  autoRenew: Boolean
+  renewalTermDays: Int
+  currency: String
+  totalValue: Float
+  signedById: ID
+  signatureData: JSON
+  terms: String
+  lineItems: JSON
+  customFields: JSON
+}
+
+input UpdateConversationInput
+  @join__type(graph: CHATBOT)
+{
+  state: ConversationState
+  contactId: String
+  draftQuoteId: String
+  context: JSON
+}
+
+input UpdateCurrencyInput
+  @join__type(graph: FINANCE)
+{
+  code: String
+  name: String
+  symbol: String
+  isBase: Boolean
+  isActive: Boolean
+  decimalPlaces: Int
+}
+
+input UpdateCustomFieldDefinitionInput
+  @join__type(graph: METADATA)
+{
+  name: String
+  fieldType: String
+  options: JSON
+  required: Boolean
+  showOnCard: Boolean
+  position: Int
+  isActive: Boolean
+}
+
+input UpdateDashboardInput
+  @join__type(graph: REPORTING)
+{
+  name: String
+  ownerId: String
+  isShared: Boolean
+  isPinned: Boolean
+}
+
+input UpdateDashboardWidgetInput
+  @join__type(graph: REPORTING)
+{
+  dashboardId: ID
+  title: String
+  widgetType: String
+  reportId: ID
+  config: JSON
+  position: Int
+  width: Int
+  height: Int
+}
+
+input UpdateDealInput
+  @join__type(graph: CRM)
+{
+  ownerId: ID
+  accountId: ID
+  pipelineId: ID
+  stageId: ID
+  name: String
+  amount: Float
+  currency: String
+  probability: Int
+  expectedCloseDate: DateTime
+  actualCloseDate: DateTime
+  status: String
+  lostReason: String
+  lostDetail: String
+  forecastCategory: String
+  source: String
+  campaignId: ID
+  customFields: JSON
+  tags: [String!]
+  closeReason: String
+}
+
+input UpdateDealTemplateInput
+  @join__type(graph: BLUEPRINT)
+{
+  name: String
+  description: String
+  pipelineId: String
+  fields: JSON
+}
+
+input UpdateDocumentInput
+  @join__type(graph: DOCUMENT)
+{
+  name: String
+  description: String
+  folderId: String
+  tags: [String!]
+  isDeleted: Boolean
+}
+
+input UpdateDuplicateGroupInput
+  @join__type(graph: METADATA)
+{
+  status: String
+  masterRecordId: String
+  resolvedAt: DateTime
+  resolvedBy: String
+}
+
+input UpdateEmailConnectionInput
+  @join__type(graph: EMAIL_SYNC)
+{
+  accessToken: String
+  refreshToken: String
+  tokenExpiry: DateTime
+  syncEnabled: Boolean
+  lastSyncAt: DateTime
+}
+
+input UpdateEmailMessageInput
+  @join__type(graph: EMAIL_SYNC)
+{
+  isRead: Boolean
+  contactId: String
+  dealId: String
+}
+
+input UpdateEmailSequenceInput
+  @join__type(graph: COMM)
+{
+  name: String
+  triggerType: String
+  isActive: Boolean
+}
+
+input UpdateEmailTemplateInput
+  @join__type(graph: COMM)
+{
+  name: String
+  subject: String
+  htmlBody: String
+  textBody: String
+  variables: [String!]
+  category: String
+  isActive: Boolean
+}
+
+input UpdateFolderInput
+  @join__type(graph: DOCUMENT)
+{
+  name: String
+  parentId: String
+}
+
+input UpdateForecastOverrideInput
+  @join__type(graph: PLANNING)
+{
+  originalValue: String
+  overrideValue: String
+  note: String
+  scopePipelineId: String
+}
+
+input UpdateForecastSubmissionInput
+  @join__type(graph: PLANNING)
+{
+  commitAmount: String
+  bestCaseAmount: String
+  pipelineAmount: String
+  commentary: String
+}
+
+input UpdateGeocodedAccountInput
+  @join__type(graph: INTEGRATION)
+{
+  lat: Float
+  lng: Float
+}
+
+input UpdateImportJobInput
+  @join__type(graph: DATA)
+{
+  status: ImportStatus
+  totalRows: Int
+  imported: Int
+  failed: Int
+  errors: JSON
+  completedAt: DateTime
+}
+
+input UpdateInvoiceInput
+  @join__type(graph: FINANCE)
+{
+  accountId: ID
+  subscriptionId: ID
+  contractId: ID
+  invoiceNumber: String
+  status: String
+  currency: String
+  subtotal: Float
+  taxAmount: Float
+  discountAmount: Float
+  total: Float
+  dueDate: DateTime
+  paidAt: DateTime
+  paidAmount: Float
+  lineItems: JSON
+  notes: String
+  customFields: JSON
+}
+
+input UpdateJourneyEnrollmentInput
+  @join__type(graph: WORKFLOW)
+{
+  currentNodeId: String
+  status: EnrollmentStatus
+  exitedAt: DateTime
+  exitReason: String
+  metadata: JSON
+}
+
+input UpdateJourneyInput
+  @join__type(graph: WORKFLOW)
+{
+  name: String
+  description: String
+  status: JourneyStatus
+  entryTrigger: String
+  entryConfig: JSON
+  nodes: JSON
+  edges: JSON
+  settings: JSON
+}
+
+input UpdateKbArticleInput
+  @join__type(graph: KNOWLEDGE)
+{
+  categoryId: String
+  title: String
+  slug: String
+  body: String
+  tags: [String!]
+  status: ArticleStatus
+  dealStages: [String!]
+}
+
+input UpdateKbCategoryInput
+  @join__type(graph: KNOWLEDGE)
+{
+  name: String
+  icon: String
+  position: Int
+  parentCategoryId: String
+}
+
+input UpdateLeadInput
+  @join__type(graph: CRM)
+{
+  ownerId: ID
+  firstName: String
+  lastName: String
+  email: String
+  phone: String
+  company: String
+  jobTitle: String
+  source: String
+  status: String
+  rating: String
+  industry: String
+  website: String
+  annualRevenue: Float
+  employeeCount: Int
+  country: String
+  city: String
+  address: String
+  linkedInUrl: String
+  twitterHandle: String
+  customFields: JSON
+  tags: [String!]
+  doNotContact: Boolean
+  gdprConsent: Boolean
+  territoryId: ID
+  assignedTo: String
+  priority: String
+  dataQualityScore: Int
+}
+
+input UpdateLeadRoutingLogInput
+  @join__type(graph: TERRITORY)
+{
+  leadId: String
+  matchedTerritoryId: ID
+  assignedOwnerId: String
+  routedAt: DateTime
+}
+
+input UpdateNoteInput
+  @join__type(graph: CRM)
+{
+  content: String
+  isPinned: Boolean
+  leadId: ID
+  contactId: ID
+  accountId: ID
+  dealId: ID
+}
+
+input UpdateOAuthConnectionInput
+  @join__type(graph: INTEGRATION)
+{
+  accessToken: String
+  refreshToken: String
+  expiresAt: DateTime
+  email: String
+}
+
+input UpdatePaymentInput
+  @join__type(graph: FINANCE)
+{
+  invoiceId: ID
+  amount: Float
+  currency: String
+  method: String
+  status: String
+  reference: String
+  gateway: String
+  gatewayRef: String
+  notes: String
+  paidAt: DateTime
+  failedAt: DateTime
+  failureReason: String
+}
+
+input UpdatePipelineInput
+  @join__type(graph: CRM)
+{
+  name: String
+  type: String
+  currency: String
+  isDefault: Boolean
+  isActive: Boolean
+  description: String
+  ownedBy: String
+}
+
+input UpdatePipelineSnapshotInput
+  @join__type(graph: REPORTING)
+{
+  pipelineId: String
+  snapshotDate: DateTime
+  stage: String
+  dealCount: Int
+  totalValue: String
+  dealIds: JSON
+}
+
+input UpdatePlaybookInput
+  @join__type(graph: BLUEPRINT)
+{
+  name: String
+  description: String
+  pipelineId: String
+  isActive: Boolean
+}
+
+input UpdatePlaybookStageInput
+  @join__type(graph: BLUEPRINT)
+{
+  stageName: String
+  position: Int
+  entryActions: JSON
+  exitCriteria: JSON
+  requiredFields: [String!]
+  talkingPoints: [String!]
+  resources: JSON
+}
+
+input UpdatePortalBrandingInput
+  @join__type(graph: PORTAL)
+{
+  logoUrl: String
+  primaryColor: String
+  companyName: String
+}
+
+input UpdatePriceTierInput
+  @join__type(graph: FINANCE)
+{
+  productId: ID
+  name: String
+  minQty: Int
+  maxQty: Int
+  unitPrice: Float
+}
+
+input UpdateProductInput
+  @join__type(graph: FINANCE)
+{
+  sku: String
+  name: String
+  nameAr: String
+  description: String
+  descriptionAr: String
+  unitAr: String
+  type: String
+  category: String
+  currency: String
+  listPrice: Float
+  cost: Float
+  billingType: String
+  billingPeriod: String
+  taxable: Boolean
+  taxCode: String
+  isActive: Boolean
+  pricingRules: JSON
+  customFields: JSON
+}
+
+input UpdatePromoCodeInput
+  @join__type(graph: FINANCE)
+{
+  code: String
+  description: String
+  discountPercent: Float
+  isActive: Boolean
+  validFrom: DateTime
+  validUntil: DateTime
+  maxUses: Int
+  applicableProductIds: [String!]
+}
+
+input UpdateQuotaPlanInput
+  @join__type(graph: PLANNING)
+{
+  name: String
+  year: Int
+  quarter: Int
+  type: QuotaType
+  currency: String
+  isActive: Boolean
+}
+
+input UpdateQuotaTargetInput
+  @join__type(graph: PLANNING)
+{
+  targetValue: String
+  currency: String
+}
+
+input UpdateQuoteInput
+  @join__type(graph: FINANCE)
+{
+  dealId: ID
+  accountId: ID
+  ownerId: ID
+  quoteNumber: String
+  name: String
+  status: String
+  currency: String
+  subtotal: Float
+  discountAmount: Float
+  taxAmount: Float
+  total: Float
+  validUntil: DateTime
+  expiresAt: DateTime
+  approvalRequired: Boolean
+  approvalStatus: String
+  approvedById: ID
+  approvedAt: DateTime
+  sentAt: DateTime
+  viewedAt: DateTime
+  acceptedAt: DateTime
+  rejectedAt: DateTime
+  rejectionReason: String
+  voidedAt: DateTime
+  voidReason: String
+  paymentTerms: String
+  terms: String
+  notes: String
+  appliedPromos: [String!]
+  lineItems: JSON
+  pricingBreakdown: JSON
+  customFields: JSON
+  baseCurrency: String
+  baseTotal: Float
+  exchangeRate: Float
+  taxZoneId: ID
+  taxBreakdown: JSON
+  templateId: ID
+  rfqId: ID
+  marginTotal: Float
+  priceBookId: ID
+  vendorTaxReg: String
+  buyerTaxReg: String
+  dueDate: DateTime
+}
+
+input UpdateReportScheduleInput
+  @join__type(graph: REPORTING)
+{
+  reportId: ID
+  cron: String
+  format: String
+  recipients: [String!]
+  subject: String
+  lastRunAt: DateTime
+  nextRunAt: DateTime
+  isActive: Boolean
+}
+
+input UpdateRoundRobinStateInput
+  @join__type(graph: TERRITORY)
+{
+  territoryId: String
+  lastIndex: Int
+}
+
+input UpdateSavedReportInput
+  @join__type(graph: REPORTING)
+{
+  name: String
+  description: String
+  objectType: String
+  columns: JSON
+  filters: JSON
+  groupBy: String
+  sortBy: String
+  sortDir: String
+  isShared: Boolean
+  ownerId: String
+  folderId: ID
+}
+
+input UpdateSavedViewInput
+  @join__type(graph: DATA)
+{
+  name: String
+  filters: JSON
+  columns: JSON
+  sortBy: String
+  sortDir: String
+  isDefault: Boolean
+}
+
+input UpdateSequenceEnrollmentInput
+  @join__type(graph: COMM)
+{
+  currentStep: Int
+  status: String
+  nextSendAt: DateTime
+}
+
+input UpdateSmsTemplateInput
+  @join__type(graph: COMM)
+{
+  name: String
+  body: String
+  variables: [String!]
+  isActive: Boolean
+}
+
+input UpdateStageInput
+  @join__type(graph: CRM)
+{
+  pipelineId: ID
+  name: String
+  order: Int
+  probability: Int
+  rottenDays: Int
+  requiredFields: JSON
+  entryConditions: JSON
+  color: String
+  isWon: Boolean
+  isLost: Boolean
+}
+
+input UpdateStageTransitionRuleInput
+  @join__type(graph: BLUEPRINT)
+{
+  rules: JSON
+}
+
+input UpdateStepExecutionInput
+  @join__type(graph: CADENCE)
+{
+  stepPosition: Int
+  stepType: StepType
+  status: ExecutionStatus
+  scheduledAt: DateTime
+  executedAt: DateTime
+  result: String
+  variant: String
+}
+
+input UpdateSubscriptionInput
+  @join__type(graph: FINANCE)
+{
+  accountId: ID
+  contractId: ID
+  productId: ID
+  planName: String
+  status: String
+  quantity: Int
+  unitPrice: Float
+  currency: String
+  billingPeriod: String
+  billingDay: Int
+  startDate: DateTime
+  endDate: DateTime
+  trialEndDate: DateTime
+  cancelledAt: DateTime
+  cancelReason: String
+  mrr: Float
+  arr: Float
+  nextBillingDate: DateTime
+  customFields: JSON
+}
+
+input UpdateSyncJobInput
+  @join__type(graph: INTEGRATION)
+{
+  status: SyncStatus
+  totalRecords: Int
+  processedRecords: Int
+  errorCount: Int
+  errorLog: JSON
+  startedAt: DateTime
+  completedAt: DateTime
+}
+
+input UpdateTagInput
+  @join__type(graph: METADATA)
+{
+  name: String
+  color: String
+  entityType: String
+}
+
+input UpdateTaxRateInput
+  @join__type(graph: FINANCE)
+{
+  zoneId: ID
+  name: String
+  code: String
+  rate: Float
+  taxType: String
+  isDefault: Boolean
+  isActive: Boolean
+}
+
+input UpdateTaxZoneInput
+  @join__type(graph: FINANCE)
+{
+  name: String
+  country: String
+  isActive: Boolean
+}
+
+input UpdateTenantInput
+  @join__type(graph: AUTH)
+{
+  name: String
+  domain: String
+  settings: JSON
+  isActive: Boolean
+}
+
+input UpdateTerritoryInput
+  @join__type(graph: TERRITORY)
+{
+  name: String
+  description: String
+  type: TerritoryType
+  ownerIds: [String!]
+  teamId: String
+  priority: Int
+  isActive: Boolean
+  currency: String
+}
+
+input UpdateTerritoryRuleInput
+  @join__type(graph: TERRITORY)
+{
+  territoryId: ID
+  field: String
+  operator: String
+  value: String
+}
+
+input UpdateUserInput
+  @join__type(graph: AUTH)
+{
+  firstName: String
+  lastName: String
+  roleId: ID
+  isActive: Boolean
+}
+
+input UpdateValidationRuleInput
+  @join__type(graph: METADATA)
+{
+  name: String
+  condition: JSON
+  requirement: JSON
+  errorMessage: String
+  isActive: Boolean
+}
+
+input UpdateWebhookSubscriptionInput
+  @join__type(graph: INTEGRATION)
+{
+  name: String
+  targetUrl: String
+  secret: String
+  events: [String!]
+  isActive: Boolean
+}
+
+input UpdateWorkflowExecutionInput
+  @join__type(graph: WORKFLOW)
+{
+  status: ExecutionStatus
+  currentNodeId: String
+  resumeAt: DateTime
+  completedAt: DateTime
+  error: String
+}
+
+input UpdateWorkflowTemplateInput
+  @join__type(graph: WORKFLOW)
+{
+  name: String
+  description: String
+  trigger: String
+  triggerConditions: JSON
+  nodes: JSON
+  edges: JSON
+  isActive: Boolean
+}
+
+type User
+  @join__type(graph: AUTH, key: "id")
+{
+  id: ID!
+  email: String!
+  firstName: String
+  lastName: String
+  avatar: String
+  role: Role!
+  tenant: Tenant!
+  isActive: Boolean!
+  lastLogin: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type ValidationRule
+  @join__type(graph: METADATA, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  objectType: String!
+  name: String!
+  condition: JSON!
+  requirement: JSON!
+  errorMessage: String!
+  isActive: Boolean!
+  createdAt: DateTime!
+}
+
+type WebhookDelivery
+  @join__type(graph: INTEGRATION, key: "id")
+{
+  id: ID!
+  subscriptionId: String!
+  subscription: WebhookSubscription
+  tenantId: String!
+  eventType: String!
+  payload: JSON!
+  status: DeliveryStatus!
+  httpStatus: Int
+  responseBody: String
+  attemptCount: Int!
+  nextRetryAt: DateTime
+  deliveredAt: DateTime
+  createdAt: DateTime!
+}
+
+type WebhookSubscription
+  @join__type(graph: INTEGRATION, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  targetUrl: String!
+  secret: String!
+  events: [String!]!
+  isActive: Boolean!
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  deliveries: [WebhookDelivery!]!
+}
+
+type WhatsAppMessage
+  @join__type(graph: COMM, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  contactId: String
+  dealId: String
+  direction: String!
+  from: String!
+  to: String!
+  body: String!
+  status: String!
+  externalId: String
+  sentBy: String
+  createdAt: DateTime!
+}
+
+type WorkflowExecution
+  @join__type(graph: WORKFLOW, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  workflowId: String!
+  workflow: WorkflowTemplate!
+  triggerType: String!
+  triggerPayload: JSON!
+  status: ExecutionStatus!
+  currentNodeId: String
+  resumeAt: DateTime
+  startedAt: DateTime!
+  completedAt: DateTime
+  error: String
+  parentForkId: String
+  parentExecId: String
+  steps: [WorkflowStep!]!
+  branchChildren: [WorkflowExecution!]!
+}
+
+type WorkflowStep
+  @join__type(graph: WORKFLOW)
+{
+  id: ID!
+  executionId: String!
+  nodeId: String!
+  nodeType: String!
+  status: StepStatus!
+  input: JSON!
+  output: JSON
+  error: String
+  startedAt: DateTime!
+  completedAt: DateTime
+}
+
+type WorkflowTemplate
+  @join__type(graph: WORKFLOW, key: "id")
+{
+  id: ID!
+  tenantId: String!
+  name: String!
+  description: String
+  trigger: String!
+  triggerConditions: JSON!
+  nodes: JSON!
+  edges: JSON!
+  isActive: Boolean!
+  version: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  executions: [WorkflowExecution!]!
+}

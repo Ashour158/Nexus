@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { serviceApiBase } from '@/lib/server/service-url';
 
-const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://auth-service:3010/api/v1';
+const AUTH_URL = serviceApiBase(process.env.AUTH_SERVICE_URL, 'http://auth-service:3000');
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization') ?? '';

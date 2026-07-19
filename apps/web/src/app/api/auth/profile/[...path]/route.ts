@@ -4,8 +4,9 @@ import {
   apiSuccess,
   getDevPreviewState,
 } from '@/lib/server/dev-preview-data';
+import { serviceApiBase } from '@/lib/server/service-url';
 
-const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://auth-service:3010/api/v1';
+const AUTH_URL = serviceApiBase(process.env.AUTH_SERVICE_URL, 'http://auth-service:3000');
 
 async function proxy(req: NextRequest, { params }: { params: { path: string[] } }, method: string) {
   const auth = req.headers.get('authorization');

@@ -39,7 +39,7 @@ preflight() {
 validate_rclone_dest() {
   case "$1" in
     *..*|*/|"") die "BACKUP_RCLONE_DEST must be a scoped prefix without .. or trailing slash" ;;
-    *:/*) : ;;
+    *:*/*) : ;;
     *) die "BACKUP_RCLONE_DEST must be remote:scoped/path, not a remote root" ;;
   esac
   remote=${1%%:*}
@@ -105,8 +105,8 @@ postgres_backup() {
   log "capturing Postgres database inventory from direct managed endpoint"
   export PGPASSWORD=$BACKUP_PGPASSWORD
   mkdir -p "$STAGE/postgres" "$STAGE/evidence"
-  dbs=$(psql -h "$BACKUP_PGHOST" -p "$BACKUP_PGPORT" -U "$BACKUP_PGUSER" -d postgres -Atc \
-    "select datname from pg_database where not datistemplate and datallowconn order by datname")
+  dbs=$(psql -h "$BACKUP_PGHOST" -p "$BACKUP_PGPORT" -U "$BACKUP_PGUSER" -d "${BACKUP_PGDATABASE:-postgres}" -Atc \
+    "select datname from pg_database where not datistemplate and datallowconn and has_database_privilege(current_user, datname, 'CONNECT') order by datname")
   [ -n "$dbs" ] || die "no non-template Postgres databases found"
   printf '%s\n' "$dbs" > "$STAGE/postgres/databases.txt"
   log "starting resource-limited scratch Postgres to derive exact counts from each dump"
@@ -214,6 +214,7 @@ meili_backup() {
   dump_dir=$(meili_dump_dir)
   [ -n "$dump_dir" ] && [ -d "$dump_dir" ] || die "Meilisearch dump dir not found; set MEILI_DUMPS_DIR"
   src="$dump_dir/$dump_uid.dump"
+  [ -s "$src" ] || src="$dump_dir/dumps/$dump_uid.dump"
   [ -s "$src" ] || die "Meilisearch dump file missing: $src"
   cp "$src" "$STAGE/meilisearch/meilisearch.dump"
   stats=$(curl -fsS "$url/stats" -H "Authorization: Bearer $MEILI_MASTER_KEY" | jq -c '[.indexes // {} | to_entries[] | {uid:.key, documents:(.value.numberOfDocuments // 0)}] | sort_by(.uid)')

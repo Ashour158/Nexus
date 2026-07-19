@@ -1,6 +1,6 @@
 import type { FastifyRequest } from 'fastify';
 import type { JwtPayload } from '@nexus/shared-types';
-import { NotFoundError, ROLE_PERMISSIONS, UnauthorizedError, ValidationError } from '@nexus/service-utils';
+import { NotFoundError, ROLE_PERMISSIONS, runCrossTenant, UnauthorizedError, ValidationError } from '@nexus/service-utils';
 import type { AuthPrisma } from '../prisma.js';
 import { verifyKeycloakAccessToken } from '../lib/keycloak.js';
 import { hashPassword, validatePasswordStrength, verifyPassword } from '@nexus/security';
@@ -231,7 +231,12 @@ export async function registerWorkspace(
 
   const passwordHash = await hashPassword(input.password);
 
-  const user = await prisma.$transaction(async (tx) => {
+  // Bootstrap the tenant + its roles + admin under an explicit cross-tenant
+  // context. Every write below carries the new tenantId directly, but this is a
+  // PUBLIC route with no tenant in AsyncLocalStorage, so the tenant-scoped Prisma
+  // extension would otherwise fail-closed on Role.createMany / user.create.
+  const user = await runCrossTenant('self-service workspace registration', () =>
+    prisma.$transaction(async (tx) => {
     const tenant = await tx.tenant.create({
       data: { slug, name: companyName },
     });
@@ -264,12 +269,15 @@ export async function registerWorkspace(
       },
     });
     return created;
-  });
+    })
+  );
 
   (request as unknown as { requestContext: { set: (k: string, v: string) => void } }).requestContext.set(
     'tenantId',
     user.tenantId
   );
+  // finalizeSession runs with the request tenant context set above, so its
+  // tenant-scoped reads/writes resolve correctly without cross-tenant mode.
   return finalizeSession(keyStore, prisma, user, meta);
 }
 

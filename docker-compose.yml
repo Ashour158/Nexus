@@ -206,7 +206,7 @@ services:
       - '127.0.0.1:3001:3001'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       # Governance posture: when true, a field-security / validation / sharing
       # evaluation ERROR denies the operation (503) instead of silently allowing
       # it. Safe default for production; unconfigured tenants (no rules) still
@@ -251,7 +251,7 @@ services:
       - '127.0.0.1:3002:3002'
     environment:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-off}
+      NEXUS_TENANT_ENFORCEMENT: ${NEXUS_TENANT_ENFORCEMENT:-on}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       CHROMIUM_PATH: /usr/bin/chromium
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_finance

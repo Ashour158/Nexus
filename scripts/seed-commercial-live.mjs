@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // @ts-check
+import { pathToFileURL } from 'node:url';
 /**
  * seed-commercial-live.mjs — populate the commercial/CPQ pipeline of a RUNNING
  * Nexus instance (products → price book → RFQ → quote → order → invoice).
@@ -23,7 +24,7 @@
  *   CRM       (default http://localhost:3001)   crm-service
  *   FINANCE   (default http://localhost:3002)   finance-service
  *   EMAIL     (default admin@demo.com)
- *   PASSWORD  (default Demo1234!)
+ *   PASSWORD  (required; no default)
  *   RFQ_COUNT (default 10)  how many deals to run through the pipeline
  *
  * Every create failure is logged and the seed continues — it never aborts, so a
@@ -36,12 +37,11 @@ const CFG = {
   CRM: process.env.CRM || 'http://localhost:3001',
   FINANCE: process.env.FINANCE || 'http://localhost:3002',
   EMAIL: process.env.EMAIL || 'admin@demo.com',
-  PASSWORD: process.env.PASSWORD || 'Demo1234!',
+  PASSWORD: process.env.PASSWORD,
   RFQ_COUNT: Number(process.env.RFQ_COUNT || 10),
 };
 
 let TOKEN = '';
-let OWNER_ID = '';
 
 const summary = {
   products: 0,
@@ -70,9 +70,33 @@ function randInt(min, max) {
 function isoDaysFromNow(days) {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
 }
-function snippet(s, n = 240) {
-  const str = typeof s === 'string' ? s : JSON.stringify(s);
+const SENSITIVE_KEYS = /^(password|token|accessToken|refreshToken|authorization|cookie|secret)$/i;
+
+export function redactSensitive(value, seen = new WeakSet()) {
+  if (value === null || typeof value !== 'object') return value;
+  if (seen.has(value)) return '[Circular]';
+  seen.add(value);
+  if (Array.isArray(value)) return value.map((item) => redactSensitive(item, seen));
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [
+    key,
+    SENSITIVE_KEYS.test(key) ? '[REDACTED]' : redactSensitive(item, seen),
+  ]));
+}
+
+export function snippet(s, n = 240) {
+  let value = s;
+  if (typeof value === 'string') {
+    try { value = JSON.parse(value); } catch { /* retain useful non-JSON context */ }
+  }
+  const redacted = redactSensitive(value);
+  const str = typeof redacted === 'string' ? redacted : JSON.stringify(redacted);
   return str && str.length > n ? `${str.slice(0, n)}…` : str;
+}
+
+function requirePassword() {
+  if (typeof CFG.PASSWORD !== 'string' || CFG.PASSWORD.length === 0) {
+    throw new Error('PASSWORD is required. Set the PASSWORD environment variable and run the seed again.');
+  }
 }
 
 async function api(method, base, path, body, headers = {}) {
@@ -186,15 +210,12 @@ async function login() {
     email: CFG.EMAIL,
     password: CFG.PASSWORD,
   });
-  if (!res.ok) throw new Error(`Login failed [${res.status}] ${snippet(res.body)}`);
+  if (!res.ok) throw new Error(`Login failed [${res.status}]: authentication was rejected.`);
   const data = unwrap(res.body) ?? {};
   if (data.mfaRequired) throw new Error('Login returned mfaRequired — cannot seed non-interactively.');
   TOKEN = data.accessToken;
-  if (!TOKEN) throw new Error(`Login OK but no accessToken: ${snippet(res.body)}`);
-  const [, payloadB64] = TOKEN.split('.');
-  const claims = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf-8'));
-  OWNER_ID = claims.sub;
-  log(`  ✓ authenticated as ${CFG.EMAIL}  ownerId=${OWNER_ID}`);
+  if (!TOKEN) throw new Error('Login succeeded but no access token was returned.');
+  log('  ✓ authenticated');
 }
 
 // ─── Step 2 — Reuse existing CRM deals (RFQ requires account + deal) ──────────
@@ -428,6 +449,7 @@ async function seedCommercial(deals, products) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
+  requirePassword();
   log('═══ Nexus commercial seed ═══');
   log(`  finance=${CFG.FINANCE}  crm=${CFG.CRM}`);
   await login();
@@ -446,7 +468,9 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('\nFATAL:', err);
-  process.exit(1);
-});
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  main().catch((err) => {
+    console.error('\nFATAL:', err?.message ?? String(err));
+    process.exitCode = 1;
+  });
+}

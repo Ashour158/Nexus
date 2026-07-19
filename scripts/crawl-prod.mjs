@@ -121,8 +121,11 @@ if (!loggedIn) {
 console.log(`logged in → ${page.url()}`);
 
 // ---- Resolve a few real detail-route IDs via the app's own BFF ----
-const routes = [...STATIC_ROUTES];
-for (const [listPath, prefix] of DETAIL_SOURCES) {
+// CRAWL_ROUTES lets a follow-up investigation re-check a handful of routes
+// without paying for the full ~6-minute sweep.
+const ROUTE_OVERRIDE = process.env.CRAWL_ROUTES?.split(',').map((r) => r.trim()).filter(Boolean);
+const routes = ROUTE_OVERRIDE?.length ? [...ROUTE_OVERRIDE] : [...STATIC_ROUTES];
+for (const [listPath, prefix] of ROUTE_OVERRIDE?.length ? [] : DETAIL_SOURCES) {
   try {
     const payload = await page.evaluate(async (p) => {
       const r = await fetch(p);
@@ -189,7 +192,7 @@ for (const route of routes) {
   results.push({ route, status, marker, toast, errs, apiFails });
   console.log(
     `${bad ? 'FAIL' : ' ok '} ${elapsedMin().toFixed(1).padStart(4)}m ${status} ${route}` +
-      (apiFails.length ? `  [api5xx: ${apiFails.length}]` : '') +
+      (apiFails.length ? `  [apiErr: ${apiFails.length}]` : '') +
       (marker ? `  [${marker}]` : '') +
       (toast ? `  [toast: ${toast}]` : '') +
       (errs.length ? `  [jsErr: ${errs[0]}]` : '')
@@ -203,6 +206,18 @@ const failures = results.filter((r) => r.status >= 400 || r.marker || r.errs.len
 const toasts = results.filter((r) => r.toast && !failures.includes(r));
 console.log(`\n=== ${results.length} routes | ${failures.length} failures | ${toasts.length} degraded (failed API behind page)`);
 for (const f of failures) console.log(`FAIL ${f.status} ${f.route} ${f.marker ?? ''} ${f.errs[0] ?? ''}`);
+// A failing API call that does NOT raise a toast is still a real 5xx — it just
+// happens to be one the page tolerates. Report those separately rather than
+// letting a "0 degraded" headline imply a clean run.
+const quietFails = results.filter((r) => r.apiFails.length > 0 && !toasts.includes(r) && !failures.includes(r));
+if (quietFails.length) {
+  console.log(`\n--- ${quietFails.length} route(s) with failing API calls but no visible error ---`);
+  for (const q of quietFails) {
+    console.log(`QUIET ${q.route}`);
+    for (const f of q.apiFails) console.log(`          └─ ${f}`);
+  }
+}
+
 for (const t of toasts) {
   console.log(`DEGRADED ${t.route} ${t.toast}`);
   // The whole point of the instrumentation: name the request that actually failed.

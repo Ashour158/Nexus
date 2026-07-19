@@ -7,12 +7,12 @@ interface WinLossData {
     totalDeals: number;
     wonDeals: number;
     lostDeals: number;
-    winRate: number;
+    winRatePct: number;
     wonRevenue: number;
     lostRevenue: number;
   };
   lostReasons: { reason: string; count: number }[];
-  monthlyTrend: { month: string; won: number; lost: number; winRate: number }[];
+  monthlyTrend: { month: string; won: number; lost: number; winRatePct: number }[];
   insights?: string[];
   serviceMap?: string[];
 }
@@ -93,7 +93,7 @@ export default function WinLossPage() {
             <Card title="Total Deals" value={String(data.summary.totalDeals)} />
             <Card title="Won" value={String(data.summary.wonDeals)} />
             <Card title="Lost" value={String(data.summary.lostDeals)} />
-            <Card title="Win Rate" value={`${data.summary.winRate}%`} />
+            <Card title="Win Rate" value={`${finitePct(data.summary.winRatePct).toFixed(1)}%`} />
             <Card title="Won Revenue" value={currency(data.summary.wonRevenue)} />
             <Card title="Lost Revenue" value={currency(data.summary.lostRevenue)} />
           </div>
@@ -101,13 +101,13 @@ export default function WinLossPage() {
             <div className="rounded-xl border border-outline-variant bg-surface p-5">
               <h2 className="mb-4 font-semibold text-on-surface">Monthly Trend</h2>
               <div className="space-y-2">
-                {data.monthlyTrend.map((m) => (
+                {(data.monthlyTrend ?? []).map((m) => (
                   <div key={m.month} className="flex items-center gap-3 text-sm">
                     <span className="w-14 text-xs text-on-surface-variant">{m.month}</span>
                     <div className="h-5 flex-1 overflow-hidden rounded bg-surface-container-high">
-                      <div className="h-full bg-success" style={{ width: `${m.winRate}%` }} />
+                      <div className="h-full bg-success" style={{ width: `${finitePct(m.winRatePct)}%` }} />
                     </div>
-                    <span className="w-10 text-end text-xs font-medium text-on-surface">{m.winRate}%</span>
+                    <span className="w-12 text-end text-xs font-medium text-on-surface">{finitePct(m.winRatePct).toFixed(1)}%</span>
                   </div>
                 ))}
               </div>
@@ -115,7 +115,7 @@ export default function WinLossPage() {
             <div className="rounded-xl border border-outline-variant bg-surface p-5">
               <h2 className="mb-4 font-semibold text-on-surface">Top Lost Reasons</h2>
               <div className="space-y-3">
-                {data.lostReasons.slice(0, 8).map((r) => (
+                {(data.lostReasons ?? []).slice(0, 8).map((r) => (
                   <div key={r.reason}>
                     <div className="mb-1 flex justify-between text-sm">
                       <span className="text-on-surface">{r.reason}</span>
@@ -175,4 +175,8 @@ function Card({ title, value }: { title: string; value: string }) {
       <p className="text-2xl font-bold text-on-surface">{value}</p>
     </div>
   );
+}
+
+function finitePct(value: number): number {
+  return Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0;
 }

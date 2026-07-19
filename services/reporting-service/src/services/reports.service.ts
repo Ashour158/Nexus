@@ -5,6 +5,13 @@ import { SYSTEM_TEMPLATES } from '../templates/index.js';
 import { executeReport, type QuerySpec } from './executor.service.js';
 import { analyticsClient } from '../lib/analytics-client.js';
 import { computeNextRun, runDueSchedules } from '../lib/schedule-runner.js';
+import {
+  fetchCanonicalDeals,
+  isLostDeal,
+  isWonDeal,
+  summarizeDeals,
+  type CanonicalDeal,
+} from '../lib/canonical-deals.js';
 
 /**
  * Reads the most recent daily PipelineSnapshot rows for a tenant and rolls them
@@ -14,14 +21,14 @@ import { computeNextRun, runDueSchedules } from '../lib/schedule-runner.js';
 async function snapshotFallbackMetrics(
   prisma: ReportingPrisma,
   tenantId: string
-): Promise<{ totalDeals: number; totalValue: number; avgDealSize: number }> {
+): Promise<{ totalDeals: number; totalValue: number; avgDealSize: number; snapshotDate: string | null }> {
   try {
     const latest = await prisma.pipelineSnapshot.findFirst({
       where: { tenantId },
       orderBy: { snapshotDate: 'desc' },
       select: { snapshotDate: true, pipelineId: true },
     });
-    if (!latest) return { totalDeals: 0, totalValue: 0, avgDealSize: 0 };
+    if (!latest) return { totalDeals: 0, totalValue: 0, avgDealSize: 0, snapshotDate: null };
 
     const rows = await prisma.pipelineSnapshot.findMany({
       where: {
@@ -42,15 +49,66 @@ async function snapshotFallbackMetrics(
       totalDeals,
       totalValue,
       avgDealSize: totalDeals > 0 ? totalValue / totalDeals : 0,
+      snapshotDate: new Date(latest.snapshotDate).toISOString(),
     };
   } catch {
-    return { totalDeals: 0, totalValue: 0, avgDealSize: 0 };
+    return { totalDeals: 0, totalValue: 0, avgDealSize: 0, snapshotDate: null };
   }
 }
 
 function currentPeriod(): { year: number; quarter: number } {
   const now = new Date();
   return { year: now.getFullYear(), quarter: Math.floor(now.getMonth() / 3) + 1 };
+}
+
+function currentPeriodRange(): { from: Date; to: Date } {
+  const { year, quarter } = currentPeriod();
+  return {
+    from: new Date(Date.UTC(year, (quarter - 1) * 3, 1)),
+    to: new Date(),
+  };
+}
+
+function performanceRows(deals: CanonicalDeal[]) {
+  return deals.map((deal) => ({
+    id: deal.id,
+    date: deal.updatedAt ?? deal.createdAt ?? '',
+    customer: deal.name ?? 'Unnamed deal',
+    customerSubtitle: deal.accountId ?? '',
+    ownerName: deal.ownerId ?? 'Unassigned',
+    ownerAvatar: null,
+    dealValue: Number(deal.amount ?? deal.value ?? 0) || 0,
+    status: isWonDeal(deal)
+      ? 'CLOSED WON'
+      : isLostDeal(deal)
+        ? 'CLOSED LOST'
+        : 'IN PROGRESS',
+  }));
+}
+
+function repPerformance(deals: CanonicalDeal[]) {
+  const groups = new Map<string, CanonicalDeal[]>();
+  for (const deal of deals) {
+    const ownerId = deal.ownerId ?? 'unassigned';
+    const rows = groups.get(ownerId) ?? [];
+    rows.push(deal);
+    groups.set(ownerId, rows);
+  }
+  return [...groups.entries()].map(([ownerId, rows]) => {
+    const metrics = summarizeDeals(rows);
+    return {
+      ownerId,
+      wonAmount: metrics.wonAmount,
+      totalRevenue: metrics.wonAmount,
+      pipelineValue: metrics.pipelineValue,
+      weightedPipeline: metrics.weightedPipeline,
+      wonDeals: metrics.wonDeals,
+      lostDeals: metrics.lostDeals,
+      openDeals: metrics.openDeals,
+      winRatePct: metrics.winRatePct,
+      winRate: metrics.winRatePct,
+    };
+  });
 }
 
 interface SaveReportInput {
@@ -171,37 +229,100 @@ export function createReportsService(prisma: ReportingPrisma) {
      */
     async getPerformanceReport(tenantId: string) {
       const period = currentPeriod();
-      const [revenue, byRep, pipeline] = await Promise.all([
+      const range = currentPeriodRange();
+      const [deals, revenue, byRep, forecast] = await Promise.all([
+        fetchCanonicalDeals(tenantId, range).catch(() => null),
         analyticsClient.getRevenueSummary(tenantId, period),
         analyticsClient.getRevenueByRep(tenantId, period),
-        analyticsClient.getPipelineSummary(tenantId),
+        analyticsClient.getForecast(tenantId),
       ]);
 
-      // Prefer live numbers; degrade to the daily snapshot when analytics is down.
-      let totalDeals = revenue?.wonDeals ?? pipeline?.totalDeals ?? 0;
-      let totalRevenue = revenue?.totalRevenue ?? pipeline?.totalValue ?? 0;
-      let avgDealSize =
-        revenue?.avgSalePrice ??
-        pipeline?.avgDealSize ??
-        (totalDeals > 0 ? totalRevenue / totalDeals : 0);
-      const winRate = revenue?.winRate ?? 0;
-      const live = revenue !== null || byRep !== null || pipeline !== null;
-
-      if (!live) {
-        const snap = await snapshotFallbackMetrics(prisma, tenantId);
-        totalDeals = snap.totalDeals;
-        totalRevenue = snap.totalValue;
-        avgDealSize = snap.avgDealSize;
+      if (deals) {
+        const metrics = summarizeDeals(deals);
+        return {
+          ...metrics,
+          decidedDeals: metrics.wonDeals + metrics.lostDeals,
+          avgDealSize: metrics.avgWonDealSize,
+          avgOpenDealSize:
+            metrics.openDeals > 0 ? metrics.pipelineValue / metrics.openDeals : 0,
+          winRate: metrics.winRatePct,
+          reps: repPerformance(deals),
+          performance: performanceRows(deals),
+          territory: [],
+          events: [],
+          period: `${period.year}-Q${period.quarter}`,
+          periodRange: { from: range.from.toISOString(), to: range.to.toISOString() },
+          source: 'crm-read-model',
+          refreshedAt: new Date().toISOString(),
+          generatedAt: new Date().toISOString(),
+          snapshotAt: null,
+        };
       }
+
+      const live = revenue !== null || byRep !== null || forecast !== null;
+      const snap = forecast ? null : await snapshotFallbackMetrics(prisma, tenantId);
+      const wonDeals = revenue?.wonDeals ?? 0;
+      const lostDeals = revenue?.lostDeals ?? 0;
+      const decidedDeals = wonDeals + lostDeals;
+      const wonAmount = revenue !== null
+        ? revenue.wonAmount ?? revenue.totalRevenue
+        : null;
+      const pipelineRaw = forecast ? Number(forecast.totalPipeline) : NaN;
+      const pipelineValue = Number.isFinite(pipelineRaw) ? pipelineRaw : snap?.totalValue ?? null;
+      const openDeals = snap?.totalDeals ?? null;
+      const weightedPipelineRaw = forecast ? Number(forecast.weightedPipeline) : NaN;
+      const weightedPipeline = Number.isFinite(weightedPipelineRaw) ? weightedPipelineRaw : null;
+      const avgWonDealSize =
+        revenue?.avgSalePrice ?? (wonAmount !== null && wonDeals > 0 ? wonAmount / wonDeals : 0);
+      const avgOpenDealSize = snap?.avgDealSize ?? null;
+      const winRatePct =
+        revenue?.winRatePct ??
+        revenue?.winRate ??
+        (decidedDeals > 0 ? (wonDeals / decidedDeals) * 100 : 0);
 
       return {
         reps: byRep ?? [],
-        totalRevenue,
-        totalDeals,
-        avgDealSize,
-        winRate,
+
+        // ── Honest, non-overlapping metric names ─────────────────────────────
+        /** Sum of `amount` over deals with status WON in the period. Null = not derivable. */
+        wonAmount,
+        /** Sum of `amount` over deals still open. NOT revenue. */
+        pipelineValue,
+        /** Sum of `amount * probability/100` over open deals. Null = not derivable. */
+        weightedPipeline,
+        /** Count of deals with status WON in the period. */
+        wonDeals,
+        /** Count of deals with status LOST in the period. */
+        lostDeals,
+        /** wonDeals + lostDeals — the denominator of winRatePct. */
+        decidedDeals,
+        /** Count of deals still open. */
+        openDeals,
+        avgWonDealSize,
+        avgOpenDealSize,
+        /** 0-100. wonDeals / (wonDeals + lostDeals) * 100, 0 when nothing closed. */
+        winRatePct,
+
+        // ── Backward-compatible aliases (won-only meaning, NOT the old one) ───
+        /** @deprecated use `wonAmount`. Won-only; no longer the sum of all deals. */
+        totalRevenue: wonAmount ?? 0,
+        /** @deprecated use `wonDeals`. */
+        totalDeals: wonDeals + lostDeals + (openDeals ?? 0),
+        /** @deprecated use `avgWonDealSize`. */
+        avgDealSize: avgWonDealSize,
+        /** @deprecated use `winRatePct` (identical 0-100 scale). */
+        winRate: winRatePct,
+
         period: period.quarter ? `${period.year}-Q${period.quarter}` : String(period.year),
         source: live ? 'analytics' : 'snapshot',
+        /** When this payload was computed; for snapshot source, the snapshot's own date. */
+        generatedAt: new Date().toISOString(),
+        snapshotAt: snap?.snapshotDate ?? null,
+        performance: [],
+        territory: [],
+        events: [],
+        periodRange: { from: range.from.toISOString(), to: range.to.toISOString() },
+        refreshedAt: new Date().toISOString(),
       };
     },
 

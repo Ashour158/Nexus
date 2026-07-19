@@ -1,4 +1,11 @@
 import type { ReportingPrisma } from '../prisma.js';
+import {
+  dealAmount,
+  fetchCanonicalDeals,
+  isLostDeal,
+  isWonDeal,
+  type CanonicalDeal,
+} from './canonical-deals.js';
 
 export type FunnelStage = {
   stage: string;
@@ -25,27 +32,11 @@ export type FunnelReport = {
  * funnel — a lost deal exits the funnel, it does not "convert" to a next stage).
  */
 const PROGRESSION = ['Lead', 'Qualified', 'Proposal', 'Negotiation', 'Closed Won'];
-const WON_STAGE = 'Closed Won';
+// NOTE: there is deliberately no WON_STAGE constant. Won/lost are decided by
+// `status` alone (see isWonDeal/isLostDeal in canonical-deals.ts); stage names
+// are only used for per-stage occupancy/progression below.
 const LOST_STAGE = 'Closed Lost';
 const DAY_MS = 86_400_000;
-
-type RawDeal = {
-  stage?: string;
-  value?: number;
-  status?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  wonAt?: string;
-  lostAt?: string;
-};
-
-function isWon(deal: RawDeal): boolean {
-  return deal.status === 'WON' || deal.stage === WON_STAGE || Boolean(deal.wonAt);
-}
-
-function isLost(deal: RawDeal): boolean {
-  return deal.status === 'LOST' || deal.stage === LOST_STAGE || Boolean(deal.lostAt);
-}
 
 /**
  * Furthest progression index a deal has demonstrably reached. Because CRM only
@@ -55,8 +46,8 @@ function isLost(deal: RawDeal): boolean {
  * A lost deal (or one whose current stage is off-progression) is only counted as
  * having entered the funnel (index 0), since we cannot know how far it advanced.
  */
-function furthestIndex(deal: RawDeal): number {
-  if (isWon(deal)) return PROGRESSION.length - 1;
+function furthestIndex(deal: CanonicalDeal): number {
+  if (isWonDeal(deal)) return PROGRESSION.length - 1;
   const idx = deal.stage ? PROGRESSION.indexOf(deal.stage) : -1;
   return idx >= 0 ? idx : 0;
 }
@@ -68,27 +59,7 @@ export async function buildFunnelReport(
   to: Date,
   pipelineId?: string
 ): Promise<FunnelReport> {
-  const crm = process.env.CRM_SERVICE_URL ?? 'http://localhost:3001';
-  const token = process.env.INTERNAL_SERVICE_TOKEN ?? '';
-  const u = new URL(`${crm}/api/v1/internal/reporting/deals`);
-  u.searchParams.set('from', from.toISOString());
-  u.searchParams.set('to', to.toISOString());
-  u.searchParams.set('limit', '5000');
-  if (pipelineId) u.searchParams.set('pipelineId', pipelineId);
-
-  const response = await fetch(u, {
-    headers: {
-      'x-service-token': token,
-      'x-tenant-id': tenantId,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`CRM reporting returned ${response.status}`);
-  }
-
-  const body = (await response.json()) as { data?: RawDeal[] };
-  const deals = body.data ?? [];
+  const deals = await fetchCanonicalDeals(tenantId, { from, to, pipelineId });
 
   // Per-stage occupancy (current stage), value, and accumulated dwell time.
   const stageMap = new Map<string, { count: number; totalValue: number; totalDays: number }>();
@@ -109,7 +80,7 @@ export async function buildFunnelReport(
     if (!stageMap.has(stageName)) stageMap.set(stageName, { count: 0, totalValue: 0, totalDays: 0 });
     const entry = stageMap.get(stageName)!;
     entry.count++;
-    entry.totalValue += deal.value ?? 0;
+    entry.totalValue += dealAmount(deal);
 
     // avgDaysInStage: dwell in the CURRENT stage, measured from the last time the
     // deal moved (updatedAt is the best available proxy for stage-entry, since
@@ -131,8 +102,8 @@ export async function buildFunnelReport(
     const fi = furthestIndex(deal);
     for (let i = 0; i <= fi && i < reached.length; i++) reached[i]++;
 
-    if (isWon(deal)) totalWon++;
-    if (isLost(deal)) totalLost++;
+    if (isWonDeal(deal)) totalWon++;
+    if (isLostDeal(deal)) totalLost++;
 
     const createdAt = deal.createdAt ? new Date(deal.createdAt) : null;
     if (deal.wonAt && createdAt) {
@@ -196,7 +167,10 @@ export async function buildFunnelReport(
     totalDeals: deals.length,
     totalWon,
     totalLost,
-    overallConversionRate: deals.length > 0 ? Math.round((totalWon / deals.length) * 1000) / 10 : 0,
+    overallConversionRate:
+      totalWon + totalLost > 0
+        ? Math.round((totalWon / (totalWon + totalLost)) * 1000) / 10
+        : 0,
     avgSalesCycledays: closedCount > 0 ? Math.round(totalSalesDays / closedCount) : 0,
   };
 }

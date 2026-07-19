@@ -325,9 +325,9 @@ export default function QuoteDetailPage(): JSX.Element {
       ) : null}
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Metric label="Subtotal" value={formatCurrency(subtotal, quote.currency)} />
-        <Metric label="Discount" value={formatCurrency(discountValue, quote.currency)} />
-        <Metric label="Tax" value={formatCurrency(taxValue, quote.currency)} />
+        <Metric label="Gross subtotal (before discount)" value={formatCurrency(subtotal, quote.currency)} />
+        <Metric label="Line discounts" value={formatCurrency(discountValue, quote.currency)} />
+        <Metric label="Tax on net" value={formatCurrency(taxValue, quote.currency)} />
         <Metric label="Total" value={formatCurrency(total, quote.currency)} />
       </section>
 
@@ -568,13 +568,16 @@ export default function QuoteDetailPage(): JSX.Element {
               <tr>
                 <th className="px-4 py-2">Product</th>
                 <th className="px-4 py-2 text-end">Qty</th>
-                <th className="px-4 py-2 text-end">Unit</th>
-                <th className="px-4 py-2 text-end">Disc %</th>
-                <th className="px-4 py-2 text-end">Line total</th>
+                <th className="px-4 py-2 text-end">List price</th>
+                <th className="px-4 py-2 text-end">Line discount</th>
+                <th className="px-4 py-2 text-end">Net unit price</th>
+                <th className="px-4 py-2 text-end">Net line total</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant">
-              {lines.map((line, idx) => (
+              {lines.map((line, idx) => {
+                const pricing = quoteLinePricing(line);
+                return (
                 <tr key={line.id ?? `${line.productId}-${idx}`}>
                   <td className="px-4 py-2">
                     <div className="font-medium text-on-surface">
@@ -586,14 +589,21 @@ export default function QuoteDetailPage(): JSX.Element {
                   </td>
                   <td className="px-4 py-2 text-end tabular-nums">{line.quantity}</td>
                   <td className="px-4 py-2 text-end font-mono text-xs">
-                    {line.unitPrice}
+                    {formatCurrency(pricing.listPrice, quote.currency)}
                   </td>
-                  <td className="px-4 py-2 text-end">{line.discountPercent}%</td>
                   <td className="px-4 py-2 text-end font-mono text-xs">
-                    {line.total}
+                    {formatCurrency(pricing.lineDiscount, quote.currency)}
+                    <span className="ml-1 text-on-surface-variant">({pricing.discountPct}%)</span>
+                  </td>
+                  <td className="px-4 py-2 text-end font-mono text-xs">
+                    {formatCurrency(pricing.netUnitPrice, quote.currency)}
+                  </td>
+                  <td className="px-4 py-2 text-end font-mono text-xs">
+                    {formatCurrency(pricing.netLineTotal, quote.currency)}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           {lines.length === 0 ? (
@@ -730,4 +740,33 @@ function Metric({ label, value }: { label: string; value: string }) {
       <p className="mt-1 text-lg font-bold text-on-surface">{value}</p>
     </div>
   );
+}
+
+function quoteLinePricing(line: QuoteLine) {
+  const quantity = finiteAmount(line.quantity);
+  const netUnitPrice = finiteAmount(line.unitPrice);
+  const discountPct = Math.min(100, Math.max(0, finiteAmount(line.discountPercent)));
+  const explicitList = Number(line.listPrice);
+  const listPrice = Number.isFinite(explicitList)
+    ? explicitList
+    : discountPct < 100
+      ? netUnitPrice / (1 - discountPct / 100)
+      : netUnitPrice;
+  const explicitDiscount = Number(line.discountAmount);
+  const lineDiscount = Number.isFinite(explicitDiscount)
+    ? explicitDiscount * quantity
+    : Math.max(0, listPrice - netUnitPrice) * quantity;
+  const explicitTotal = Number(line.total);
+  return {
+    listPrice,
+    lineDiscount,
+    netUnitPrice,
+    netLineTotal: Number.isFinite(explicitTotal) ? explicitTotal : netUnitPrice * quantity,
+    discountPct,
+  };
+}
+
+function finiteAmount(value: unknown): number {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : 0;
 }

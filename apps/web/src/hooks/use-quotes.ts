@@ -37,6 +37,7 @@ export interface QuoteLine {
   unitPrice: string;
   listPrice?: string | null;
   discountPercent: string;
+  discountAmount?: string | null;
   taxPercent?: string | null;
   total: string;
   isFree?: boolean;

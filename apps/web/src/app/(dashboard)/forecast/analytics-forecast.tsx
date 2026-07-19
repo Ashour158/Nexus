@@ -20,6 +20,7 @@ const fmt = (value: string | number) => {
 
 export function AnalyticsForecastSection() {
   const { data, isLoading, isError } = useForecast();
+  const forecastByMonth = Array.isArray(data?.forecastByMonth) ? data.forecastByMonth : [];
 
   return (
     <section className="mt-10">
@@ -56,11 +57,13 @@ export function AnalyticsForecastSection() {
             </div>
             <div className="rounded-lg border border-success/30 bg-success-container p-4">
               <p className="text-xs text-success">Win rate</p>
-              <p className="text-lg font-semibold text-on-success-container">{data.winRate}%</p>
+              <p className="text-lg font-semibold text-on-success-container">
+                {Number.isFinite(data.winRatePct) ? data.winRatePct.toFixed(1) : '0.0'}%
+              </p>
             </div>
           </div>
 
-          {data.forecastByMonth.length > 0 ? (
+          {forecastByMonth.length > 0 ? (
             <div className="mt-4 overflow-hidden rounded-xl border border-outline-variant bg-surface">
               <table className="w-full text-sm">
                 <thead className="border-b border-outline-variant bg-surface-container-low">
@@ -71,7 +74,7 @@ export function AnalyticsForecastSection() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant">
-                  {data.forecastByMonth.map((row) => (
+                  {forecastByMonth.map((row) => (
                     <tr key={row.month} className="hover:bg-surface-container-low">
                       <td className="px-4 py-3 font-medium text-on-surface">{row.month}</td>
                       <td className="px-4 py-3 text-end text-on-surface">{fmt(row.total)}</td>

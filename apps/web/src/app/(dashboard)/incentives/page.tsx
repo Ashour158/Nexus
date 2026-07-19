@@ -8,15 +8,28 @@ interface Badge {
   name: string;
   description: string;
   icon: string;
-  earnedAt: string;
+  awardedTo?: Array<{ awardedAt?: string | null }>;
 }
+/**
+ * Field names below mirror what incentive-service actually returns (the Prisma
+ * `Contest` model): `endDate`, `prizeDescription`, `isActive`. The page
+ * previously read `endsAt` / `prize` / `status`, which are simply absent — so
+ * `new Date(undefined)` rendered "Invalid Date" on every card. The legacy names
+ * are kept as optional fallbacks in case an older BFF shape is still in play.
+ */
 interface Contest {
   id: string;
   name: string;
   description: string;
-  endsAt: string;
-  prize: string;
-  status: string;
+  endDate?: string | null;
+  /** @deprecated legacy alias for `endDate`. */
+  endsAt?: string | null;
+  prizeDescription?: string | null;
+  /** @deprecated legacy alias for `prizeDescription`. */
+  prize?: string | null;
+  isActive?: boolean;
+  /** @deprecated legacy alias derived from `isActive`. */
+  status?: string;
   leaderboard?: { repName: string; score: number }[];
 }
 
@@ -31,7 +44,14 @@ export default function IncentivesPage() {
       fetch('/api/incentive/contests').then((r) => r.json()),
     ])
       .then(([b, c]) => {
-        setBadges(b.data || []);
+        setBadges(
+          Array.isArray(b.data)
+            ? b.data.filter(
+                (badge: Badge) =>
+                  Array.isArray(badge.awardedTo) && badge.awardedTo.length > 0
+              )
+            : []
+        );
         setContests(c.data || []);
         setLoading(false);
       })
@@ -62,7 +82,9 @@ export default function IncentivesPage() {
                   <div key={b.id} className="rounded-xl border border-warning/30 bg-warning-container p-3 text-center" title={b.description}>
                     <p className="text-3xl">{b.icon || '🏅'}</p>
                     <p className="mt-1 text-xs font-medium text-on-surface">{b.name}</p>
-                    <p className="text-xs text-on-surface-variant">{new Date(b.earnedAt).toLocaleDateString()}</p>
+                    <p className="text-xs text-on-surface-variant">
+                      {safeDate(b.awardedTo?.[0]?.awardedAt)}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -88,9 +110,21 @@ export default function IncentivesPage() {
                         <h3 className="font-semibold text-on-surface">{c.name}</h3>
                         <p className="mt-0.5 text-xs text-on-surface-variant">{c.description}</p>
                       </div>
-                      <span className={`rounded px-2 py-0.5 text-xs font-medium ${c.status === 'ACTIVE' ? 'bg-success-container text-on-success-container' : 'bg-surface-container-high text-on-surface'}`}>{c.status}</span>
+                      {(() => {
+                        const active = c.isActive ?? c.status === 'ACTIVE';
+                        return (
+                          <span
+                            className={`rounded px-2 py-0.5 text-xs font-medium ${active ? 'bg-success-container text-on-success-container' : 'bg-surface-container-high text-on-surface'}`}
+                          >
+                            {active ? 'ACTIVE' : 'ENDED'}
+                          </span>
+                        );
+                      })()}
                     </div>
-                    <p className="mt-2 text-xs text-on-surface-variant">🏆 Prize: {c.prize} · Ends: {new Date(c.endsAt).toLocaleDateString()}</p>
+                    <p className="mt-2 text-xs text-on-surface-variant">
+                      🏆 Prize: {c.prizeDescription || c.prize || '—'} · Ends:{' '}
+                      {safeDate(c.endDate ?? c.endsAt)}
+                    </p>
                     {c.leaderboard && c.leaderboard.length > 0 ? (
                       <ol className="mt-3 space-y-1">
                         {c.leaderboard.slice(0, 3).map((entry, i) => (
@@ -110,4 +144,10 @@ export default function IncentivesPage() {
       )}
     </div>
   );
+}
+
+function safeDate(value: string | null | undefined): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toLocaleDateString() : '—';
 }

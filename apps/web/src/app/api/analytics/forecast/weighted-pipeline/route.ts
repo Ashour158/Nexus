@@ -41,7 +41,8 @@ export async function GET(req: NextRequest) {
       data: {
         weightedPipeline: String(Math.round(weighted)),
         totalPipeline: String(Math.round(total)),
-        winRate: decided ? ((won / decided) * 100).toFixed(1) : '0.0',
+        winRatePct: decided ? Math.round((won / decided) * 1000) / 10 : 0,
+        winRate: decided ? Math.round((won / decided) * 1000) / 10 : 0,
         forecastByMonth: [...byMonth.entries()]
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([month, bucket]) => ({

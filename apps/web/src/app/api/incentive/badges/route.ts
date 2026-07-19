@@ -4,7 +4,9 @@ const INCENTIVE_SERVICE = process.env.INCENTIVE_SERVICE_URL || 'http://localhost
 
 export async function GET(req: NextRequest) {
   const tenantId = req.headers.get('x-tenant-id') || 'default';
-  const res = await fetch(`${INCENTIVE_SERVICE}/api/v1/badges`, {
+  // "Your Badges" must use the current-user projection; the tenant-wide route
+  // includes awards belonging to other users.
+  const res = await fetch(`${INCENTIVE_SERVICE}/api/v1/badges/mine`, {
     headers: { 'x-tenant-id': tenantId, authorization: req.headers.get('authorization') ?? '' },
   });
   return NextResponse.json(await res.json(), { status: res.status });

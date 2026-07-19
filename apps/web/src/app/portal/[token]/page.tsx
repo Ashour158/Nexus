@@ -57,26 +57,47 @@ export default async function PortalPage({ params }: { params: { token: string }
       <section className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
         <table className="w-full text-sm">
           <thead className="bg-surface-container-low text-left text-xs uppercase text-on-surface-variant">
-            <tr><th className="px-3 py-2">Product</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
+            {/*
+              Labels are explicit about the basis of each column. The stored
+              `unitPrice`/`total` on a quote line are POST-discount (net) values,
+              while `quote.subtotal` is the PRE-discount gross. Showing net line
+              values under a bare "Unit Price"/"Total" next to a gross
+              "Subtotal" made the document look like it did not add up. No stored
+              value or calculation is changed here — only what each number is
+              called.
+            */}
+            <tr>
+              <th className="px-3 py-2">Product</th>
+              <th>Qty</th>
+              <th>List price</th>
+              <th>Line discount</th>
+              <th>Net unit price</th>
+              <th>Net line total</th>
+            </tr>
           </thead>
           <tbody>
-            {lines.map((line, idx) => (
-              <tr key={idx} className="border-t">
-                <td className="px-3 py-2">{String(line.productName ?? line.name ?? 'Line item')}</td>
-                <td>{String(line.quantity ?? 1)}</td>
-                <td>{formatCurrency(Number(line.unitPrice ?? 0))}</td>
-                <td>{formatCurrency(Number(line.total ?? 0))}</td>
-              </tr>
-            ))}
+            {lines.map((line, idx) => {
+              const pricing = portalLinePricing(line);
+              return (
+                <tr key={idx} className="border-t">
+                  <td className="px-3 py-2">{String(line.productName ?? line.name ?? 'Line item')}</td>
+                  <td>{pricing.quantity}</td>
+                  <td>{formatCurrency(pricing.listPrice)}</td>
+                  <td>{formatCurrency(pricing.lineDiscount)}</td>
+                  <td>{formatCurrency(pricing.netUnitPrice)}</td>
+                  <td>{formatCurrency(pricing.netLineTotal)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </section>
 
       <section className="grid gap-3 rounded-lg border border-outline-variant bg-surface p-4 sm:grid-cols-4">
-        <Metric label="Subtotal" value={formatCurrency(Number(quote.subtotal ?? 0))} />
-        <Metric label="Discount" value={formatCurrency(Number(quote.discountAmount ?? quote.discountTotal ?? 0))} />
-        <Metric label="Tax" value={formatCurrency(Number(quote.taxAmount ?? quote.taxTotal ?? 0))} />
-        <Metric label="Grand Total" value={formatCurrency(Number(quote.total ?? 0))} />
+        <Metric label="Gross subtotal (before discount)" value={formatCurrency(Number(quote.subtotal ?? 0))} />
+        <Metric label="Line discounts" value={formatCurrency(Number(quote.discountAmount ?? quote.discountTotal ?? 0))} />
+        <Metric label="Tax on net" value={formatCurrency(Number(quote.taxAmount ?? quote.taxTotal ?? 0))} />
+        <Metric label="Grand total" value={formatCurrency(Number(quote.total ?? 0))} />
       </section>
 
       <section className="flex flex-wrap gap-2">
@@ -99,6 +120,40 @@ export default async function PortalPage({ params }: { params: { token: string }
       ) : null}
     </main>
   );
+}
+
+function finiteAmount(value: unknown): number {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+/**
+ * Presentation-only derivation of the four line columns. Reads whatever the
+ * quote payload actually carries and derives the rest; it NEVER recomputes or
+ * overrides a stored total — `total` wins whenever it is present.
+ */
+function portalLinePricing(line: Record<string, unknown>) {
+  const quantity = finiteAmount(line.quantity ?? 1);
+  const netUnitPrice = finiteAmount(line.unitPrice);
+  const discountPct = Math.min(100, Math.max(0, finiteAmount(line.discountPercent)));
+  const explicitList = Number(line.listPrice);
+  const listPrice = Number.isFinite(explicitList)
+    ? explicitList
+    : discountPct > 0 && discountPct < 100
+      ? netUnitPrice / (1 - discountPct / 100)
+      : netUnitPrice;
+  const explicitDiscount = Number(line.discountAmount);
+  const lineDiscount = Number.isFinite(explicitDiscount)
+    ? explicitDiscount
+    : Math.max(0, listPrice - netUnitPrice) * quantity;
+  const explicitTotal = Number(line.total);
+  return {
+    quantity,
+    listPrice,
+    lineDiscount,
+    netUnitPrice,
+    netLineTotal: Number.isFinite(explicitTotal) ? explicitTotal : netUnitPrice * quantity,
+  };
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

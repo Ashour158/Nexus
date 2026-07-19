@@ -23,9 +23,13 @@ export async function takeSnapshotNow(
   if (!response.ok) return;
 
   const body = (await response.json()) as {
-    data?: Array<{ id: string; name: string; stage: string; value: number }>;
+    data?: Array<{ id: string; name: string; stage: string; value: number; status?: string }>;
   };
-  const deals = body.data ?? [];
+  // Pipeline snapshots cache OPEN pipeline only. Closed value must never be
+  // available for a fallback to mislabel as revenue.
+  const deals = (body.data ?? []).filter(
+    (deal) => deal.status !== 'WON' && deal.status !== 'LOST'
+  );
 
   const pid = pipelineId ?? 'all';
   const stageMap = new Map<string, { dealCount: number; totalValue: number; deals: typeof deals }>();

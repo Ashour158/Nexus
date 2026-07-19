@@ -43,10 +43,18 @@ export function useFieldPermissions() {
     queryKey: KEY,
     queryFn: async () => {
       const data = await fetch('/api/metadata/field-permissions').then(toJson);
-      const rows = (data as { fieldPermissions?: FieldPermission[] })?.fieldPermissions ?? [];
+      const rows = (data as { fieldPermissions?: FieldPermission[] })?.fieldPermissions;
+      // FAIL CLOSED: a 200 whose body lacks `fieldPermissions` means we did not
+      // actually read the policy. Surfacing `[]` here would render as "no field
+      // restrictions exist", i.e. a silently permissive default. Throw instead so
+      // the caller shows an explicit error state.
+      if (!Array.isArray(rows)) {
+        throw new Error('Field permission policy response was malformed');
+      }
       return rows.map((r) => ({ ...r, allowedRoles: normalizeRoles(r.allowedRoles) }));
     },
     staleTime: 30_000,
+    retry: 1,
   });
 }
 

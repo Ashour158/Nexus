@@ -4,6 +4,11 @@ import type { JwtPayload } from '@nexus/shared-types';
 import type { ReportingPrisma } from '../prisma.js';
 import { buildFunnelReport } from '../lib/funnel-engine.js';
 import { takeSnapshotNow } from '../lib/snapshot.job.js';
+import {
+  buildWinLossReport,
+  dateRangeFromDays,
+  fetchCanonicalDeals,
+} from '../lib/canonical-deals.js';
 
 // AUTHZ: match sibling bi.routes.ts — ANALYTICS.READ for reads, ANALYTICS.EXPORT
 // for the snapshot-take write. Layers on top of the global jwtVerify preHandler.
@@ -23,6 +28,37 @@ export async function registerFunnelRoutes(app: FastifyInstance, prisma: Reporti
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Funnel failed';
       return reply.code(502).send({ success: false, error: { code: 'BAD_GATEWAY', message: 'Request failed', details: msg, requestId: req.id } });
+    }
+  });
+
+  app.get('/api/v1/analytics/win-loss', READ, async (req, reply) => {
+    const jwt = (req as any).user as JwtPayload;
+    const { period, from, to } = req.query as {
+      period?: string;
+      from?: string;
+      to?: string;
+    };
+    const defaults = dateRangeFromDays(Number(period ?? 90));
+    const fromDate = from ? new Date(from) : defaults.from;
+    const toDate = to ? new Date(to) : defaults.to;
+    if (!Number.isFinite(fromDate.getTime()) || !Number.isFinite(toDate.getTime())) {
+      return reply.code(400).send({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'from/to must be valid dates', requestId: req.id },
+      });
+    }
+    try {
+      const deals = await fetchCanonicalDeals(jwt.tenantId, { from: fromDate, to: toDate });
+      return reply.send({
+        success: true,
+        data: buildWinLossReport(deals, fromDate, toDate),
+      });
+    } catch (e) {
+      const details = e instanceof Error ? e.message : 'Win/loss failed';
+      return reply.code(502).send({
+        success: false,
+        error: { code: 'BAD_GATEWAY', message: 'Request failed', details, requestId: req.id },
+      });
     }
   });
 

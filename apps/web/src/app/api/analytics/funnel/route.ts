@@ -9,28 +9,29 @@ export async function GET(req: NextRequest) {
     const stages = state.pipelines.find((pipeline) => pipeline.isDefault)?.stages ?? [];
     const totalDeals = state.deals.length;
     const totalWon = state.deals.filter((deal) => deal.status === 'WON').length;
+    const totalLost = state.deals.filter((deal) => deal.status === 'LOST').length;
 
     return NextResponse.json({
-      stages: stages.map((stage, index) => {
-        const count = Math.max(
-          state.deals.filter((deal) => deal.stageId === stage.id).length,
-          totalDeals - index * 2
-        );
+      stages: stages.map((stage) => {
+        const stageDeals = state.deals.filter((deal) => deal.stageId === stage.id);
         return {
           stage: stage.name,
-          count,
-          totalValue: state.deals
-            .filter((deal) => deal.stageId === stage.id || index < 2)
-            .reduce((sum, deal) => sum + (Number(deal.amount) || 0), 0),
-          conversionRate: stage.probability,
-          dropOffRate: index === 0 ? 0 : Math.max(0, 100 - stage.probability),
-          avgDaysInStage: [3, 8, 14, 11, 1][index] ?? 5,
+          count: stageDeals.length,
+          totalValue: stageDeals.reduce((sum, deal) => sum + (Number(deal.amount) || 0), 0),
+          conversionRate: 0,
+          dropOffRate: 0,
+          // Preview state has no stage transition timestamps; zero is explicit unknown.
+          avgDaysInStage: 0,
         };
       }),
       totalDeals,
       totalWon,
-      overallConversionRate: totalDeals > 0 ? Math.round((totalWon / totalDeals) * 100) : 0,
-      avgSalesCycledays: 42,
+      totalLost,
+      overallConversionRate:
+        totalWon + totalLost > 0
+          ? Math.round((totalWon / (totalWon + totalLost)) * 1000) / 10
+          : 0,
+      avgSalesCycledays: 0,
     });
   }
 

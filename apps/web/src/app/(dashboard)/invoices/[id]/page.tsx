@@ -217,9 +217,10 @@ export default function InvoiceDetailPage() {
         </form>
       )}
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Metric label="Subtotal" value={formatCurrency(Number(inv.subtotal), inv.currency)} />
-        <Metric label="Tax" value={formatCurrency(Number(inv.taxAmount ?? 0), inv.currency)} />
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <Metric label="Gross subtotal (before discount)" value={formatCurrency(Number(inv.subtotal), inv.currency)} />
+        <Metric label="Line discounts" value={formatCurrency(Number(inv.discountAmount ?? 0), inv.currency)} />
+        <Metric label="Tax on net" value={formatCurrency(Number(inv.taxAmount ?? 0), inv.currency)} />
         <Metric label="Total" value={formatCurrency(Number(inv.total), inv.currency)} />
         <Metric label="Paid" value={formatCurrency(Number(inv.paidAmount ?? 0), inv.currency)} />
       </section>
@@ -236,12 +237,16 @@ export default function InvoiceDetailPage() {
                   <tr>
                     <th className="px-4 py-2">Description</th>
                     <th className="px-4 py-2 text-end">Qty</th>
-                    <th className="px-4 py-2 text-end">Unit</th>
-                    <th className="px-4 py-2 text-end">Total</th>
+                    <th className="px-4 py-2 text-end">List price</th>
+                    <th className="px-4 py-2 text-end">Line discount</th>
+                    <th className="px-4 py-2 text-end">Net unit price</th>
+                    <th className="px-4 py-2 text-end">Net line total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant">
-                  {lineItems.map((item: InvoiceLineItem, idx: number) => (
+                  {lineItems.map((item: InvoiceLineItem, idx: number) => {
+                    const pricing = invoiceLinePricing(item);
+                    return (
                     <tr key={idx}>
                       <td className="px-4 py-2">
                         <div className="font-medium text-on-surface">
@@ -252,16 +257,24 @@ export default function InvoiceDetailPage() {
                         {item.quantity ?? 1}
                       </td>
                       <td className="px-4 py-2 text-end font-mono text-xs">
-                        {formatCurrency(item.unitPrice ?? 0, invoice.currency)}
+                        {formatCurrency(pricing.listPrice, invoice.currency)}
                       </td>
                       <td className="px-4 py-2 text-end font-mono text-xs">
-                        {formatCurrency(item.total ?? 0, invoice.currency)}
+                        {formatCurrency(pricing.lineDiscount, invoice.currency)}
+                        <span className="ml-1 text-on-surface-variant">({pricing.discountPct}%)</span>
+                      </td>
+                      <td className="px-4 py-2 text-end font-mono text-xs">
+                        {formatCurrency(pricing.netUnitPrice, invoice.currency)}
+                      </td>
+                      <td className="px-4 py-2 text-end font-mono text-xs">
+                        {formatCurrency(pricing.netLineTotal, invoice.currency)}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                   {lineItems.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-4 py-6 text-center text-sm text-on-surface-variant">
+                      <td colSpan={6} className="px-4 py-6 text-center text-sm text-on-surface-variant">
                         No line items.
                       </td>
                     </tr>
@@ -341,4 +354,24 @@ function Metric({ label, value }: { label: string; value: string }) {
       <p className="mt-1 text-lg font-bold text-on-surface">{value}</p>
     </div>
   );
+}
+
+function invoiceLinePricing(item: InvoiceLineItem) {
+  const quantity = finiteAmount(item.quantity);
+  const listPrice = finiteAmount(item.unitPrice);
+  const discountPct = Math.min(100, Math.max(0, finiteAmount(item.discountPercent)));
+  const lineDiscount = listPrice * quantity * (discountPct / 100);
+  const netUnitPrice = listPrice * (1 - discountPct / 100);
+  return {
+    listPrice,
+    lineDiscount,
+    netUnitPrice,
+    netLineTotal: netUnitPrice * quantity,
+    discountPct,
+  };
+}
+
+function finiteAmount(value: unknown): number {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : 0;
 }

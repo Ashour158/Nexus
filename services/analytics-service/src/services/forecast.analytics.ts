@@ -31,7 +31,10 @@ export interface ForecastCategoryBreakdown {
 export interface ForecastData {
   weightedPipeline: string;
   totalPipeline: string;
-  winRate: string;
+  /** Percentage on the 0-100 scale. */
+  winRatePct: number;
+  /** Compatibility alias, also on the 0-100 scale. */
+  winRate: number;
   forecastByMonth: Array<{
     month: string;
     weighted: string;
@@ -164,7 +167,8 @@ export function createForecastAnalyticsService(client: ClickHouseClient) {
       return {
         weightedPipeline: weightedPipeline.toFixed(2),
         totalPipeline: totalPipeline.toFixed(2),
-        winRate: winRate.toFixed(4),
+        winRatePct: Number(winRate.mul(100).toFixed(2)),
+        winRate: Number(winRate.mul(100).toFixed(2)),
         forecastByMonth: Object.entries(byMonth)
           .map(([month, values]) => ({
             month,

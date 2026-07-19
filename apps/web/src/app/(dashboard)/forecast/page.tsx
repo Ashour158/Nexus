@@ -43,6 +43,7 @@ export default function ForecastPage() {
   const userId = useAuthStore((s) => s.userId);
   const [data, setData] = useState<ForecastSummary | null>(null);
   const [teamData, setTeamData] = useState<TeamSummaryPayload | null>(null);
+  const [forecastError, setForecastError] = useState<string | null>(null);
   const [teamError, setTeamError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [teamLoading, setTeamLoading] = useState(false);
@@ -57,16 +58,41 @@ export default function ForecastPage() {
   }, [accessToken, tenantId]);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
+    setForecastError(null);
     fetch(`/api/crm/forecast?period=${period}`, { headers: authHeaders })
-      .then((r) => r.json())
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          const message =
+            typeof body?.error?.message === 'string'
+              ? body.error.message
+              : `Forecast request failed (${r.status})`;
+          throw new Error(message);
+        }
+        return body;
+      })
       .then((d) => {
         // The /api/crm/forecast proxy wraps the payload in { success, data };
         // fall back to the raw body if an unwrapped shape is ever returned.
-        setData((d?.data ?? d) as ForecastSummary | null);
-        setLoading(false);
+        const payload = d?.data ?? d;
+        if (!payload || typeof payload !== 'object') {
+          throw new Error('Forecast response was malformed');
+        }
+        if (!cancelled) setData(payload as ForecastSummary);
       })
-      .catch(() => setLoading(false));
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setData(null);
+        setForecastError(error instanceof Error ? error.message : 'Unable to load forecast');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [period, authHeaders]);
 
   useEffect(() => {
@@ -96,12 +122,22 @@ export default function ForecastPage() {
       .finally(() => setTeamLoading(false));
   }, [period, accessToken, authHeaders]);
 
-  const fmt = (n: number) =>
+  const fmt = (n: number | null | undefined) =>
     new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       maximumFractionDigits: 0,
-    }).format(n);
+    }).format(Number.isFinite(Number(n)) ? Number(n) : 0);
+
+  // The upstream payload is only partially trusted: `/api/crm/forecast` can
+  // return a 200 whose body lacks `stages` (e.g. a degraded/short-circuited
+  // response). `data.stages.map(...)` then threw
+  // "Cannot read properties of undefined (reading 'map')" and took the whole
+  // page down. Normalise to arrays here and render an explicit empty state.
+  const stages: ForecastStage[] = Array.isArray(data?.stages) ? data!.stages : [];
+  const stagesMissing = Boolean(data) && !Array.isArray(data?.stages);
+  const reps: TeamRepRow[] = Array.isArray(teamData?.reps) ? teamData!.reps : [];
+  const teamTotals = teamData?.totals ?? { repTotal: 0, managerTotal: 0 };
 
   const overrideMutation = useMutation({
     mutationFn: async ({ repId, value }: { repId: string; value: number | null }) => {
@@ -147,7 +183,9 @@ export default function ForecastPage() {
           ))}
         </div>
       ) : !data ? (
-        <div className="py-16 text-center text-on-surface-variant">Unable to load forecast</div>
+        <div role="alert" className="rounded-xl border border-error/30 bg-error-container px-4 py-8 text-center text-error">
+          {forecastError ?? 'Unable to load forecast'}
+        </div>
       ) : (
         <>
           <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -164,6 +202,18 @@ export default function ForecastPage() {
             ))}
           </div>
 
+          {stages.length === 0 ? (
+            <div className="rounded-xl border border-outline-variant bg-surface p-12 text-center">
+              <p className="text-sm font-medium text-on-surface">
+                {stagesMissing ? 'Stage breakdown unavailable' : 'No stages in this period'}
+              </p>
+              <p className="mt-1 text-xs text-on-surface-variant">
+                {stagesMissing
+                  ? 'The forecast service returned a response without a stage breakdown. Totals above may be incomplete.'
+                  : 'No open deals fall inside the selected period.'}
+              </p>
+            </div>
+          ) : (
           <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
             <table className="w-full text-sm">
               <thead className="border-b border-outline-variant bg-surface-container-low">
@@ -176,7 +226,7 @@ export default function ForecastPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant">
-                {data.stages.map((s) => (
+                {stages.map((s) => (
                   <tr key={s.stageId} className="hover:bg-surface-container-low">
                     <td className="px-4 py-3 font-medium text-on-surface">{s.stageName}</td>
                     <td className="px-4 py-3 text-end text-on-surface-variant">{s.probability}%</td>
@@ -190,6 +240,7 @@ export default function ForecastPage() {
               </tbody>
             </table>
           </div>
+          )}
         </>
       )}
 
@@ -211,11 +262,11 @@ export default function ForecastPage() {
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border border-outline-variant bg-surface-container-low p-4">
                   <p className="text-xs text-on-surface-variant">Sum (rep commits)</p>
-                  <p className="text-lg font-semibold text-on-surface">{fmt(teamData.totals.repTotal)}</p>
+                  <p className="text-lg font-semibold text-on-surface">{fmt(teamTotals.repTotal)}</p>
                 </div>
                 <div className="rounded-lg border border-primary/40 bg-primary-container p-4">
                   <p className="text-xs text-primary">Sum (after overrides)</p>
-                  <p className="text-lg font-semibold text-on-primary-container">{fmt(teamData.totals.managerTotal)}</p>
+                  <p className="text-lg font-semibold text-on-primary-container">{fmt(teamTotals.managerTotal)}</p>
                 </div>
               </div>
 
@@ -230,7 +281,7 @@ export default function ForecastPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(teamData.reps ?? []).map((rep) => (
+                    {reps.map((rep) => (
                       <tr key={rep.repId} className="border-t border-outline-variant hover:bg-surface-container-low">
                         <td className="px-4 py-3 font-medium text-on-surface">{rep.repName}</td>
                         <td className="px-4 py-3 text-end text-on-surface">{fmt(rep.weightedCommit)}</td>
@@ -244,7 +295,9 @@ export default function ForecastPage() {
                           />
                         </td>
                         <td className={`px-4 py-3 text-end font-medium ${rep.attainment >= 100 ? 'text-success' : rep.attainment >= 70 ? 'text-warning' : 'text-error'}`}>
-                          {rep.attainment.toFixed(1)}%
+                          {Number.isFinite(Number(rep.attainment))
+                            ? `${Number(rep.attainment).toFixed(1)}%`
+                            : '—'}
                         </td>
                       </tr>
                     ))}

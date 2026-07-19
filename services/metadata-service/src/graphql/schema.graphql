@@ -7,7 +7,7 @@ scalar JSON
 type Query {
   customFieldDefinitions(limit: Int, offset: Int, entityType: String): [CustomFieldDefinition!]!
   customFieldDefinition(id: ID!): CustomFieldDefinition
-  fieldPermissions(limit: Int, offset: Int): [FieldPermission!]!
+  fieldPermissions(limit: Int, offset: Int, objectType: String): [FieldPermission!]!
   fieldPermission(id: ID!): FieldPermission
   validationRules(limit: Int, offset: Int, objectType: String): [ValidationRule!]!
   validationRule(id: ID!): ValidationRule

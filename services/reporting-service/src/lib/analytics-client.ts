@@ -127,9 +127,11 @@ export interface PipelineSummary {
 
 export interface RevenueSummary {
   totalRevenue: number;
+  wonAmount?: number;
   wonDeals: number;
   lostDeals: number;
   winRate: number;
+  winRatePct?: number;
   avgSalePrice: number;
 }
 
@@ -147,7 +149,8 @@ export interface ActivitySummary {
 export interface ForecastData {
   weightedPipeline: string;
   totalPipeline: string;
-  winRate: string;
+  winRatePct: number;
+  winRate?: number;
   forecastByMonth: Array<{ month: string; weighted: string; total: string }>;
 }
 

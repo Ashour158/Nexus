@@ -37,9 +37,11 @@ export function useRevenueSummary(year: number, quarter?: number) {
     queryFn: () =>
       apiClients.analytics.get<{
         totalRevenue: number;
+        wonAmount: number;
         wonDeals: number;
         lostDeals: number;
         winRate: number;
+        winRatePct: number;
         avgSalePrice: number;
       }>('/revenue/summary', { params: { year, quarter } }),
   });
@@ -97,7 +99,8 @@ export function useForecast() {
       apiClients.analytics.get<{
         weightedPipeline: string;
         totalPipeline: string;
-        winRate: string;
+        winRatePct: number;
+        winRate?: number;
         forecastByMonth: Array<{ month: string; weighted: string; total: string }>;
       }>('/forecast/weighted-pipeline'),
   });

@@ -137,23 +137,34 @@ export default function OrderDetailPage(): JSX.Element {
                   <tr>
                     <th className="px-4 py-2">Item</th>
                     <th className="px-4 py-2 text-right">Qty</th>
-                    <th className="px-4 py-2 text-right">Unit price</th>
-                    <th className="px-4 py-2 text-right">Total</th>
+                    <th className="px-4 py-2 text-right">List price</th>
+                    <th className="px-4 py-2 text-right">Line discount</th>
+                    <th className="px-4 py-2 text-right">Net unit price</th>
+                    <th className="px-4 py-2 text-right">Net line total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant">
-                  {order.lineItems.map((item, i) => (
+                  {order.lineItems.map((item, i) => {
+                    const pricing = orderLinePricing(item);
+                    return (
                     <tr key={item.id ?? i}>
                       <td className="px-4 py-2 text-on-surface">{lineLabel(item, i)}</td>
                       <td className="px-4 py-2 text-right text-on-surface-variant">{item.quantity ?? '—'}</td>
                       <td className="px-4 py-2 text-right text-on-surface-variant">
-                        {item.unitPrice != null ? formatCurrency(item.unitPrice, order.currency) : '—'}
+                        {formatCurrency(pricing.listPrice, order.currency)}
+                      </td>
+                      <td className="px-4 py-2 text-right text-on-surface-variant">
+                        {formatCurrency(pricing.lineDiscount, order.currency)}
+                      </td>
+                      <td className="px-4 py-2 text-right text-on-surface-variant">
+                        {formatCurrency(pricing.netUnitPrice, order.currency)}
                       </td>
                       <td className="px-4 py-2 text-right font-medium text-on-surface">
-                        {item.total != null ? formatCurrency(item.total, order.currency) : '—'}
+                        {formatCurrency(pricing.netLineTotal, order.currency)}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -161,9 +172,9 @@ export default function OrderDetailPage(): JSX.Element {
 
           {/* Totals */}
           <section className="ml-auto w-full max-w-xs space-y-1 rounded-lg border border-outline-variant bg-surface p-4 text-sm">
-            <Row label="Subtotal" value={formatCurrency(order.subtotal, order.currency)} />
-            <Row label="Discount" value={`- ${formatCurrency(order.discountAmount, order.currency)}`} />
-            <Row label="Tax" value={formatCurrency(order.taxAmount, order.currency)} />
+            <Row label="Gross subtotal (before discount)" value={formatCurrency(order.subtotal, order.currency)} />
+            <Row label="Line discounts" value={`- ${formatCurrency(order.discountAmount, order.currency)}`} />
+            <Row label="Tax on net" value={formatCurrency(order.taxAmount, order.currency)} />
             <div className="mt-2 border-t border-outline-variant pt-2">
               <Row label="Total" value={formatCurrency(order.total, order.currency)} bold />
             </div>
@@ -181,4 +192,26 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
       <span className={bold ? 'text-base font-bold text-on-surface' : 'text-on-surface'}>{value}</span>
     </div>
   );
+}
+
+function orderLinePricing(item: OrderLineItem) {
+  const quantity = finiteAmount(item.quantity);
+  const netUnitPrice = finiteAmount(item.unitPrice);
+  const listPrice = item.listPrice == null ? netUnitPrice : finiteAmount(item.listPrice);
+  const explicitDiscount = Number(item.discountAmount);
+  const lineDiscount = Number.isFinite(explicitDiscount)
+    ? explicitDiscount
+    : Math.max(0, listPrice - netUnitPrice) * quantity;
+  const explicitTotal = Number(item.total);
+  return {
+    listPrice,
+    lineDiscount,
+    netUnitPrice,
+    netLineTotal: Number.isFinite(explicitTotal) ? explicitTotal : netUnitPrice * quantity,
+  };
+}
+
+function finiteAmount(value: unknown): number {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : 0;
 }

@@ -44,6 +44,12 @@ interface EventRow {
 }
 
 interface PerformanceReport {
+  wonAmount: number | null;
+  pipelineValue: number | null;
+  weightedPipeline: number | null;
+  winRatePct: number;
+  openDeals: number | null;
+  avgWonDealSize?: number | null;
   kpis?: {
     revenueDelta?: number;
     conversionDelta?: number;
@@ -110,11 +116,6 @@ export default function AnalyticsPage(): ReactElement {
     });
   }, [data?.performance, search]);
 
-  const totalRevenue = rows.reduce((sum, row) => sum + row.dealValue, 0);
-  const won = rows.filter((row) => row.status === 'CLOSED WON').length;
-  const activeDeals = rows.filter((row) => row.status === 'IN PROGRESS' || row.status === 'PENDING APPROVAL').length;
-  const conversion = rows.length ? (won / rows.length) * 100 : 0;
-  const avgDealSize = rows.length ? totalRevenue / rows.length : 0;
   const maxTerritory = Math.max(...(data?.territory ?? []).map((row) => row.value), 1);
 
   if (isLoading) {
@@ -173,10 +174,10 @@ export default function AnalyticsPage(): ReactElement {
       </section>
 
       <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <SparkMetric label="Total Revenue" value={formatCurrency(totalRevenue)} tone="blue" sparkline={data.kpis?.revenueSparkline ?? []} />
-        <SparkMetric label="Conversion Rate" value={`${conversion.toFixed(1)}%`} tone="emerald" sparkline={data.kpis?.conversionSparkline ?? []} />
-        <SparkMetric label="Active Deals" value={String(activeDeals)} tone="amber" sparkline={data.kpis?.activeDealsSparkline ?? []} />
-        <SparkMetric label="Avg Deal Size" value={formatCurrency(avgDealSize)} tone="indigo" sparkline={data.kpis?.avgDealSizeSparkline ?? []} />
+        <SparkMetric label="Won Revenue" value={metricCurrency(data.wonAmount)} tone="blue" sparkline={data.kpis?.revenueSparkline ?? []} />
+        <SparkMetric label="Win Rate" value={`${finite(data.winRatePct).toFixed(1)}%`} tone="emerald" sparkline={data.kpis?.conversionSparkline ?? []} />
+        <SparkMetric label="Open Pipeline" value={metricCurrency(data.pipelineValue)} tone="amber" sparkline={data.kpis?.activeDealsSparkline ?? []} />
+        <SparkMetric label="Weighted Pipeline" value={metricCurrency(data.weightedPipeline)} tone="indigo" sparkline={data.kpis?.avgDealSizeSparkline ?? []} />
       </section>
 
       <section className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
@@ -405,4 +406,12 @@ function TableHead({ children, className }: { children: React.ReactNode; classNa
 function initials(value: string): string {
   const parts = value.split(/\s+/).filter(Boolean);
   return `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? parts[0]?.[1] ?? ''}`.toUpperCase() || 'NX';
+}
+
+function finite(value: number | null | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+function metricCurrency(value: number | null | undefined): string {
+  return value == null ? 'Not available' : formatCurrency(finite(value));
 }

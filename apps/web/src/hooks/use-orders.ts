@@ -42,6 +42,10 @@ export interface OrderLineItem {
   description?: string;
   quantity?: number;
   unitPrice?: number;
+  listPrice?: number;
+  discountPercent?: number;
+  discountAmount?: number;
+  taxAmount?: number;
   total?: number;
   [key: string]: unknown;
 }

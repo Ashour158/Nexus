@@ -32,9 +32,11 @@ export function createRevenueAnalyticsService(client: ClickHouseClient) {
       period: { year: number; quarter?: number }
     ): Promise<{
       totalRevenue: number;
+      wonAmount: number;
       wonDeals: number;
       lostDeals: number;
       winRate: number;
+      winRatePct: number;
       avgSalePrice: number;
     }> {
       const { from, toExclusive } = periodRange(period.year, period.quarter);
@@ -57,11 +59,14 @@ export function createRevenueAnalyticsService(client: ClickHouseClient) {
       const lostDeals = Number(row.lostDeals ?? 0);
       const totalRevenue = Number(row.totalRevenue ?? 0);
       const totalClosed = wonDeals + lostDeals;
+      const winRatePct = totalClosed > 0 ? (wonDeals / totalClosed) * 100 : 0;
       return {
         totalRevenue,
+        wonAmount: totalRevenue,
         wonDeals,
         lostDeals,
-        winRate: totalClosed > 0 ? (wonDeals / totalClosed) * 100 : 0,
+        winRate: winRatePct,
+        winRatePct,
         avgSalePrice: wonDeals > 0 ? totalRevenue / wonDeals : 0,
       };
     },

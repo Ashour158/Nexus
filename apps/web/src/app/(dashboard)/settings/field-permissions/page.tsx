@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Plus, Trash2, ShieldCheck, Lock } from 'lucide-react';
+import { Plus, Trash2, ShieldCheck, Lock, ShieldAlert } from 'lucide-react';
 import { notify } from '@/lib/toast';
 import { useRoles } from '@/hooks/use-roles';
 import {
@@ -24,11 +24,18 @@ export default function FieldPermissionsSettingsPage() {
   const [fieldName, setFieldName] = useState('');
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
 
-  const { data: rules = [], isLoading } = useFieldPermissions();
-  const { data: roleData } = useRoles();
+  const { data: rules = [], isLoading, isError, error, refetch } = useFieldPermissions();
+  const { data: roleData, isLoading: rolesLoading, isError: rolesError } = useRoles();
   const roles = roleData?.data ?? [];
   const createRule = useCreateFieldPermission();
   const deleteRule = useDeleteFieldPermission();
+
+  // FAIL CLOSED: when the field-level-security policy cannot be loaded we must
+  // NOT fall back to "no restrictions / everything readable+writable" — that
+  // renders a permissive picture of an unknown policy and invites an admin to
+  // act on it. Instead we hide the policy table entirely and block edits until
+  // the policy is known.
+  const policyUnavailable = isError;
 
   const rows = useMemo(
     () => rules.filter((r) => r.objectType === objectType),
@@ -94,6 +101,32 @@ export default function FieldPermissionsSettingsPage() {
         ))}
       </div>
 
+      {policyUnavailable ? (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-xl border border-error/40 bg-error-container p-4"
+        >
+          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-error" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-on-error-container">
+              Field-level security policy could not be loaded
+            </p>
+            <p className="mt-1 text-sm text-on-error-container">
+              Access is treated as restricted until the policy loads — this page is NOT showing
+              &ldquo;no restrictions&rdquo;. Editing is disabled.
+              {error?.message ? ` (${error.message})` : ''}
+            </p>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className="mt-3 rounded-lg border border-error/40 px-3 py-1.5 text-sm font-medium text-on-error-container hover:bg-error/10"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="space-y-4 rounded-xl border border-primary/40 bg-primary-container p-5">
         <h3 className="font-semibold text-on-primary-container">
           New rule on {OBJECT_TABS.find((t) => t.key === objectType)?.label}
@@ -114,8 +147,16 @@ export default function FieldPermissionsSettingsPage() {
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface">Allowed roles</label>
             <div className="flex flex-wrap gap-2 rounded-lg border border-outline-variant bg-surface p-2">
-              {roles.length === 0 ? (
-                <span className="px-1 text-xs text-on-surface-variant">No roles available</span>
+              {rolesLoading ? (
+                <span className="px-1 text-xs text-on-surface-variant">Loading roles…</span>
+              ) : rolesError ? (
+                <span className="px-1 text-xs font-medium text-error">
+                  Roles could not be loaded — cannot grant field access right now.
+                </span>
+              ) : roles.length === 0 ? (
+                <span className="px-1 text-xs text-on-surface-variant">
+                  This tenant has no roles defined yet. Create a role under Settings → Roles first.
+                </span>
               ) : (
                 roles.map((role) => {
                   const active = selectedRoles.includes(role.name);
@@ -141,7 +182,12 @@ export default function FieldPermissionsSettingsPage() {
         <div className="flex justify-end">
           <button
             onClick={add}
-            disabled={createRule.isPending || !fieldName.trim() || selectedRoles.length === 0}
+            disabled={
+              policyUnavailable ||
+              createRule.isPending ||
+              !fieldName.trim() ||
+              selectedRoles.length === 0
+            }
             className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary disabled:opacity-50"
           >
             <Plus className="h-4 w-4" /> {createRule.isPending ? 'Adding…' : 'Add rule'}
@@ -152,6 +198,15 @@ export default function FieldPermissionsSettingsPage() {
       <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
         {isLoading ? (
           <div className="p-8 text-center text-sm text-on-surface-variant">Loading rules…</div>
+        ) : policyUnavailable ? (
+          <div className="p-12 text-center">
+            <ShieldAlert className="mx-auto mb-3 h-10 w-10 text-error" />
+            <p className="text-sm font-medium text-on-surface">Policy unknown — assume restricted</p>
+            <p className="mt-1 text-xs text-on-surface-variant">
+              We could not read the field-level security rules, so none are shown. Do not infer that
+              fields are unrestricted.
+            </p>
+          </div>
         ) : rows.length === 0 ? (
           <div className="p-12 text-center">
             <Lock className="mx-auto mb-3 h-10 w-10 text-outline" />

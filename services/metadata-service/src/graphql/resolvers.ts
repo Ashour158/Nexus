@@ -22,9 +22,10 @@ export const resolvers = {
       if (ctx.tenantId && item?.tenantId !== ctx.tenantId) return null;
       return item ? mapFieldDef(item) : null;
     },
-    async fieldPermissions(_parent: unknown, { limit = 20, offset = 0 }: { limit?: number; offset?: number }, ctx: GraphQLContext) {
+    async fieldPermissions(_parent: unknown, { limit = 20, offset = 0, objectType }: { limit?: number; offset?: number; objectType?: string }, ctx: GraphQLContext) {
       requireGqlPermission(ctx, READ);
-      const where = ctx.tenantId ? { tenantId: ctx.tenantId } : {};
+      const where: any = ctx.tenantId ? { tenantId: ctx.tenantId } : {};
+      if (objectType) where.objectType = objectType;
       const items = await ctx.prisma.fieldPermission.findMany({ where, take: Math.min(limit, 100), skip: offset });
       for (const item of items) ctx.loaders.permissionLoader.prime(item.id, item);
       return items;

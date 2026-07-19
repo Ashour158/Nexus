@@ -15,6 +15,7 @@ type FunnelData = {
   stages: FunnelStage[];
   totalDeals: number;
   totalWon: number;
+  totalLost: number;
   overallConversionRate: number;
   avgSalesCycledays: number;
 };
@@ -63,10 +64,11 @@ export default function FunnelPage() {
       </div>
 
       {data && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {[
             { label: 'Total Deals', value: data.totalDeals },
             { label: 'Deals Won', value: data.totalWon },
+            { label: 'Deals Lost', value: data.totalLost },
             { label: 'Win Rate', value: `${data.overallConversionRate}%` },
             { label: 'Avg Sales Cycle', value: `${data.avgSalesCycledays}d` },
           ].map((m) => (

@@ -28,16 +28,30 @@ async function callGraphQL(
 
   const json = await res.json().catch(() => ({}));
   if (json?.errors?.length) {
-    const message = json.errors[0]?.message ?? 'GraphQL error';
-    const status = /permission|forbidden|unauthor/i.test(message) ? 403 : 400;
-    return NextResponse.json({ error: message }, { status });
+    const first = json.errors[0] ?? {};
+    const message = first.message ?? 'GraphQL error';
+    // Derive the HTTP status from the GraphQL error's own `extensions`, NOT from
+    // a regex over the human-readable message. The message-sniffing version
+    // mapped metadata-service's `Not authenticated` (code UNAUTHENTICATED) to a
+    // misleading HTTP 400 "bad request" — the reason `GET ?objectType=deal`
+    // returned 400 on a call whose parameters were perfectly valid.
+    const code = String(first.extensions?.code ?? '');
+    const extStatus = Number(first.extensions?.status);
+    const status = Number.isFinite(extStatus) && extStatus >= 400 && extStatus <= 599
+      ? extStatus
+      : code === 'UNAUTHENTICATED'
+        ? 401
+        : code === 'FORBIDDEN'
+          ? 403
+          : 502;
+    return NextResponse.json({ error: message, code: code || 'UPSTREAM_ERROR' }, { status });
   }
   return NextResponse.json(json?.data ?? {}, { status: res.status });
 }
 
 const LIST_QUERY = /* GraphQL */ `
-  query FieldPermissions($limit: Int) {
-    fieldPermissions(limit: $limit) {
+  query FieldPermissions($limit: Int, $objectType: String) {
+    fieldPermissions(limit: $limit, objectType: $objectType) {
       id
       tenantId
       objectType
@@ -67,8 +81,19 @@ const DELETE_MUTATION = /* GraphQL */ `
   }
 `;
 
+/**
+ * GET /api/metadata/field-permissions[?objectType=deal][&limit=100]
+ *
+ * Required: a caller `Authorization: Bearer <jwt>` carrying `settings:read`
+ * (metadata-service resolves the tenant from the verified token). Both query
+ * params are OPTIONAL filters — `objectType` narrows to one CRM object, `limit`
+ * caps the page at 100 (the resolver's own ceiling).
+ */
 export async function GET(req: NextRequest) {
-  return callGraphQL(req, LIST_QUERY, { limit: 100 });
+  const objectType = req.nextUrl.searchParams.get('objectType');
+  const rawLimit = Number(req.nextUrl.searchParams.get('limit'));
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 100;
+  return callGraphQL(req, LIST_QUERY, { limit, objectType: objectType || null });
 }
 
 export async function POST(req: NextRequest) {

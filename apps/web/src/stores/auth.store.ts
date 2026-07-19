@@ -39,6 +39,13 @@ interface AuthState {
    * every action on `resource` (e.g. `deals:*` covers `deals:update`).
    */
   hasPermission: (permission: string) => boolean;
+  /**
+   * True when the user is an administrator. Accepts any admin/super-admin role
+   * (case-insensitive) OR the `*` wildcard permission. Frontend admin gates
+   * must use this — a bare `roles.includes('admin')` denies the seeded
+   * `SUPER_ADMIN` role and hides admin surfaces from the super admin.
+   */
+  isAdmin: () => boolean;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -75,6 +82,13 @@ export const useAuthStore = create<AuthState>()(
         if (owned.includes(permission)) return true;
         const [resource] = permission.split(':');
         return resource ? owned.includes(`${resource}:*`) : false;
+      },
+      isAdmin: () => {
+        if (get().permissions.includes('*')) return true;
+        return (get().roles ?? []).some((r) => {
+          const lower = r.toLowerCase();
+          return lower === 'admin' || lower === 'super_admin' || lower === 'superadmin';
+        });
       },
     }),
     {

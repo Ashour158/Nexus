@@ -4,7 +4,10 @@ import type { JwtPayload } from '@nexus/shared-types';
 import type { AuthPrisma } from '../prisma.js';
 
 function isAdmin(jwt: JwtPayload): boolean {
-  return jwt.roles.includes('admin') || jwt.roles.includes('ADMIN');
+  // Accept the seeded SUPER_ADMIN role too (was admin/ADMIN only, which 403'd
+  // the super admin on profile/team routes). Case-insensitive.
+  const roles = (jwt.roles ?? []).map((r) => r.toLowerCase());
+  return roles.some((r) => r === 'admin' || r === 'super_admin' || r === 'superadmin');
 }
 
 export async function registerProfileRoutes(app: FastifyInstance, prisma: AuthPrisma): Promise<void> {

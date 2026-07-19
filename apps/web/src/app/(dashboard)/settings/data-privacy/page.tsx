@@ -8,8 +8,7 @@ import { ShieldAlert } from 'lucide-react';
 
 export default function DataPrivacyPage() {
   const token = useAuthStore((s) => s.accessToken);
-  const roles = useAuthStore((s) => s.roles);
-  const role = roles[0]?.toLowerCase() ?? '';
+  const isAdmin = useAuthStore((s) => s.isAdmin);
   const [transferFrom, setTransferFrom] = useState('');
   const [transferTo, setTransferTo] = useState('');
   const [modules, setModules] = useState<string[]>(['all']);
@@ -22,7 +21,7 @@ export default function DataPrivacyPage() {
   const transfer = useMutation({ mutationFn: () => fetch('/api/auth/data-ownership/transfer', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ fromUserId: transferFrom, toUserId: transferTo, modules }) }).then((r) => r.json()), onSuccess: (res) => res.success ? notify.success(res.message || 'Transfer initiated') : notify.error('Transfer failed', res.error) });
   const gdprErase = useMutation({ mutationFn: () => fetch('/api/auth/data-ownership/gdpe-erasure', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ contactEmail: gdprEmail, reason: gdprReason }) }).then((r) => r.json()), onSuccess: (res) => res.success ? notify.success(res.message || 'Erasure request submitted') : notify.error('Request failed', res.error) });
 
-  if (role !== 'admin') return <div className="flex flex-col items-center justify-center py-20"><ShieldAlert className="mb-4 h-12 w-12 text-outline" /><h2 className="text-lg font-semibold text-on-surface-variant">Admin Access Required</h2></div>;
+  if (!isAdmin()) return <div className="flex flex-col items-center justify-center py-20"><ShieldAlert className="mb-4 h-12 w-12 text-outline" /><h2 className="text-lg font-semibold text-on-surface-variant">Admin Access Required</h2></div>;
 
   const users = (teamData?.data || []) as Array<{ id: string; firstName: string; lastName: string; email: string }>;
 

@@ -70,9 +70,11 @@ const NAV_GROUPS: NavGroup[] = [
 export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps): ReactElement {
   const pathname = usePathname() ?? '/';
   const toggle = useUiStore((s) => s.toggleSidebar);
-  const roles = useAuthStore((s) => s.roles);
   const userId = useAuthStore((s) => s.userId);
   const tenantId = useAuthStore((s) => s.tenantId);
+  // Admin nav visibility must accept SUPER_ADMIN (and the `*` permission), not
+  // just a literal 'admin' role — otherwise the super admin loses admin nav.
+  const userIsAdmin = useAuthStore((s) => s.isAdmin)();
 
   const isActive = (href: string) =>
     pathname === href || (href !== '/' && pathname.startsWith(`${href}/`));
@@ -155,8 +157,8 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps): ReactEleme
             const isExpanded = expandedGroups[group.label] ?? false;
 
             const visibleItems = group.items.filter((item) => {
-              if (item.href === '/settings/users' && !roles.includes('admin')) return false;
-              if (item.adminOnly && !roles.includes('admin')) return false;
+              if (item.href === '/settings/users' && !userIsAdmin) return false;
+              if (item.adminOnly && !userIsAdmin) return false;
               return true;
             });
             if (visibleItems.length === 0) return null;
@@ -224,7 +226,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps): ReactEleme
                 {userId ?? 'User'}
               </p>
               <p className="truncate text-xs text-on-surface-variant">
-                {roles.includes('admin') ? 'Administrator' : tenantId ?? 'Default Tenant'}
+                {userIsAdmin ? 'Administrator' : tenantId ?? 'Default Tenant'}
               </p>
             </div>
           </div>

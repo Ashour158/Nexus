@@ -4,6 +4,7 @@ import {
   type Prisma,
 } from '../../../node_modules/.prisma/outbox-relay-client/index.js';
 import type { Producer } from 'kafkajs';
+import type { EffectProbeRegistry } from '@nexus/service-utils';
 
 export interface OutboxMessage {
   id: string;
@@ -30,6 +31,7 @@ export interface RelayOptions {
   batchSize: number;
   maxRetries: number;
   dlqEnabled: boolean;
+  effectProbes?: EffectProbeRegistry;
 }
 
 export class OutboxRelay {
@@ -40,6 +42,7 @@ export class OutboxRelay {
   private batchSize: number;
   private maxRetries: number;
   private dlqEnabled: boolean;
+  private effectProbes?: EffectProbeRegistry;
   private intervals: NodeJS.Timeout[] = [];
   private running = false;
 
@@ -51,6 +54,8 @@ export class OutboxRelay {
     this.batchSize = opts.batchSize;
     this.maxRetries = opts.maxRetries;
     this.dlqEnabled = opts.dlqEnabled;
+    this.effectProbes = opts.effectProbes;
+    for (const service of this.services) this.effectProbes?.registerEngine(service.name);
   }
 
   async start(): Promise<void> {
@@ -105,6 +110,7 @@ export class OutboxRelay {
           orderBy: { createdAt: 'asc' },
           take: this.batchSize,
         })) as OutboxMessage[];
+        lastErr = undefined;
         break;
       } catch (err) {
         lastErr = err;
@@ -121,11 +127,13 @@ export class OutboxRelay {
 
     if (messages.length === 0) {
       if (lastErr) {
+        this.effectProbes?.recordIntervalFailure(svc.name, lastErr);
         this.log.warn(
           { err: lastErr, service: svc.name },
           'Giving up on outbox poll after retries'
         );
       }
+      else this.effectProbes?.recordInterval(svc.name, 0, 0);
       return;
     }
 
@@ -196,12 +204,15 @@ export class OutboxRelay {
     try {
       await svc.prisma.$transaction(updates);
     } catch (err) {
+      this.effectProbes?.recordIntervalFailure(svc.name, err);
       this.log.error(
         { err, service: svc.name },
         'Failed to commit batch updates'
       );
       return;
     }
+
+    this.effectProbes?.recordInterval(svc.name, messages.length, updates.length);
 
     const duration = Date.now() - batchStart;
     this.log.info(

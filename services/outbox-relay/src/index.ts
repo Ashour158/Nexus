@@ -6,6 +6,7 @@ import {
   createService,
   globalErrorHandler,
   registerHealthRoutes,
+  EffectProbeRegistry,
   startService,
 } from '@nexus/service-utils';
 import { getKafkaClient } from '@nexus/kafka';
@@ -54,6 +55,24 @@ const services = serviceConfigs.map((cfg) => ({
   }),
 }));
 
+const effectProbes = new EffectProbeRegistry('outbox-relay', {
+  samplerMinIntervalMs: Math.max(config.POLL_INTERVAL_MS, 15_000),
+});
+
+for (const service of services) {
+  effectProbes.registerEngine(service.name, async () => {
+    const [outboxPendingCount, oldest] = await Promise.all([
+      service.prisma.outboxMessage.count({ where: { status: 'PENDING' } }),
+      service.prisma.outboxMessage.findFirst({
+        where: { status: 'PENDING' },
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true },
+      }),
+    ]);
+    return { outboxPendingCount, outboxOldestPendingAt: oldest?.createdAt ?? null };
+  });
+}
+
 const relay = new OutboxRelay({
   producer,
   services,
@@ -62,6 +81,12 @@ const relay = new OutboxRelay({
   batchSize: config.BATCH_SIZE,
   maxRetries: config.MAX_RETRIES,
   dlqEnabled: config.DLQ_ENABLED === 'true',
+  effectProbes,
+});
+
+effectProbes.registerEngine('dlq', async () => {
+  const topics = await dlqReplay.getStats();
+  return { dlqDepth: topics.reduce((sum, topic) => sum + topic.depth, 0) };
 });
 
 const dlqReplay = new DLQReplay({
@@ -79,7 +104,7 @@ registerHealthRoutes(app, 'outbox-relay', [
     const result = await checkDatabase(svc.prisma);
     return { ...result, name: `db-${svc.name}` };
   }),
-]);
+], effectProbes);
 
 app.addHook('onClose', async () => {
   await relay.stop();

@@ -193,8 +193,8 @@ describe('DLQReplay', () => {
     const stats = await replay.getStats();
 
     expect(stats).toEqual([
-      { topic: 'contact.updated.dlq', lag: 5 },
-      { topic: 'deal.created.dlq', lag: 5 },
+      { topic: 'contact.updated.dlq', depth: 5 },
+      { topic: 'deal.created.dlq', depth: 5 },
     ]);
     expect(mockKafka._admin.listTopics).toHaveBeenCalled();
     expect(mockKafka._admin.fetchTopicOffsets).toHaveBeenCalledWith('deal.created.dlq');

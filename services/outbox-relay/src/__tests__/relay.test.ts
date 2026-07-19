@@ -27,9 +27,7 @@ function createMockPrisma(messages: unknown[] = []) {
   return {
     outboxMessage: {
       findMany: vi.fn().mockResolvedValue(messages),
-      update: vi.fn().mockImplementation((args: { where: { id: string } }) =>
-        Promise.resolve({ id: args.where.id })
-      ),
+      update: vi.fn().mockImplementation((args: unknown) => args),
     },
     $transaction: vi.fn().mockImplementation((ops: unknown[]) =>
       Promise.resolve(ops)
@@ -55,9 +53,9 @@ describe('OutboxRelay', () => {
       aggregateId: 'a1',
       eventType: 'OrderCreated',
       createdAt: new Date(),
-      processedAt: null,
+      status: 'PENDING',
+      sentAt: null,
       error: null,
-      retryCount: 0,
     };
 
     const mockPrisma = createMockPrisma([msg]);
@@ -76,7 +74,7 @@ describe('OutboxRelay', () => {
     await new Promise((r) => setTimeout(r, 50));
 
     expect(mockPrisma.outboxMessage.findMany).toHaveBeenCalledWith({
-      where: { processedAt: null, retryCount: { lt: 5 } },
+      where: { status: 'PENDING' },
       orderBy: { createdAt: 'asc' },
       take: 100,
     });
@@ -86,7 +84,7 @@ describe('OutboxRelay', () => {
       messages: [
         expect.objectContaining({
           key: 'msg-1',
-          value: JSON.stringify({ foo: 'bar' }),
+          value: expect.stringContaining('"payload":{"foo":"bar"}'),
         }),
       ],
     });
@@ -97,14 +95,14 @@ describe('OutboxRelay', () => {
     expect(txCalls[0]).toEqual(
       expect.objectContaining({
         where: { id: 'msg-1' },
-        data: expect.objectContaining({ processedAt: expect.any(Date) }),
+        data: expect.objectContaining({ status: 'SENT', sentAt: expect.any(Date) }),
       })
     );
 
     await relay.stop();
   });
 
-  it('should increment retryCount on publish failure', async () => {
+  it('should mark a permanently failed publish FAILED', async () => {
     const msg = {
       id: 'msg-2',
       topic: 'test.topic',
@@ -116,9 +114,9 @@ describe('OutboxRelay', () => {
       aggregateId: 'a1',
       eventType: 'OrderCreated',
       createdAt: new Date(),
-      processedAt: null,
+      status: 'PENDING',
+      sentAt: null,
       error: null,
-      retryCount: 0,
     };
 
     const mockPrisma = createMockPrisma([msg]);
@@ -136,7 +134,7 @@ describe('OutboxRelay', () => {
     });
 
     await relay.start();
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 200));
 
     expect(mockPrisma.$transaction).toHaveBeenCalled();
     const txCalls = mockPrisma.$transaction.mock.calls[0][0];
@@ -144,7 +142,7 @@ describe('OutboxRelay', () => {
       expect.objectContaining({
         where: { id: 'msg-2' },
         data: expect.objectContaining({
-          retryCount: { increment: 1 },
+          status: 'FAILED',
           error: 'Kafka down',
         }),
       })
@@ -165,9 +163,9 @@ describe('OutboxRelay', () => {
       aggregateId: 'a1',
       eventType: 'OrderCreated',
       createdAt: new Date(),
-      processedAt: null,
+      status: 'PENDING',
+      sentAt: null,
       error: null,
-      retryCount: 4,
     };
 
     const mockPrisma = createMockPrisma([msg]);
@@ -206,5 +204,48 @@ describe('OutboxRelay', () => {
     );
 
     await relay.stop();
+  });
+
+  it('records idle and successfully committed relay intervals', async () => {
+    const message = {
+      id: 'observed', topic: 'test.topic', payload: {}, headers: {}, aggregateId: null,
+      status: 'PENDING', createdAt: new Date(), sentAt: null, error: null,
+    };
+    const prisma = createMockPrisma([]);
+    const effectProbes = { registerEngine: vi.fn(), recordInterval: vi.fn(), recordIntervalFailure: vi.fn() };
+    const relay = new OutboxRelay({ producer: createMockProducer(), services: [{ name: 'svc', prisma: prisma as any }], log: createMockLogger(), pollIntervalMs: 5000, batchSize: 10, maxRetries: 0, dlqEnabled: false, effectProbes: effectProbes as any });
+    await relay.start();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(effectProbes.recordInterval).toHaveBeenCalledWith('svc', 0, 0);
+
+    prisma.outboxMessage.findMany.mockResolvedValueOnce([message]);
+    await (relay as any).pollService({ name: 'svc', prisma });
+    expect(effectProbes.recordInterval).toHaveBeenLastCalledWith('svc', 1, 1);
+    await relay.stop();
+  });
+
+  it('records a failed poll/commit as a probe failure, not zero output', async () => {
+    const prisma = createMockPrisma([]);
+    prisma.outboxMessage.findMany.mockRejectedValue(new Error('db down'));
+    const effectProbes = { registerEngine: vi.fn(), recordInterval: vi.fn(), recordIntervalFailure: vi.fn() };
+    const relay = new OutboxRelay({ producer: createMockProducer(), services: [{ name: 'svc', prisma: prisma as any }], log: createMockLogger(), pollIntervalMs: 5000, batchSize: 10, maxRetries: 0, dlqEnabled: false, effectProbes: effectProbes as any });
+    await (relay as any).pollService({ name: 'svc', prisma });
+    expect(effectProbes.recordIntervalFailure).toHaveBeenCalledWith('svc', expect.any(Error));
+    expect(effectProbes.recordInterval).not.toHaveBeenCalled();
+  });
+
+  it('records an idle interval when a transient fetch failure retries to an empty result', async () => {
+    vi.useFakeTimers();
+    const prisma = createMockPrisma([]);
+    prisma.outboxMessage.findMany
+      .mockRejectedValueOnce(new Error('transient db failure'))
+      .mockResolvedValueOnce([]);
+    const effectProbes = { registerEngine: vi.fn(), recordInterval: vi.fn(), recordIntervalFailure: vi.fn() };
+    const relay = new OutboxRelay({ producer: createMockProducer(), services: [{ name: 'svc', prisma: prisma as any }], log: createMockLogger(), pollIntervalMs: 5000, batchSize: 10, maxRetries: 0, dlqEnabled: false, effectProbes: effectProbes as any });
+    const poll = (relay as any).pollService({ name: 'svc', prisma });
+    await vi.advanceTimersByTimeAsync(500);
+    await poll;
+    expect(effectProbes.recordInterval).toHaveBeenCalledWith('svc', 0, 0);
+    expect(effectProbes.recordIntervalFailure).not.toHaveBeenCalled();
   });
 });

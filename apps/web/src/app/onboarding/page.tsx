@@ -204,9 +204,18 @@ export default function OnboardingPage() {
           ) : null}
         </div>
 
-        <div className="mt-6 text-center">
-          <Link href="/" className="text-xs text-on-surface-variant hover:text-on-surface-variant">
-            Skip onboarding for now
+        {/* Skip is a first-class exit, not fine print. Onboarding is forced on
+            any session without the `nexus_onboarding_seen` cookie — including an
+            established workspace opened in a new browser — so an admin who does
+            not need setup must be able to leave obviously and immediately. The
+            previous version was 12px grey text whose hover state was the SAME
+            colour, giving no affordance at all. */}
+        <div className="mt-6 flex justify-center">
+          <Link
+            href="/"
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-outline-variant bg-surface px-4 text-sm font-semibold text-on-surface transition hover:bg-surface-container-high focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            Skip setup — go to dashboard
           </Link>
         </div>
       </div>

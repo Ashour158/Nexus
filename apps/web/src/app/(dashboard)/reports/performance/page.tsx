@@ -121,39 +121,81 @@ export default function PerformanceDashboardPage() {
       </header>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {reps.map((row: any) => (
-          <div key={row.id} className="rounded-xl border border-outline-variant bg-surface p-4">
-            <div className="flex items-center gap-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-highest text-sm font-semibold">
-                {row.name.split(' ').map((p: string) => p[0]).join('')}
-              </span>
-              <div>
-                <p className="font-semibold text-on-surface">{row.name}</p>
-                <p className="text-xs text-on-surface-variant">{row.won} deals won</p>
+        {reps.map((row: any, index: number) => {
+          // The performance report's rep rows are keyed by `ownerId` and carry
+          // canonical outcome figures (wonAmount/wonDeals). They do NOT carry
+          // `name`, `revenue` or `quota` — reading `row.name.split(...)` threw
+          // and took the whole page down with "Something went wrong".
+          // Render what actually exists; never invent a quota.
+          const displayName: string =
+            row.name ?? row.ownerName ?? row.owner ?? 'Unnamed owner';
+          const initials =
+            displayName
+              .split(/\s+/)
+              .filter(Boolean)
+              .map((p: string) => p[0])
+              .join('')
+              .slice(0, 2)
+              .toUpperCase() || '—';
+          const wonAmount = Number(row.wonAmount ?? row.totalRevenue ?? row.revenue ?? 0);
+          const wonDeals = Number(row.wonDeals ?? row.won ?? 0);
+          // Quota is not part of this payload. Show attainment only when a real
+          // quota exists; otherwise omit the bar rather than divide by undefined.
+          const quota = Number(row.quota ?? 0);
+          const hasQuota = Number.isFinite(quota) && quota > 0;
+          const attainmentPct = hasQuota
+            ? Math.min(100, Math.max(0, (wonAmount / quota) * 100))
+            : null;
+
+          return (
+            <div
+              key={row.id ?? row.ownerId ?? index}
+              className="rounded-xl border border-outline-variant bg-surface p-4"
+            >
+              <div className="flex items-center gap-3">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-highest text-sm font-semibold">
+                  {initials}
+                </span>
+                <div>
+                  <p className="font-semibold text-on-surface">{displayName}</p>
+                  <p className="text-xs text-on-surface-variant">{wonDeals} deals won</p>
+                </div>
+              </div>
+              {attainmentPct !== null ? (
+                <div className="mt-3 h-2 rounded-full bg-surface-container-high">
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${attainmentPct}%` }}
+                  />
+                </div>
+              ) : null}
+              <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                <p>
+                  Won revenue:{' '}
+                  <span className="font-semibold">${wonAmount.toLocaleString()}</span>
+                </p>
+                <p>
+                  Quota:{' '}
+                  <span className="font-semibold">
+                    {hasQuota ? `$${quota.toLocaleString()}` : '—'}
+                  </span>
+                </p>
+                <p>
+                  Open pipeline:{' '}
+                  <span className="font-semibold">
+                    ${Number(row.pipelineValue ?? 0).toLocaleString()}
+                  </span>
+                </p>
+                <p>
+                  Win rate:{' '}
+                  <span className="font-semibold">
+                    {Number(row.winRatePct ?? row.winRate ?? 0).toFixed(0)}%
+                  </span>
+                </p>
               </div>
             </div>
-            <div className="mt-3 h-2 rounded-full bg-surface-container-high">
-              <div
-                className="h-full rounded-full bg-primary"
-                style={{ width: `${Math.min(100, (row.revenue / row.quota) * 100)}%` }}
-              />
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-              <p>
-                Revenue: <span className="font-semibold">${row.revenue.toLocaleString()}</span>
-              </p>
-              <p>
-                Quota: <span className="font-semibold">${row.quota.toLocaleString()}</span>
-              </p>
-              <p>
-                Activities: <span className="font-semibold">{row.activities}</span>
-              </p>
-              <p>
-                Response: <span className="font-semibold">{row.responseHrs}h</span>
-              </p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </section>
 
       <section className="rounded-xl border border-outline-variant bg-surface p-4">

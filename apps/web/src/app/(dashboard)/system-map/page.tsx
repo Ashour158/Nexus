@@ -20,7 +20,17 @@ const statusLabel: Record<ModuleStatus, string> = {
 
 export default function SystemMapPage() {
   const surfaced = CRM_MODULES.filter((module) => module.sidebar).length;
-  const needingBackend = CRM_MODULES.filter((module) => module.status === 'needs-backend').length;
+  const productionReady = CRM_MODULES.filter(
+    (module) => module.status === 'ready' || module.status === 'wired'
+  ).length;
+  const preview = CRM_MODULES.filter((module) => module.status === 'preview').length;
+  // Share of the registry that is actually production-grade. Reported instead of
+  // the old "Needs backend" tile, which was ALWAYS 0 (no module carries that
+  // status) and, sitting beside a "Preview Ready" label, read as "everything is
+  // production-ready" while a third of the registry is preview-only.
+  const productionPct = CRM_MODULES.length
+    ? Math.round((productionReady / CRM_MODULES.length) * 100)
+    : 0;
 
   return (
     <main className="space-y-6 px-6 py-6">
@@ -30,8 +40,9 @@ export default function SystemMapPage() {
           <div>
             <h1 className="text-3xl font-bold text-on-surface">System Map</h1>
             <p className="mt-2 max-w-3xl text-sm text-on-surface-variant">
-              The full module registry for the CRM: every major feature area, the service that powers it,
-              what has depth already, and what still needs backend hardening.
+              The full module registry for the CRM: every major feature area and the service that powers
+              it. Modules marked <span className="font-semibold text-on-surface">Preview</span> are not
+              production-grade — treat them as demonstrations, not supported capability.
             </p>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center">
@@ -43,9 +54,9 @@ export default function SystemMapPage() {
       </header>
 
       <section className="grid gap-3 md:grid-cols-4">
-        <Summary label="Ready/Wired" value={CRM_MODULES.filter((m) => m.status === 'ready' || m.status === 'wired').length} />
-        <Summary label="Preview Ready" value={CRM_MODULES.filter((m) => m.status === 'preview').length} />
-        <Summary label="Needs Backend" value={needingBackend} />
+        <Summary label="Production-ready" value={productionReady} />
+        <Summary label="Preview — not production" value={preview} />
+        <Summary label="Production coverage" value={`${productionPct}%`} />
         <Summary label="Registry Groups" value={CRM_MODULE_GROUPS.length} />
       </section>
 
@@ -125,7 +136,7 @@ function Metric({ label, value }: { label: string; value: number }) {
   );
 }
 
-function Summary({ label, value }: { label: string; value: number }) {
+function Summary({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="rounded-md border border-outline-variant bg-surface p-4 shadow-sm">
       <p className="text-sm font-medium text-on-surface-variant">{label}</p>

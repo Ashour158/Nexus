@@ -80,8 +80,10 @@ test.describe('Accessibility (axe runtime, WCAG 2 A/AA)', () => {
   // Authenticated surfaces — gated behind the middleware cookie fixture.
   test.describe('authenticated surfaces', () => {
     test.beforeEach(async ({ context }) => {
+      // Playwright rejects cookies carrying BOTH url and path; these entries
+      // already declare path, so pair them with domain instead of url.
       await context.addCookies(
-        AUTH_COOKIES.map((c) => ({ ...c, url: 'http://localhost:3000' })),
+        AUTH_COOKIES.map((c) => ({ ...c, domain: 'localhost' })),
       );
     });
 

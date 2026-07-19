@@ -25,7 +25,10 @@
   --md-on-surface-variant: 69 69 90;
   --md-inverse-surface: 47 47 57;
   --md-inverse-on-surface: 243 239 252;
-  --md-outline: 119 117 135;
+  /* #6b6979 — darkened from #777587: this token also renders as small TEXT
+     in list metadata, and 4.26:1 on light surfaces fails WCAG AA (needs 4.5).
+     Now 5.09:1 on the lightest surface (#f8f9fc). */
+  --md-outline: 107 105 121;
   --md-outline-variant: 205 207 224;
 
   /* ---- Primary (Nexus Indigo) ---- */

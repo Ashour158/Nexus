@@ -36,6 +36,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
         position="bottom-right"
         richColors
         closeButton
+        // Sonner's rich-colors error red (#e60000 on #fff0f0) is 4.34:1 —
+        // below the WCAG AA 4.5:1 minimum for small text. Darken the text.
+        style={{ '--error-text': '#b91c1c' } as React.CSSProperties}
         toastOptions={{
           duration: 4000,
           classNames: {

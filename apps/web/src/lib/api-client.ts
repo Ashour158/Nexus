@@ -123,7 +123,12 @@ function isApiError(body: unknown): body is ApiErrorEnvelope {
   );
 }
 
-let refreshPromise: Promise<string> | null = null;
+/**
+ * Single-flight guard for the cookie-backed token refresh. Refresh tokens
+ * rotate server-side, so parallel refreshes would invalidate one another —
+ * every 401 waits on this one promise instead.
+ */
+let refreshPromise: Promise<boolean> | null = null;
 
 function createApiClient(baseURL: string): AxiosInstance {
   const client = axios.create({ baseURL, timeout: 30_000 });
@@ -152,34 +157,34 @@ function createApiClient(baseURL: string): AxiosInstance {
       const body = error.response?.data;
       const originalRequest = error.config;
 
-      if (status === 401 && originalRequest) {
-        const refreshToken = useAuthStore.getState().refreshToken;
-        if (refreshToken) {
-          try {
-            if (!refreshPromise) {
-              refreshPromise = axios
-                .post<{ success: boolean; data?: { accessToken?: string } }>(
-                  `${BASE_URLS.auth}/auth/refresh`,
-                  { refreshToken }
-                )
-                .then((res) => {
-                  const newToken = res.data.data?.accessToken;
-                  if (!newToken) throw new Error('Refresh response missing accessToken');
-                  useAuthStore.getState().setAccessToken(newToken);
-                  return newToken;
-                })
-                .finally(() => {
-                  refreshPromise = null;
-                });
-            }
-            const newAccessToken = await refreshPromise;
-            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-            return client.request(originalRequest);
-          } catch {
-            useAuthStore.getState().clearSession();
-            clearAuthCookie();
+      if (status === 401 && originalRequest && !(originalRequest as { _retried?: boolean })._retried) {
+        // Refresh through the SERVER-SIDE cookie endpoint, not the in-memory
+        // refresh token: after a reload the store is empty by design, so the
+        // old in-memory path could never recover and the ~15m access token
+        // simply died mid-session. `/api/auth/session/refresh` reads the
+        // HttpOnly refresh cookie and rotates both cookies server-side.
+        //
+        // Refresh tokens rotate, so this MUST be single-flight — concurrent
+        // refreshes would invalidate each other and log the user out.
+        try {
+          if (!refreshPromise) {
+            refreshPromise = axios
+              .post<{ success: boolean }>('/api/auth/session/refresh', {})
+              .then(() => true)
+              .finally(() => {
+                refreshPromise = null;
+              });
           }
-        } else {
+          await refreshPromise;
+          // Mark so a still-401 response can't loop forever.
+          (originalRequest as { _retried?: boolean })._retried = true;
+          // No Authorization header is set here on purpose: middleware attaches
+          // the freshly-rotated cookie token when proxying the retry.
+          return client.request(originalRequest);
+        } catch {
+          // Refresh genuinely failed (expired/revoked). The refresh endpoint has
+          // already cleared the HttpOnly cookies; drop local state too so the
+          // app redirects to login instead of looping on dead credentials.
           useAuthStore.getState().clearSession();
           clearAuthCookie();
         }

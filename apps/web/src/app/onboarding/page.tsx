@@ -81,14 +81,14 @@ export default function OnboardingPage() {
   // Mark the wizard as "seen" so middleware stops force-redirecting here — this
   // is what lets the user skip freely without bouncing back into a loop.
   useEffect(() => {
-    document.cookie = 'nexus_onboarding_seen=1; path=/; max-age=31536000; samesite=lax';
+    document.cookie = 'nexus_onboarding_seen=1; path=/; max-age=31536000; samesite=lax; secure';
   }, []);
 
   // If the server-side store already reports onboarding complete (returning
   // user who simply lacked the cookie), flag it and send them into the app.
   useEffect(() => {
     if (state?.completed) {
-      document.cookie = 'nexus_onboarded=1; path=/; max-age=31536000; samesite=lax';
+      document.cookie = 'nexus_onboarded=1; path=/; max-age=31536000; samesite=lax; secure';
       router.replace('/dashboard');
     }
   }, [state?.completed, router]);
@@ -124,7 +124,7 @@ export default function OnboardingPage() {
     } catch {
       // Best-effort: still let the user into the app if persistence fails.
     }
-    document.cookie = 'nexus_onboarded=1; path=/; max-age=31536000; samesite=lax';
+    document.cookie = 'nexus_onboarded=1; path=/; max-age=31536000; samesite=lax; secure';
     router.push('/dashboard');
   }
 

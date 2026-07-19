@@ -26,9 +26,45 @@ type SetSessionFn = (payload: {
   refreshToken?: string;
   userId: string;
   tenantId: string;
+  email?: string;
+  displayName?: string;
   roles?: string[];
   permissions?: string[];
 }) => void;
+
+/**
+ * Build a human-readable display name for the signed-in user.
+ *
+ * Prefers a real name claim when the token carries one (`name`, or
+ * `firstName`/`lastName`); otherwise falls back to the email local-part with
+ * dots/underscores/hyphens/digits-suffix cleaned up and each word title-cased:
+ * `admin@demo.com` → `Admin`, `jane.doe@acme.io` → `Jane Doe`.
+ *
+ * Returns `undefined` when there is nothing human-readable to show — callers
+ * must fall back to email or a neutral label, NEVER to the raw user id (cuid).
+ */
+export function deriveDisplayName(claims: Record<string, unknown>): string | undefined {
+  const titleCase = (value: string) =>
+    value
+      .split(/[\s._-]+/)
+      .filter(Boolean)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ')
+      .trim();
+
+  const name = typeof claims.name === 'string' ? claims.name.trim() : '';
+  if (name) return name;
+
+  const first = typeof claims.firstName === 'string' ? claims.firstName.trim() : '';
+  const last = typeof claims.lastName === 'string' ? claims.lastName.trim() : '';
+  const full = `${first} ${last}`.trim();
+  if (full) return full;
+
+  const email = typeof claims.email === 'string' ? claims.email.trim() : '';
+  const localPart = email.split('@')[0] ?? '';
+  const cleaned = titleCase(localPart);
+  return cleaned || undefined;
+}
 
 /**
  * Run the shared post-auth sequence given the tokens returned by
@@ -54,15 +90,24 @@ export async function establishSession(
     refreshToken,
     userId: String(claims.sub ?? ''),
     tenantId: String(claims.tenantId ?? ''),
+    // Identity metadata for the UI. `email` is a verified claim on the token;
+    // `displayName` is derived from it so greetings/profile never render the
+    // opaque `sub` cuid.
+    email: typeof claims.email === 'string' ? claims.email : undefined,
+    displayName: deriveDisplayName(claims),
     roles: Array.isArray(claims.roles) ? (claims.roles as string[]) : [],
     permissions: Array.isArray(claims.permissions)
       ? (claims.permissions as string[])
       : [],
   });
+  // Hand BOTH tokens to the server-side handler. The refresh token is what lets
+  // /api/auth/session/refresh mint a new access token once the ~15m JWT expires
+  // — without it the cookie session dies silently mid-use and every API call
+  // starts failing while the user still appears signed in.
   await fetch('/api/auth/session', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ accessToken }),
+    body: JSON.stringify({ accessToken, refreshToken }),
   });
-  document.cookie = 'nexus_session=1;path=/;max-age=86400;SameSite=Lax';
+  document.cookie = 'nexus_session=1;path=/;max-age=86400;SameSite=Lax;Secure';
 }

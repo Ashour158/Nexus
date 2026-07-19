@@ -21,7 +21,18 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 
 const TOKEN_COOKIE = 'nexus_token';
-const MAX_AGE_SECONDS = 60 * 60 * 24; // 24h — matches the previous cookie lifetime.
+const REFRESH_COOKIE = 'nexus_refresh';
+/**
+ * Access-token cookie lifetime. The JWT inside expires in ~15m (JWT_EXPIRY), so
+ * this cookie must NOT outlive it by much: a long-lived cookie wrapping a dead
+ * JWT is exactly the failure mode that made every authenticated call fail ~15
+ * minutes into a session while the user still appeared signed in. We keep a
+ * small grace margin so a request in flight at the boundary can still be
+ * refreshed, and `/api/auth/session/refresh` re-issues both cookies.
+ */
+const ACCESS_MAX_AGE_SECONDS = 60 * 20; // 20m — 15m token + grace
+/** Refresh token lives as long as the server-side session (REFRESH_TOKEN_EXPIRY, default 7d). */
+const REFRESH_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
 /** Shared cookie attributes. `secure` is disabled in dev so http://localhost works. */
 const COOKIE_BASE = {
@@ -33,8 +44,12 @@ const COOKIE_BASE = {
 
 export async function POST(req: NextRequest) {
   let accessToken: unknown;
+  let refreshToken: unknown;
   try {
-    ({ accessToken } = (await req.json()) as { accessToken?: unknown });
+    ({ accessToken, refreshToken } = (await req.json()) as {
+      accessToken?: unknown;
+      refreshToken?: unknown;
+    });
   } catch {
     return NextResponse.json(
       { success: false, error: 'Invalid JSON body' },
@@ -54,19 +69,27 @@ export async function POST(req: NextRequest) {
     name: TOKEN_COOKIE,
     value: accessToken,
     ...COOKIE_BASE,
-    maxAge: MAX_AGE_SECONDS,
+    maxAge: ACCESS_MAX_AGE_SECONDS,
   });
+  // The refresh token is what lets `/api/auth/session/refresh` mint a new access
+  // token once the short-lived one expires. It is equally secret, so it gets the
+  // same HttpOnly/Secure/SameSite treatment and is never exposed to client JS.
+  if (typeof refreshToken === 'string' && refreshToken.length > 0) {
+    res.cookies.set({
+      name: REFRESH_COOKIE,
+      value: refreshToken,
+      ...COOKIE_BASE,
+      maxAge: REFRESH_MAX_AGE_SECONDS,
+    });
+  }
   return res;
 }
 
 export async function DELETE() {
   const res = NextResponse.json({ success: true });
-  // Expire the HttpOnly token cookie server-side (client JS cannot clear it).
-  res.cookies.set({
-    name: TOKEN_COOKIE,
-    value: '',
-    ...COOKIE_BASE,
-    maxAge: 0,
-  });
+  // Expire BOTH HttpOnly cookies server-side (client JS cannot clear them).
+  for (const name of [TOKEN_COOKIE, REFRESH_COOKIE]) {
+    res.cookies.set({ name, value: '', ...COOKIE_BASE, maxAge: 0 });
+  }
   return res;
 }

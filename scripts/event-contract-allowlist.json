@@ -1,3 +1,1159 @@
 {
-  "entries": []
+  "entries": [
+    {
+      "category": "unconsumed",
+      "service": "activities-service",
+      "event": "activity.overdue",
+      "topic": "nexus.crm.activities",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "approval-service",
+      "event": "approval.step.advanced",
+      "topic": "nexus.automation.workflows",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "approval-service",
+      "event": "approval.step.delegated",
+      "topic": "nexus.automation.workflows",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "auth-service",
+      "event": "auth.governance.audited",
+      "topic": "nexus.compliance.audit",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "auth-service",
+      "event": "data.ownership.transfer",
+      "topic": "data.ownership.transfer",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "auth-service",
+      "event": "gdpr.export.requested",
+      "topic": "gdpr.export.requested",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "billing-service",
+      "event": "credit_note.issued",
+      "topic": "nexus.finance.invoices",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "billing-service",
+      "event": "payment.received",
+      "topic": "nexus.finance.payments",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "blueprint-service",
+      "event": "blueprint.playbook.created",
+      "topic": "nexus.blueprint.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "blueprint-service",
+      "event": "blueprint.playbook.updated",
+      "topic": "nexus.blueprint.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "blueprint-service",
+      "event": "blueprint.stage.upserted",
+      "topic": "nexus.blueprint.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "blueprint-service",
+      "event": "blueprint.transition.completed",
+      "topic": "nexus.blueprint.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "blueprint-service",
+      "event": "blueprint.transition.created",
+      "topic": "nexus.blueprint.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "blueprint-service",
+      "event": "blueprint.transition.function",
+      "topic": "nexus.blueprint.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "cadence-service",
+      "event": "cadence.enrolled",
+      "topic": "nexus.automation.workflows",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "cadence-service",
+      "event": "cadence.step.failed",
+      "topic": "nexus.automation.workflows",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "cadence-service",
+      "event": "cadence.step.processed",
+      "topic": "nexus.automation.workflows",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "campaign-service",
+      "event": "campaign.member_added",
+      "topic": "nexus.analytics.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "comm-service",
+      "event": "call.logged",
+      "topic": "nexus.comms.calls",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "comm-service",
+      "event": "email.sent",
+      "topic": "nexus.comms.emails",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "comm-service",
+      "event": "whatsapp.sent",
+      "topic": "nexus.comms.calls",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "crm-service",
+      "event": "deal.archived",
+      "topic": "nexus.crm.deals",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "crm-service",
+      "event": "deal.meddic_updated",
+      "topic": "nexus.crm.deals",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "crm-service",
+      "event": "deal.reopened",
+      "topic": "nexus.crm.deals",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "crm-service",
+      "event": "deal.restored",
+      "topic": "nexus.crm.deals",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "crm-service",
+      "event": "deal.team.updated",
+      "topic": "nexus.crm.deals",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "crm-service",
+      "event": "record.reassigned",
+      "topic": "nexus.crm.accounts",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "crm-service",
+      "event": "record.reassigned",
+      "topic": "nexus.crm.contacts",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "crm-service",
+      "event": "record.reassigned",
+      "topic": "nexus.crm.deals",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "crm-service",
+      "event": "record.reassigned",
+      "topic": "nexus.crm.leads",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "crm-service",
+      "event": "records.bulk.reassigned",
+      "topic": "records.bulk.reassigned",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "finance-service",
+      "event": "contract.deleted",
+      "topic": "nexus.finance.contracts",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "finance-service",
+      "event": "subscription.creation_failed",
+      "topic": "nexus.finance.contracts",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "integration-service",
+      "event": "integration.sync.completed",
+      "topic": "nexus.integration.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "integration-service",
+      "event": "integration.sync.failed",
+      "topic": "nexus.integration.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "integration-service",
+      "event": "integration.sync.started",
+      "topic": "nexus.integration.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "notification-service",
+      "event": "whatsapp.received",
+      "topic": "nexus.comms.calls",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "planning-service",
+      "event": "forecast.reviewed",
+      "topic": "nexus.analytics.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "planning-service",
+      "event": "forecast.submitted",
+      "topic": "nexus.analytics.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "portal-service",
+      "event": "portal.case.commented",
+      "topic": "nexus.crm.activities",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "portal-service",
+      "event": "portal.case.submitted",
+      "topic": "nexus.crm.activities",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "portal-service",
+      "event": "portal.deal.registered",
+      "topic": "nexus.crm.leads",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "portal-service",
+      "event": "portal.engagement",
+      "topic": "nexus.crm.activities",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "quotes-service",
+      "event": "order.requested",
+      "topic": "nexus.finance.contracts",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "workflow-service",
+      "event": "journey.enrolled",
+      "topic": "nexus.automation.workflows",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unconsumed",
+      "service": "workflow-service",
+      "event": "workflow.completed",
+      "topic": "nexus.automation.workflows",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unknownTopic",
+      "service": "auth-service",
+      "event": "data.ownership.transfer",
+      "topic": "data.ownership.transfer",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unknownTopic",
+      "service": "auth-service",
+      "event": "gdpr.erasure.requested",
+      "topic": "gdpr.erasure.requested",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unknownTopic",
+      "service": "auth-service",
+      "event": "gdpr.export.requested",
+      "topic": "gdpr.export.requested",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unknownTopic",
+      "service": "crm-service",
+      "event": "records.bulk.reassigned",
+      "topic": "records.bulk.reassigned",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unknownTopic",
+      "service": "knowledge-service",
+      "event": "?",
+      "topic": "nexus.knowledge.articles",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unknownTopic",
+      "service": "knowledge-service",
+      "event": "kb.article.deleted",
+      "topic": "nexus.knowledge.articles",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unknownTopic",
+      "service": "ticket-service",
+      "event": "?",
+      "topic": "nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "campaign.created",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "campaign.launched",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "campaign.status_changed",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "campaign.updated",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "contact.deleted",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "order.created",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "order.updated",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "quote.accepted",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "quote.converted_to_order",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "quote.created",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "quote.created_from_rfq",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "quote.rejected",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "quote.sent",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "subscription.created",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "ticket.assigned",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "ticket.closed",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "ticket.created",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "ticket.reopened",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "ticket.resolved",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "ticket.status_changed",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "analytics-service",
+      "event": "ticket.updated",
+      "topic": "nexus.analytics.events,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.commissions,nexus.finance.contracts,nexus.finance.invoices,nexus.finance.payments,nexus.finance.quotes,nexus.ticket.events",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "billing-service",
+      "event": "subscription.created",
+      "topic": "nexus.finance.contracts",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "cadence-service",
+      "event": "email.received",
+      "topic": "nexus.comms.emails,nexus.crm.activities",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "comm-service",
+      "event": "quote.sent",
+      "topic": "nexus.comms.email-send,nexus.crm.activities,nexus.crm.deals,nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "crm-service",
+      "event": "content.downloaded",
+      "topic": "nexus.crm.activities,nexus.crm.deals,nexus.crm.leads",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "crm-service",
+      "event": "email.opened",
+      "topic": "nexus.crm.activities,nexus.crm.deals,nexus.crm.leads",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "crm-service",
+      "event": "page.viewed",
+      "topic": "nexus.crm.activities,nexus.crm.deals,nexus.crm.leads",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "deals-service",
+      "event": "quote.accepted",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "deals-service",
+      "event": "quote.approved",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "deals-service",
+      "event": "quote.converted_to_order",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "deals-service",
+      "event": "quote.created",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "deals-service",
+      "event": "quote.created_from_rfq",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "deals-service",
+      "event": "quote.expired",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "deals-service",
+      "event": "quote.rejected",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "deals-service",
+      "event": "quote.revision_created",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "deals-service",
+      "event": "quote.sent",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "deals-service",
+      "event": "quote.signature_requested",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "deals-service",
+      "event": "quote.signed",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "deals-service",
+      "event": "quote.submitted_for_approval",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "deals-service",
+      "event": "quote.voided",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "finance-service",
+      "event": "rfq.created",
+      "topic": "nexus.crm.deals,nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "integration-service",
+      "event": "activity.updated",
+      "topic": "nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "notification-service",
+      "event": "quote.accepted",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "notification-service",
+      "event": "quote.rejected",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "notification-service",
+      "event": "quote.sent",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "realtime-service",
+      "event": "lead.deleted",
+      "topic": "nexus.crm.leads",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "realtime-service",
+      "event": "lead.qualified",
+      "topic": "nexus.crm.leads",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "realtime-service",
+      "event": "lead.unqualified",
+      "topic": "nexus.crm.leads",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "realtime-service",
+      "event": "order.created",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "realtime-service",
+      "event": "quote.accepted",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "realtime-service",
+      "event": "quote.converted_to_order",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "realtime-service",
+      "event": "quote.created",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "realtime-service",
+      "event": "quote.document.rendered",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "realtime-service",
+      "event": "quote.duplicated",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "realtime-service",
+      "event": "quote.esign.sent",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "realtime-service",
+      "event": "quote.rejected",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "realtime-service",
+      "event": "quote.sent",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "realtime-service",
+      "event": "quote.updated",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "realtime-service",
+      "event": "quote.voided",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "realtime-service",
+      "event": "rfq.converted_to_quote",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "realtime-service",
+      "event": "rfq.created",
+      "topic": "nexus.finance.quotes",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "search-service",
+      "event": "activity.deleted",
+      "topic": "nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes,nexus.knowledge.articles",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "search-service",
+      "event": "activity.updated",
+      "topic": "nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes,nexus.knowledge.articles",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "search-service",
+      "event": "kb.article.archived",
+      "topic": "nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes,nexus.knowledge.articles",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "search-service",
+      "event": "kb.article.created",
+      "topic": "nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes,nexus.knowledge.articles",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "search-service",
+      "event": "kb.article.published",
+      "topic": "nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes,nexus.knowledge.articles",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "search-service",
+      "event": "kb.article.updated",
+      "topic": "nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes,nexus.knowledge.articles",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "search-service",
+      "event": "quote.accepted",
+      "topic": "nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes,nexus.knowledge.articles",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "search-service",
+      "event": "quote.created",
+      "topic": "nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes,nexus.knowledge.articles",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "search-service",
+      "event": "quote.rejected",
+      "topic": "nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes,nexus.knowledge.articles",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "search-service",
+      "event": "quote.sent",
+      "topic": "nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes,nexus.knowledge.articles",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "search-service",
+      "event": "quote.updated",
+      "topic": "nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes,nexus.knowledge.articles",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "search-service",
+      "event": "quote.voided",
+      "topic": "nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes,nexus.knowledge.articles",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "workflow-service",
+      "event": "custom_button.workflow.trigger",
+      "topic": "nexus.automation.workflows,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes,nexus.platform.notifications",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "workflow-service",
+      "event": "quote.accepted",
+      "topic": "nexus.automation.workflows,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes,nexus.platform.notifications",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "workflow-service",
+      "event": "quote.created",
+      "topic": "nexus.automation.workflows,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes,nexus.platform.notifications",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "workflow-service",
+      "event": "quote.rejected",
+      "topic": "nexus.automation.workflows,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes,nexus.platform.notifications",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unpublished",
+      "service": "workflow-service",
+      "event": "quote.sent",
+      "topic": "nexus.automation.workflows,nexus.crm.accounts,nexus.crm.activities,nexus.crm.contacts,nexus.crm.deals,nexus.crm.leads,nexus.finance.quotes,nexus.platform.notifications",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "audit-consumer",
+      "event": "?",
+      "topic": "{ topic: TOPIC, fromBeginning: false }",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "campaign-service",
+      "event": "?",
+      "topic": "topic",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "campaign-service",
+      "event": "t",
+      "topic": "?",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "chatbot-service",
+      "event": "input.type",
+      "topic": "TOPICS.ACTIVITIES",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "crm-service",
+      "event": "?",
+      "topic": "topic",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "crm-service",
+      "event": "`${input.entityType}.bulk.deleted`",
+      "topic": "`${input.entityType}.bulk.deleted`",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "crm-service",
+      "event": "`${input.entityType}.bulk.updated`",
+      "topic": "`${input.entityType}.bulk.updated`",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "crm-service",
+      "event": "eventType",
+      "topic": "?",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "crm-service",
+      "event": "status === 'QUALIFIED' ? 'lead.qualified' : 'lead.unqualified'",
+      "topic": "TOPICS.LEADS",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "crm-service",
+      "event": "type",
+      "topic": "?",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "data-service",
+      "event": "config.eventType",
+      "topic": "config.topic",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "email-sync-service",
+      "event": "?",
+      "topic": "TOPICS.EMAILS",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "finance-service",
+      "event": "?",
+      "topic": "TOPICS.QUOTES",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "finance-service",
+      "event": "input.type",
+      "topic": "?",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "finance-service",
+      "event": "type",
+      "topic": "TOPICS.QUOTES",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "integration-service",
+      "event": "type",
+      "topic": "?",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "knowledge-service",
+      "event": "?",
+      "topic": "KB_ARTICLES_TOPIC",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "leads-service",
+      "event": "?",
+      "topic": "TOPICS.LEADS",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "metadata-service",
+      "event": "?",
+      "topic": "TOPICS.WORKFLOWS",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "notes-service",
+      "event": "?",
+      "topic": "TOPICS.CONTACTS",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "outbox-relay",
+      "event": "?",
+      "topic": "{ topic, fromBeginning: true }",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "quotes-service",
+      "event": "?",
+      "topic": "TOPICS.QUOTES",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "realtime-service",
+      "event": "`quote.esign.${status}`",
+      "topic": "?",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "realtime-service",
+      "event": "eventType",
+      "topic": "?",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "router-coprocessor",
+      "event": "walk",
+      "topic": "?",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "storage-service",
+      "event": "?",
+      "topic": "TOPICS.INTEGRATION",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "territory-service",
+      "event": "?",
+      "topic": "topic",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "ticket-service",
+      "event": "?",
+      "topic": "TICKET_TOPIC",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "workflow-service",
+      "event": "?",
+      "topic": "AUTOMATION_TOPICS.map((t) => `${t}.dlq`)",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "workflow-service",
+      "event": "?",
+      "topic": "JOURNEY_TOPIC",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "workflow-service",
+      "event": "?",
+      "topic": "TOPICS.NOTIFICATIONS",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "workflow-service",
+      "event": "?",
+      "topic": "TOPICS.WORKFLOWS",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "workflow-service",
+      "event": "t",
+      "topic": "?",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    },
+    {
+      "category": "unsupported",
+      "service": "workflow-service",
+      "event": "type",
+      "topic": "?",
+      "reason": "Baseline accepted 2026-07-19: pre-existing finding tracked in docs/EVENTS.md. New findings must be fixed or explicitly allowlisted with a reason."
+    }
+  ]
 }

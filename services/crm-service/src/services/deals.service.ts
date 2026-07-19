@@ -51,6 +51,70 @@ export function deriveForecastCategory(
   return 'PIPELINE';
 }
 
+/**
+ * Stage → outcome reconciliation (BL-05). A deal's outcome has ONE canonical
+ * source of truth: `status` + `actualCloseDate`. The stage's `isWon`/`isLost`
+ * flags DRIVE that status, so landing in a terminal stage must also close the
+ * deal, and leaving one must reopen it.
+ *
+ * WHY THIS IS SHARED: `moveDealToStage` and `updateDeal` can BOTH change
+ * `stageId`, but only the former reconciled status — so a generic
+ * `PATCH /deals/:id { stageId: <Closed Won> }` parked deals in a won/lost stage
+ * while leaving `status: 'OPEN'` and `actualCloseDate: null`. Downstream engines
+ * then disagreed about the same records (funnel read the stage and saw wins;
+ * win/loss read the status and saw none; commissions never got a `deal.won`).
+ * Both paths now derive the patch here so they cannot drift apart again.
+ *
+ * Returns the field patch to merge into the update, plus which close-lifecycle
+ * event (if any) the caller must publish AFTER the write succeeds.
+ */
+export function deriveStageOutcomeReconciliation(
+  stage: { isWon?: boolean | null; isLost?: boolean | null; probability?: number | null },
+  existing: { status: string; lostReason?: string | null }
+): {
+  patch: Record<string, unknown>;
+  transition: 'won' | 'lost' | 'reopen' | null;
+} {
+  const patch: Record<string, unknown> = {};
+
+  if (stage.isWon) {
+    patch.status = 'WON';
+    patch.actualCloseDate = new Date();
+    patch.probability = 100;
+    patch.forecastCategory = 'CLOSED';
+    return { patch, transition: existing.status !== 'WON' ? 'won' : null };
+  }
+
+  if (stage.isLost) {
+    patch.status = 'LOST';
+    patch.actualCloseDate = new Date();
+    patch.probability = 0;
+    patch.forecastCategory = 'OMITTED';
+    // No reason is supplied on a drag/patch — default one so the record is never
+    // "lost for no stated reason".
+    if (!existing.lostReason) {
+      patch.lostReason = 'Moved to lost stage';
+      patch.closeReason = 'Moved to lost stage';
+    }
+    return { patch, transition: existing.status !== 'LOST' ? 'lost' : null };
+  }
+
+  if (existing.status === 'WON' || existing.status === 'LOST') {
+    // Moved back OUT of a terminal stage: reopen and clear close side-effects.
+    patch.status = 'OPEN';
+    patch.actualCloseDate = null;
+    patch.forecastCategory = deriveForecastCategory(stage.probability);
+    patch.lostReason = null;
+    patch.lostDetail = null;
+    patch.closeReason = null;
+    return { patch, transition: 'reopen' };
+  }
+
+  // Ordinary open→open move: forecast category follows the destination stage.
+  patch.forecastCategory = deriveForecastCategory(stage.probability);
+  return { patch, transition: null };
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 /** Full deal read-shape for detail views (Section 34.2 `GET /deals/:id`). */
@@ -701,12 +765,24 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         }
       }
 
+      // Stage→outcome reconciliation for the generic update path. `updateDeal`
+      // can change `stageId` just like `moveDealToStage`, so it must close/reopen
+      // the deal the same way — otherwise a PATCH parks a deal in Closed Won
+      // while `status` stays OPEN and no `deal.won` is ever published.
+      let stageOutcome: {
+        patch: Record<string, unknown>;
+        transition: 'won' | 'lost' | 'reopen' | null;
+      } | null = null;
+
       // Blueprint validation when stage actually changes
       if (data.stageId && data.stageId !== existing.stageId) {
         const [contacts, activities, targetStage] = await Promise.all([
           prisma.dealContact.findMany({ where: { dealId: id }, include: { contact: true } }),
           prisma.activity.findMany({ where: { dealId: id, tenantId } }),
-          prisma.stage.findFirst({ where: { id: data.stageId, tenantId }, select: { isWon: true, isLost: true } }),
+          prisma.stage.findFirst({
+            where: { id: data.stageId, tenantId },
+            select: { isWon: true, isLost: true, probability: true },
+          }),
         ]);
         const safeContacts = contacts ?? [];
         const safeActivities = activities ?? [];
@@ -720,6 +796,13 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
           completedActivityTypes: safeActivities.filter(a => a.status === 'COMPLETED').map(a => a.type),
           activities: safeActivities.map(a => ({ type: a.type, completed: a.status === 'COMPLETED' })),
         }, { toStageIsTerminal: Boolean(targetStage?.isWon || targetStage?.isLost) });
+
+        if (targetStage) {
+          stageOutcome = deriveStageOutcomeReconciliation(targetStage, {
+            status: existing.status,
+            lostReason: existing.lostReason,
+          });
+        }
       }
 
       // Terminal-state guard (BL-13): a generic update must not silently change
@@ -808,6 +891,15 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         roles
       );
       const safeUpdateData = permResult.update as Prisma.DealUpdateInput;
+
+      // Apply the stage→outcome reconciliation AFTER the FieldPermission pass.
+      // These fields are a SYSTEM invariant derived from the destination stage,
+      // not a caller-supplied write, so they must not be stripped: a rep who
+      // lacks write access to `status` may still legitimately drag a deal into
+      // Closed Won, and the deal must actually close.
+      if (stageOutcome) {
+        Object.assign(safeUpdateData, stageOutcome.patch);
+      }
 
       // Validation rules run against the post-write record. Build the candidate
       // from the raw scalar patch merged onto the existing row, dropping any
@@ -903,6 +995,63 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
             newOwnerId: updated.ownerId,
             previousOwnerId: existing.ownerId ?? null,
             dealName: updated.name,
+          },
+        });
+      }
+
+      // Close-lifecycle events for a stage-driven close via the generic update
+      // path. Without these, a deal patched into Closed Won never reached
+      // finance/analytics/commissions as a win — the read models stayed at zero
+      // while the record itself looked closed. Emitted only on an actual status
+      // TRANSITION, so a repeated PATCH cannot double-count a win.
+      if (stageOutcome?.transition === 'won') {
+        let teamSplits: Array<{
+          userId: string;
+          role: string;
+          splitType: string;
+          splitPercent: number;
+        }> = [];
+        try {
+          const rows = await prisma.dealTeam.findMany({ where: { tenantId, dealId: id } });
+          teamSplits = rows.map((r) => ({
+            userId: r.userId,
+            role: r.role,
+            splitType: r.splitType,
+            splitPercent: Number(r.splitPercent.toFixed(2)),
+          }));
+        } catch {
+          teamSplits = [];
+        }
+        await producer.publish(TOPICS.DEALS, {
+          type: 'deal.won',
+          tenantId,
+          payload: {
+            dealId: updated.id,
+            ownerId: updated.ownerId,
+            accountId: updated.accountId,
+            stageId: updated.stageId,
+            pipelineId: updated.pipelineId,
+            amount: decimalToNumber(updated.amount),
+            currency: updated.currency,
+            expectedCloseDate: updated.expectedCloseDate?.toISOString() ?? null,
+            probability: updated.probability,
+            teamSplits,
+          },
+        });
+      } else if (stageOutcome?.transition === 'lost') {
+        await producer.publish(TOPICS.DEALS, {
+          type: 'deal.lost',
+          tenantId,
+          payload: {
+            dealId: updated.id,
+            ownerId: updated.ownerId,
+            accountId: updated.accountId,
+            stageId: updated.stageId,
+            pipelineId: updated.pipelineId,
+            currency: updated.currency,
+            reason: updated.lostReason ?? 'Moved to lost stage',
+            amount: decimalToNumber(updated.amount),
+            expectedCloseDate: updated.expectedCloseDate?.toISOString() ?? null,
           },
         });
       }
@@ -1068,43 +1217,13 @@ export function createDealsService(prisma: CrmPrisma, producer: NexusProducer) {
         version: { increment: 1 },
       };
 
-      // 'won' | 'lost' | 'reopen' | null — which close-lifecycle event to emit.
-      let statusTransition: 'won' | 'lost' | 'reopen' | null = null;
-
-      if (stage.isWon) {
-        // Mirror markDealWon side-effects so downstream stays consistent.
-        stageData.status = 'WON';
-        stageData.actualCloseDate = new Date();
-        stageData.probability = 100;
-        stageData.forecastCategory = 'CLOSED';
-        if (existing.status !== 'WON') statusTransition = 'won';
-      } else if (stage.isLost) {
-        // Mirror markDealLost side-effects. No reason is supplied on a drag, so
-        // default one when the deal doesn't already carry a lost reason.
-        stageData.status = 'LOST';
-        stageData.actualCloseDate = new Date();
-        stageData.probability = 0;
-        stageData.forecastCategory = 'OMITTED';
-        if (!existing.lostReason) {
-          stageData.lostReason = 'Moved to lost stage';
-          stageData.closeReason = 'Moved to lost stage';
-        }
-        if (existing.status !== 'LOST') statusTransition = 'lost';
-      } else if (existing.status === 'WON' || existing.status === 'LOST') {
-        // Moved OUT of a closed stage back into an open one: reopen the deal and
-        // clear the close side-effects (probability follows the open stage).
-        stageData.status = 'OPEN';
-        stageData.actualCloseDate = null;
-        stageData.forecastCategory = deriveForecastCategory(stage.probability);
-        stageData.lostReason = null;
-        stageData.lostDetail = null;
-        stageData.closeReason = null;
-        statusTransition = 'reopen';
-      } else {
-        // B7: ordinary open→open move — re-derive the forecast category from the
-        // destination stage's probability (COMMIT/BEST_CASE/PIPELINE).
-        stageData.forecastCategory = deriveForecastCategory(stage.probability);
-      }
+      // Shared with `updateDeal` — the SAME derivation drives both stage-change
+      // paths so they can never disagree about whether a deal is closed.
+      const { patch, transition: statusTransition } = deriveStageOutcomeReconciliation(
+        stage,
+        { status: existing.status, lostReason: existing.lostReason }
+      );
+      Object.assign(stageData, patch);
 
       const updated = await prisma.deal.update({
         where: { id },

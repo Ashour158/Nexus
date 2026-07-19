@@ -12,7 +12,7 @@ Restore from backup is recovery, not failover. RPO and RTO are not measured in
 this environment. Measure them with:
 
 ```sh
-ENV_FILE=/etc/nexus/prod.env AGE_IDENTITY_FILE=/root/.config/age/nexus-backup-age-identity.txt sh scripts/nexus-restore-drill.sh /path/to/nexus-backup-YYYYmmddTHHMMSSZ.tar.age
+ENV_FILE=/etc/nexus/prod.env BACKUP_AGE_IDENTITY_FILE=/root/.config/age/nexus-backup-age-identity.txt sh scripts/nexus-restore-drill.sh /path/to/nexus-backup-YYYYmmddTHHMMSSZ.tar.age
 ```
 
 ## Residual Risks

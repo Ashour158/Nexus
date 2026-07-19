@@ -84,7 +84,7 @@ export default function FunnelPage() {
         <div className="rounded-xl border border-outline-variant dark:border-outline-variant bg-surface dark:bg-surface p-6 space-y-4">
           <h2 className="font-semibold text-on-surface ">Stage Breakdown</h2>
           <div className="space-y-3">
-            {data.stages.map((stage) => (
+            {(data.stages ?? []).map((stage) => (
               <div key={stage.stage} className="space-y-1">
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium text-on-surface dark:text-outline">{stage.stage}</span>

@@ -18,10 +18,30 @@ import { resolveUserPermissions } from '../lib/permissions.js';
 import { hashPassword } from '@nexus/security';
 import { randomBytes } from 'node:crypto';
 
-/** User row with role assignments (Section 31.1 relations). */
-export type UserWithRoles = Prisma.UserGetPayload<{
+/**
+ * User row with role assignments (Section 31.1 relations), with the secret
+ * `passwordHash` column stripped. Every read that reaches an API response runs
+ * through `stripHash` so the hash never leaves the data layer.
+ *
+ * NOTE: we sanitize in code rather than via Prisma query-level `omit` because
+ * the auth-client is generated on Prisma 5.22 without the `omitApi` preview
+ * feature — passing `omit` there throws `Unknown argument \`omit\`` at runtime.
+ */
+type FullUserWithRoles = Prisma.UserGetPayload<{
   include: { userRoles: { include: { role: true } } };
 }>;
+export type UserWithRoles = Omit<FullUserWithRoles, 'passwordHash'>;
+
+/** Shared Prisma args: include role assignments (hash stripped afterwards). */
+const SAFE_USER_ARGS = {
+  include: { userRoles: { include: { role: true } } },
+} as const;
+
+/** Drop the secret `passwordHash` column from a user row before it leaves the service. */
+function stripHash<T extends { passwordHash?: unknown }>(row: T): Omit<T, 'passwordHash'> {
+  const { passwordHash: _passwordHash, ...safe } = row;
+  return safe;
+}
 
 /**
  * Whether invites provision a LOCAL account (temp password + forced change) rather
@@ -81,12 +101,12 @@ export function createUsersService(prisma: AuthPrisma) {
   async function getUserById(tenantId: string, id: string): Promise<UserWithRoles> {
     const row = await prisma.user.findFirst({
       where: { id, tenantId },
-      include: { userRoles: { include: { role: true } } },
+      ...SAFE_USER_ARGS,
     });
     if (!row) {
       throw new NotFoundError('User', id);
     }
-    return row;
+    return stripHash(row);
   }
 
   return {
@@ -107,10 +127,10 @@ export function createUsersService(prisma: AuthPrisma) {
           skip: (page - 1) * limit,
           take: limit,
           orderBy: { createdAt: sortDir },
-          include: { userRoles: { include: { role: true } } },
+          ...SAFE_USER_ARGS,
         }),
       ]);
-      return toPaginatedResult(rows, total, page, limit);
+      return toPaginatedResult(rows.map(stripHash), total, page, limit);
     },
 
     getUserById,
@@ -159,10 +179,10 @@ export function createUsersService(prisma: AuthPrisma) {
                 create: uniqueRoleIds.map((roleId) => ({ role: { connect: { id: roleId } } })),
               },
             },
-            include: { userRoles: { include: { role: true } } },
+            ...SAFE_USER_ARGS,
           })
         );
-        return { ...user, temporaryPassword };
+        return { ...stripHash(user), temporaryPassword };
       }
 
       const keycloakId = await createKeycloakRealmUser({
@@ -187,7 +207,7 @@ export function createUsersService(prisma: AuthPrisma) {
                 })),
               },
             },
-            include: { userRoles: { include: { role: true } } },
+            ...SAFE_USER_ARGS,
           });
         });
       } catch (err) {
@@ -212,7 +232,7 @@ export function createUsersService(prisma: AuthPrisma) {
       const updated = await prisma.user.update({
         where: { id_tenantId: { id, tenantId } },
         data,
-        include: { userRoles: { include: { role: true } } },
+        ...SAFE_USER_ARGS,
       });
       return updated;
     },

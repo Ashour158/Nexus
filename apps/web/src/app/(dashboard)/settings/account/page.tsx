@@ -257,39 +257,30 @@ function TeamTab() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Roles & permissions" description="Configure what each role can do.">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-outline-variant">
-                <th className="text-start font-medium text-on-surface-variant py-2 pe-4 w-48">Permission</th>
-                {(roles.length ? roles : [{ id: 'admin', name: 'Admin' }, { id: 'manager', name: 'Manager' }, { id: 'rep', name: 'Rep' }, { id: 'viewer', name: 'Viewer' }]).map((r) => (
-                  <th key={r.id} className="text-center font-medium text-on-surface-variant py-2 px-3">{r.name}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ['View contacts', true, true, true, true],
-                ['Edit contacts', true, true, true, false],
-                ['Delete contacts', true, true, false, false],
-                ['Manage pipelines', true, true, false, false],
-                ['View reports', true, true, true, true],
-                ['Manage team', true, false, false, false],
-                ['Contract access', true, false, false, false],
-              ].map(([label, ...perms]) => (
-                <tr key={String(label)} className="border-b border-outline-variant last:border-0">
-                  <td className="py-2.5 pe-4 text-on-surface">{label}</td>
-                  {perms.map((p, i) => (
-                    <td key={i} className="py-2.5 px-3 text-center">
-                      <span className={`text-base ${p ? 'text-success' : 'text-outline'}`}>{p ? '✓' : '✕'}</span>
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <SectionCard title="Roles & permissions" description="Roles determine what each member can access. Create roles and edit granular permissions on the Roles page.">
+        {roles.length === 0 ? (
+          <p className="text-sm text-on-surface-variant">No roles defined yet.</p>
+        ) : (
+          <ul className="divide-y divide-outline-variant rounded-lg border border-outline-variant">
+            {roles.map((r) => (
+              <li key={r.id} className="flex items-center justify-between px-3 py-2.5">
+                <span className="text-sm font-medium text-on-surface">{r.name}</span>
+                {r.isSystem ? (
+                  <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-xs text-on-surface-variant">System</span>
+                ) : (
+                  <span className="rounded-full bg-primary-container px-2 py-0.5 text-xs text-primary">Custom</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        <Link
+          href="/settings/roles"
+          className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:text-primary"
+        >
+          Manage roles &amp; permissions
+          <ArrowUpRight className="h-4 w-4" />
+        </Link>
       </SectionCard>
     </div>
   );

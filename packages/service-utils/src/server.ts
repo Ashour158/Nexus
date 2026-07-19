@@ -123,11 +123,16 @@ function isPublicRoute(url: string, method: string): boolean {
   if (
     method === 'POST' &&
     (path === '/api/v1/auth/login' ||
+      path === '/api/v1/auth/register' ||
       path === '/api/v1/auth/refresh' ||
       path === '/api/v1/auth/forgot-password' ||
       path === '/api/v1/auth/reset-password' ||
       /^\/api\/v1\/auth\/saml\/callback\/.+/.test(path))
   ) {
+    return true;
+  }
+  /** Public workspace lookup by email — powers the multi-workspace login picker. */
+  if (method === 'GET' && path === '/api/v1/auth/workspaces') {
     return true;
   }
   if (method === 'GET' && (/^\/api\/v1\/auth\/saml\/metadata/.test(path) || /^\/api\/v1\/auth\/saml\/login\/.+/.test(path))) {

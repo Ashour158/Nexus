@@ -22,92 +22,79 @@ function clearAuthCookie() {
 
 const DEV_BFF_URL = process.env.NODE_ENV === 'development' ? 'http://localhost:3000/api' : undefined;
 
+/**
+ * Same-origin BFF fallback for PRODUCTION. A browser can never reach a
+ * `localhost:<port>` service URL, so any client whose `NEXT_PUBLIC_*_URL` is
+ * unset must default to the same-origin `/bff/<domain>` rewrite (see
+ * next.config.mjs) — NOT to localhost. This has bitten prod repeatedly
+ * (Leads/Quotes/Cadences/Territories/Recycle Bin "Network Error"); the guard
+ * lives here so a forgotten env var degrades to a working same-origin proxy
+ * instead of a dead localhost call. Dev behavior is unchanged (localhost /
+ * app-api proxies), because the docker-network rewrite hostnames don't resolve
+ * outside the compose network.
+ */
+const IS_PROD = process.env.NODE_ENV === 'production';
+const bff = (domain: string, devLocal: string): string =>
+  IS_PROD ? `/bff/${domain}` : devLocal;
+
 export const BASE_URLS: Record<string, string> = {
-  crm: DEV_BFF_URL ?? process.env.NEXT_PUBLIC_CRM_URL ?? 'http://localhost:3001/api/v1',
-  finance: process.env.NEXT_PUBLIC_FINANCE_URL ?? 'http://localhost:3002/api/v1',
-  comms: process.env.NEXT_PUBLIC_COMMS_URL ?? 'http://localhost:3009/api/v1',
-  workflow: process.env.NEXT_PUBLIC_WF_URL ?? 'http://localhost:3007/api/v1',
-  // In dev the browser cannot reach the analytics service (:3008) directly, so
-  // route through the Next BFF proxy under /api/analytics (see
-  // app/api/analytics/**). In prod use the service base or an explicit env URL.
+  crm: DEV_BFF_URL ?? process.env.NEXT_PUBLIC_CRM_URL ?? bff('crm', 'http://localhost:3001/api/v1'),
+  finance: process.env.NEXT_PUBLIC_FINANCE_URL ?? bff('finance', 'http://localhost:3002/api/v1'),
+  comms: process.env.NEXT_PUBLIC_COMMS_URL ?? bff('comms', 'http://localhost:3009/api/v1'),
+  workflow: process.env.NEXT_PUBLIC_WF_URL ?? bff('workflow', 'http://localhost:3007/api/v1'),
   analytics:
     (DEV_BFF_URL ? `${DEV_BFF_URL}/analytics` : undefined) ??
     process.env.NEXT_PUBLIC_ANALYTICS_URL ??
-    'http://localhost:3008/api/v1/analytics',
-  auth: process.env.NEXT_PUBLIC_AUTH_URL ?? 'http://localhost:3000/api/v1',
+    bff('analytics', 'http://localhost:3008/api/v1/analytics'),
+  auth: process.env.NEXT_PUBLIC_AUTH_URL ?? bff('auth', 'http://localhost:3000/api/v1'),
   notification:
     process.env.NEXT_PUBLIC_NOTIFICATION_SERVICE_URL ??
     (process.env.NODE_ENV === 'development'
       ? 'http://localhost:3000/api/v1'
-      : 'http://localhost:3003/api/v1'),
-  search: process.env.NEXT_PUBLIC_SEARCH_URL ?? 'http://localhost:3006/api/v1/search',
+      : bff('notification', 'http://localhost:3003/api/v1')),
+  search: process.env.NEXT_PUBLIC_SEARCH_URL ?? bff('search', 'http://localhost:3006/api/v1/search'),
   storage:
-    process.env.NEXT_PUBLIC_STORAGE_URL ?? 'http://localhost:3010/api/v1/storage',
+    process.env.NEXT_PUBLIC_STORAGE_URL ?? bff('storage', 'http://localhost:3010/api/v1/storage'),
   integration:
-    process.env.NEXT_PUBLIC_INTEGRATION_URL ?? 'http://localhost:3012/api/v1',
+    process.env.NEXT_PUBLIC_INTEGRATION_URL ?? bff('integration', 'http://localhost:3012/api/v1'),
   tickets:
-    process.env.NEXT_PUBLIC_TICKET_URL ?? 'http://localhost:3029/api/v1',
+    process.env.NEXT_PUBLIC_TICKET_URL ?? bff('tickets', 'http://localhost:3029/api/v1'),
   campaigns:
-    process.env.NEXT_PUBLIC_CAMPAIGN_URL ?? 'http://localhost:3025/api/v1',
+    process.env.NEXT_PUBLIC_CAMPAIGN_URL ?? bff('campaign', 'http://localhost:3025/api/v1'),
   // All CRM entities now route through crm-service
-  leads:
-    DEV_BFF_URL ?? process.env.NEXT_PUBLIC_CRM_URL ?? 'http://localhost:3001/api/v1',
-  accounts:
-    DEV_BFF_URL ?? process.env.NEXT_PUBLIC_CRM_URL ?? 'http://localhost:3001/api/v1',
-  notes: process.env.NEXT_PUBLIC_CRM_URL ?? 'http://localhost:3001/api/v1',
-  quotes:
-    DEV_BFF_URL ?? process.env.NEXT_PUBLIC_QUOTES_URL ?? 'http://localhost:3033/api/v1',
-  contacts:
-    DEV_BFF_URL ?? process.env.NEXT_PUBLIC_CRM_URL ?? 'http://localhost:3001/api/v1',
-  deals:
-    DEV_BFF_URL ?? process.env.NEXT_PUBLIC_CRM_URL ?? 'http://localhost:3001/api/v1',
-  activities:
-    DEV_BFF_URL ?? process.env.NEXT_PUBLIC_CRM_URL ?? 'http://localhost:3001/api/v1',
-  cadence:
-    DEV_BFF_URL ?? process.env.NEXT_PUBLIC_CADENCE_URL ?? 'http://localhost:3018/api/v1',
-  territory:
-    process.env.NEXT_PUBLIC_TERRITORY_URL ?? 'http://localhost:3019/api/v1',
-  planning:
-    process.env.NEXT_PUBLIC_PLANNING_URL ?? 'http://localhost:3020/api/v1',
-  reporting:
-    process.env.NEXT_PUBLIC_REPORTING_URL ?? 'http://localhost:3021/api/v1',
-  // Saved BI definitions (dashboards + reports). In dev the browser cannot
-  // reach reporting-service (:3021) directly, so route through the Next BFF
-  // proxy at /api/bi (see app/api/bi/[[...path]]). In prod use the service or
-  // an explicit env URL.
+  leads: DEV_BFF_URL ?? process.env.NEXT_PUBLIC_CRM_URL ?? bff('crm', 'http://localhost:3001/api/v1'),
+  accounts: DEV_BFF_URL ?? process.env.NEXT_PUBLIC_CRM_URL ?? bff('crm', 'http://localhost:3001/api/v1'),
+  notes: process.env.NEXT_PUBLIC_CRM_URL ?? bff('crm', 'http://localhost:3001/api/v1'),
+  // Quotes were consolidated onto finance-service (the :3033 quotes-service is
+  // decommissioned); the client rides the finance BFF.
+  quotes: DEV_BFF_URL ?? process.env.NEXT_PUBLIC_QUOTES_URL ?? bff('finance', 'http://localhost:3002/api/v1'),
+  contacts: DEV_BFF_URL ?? process.env.NEXT_PUBLIC_CRM_URL ?? bff('crm', 'http://localhost:3001/api/v1'),
+  deals: DEV_BFF_URL ?? process.env.NEXT_PUBLIC_CRM_URL ?? bff('crm', 'http://localhost:3001/api/v1'),
+  activities: DEV_BFF_URL ?? process.env.NEXT_PUBLIC_CRM_URL ?? bff('crm', 'http://localhost:3001/api/v1'),
+  cadence: DEV_BFF_URL ?? process.env.NEXT_PUBLIC_CADENCE_URL ?? bff('cadence', 'http://localhost:3018/api/v1'),
+  territory: process.env.NEXT_PUBLIC_TERRITORY_URL ?? bff('territory', 'http://localhost:3019/api/v1'),
+  planning: process.env.NEXT_PUBLIC_PLANNING_URL ?? bff('planning', 'http://localhost:3020/api/v1'),
+  reporting: process.env.NEXT_PUBLIC_REPORTING_URL ?? bff('reporting', 'http://localhost:3021/api/v1'),
   bi:
     (DEV_BFF_URL ? `${DEV_BFF_URL}/bi` : undefined) ??
     process.env.NEXT_PUBLIC_BI_URL ??
-    'http://localhost:3021/api/v1/bi',
-  portal:
-    process.env.NEXT_PUBLIC_PORTAL_URL ?? 'http://localhost:3022',
-  knowledge:
-    process.env.NEXT_PUBLIC_KNOWLEDGE_URL ?? 'http://localhost:3023/api/v1',
-  incentive:
-    process.env.NEXT_PUBLIC_INCENTIVE_URL ?? 'http://localhost:3024/api/v1',
-  data:
-    process.env.NEXT_PUBLIC_DATA_URL ?? 'http://localhost:3015/api/v1',
-  // Low-code platform (metadata-service). Base is the BFF root so both
-  // `/custom-modules/**` and `/formula/evaluate` resolve. In dev the browser
-  // cannot reach metadata-service (:3004) directly, so route through the Next
-  // BFF (see app/api/custom-modules/** + app/api/formula/**). In prod use the
-  // service base or an explicit env URL.
+    bff('bi', 'http://localhost:3021/api/v1/bi'),
+  portal: process.env.NEXT_PUBLIC_PORTAL_URL ?? bff('portal', 'http://localhost:3022'),
+  knowledge: process.env.NEXT_PUBLIC_KNOWLEDGE_URL ?? bff('knowledge', 'http://localhost:3023/api/v1'),
+  incentive: process.env.NEXT_PUBLIC_INCENTIVE_URL ?? bff('incentive', 'http://localhost:3024/api/v1'),
+  data: process.env.NEXT_PUBLIC_DATA_URL ?? bff('data', 'http://localhost:3015/api/v1'),
   customModules:
     DEV_BFF_URL ??
     process.env.NEXT_PUBLIC_METADATA_URL ??
-    'http://localhost:3004/api/v1',
-  // CommandCenter journeys (workflow-service). Dev routes through the BFF at
-  // /api/command-center (see app/api/command-center/**).
+    bff('metadata', 'http://localhost:3004/api/v1'),
   commandCenter:
     (DEV_BFF_URL ? `${DEV_BFF_URL}/command-center` : undefined) ??
     process.env.NEXT_PUBLIC_WF_URL ??
-    'http://localhost:3007/api/v1/command-center',
-  // Omnichannel CTI telephony (comm-service). Dev routes through the BFF at
-  // /api/telephony (see app/api/telephony/**).
+    bff('command-center', 'http://localhost:3007/api/v1/command-center'),
   telephony:
     (DEV_BFF_URL ? `${DEV_BFF_URL}/telephony` : undefined) ??
     process.env.NEXT_PUBLIC_COMMS_URL ??
-    'http://localhost:3009/api/v1/telephony',
+    bff('telephony', 'http://localhost:3009/api/v1/telephony'),
 };
 
 interface ApiErrorEnvelope {

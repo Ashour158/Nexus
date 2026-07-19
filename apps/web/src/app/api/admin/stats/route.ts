@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 
 const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://auth-service:3010/api/v1';
-const CRM_URL = process.env.NEXT_PUBLIC_CRM_URL ?? 'http://crm-service:3001/api/v1';
+const CRM_URL = process.env.CRM_SERVICE_URL
+  ? `${process.env.CRM_SERVICE_URL}/api/v1`
+  : process.env.NEXT_PUBLIC_CRM_URL ?? 'http://crm-service:3001/api/v1';
 
 export async function GET(req: NextRequest) {
   try {

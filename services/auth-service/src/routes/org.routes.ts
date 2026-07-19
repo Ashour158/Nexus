@@ -174,7 +174,9 @@ export async function registerOrgRoutes(
             },
           });
 
-          return reply.send({ success: true, data: user });
+          // SECURITY: strip the credential hash before returning the user row.
+          const { passwordHash: _pw, mfaSecret: _mfa, ...safeUser } = user as Record<string, unknown>;
+          return reply.send({ success: true, data: safeUser });
         }
       );
 

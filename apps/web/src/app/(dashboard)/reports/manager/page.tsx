@@ -17,6 +17,7 @@ function heatClass(value: number) {
 export default function ManagerDashboardPage() {
   const roles = useAuthStore((s) => s.roles);
   const hasPermission = useAuthStore((s) => s.hasPermission);
+  const isAdmin = useAuthStore((s) => s.isAdmin);
   const router = useRouter();
 
   const { data: reportData, isLoading, error } = useQuery({
@@ -50,7 +51,7 @@ export default function ManagerDashboardPage() {
 
   const allowed =
     roles.includes('manager') ||
-    roles.includes('admin') ||
+    isAdmin() ||
     hasPermission('reports:read') ||
     (process.env.NODE_ENV === 'development' &&
       process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS !== 'false');

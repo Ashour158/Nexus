@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ArrowLeft, CheckCircle2, FileText, ShieldCheck, Target, UserPlus } from 'lucide-react';
 import type { CreateLeadInput } from '@nexus/validation';
 import { useCreateLead } from '@/hooks/use-leads';
 import { useUsers } from '@/hooks/use-users';
+import { useAuthStore } from '@/stores/auth.store';
 import { notify } from '@/lib/toast';
 import {
   CRMCard,
@@ -81,7 +82,7 @@ const initialDraft: LeadDraft = {
   phone: '',
   company: '',
   jobTitle: '',
-  ownerId: 'dev-admin',
+  ownerId: '',
   source: 'MANUAL',
   rating: 'COLD',
   industry: '',
@@ -99,6 +100,7 @@ export default function NewLeadPage() {
   const router = useRouter();
   const createLead = useCreateLead();
   const users = useUsers();
+  const currentUserId = useAuthStore((s) => s.userId);
   const [draft, setDraft] = useState<LeadDraft>(initialDraft);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -106,6 +108,15 @@ export default function NewLeadPage() {
     const loaded = users.data?.data ?? [];
     return loaded.map((user) => ({ value: user.id, label: `${user.firstName} ${user.lastName}` }));
   }, [users.data]);
+
+  // Default the owner to the signed-in user once the store hydrates, so a lead is
+  // always creatable without hunting the dropdown (replaces the old 'dev-admin'
+  // placeholder that was an invalid owner id in production).
+  useEffect(() => {
+    if (!draft.ownerId && currentUserId) {
+      setDraft((prev) => (prev.ownerId ? prev : { ...prev, ownerId: currentUserId }));
+    }
+  }, [currentUserId, draft.ownerId]);
 
   function update<K extends keyof LeadDraft>(key: K, value: LeadDraft[K]) {
     setDraft((prev) => ({ ...prev, [key]: value }));

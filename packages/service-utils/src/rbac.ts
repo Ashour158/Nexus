@@ -473,6 +473,7 @@ export function requireOwnership(resourceField: string = 'ownerId') {
     const isAdmin =
       checkPermission(user.permissions ?? [], '*') ||
       user.roles?.includes('ADMIN') ||
+      user.roles?.includes('SUPER_ADMIN') ||
       user.roles?.includes('SALES_MANAGER');
     if (isAdmin) return;
 

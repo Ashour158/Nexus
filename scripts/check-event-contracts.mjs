@@ -695,6 +695,21 @@ function analyze(topics, extracted, startup, allowlist) {
   return { publishers, handlers, subscriptions, consumerUnits, activeUnits, findings: active, allowed };
 }
 
+/**
+ * Render a value as a Markdown code span. Values that themselves contain
+ * backticks (template-literal expressions captured from source) need a longer
+ * delimiter run, padded with spaces when the value starts/ends with a backtick
+ * — otherwise the span breaks and markdownlint flags MD038.
+ */
+function codeSpan(value) {
+  const text = String(value);
+  if (!text.includes('`')) return `\`${text}\``;
+  const longestRun = Math.max(...(text.match(/`+/g) ?? ['`']).map((run) => run.length));
+  const delimiter = '`'.repeat(longestRun + 1);
+  const pad = text.startsWith('`') || text.endsWith('`') ? ' ' : '';
+  return `${delimiter}${pad}${text}${pad}${delimiter}`;
+}
+
 function renderDocs(topics, result) {
   const rows = result.publishers
     .slice()
@@ -702,7 +717,7 @@ function renderDocs(topics, result) {
     .map((item) => {
       const consumers = result.activeUnits.flatMap((unit) =>
         unit.handlers.filter((handler) => handler.event === item.event && unit.subscriptions.some((sub) => sub.topic === item.topic)));
-      return `| \`${item.event}\` | \`${item.topic}\` | ${item.service} | ${consumers.map((c) => c.service).sort().join(', ') || '—'} |`;
+      return `| ${codeSpan(item.event)} | ${codeSpan(item.topic)} | ${item.service} | ${consumers.map((c) => c.service).sort().join(', ') || '—'} |`;
     });
   return [
     '# Event contracts',
@@ -718,7 +733,7 @@ function renderDocs(topics, result) {
     '## Allowlisted findings',
     '',
     ...(result.allowed.length
-      ? result.allowed.map((item) => `- ${CATEGORIES[item.category]}: ${item.service} / \`${item.event}\` / \`${item.topic}\` — ${item.reason}`)
+      ? result.allowed.map((item) => `- ${CATEGORIES[item.category]}: ${item.service} / ${codeSpan(item.event)} / ${codeSpan(item.topic)} — ${item.reason}`)
       : ['None.']),
     '',
   ].join('\n');

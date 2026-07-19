@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const CRM_URL = process.env.NEXT_PUBLIC_CRM_URL ?? 'http://localhost:3001/api/v1';
+const CRM_URL = process.env.CRM_SERVICE_URL
+  ? `${process.env.CRM_SERVICE_URL}/api/v1`
+  : process.env.NEXT_PUBLIC_CRM_URL ?? 'http://localhost:3001/api/v1';
 
 async function proxy(
   req: NextRequest,

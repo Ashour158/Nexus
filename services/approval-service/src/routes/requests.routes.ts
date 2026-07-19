@@ -174,7 +174,8 @@ export async function registerRequestsRoutes(
         user.tenantId,
         id,
         user.sub,
-        Array.isArray(user.roles) && user.roles.includes('ADMIN')
+        Array.isArray(user.roles) &&
+          user.roles.some((r) => r === 'ADMIN' || r === 'SUPER_ADMIN')
       );
       if (!data) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Not found or forbidden', requestId: request.id } });
       return reply.send({ success: true, data });

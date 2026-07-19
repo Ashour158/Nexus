@@ -4,7 +4,24 @@ import type { JwtPayload } from '@nexus/shared-types';
 import type { AuthPrisma } from '../prisma.js';
 
 function isAdmin(jwt: JwtPayload): boolean {
-  return jwt.roles.includes('admin') || jwt.roles.includes('ADMIN');
+  // Accept the seeded SUPER_ADMIN role too (was admin/ADMIN only, which 403'd
+  // the super admin on profile/team routes). Case-insensitive.
+  const roles = (jwt.roles ?? []).map((r) => r.toLowerCase());
+  return roles.some((r) => r === 'admin' || r === 'super_admin' || r === 'superadmin');
+}
+
+/**
+ * Strip the secret `passwordHash` (and any legacy secret columns) from a user
+ * row before it leaves the service. SECURITY: every profile/team handler returns
+ * user records straight from Prisma, which includes `passwordHash` unless we
+ * remove it here — a direct credential-hash leak over the API.
+ */
+function stripHash<T>(row: T): T {
+  if (row && typeof row === 'object') {
+    const { passwordHash: _passwordHash, mfaSecret: _mfaSecret, ...safe } = row as Record<string, unknown>;
+    return safe as T;
+  }
+  return row;
 }
 
 export async function registerProfileRoutes(app: FastifyInstance, prisma: AuthPrisma): Promise<void> {
@@ -17,7 +34,7 @@ export async function registerProfileRoutes(app: FastifyInstance, prisma: AuthPr
         include: { profile: true, userRoles: { include: { role: true } } },
       });
       if (!user) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Resource not found', requestId: req.id } });
-      return reply.send({ success: true, data: user });
+      return reply.send({ success: true, data: stripHash(user) });
     });
 
     r.get('/profile/users/:id', async (req, reply) => {
@@ -32,7 +49,7 @@ export async function registerProfileRoutes(app: FastifyInstance, prisma: AuthPr
         include: { profile: true, userRoles: { include: { role: true } } },
       });
       if (!user) return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Resource not found', requestId: req.id } });
-      return reply.send({ success: true, data: user });
+      return reply.send({ success: true, data: stripHash(user) });
     });
 
     const ProfileUpdateSchema = z.object({
@@ -82,7 +99,7 @@ export async function registerProfileRoutes(app: FastifyInstance, prisma: AuthPr
         },
         include: { profile: true },
       });
-      return reply.send({ success: true, data: user });
+      return reply.send({ success: true, data: stripHash(user) });
     });
 
     r.put('/profile/users/:id', async (req, reply) => {
@@ -111,7 +128,7 @@ export async function registerProfileRoutes(app: FastifyInstance, prisma: AuthPr
         },
         include: { profile: true },
       });
-      return reply.send({ success: true, data: user });
+      return reply.send({ success: true, data: stripHash(user) });
     });
 
     r.post('/profile/me/avatar', async (req, reply) => {
@@ -139,7 +156,7 @@ export async function registerProfileRoutes(app: FastifyInstance, prisma: AuthPr
           take: limit,
         }),
       ]);
-      return reply.send({ success: true, data: users, total, page, limit });
+      return reply.send({ success: true, data: users.map(stripHash), total, page, limit });
     });
   }, { prefix: '/api/v1' });
 }

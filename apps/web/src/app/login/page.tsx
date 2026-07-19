@@ -7,23 +7,22 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/stores/auth.store';
+import { establishSession } from '@/lib/auth-session';
 
-/** Decode a JWT payload (base64url) in the browser without a dependency. */
-function decodeJwt(token: string): Record<string, unknown> {
-  try {
-    const part = token.split('.')[1];
-    if (!part) return {};
-    const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
-    return JSON.parse(atob(padded));
-  } catch {
-    return {};
-  }
+interface Workspace {
+  tenantId: string;
+  slug: string;
+  name: string;
 }
 
 /**
  * Minimal email/password login that exchanges credentials with `auth-service`
  * (POST /auth/login). Keycloak SSO will layer on top in a later prompt.
+ *
+ * Multi-workspace: on submit we first look up which workspaces the email has an
+ * account in (GET /auth/workspaces). 0–1 workspaces log in straight through
+ * (the single slug, if any); >1 reveals an inline picker and asks the user to
+ * choose before the login POST goes out with the selected `workspaceSlug`.
  */
 export default function LoginPage() {
   const router = useRouter();
@@ -33,6 +32,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [selectedSlug, setSelectedSlug] = useState('');
 
   useEffect(() => {
     if (
@@ -53,56 +54,82 @@ export default function LoginPage() {
     router.replace(searchParams.get('redirect') ?? '/');
   }, [router, searchParams, setSession]);
 
+  const authUrl =
+    process.env.NEXT_PUBLIC_AUTH_URL ?? 'http://localhost:3010/api/v1';
+
+  /** POST /auth/login (optionally scoped to a workspace) and run the shared
+   * post-auth sequence. Returns nothing; throws are handled by the caller. */
+  const doLogin = async (workspaceSlug?: string) => {
+    const res = await axios.post<{
+      success: boolean;
+      data: { accessToken: string; refreshToken?: string };
+    }>(`${authUrl}/auth/login`, {
+      email,
+      password,
+      ...(workspaceSlug ? { workspaceSlug } : {}),
+    });
+
+    if (!res.data?.success || !res.data.data?.accessToken) {
+      throw new Error('Authentication failed');
+    }
+    const { accessToken, refreshToken } = res.data.data;
+    await establishSession({ accessToken, refreshToken }, setSession);
+    const redirect = searchParams.get('redirect');
+    router.push(redirect ?? '/deals');
+  };
+
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
-      const authUrl =
-        process.env.NEXT_PUBLIC_AUTH_URL ?? 'http://localhost:3010/api/v1';
-      const res = await axios.post<{
-        success: boolean;
-        data: { accessToken: string; refreshToken?: string };
-      }>(`${authUrl}/auth/login`, { email, password });
-
-      if (!res.data?.success || !res.data.data?.accessToken) {
-        throw new Error('Authentication failed');
+      // If the picker is already showing, the user has resolved which workspace
+      // to sign into — go straight to the scoped login.
+      if (workspaces.length > 1) {
+        if (!selectedSlug) {
+          setError('Select a workspace to continue.');
+          return;
+        }
+        await doLogin(selectedSlug);
+        return;
       }
-      const { accessToken, refreshToken } = res.data.data;
-      // Identity/roles/permissions live in the JWT claims, not the response body.
-      const claims = decodeJwt(accessToken);
-      setSession({
-        accessToken,
-        refreshToken,
-        userId: String(claims.sub ?? ''),
-        tenantId: String(claims.tenantId ?? ''),
-        roles: Array.isArray(claims.roles) ? (claims.roles as string[]) : [],
-        permissions: Array.isArray(claims.permissions) ? (claims.permissions as string[]) : [],
-      });
-      // Store the raw JWT ONLY in a server-set HttpOnly, Secure, SameSite=Strict
-      // cookie (RR-H10). This POST hands the token to a server-side route handler
-      // that writes it via `Set-Cookie` — it is never placed in `document.cookie`
-      // or web storage, so client JS (and any XSS) can never read it. The
-      // server-side middleware reads that HttpOnly cookie and attaches
-      // `Authorization: Bearer` when proxying /api/* requests upstream.
-      await fetch('/api/auth/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken }),
-      });
-      // Coarse-grained, non-secret presence flag for middleware route protection.
-      // (Not the token — just "a session exists"; safe to be JS-readable.)
-      document.cookie = 'nexus_session=1;path=/;max-age=86400;SameSite=Lax';
-      const redirect = searchParams.get('redirect');
-      router.push(redirect ?? '/deals');
+
+      // Resolve which workspace(s) this email belongs to before authenticating.
+      // Always 200; degrade gracefully to a plain login if the lookup fails.
+      let found: Workspace[] = [];
+      try {
+        const wsRes = await axios.get<{
+          success: boolean;
+          data: { workspaces: Workspace[] };
+        }>(`${authUrl}/auth/workspaces`, { params: { email } });
+        found = wsRes.data?.data?.workspaces ?? [];
+      } catch {
+        found = [];
+      }
+
+      if (found.length > 1) {
+        // Reveal the picker and ask the user to choose + resubmit.
+        setWorkspaces(found);
+        setSelectedSlug(found[0]?.slug ?? '');
+        return;
+      }
+
+      // 0 or 1 workspace: log in as today (single slug when known).
+      await doLogin(found[0]?.slug);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'Unable to sign in right now';
+        axios.isAxiosError(err) && err.response?.data?.error
+          ? String(err.response.data.error)
+          : err instanceof Error
+            ? err.message
+            : 'Unable to sign in right now';
       setError(message);
     } finally {
       setSubmitting(false);
     }
   };
+
+  const multiWorkspace = workspaces.length > 1;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md items-center px-6">
@@ -123,7 +150,14 @@ export default function LoginPage() {
                 type="email"
                 autoComplete="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  // Email changed — the resolved workspace list no longer applies.
+                  if (workspaces.length > 0) {
+                    setWorkspaces([]);
+                    setSelectedSlug('');
+                  }
+                }}
                 required
               />
             )}
@@ -140,6 +174,34 @@ export default function LoginPage() {
               />
             )}
           </FormField>
+
+          {multiWorkspace ? (
+            <FormField
+              label="Workspace"
+              required
+              hint="Your email has access to multiple workspaces — choose one."
+            >
+              {({ id, describedBy }) => (
+                <select
+                  id={id}
+                  aria-describedby={describedBy}
+                  value={selectedSlug}
+                  onChange={(e) => setSelectedSlug(e.target.value)}
+                  required
+                  className="flex h-10 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1 text-sm text-on-surface focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                >
+                  <option value="" disabled>
+                    Select a workspace…
+                  </option>
+                  {workspaces.map((ws) => (
+                    <option key={ws.tenantId} value={ws.slug}>
+                      {ws.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FormField>
+          ) : null}
         </div>
 
         {error ? (
@@ -150,11 +212,22 @@ export default function LoginPage() {
 
         <div className="mt-6 flex justify-end">
           <Button type="submit" disabled={submitting}>
-            {submitting ? 'Signing in…' : 'Sign in'}
+            {submitting
+              ? 'Signing in…'
+              : multiWorkspace
+                ? 'Continue'
+                : 'Sign in'}
           </Button>
         </div>
 
-        <p className="mt-6 text-center text-xs text-on-surface-variant">
+        <p className="mt-6 text-center text-sm text-on-surface-variant">
+          Need a workspace?{' '}
+          <a href="/register" className="font-medium text-primary underline">
+            Create an account
+          </a>
+        </p>
+
+        <p className="mt-4 text-center text-xs text-on-surface-variant">
           By signing in you agree to our{' '}
           <a href="/legal/terms" className="underline hover:text-on-surface-variant">Terms</a>{' '}and{' '}
           <a href="/legal/privacy" className="underline hover:text-on-surface-variant">Privacy Policy</a>.

@@ -234,7 +234,8 @@ minio_backup() {
   user=${MINIO_ROOT_USER:-nexus}
   alias_name=nexus_src
   export "MC_HOST_${alias_name}=$endpoint_scheme://$(urlencode "$user"):$(urlencode "$MINIO_ROOT_PASSWORD")@$endpoint_host"
-  mc ls "$alias_name" | awk '{print $NF}' | sed 's,/$,,' | LC_ALL=C sort > "$STAGE/minio/buckets.txt"
+  bucket_list=$(mc ls "$alias_name") || die "mc ls failed against source MinIO; not silently backing up zero buckets"
+  printf '%s\n' "$bucket_list" | awk 'NF {print $NF}' | sed 's,/$,,' | LC_ALL=C sort > "$STAGE/minio/buckets.txt"
   printf '[' > "$STAGE/evidence/minio.json"
   first_bucket=1
   while IFS= read -r bucket; do

@@ -4,7 +4,7 @@ set -eu
 usage() {
   cat <<'USAGE'
 Usage:
-  ENV_FILE=/etc/nexus/prod.env BACKUP_AGE_IDENTITY_FILE=/root/.config/age/nexus-backup-age-identity.txt sh scripts/nexus-restore-drill.sh /path/to/nexus-backup-YYYYmmddTHHMMSSZ.tar.age
+  ENV_FILE=/etc/nexus/prod.env BACKUP_AGE_IDENTITY_FILE=/root/.config/sops/age/nexus-prod-keys.txt sh scripts/nexus-restore-drill.sh /path/to/nexus-backup-YYYYmmddTHHMMSSZ.tar.age
 
 Restores one encrypted artifact into scratch targets only, asserts equality with
 the backup manifest, and writes an atomic JSON evidence report. It never writes

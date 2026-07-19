@@ -6,7 +6,7 @@ case "${1:-}" in -h|--help) printf 'Usage: sudo sh scripts/install-backup-timer.
 [ "$(id -u)" -eq 0 ] || die "run as root on the droplet"
 repo=/opt/nexus
 [ -f "$repo/scripts/nexus-backup.sh" ] || die "missing $repo/scripts/nexus-backup.sh"
-ENV_FILE=/etc/nexus/prod.env BACKUP_AGE_IDENTITY_FILE=/root/.config/age/nexus-backup-age-identity.txt sh "$repo/scripts/nexus-backup.sh" --preflight
+ENV_FILE=/etc/nexus/prod.env BACKUP_AGE_IDENTITY_FILE=/root/.config/sops/age/nexus-prod-keys.txt sh "$repo/scripts/nexus-backup.sh" --preflight
 install -d -m 0755 /etc/systemd/system
 install -m 0644 "$repo/infrastructure/systemd/nexus-backup.service" /etc/systemd/system/nexus-backup.service
 install -m 0644 "$repo/infrastructure/systemd/nexus-backup.timer" /etc/systemd/system/nexus-backup.timer

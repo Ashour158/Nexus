@@ -6,7 +6,7 @@ After=docker.service network-online.target
 [Service]
 Type=oneshot
 Environment=ENV_FILE=/etc/nexus/prod.env
-Environment=BACKUP_AGE_IDENTITY_FILE=/root/.config/age/nexus-backup-age-identity.txt
+Environment=BACKUP_AGE_IDENTITY_FILE=/root/.config/sops/age/nexus-prod-keys.txt
 WorkingDirectory=/opt/nexus
 ExecStart=/bin/sh /opt/nexus/scripts/nexus-backup.sh
 UMask=0077

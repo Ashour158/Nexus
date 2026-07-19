@@ -45,11 +45,11 @@ Recover the backup age identity and rclone config from the operator vault. Do
 not print secrets:
 
 ```sh
-install -d -m 700 /root/.config/rclone /root/.config/age
+install -d -m 700 /root/.config/rclone /root/.config/sops/age
 install -m 600 rclone.conf /root/.config/rclone/rclone.conf
-install -m 600 nexus-backup-age-identity.txt /root/.config/age/nexus-backup-age-identity.txt
-export AGE_IDENTITY_FILE=/root/.config/age/nexus-backup-age-identity.txt
-export BACKUP_AGE_IDENTITY_FILE=/root/.config/age/nexus-backup-age-identity.txt
+install -m 600 nexus-prod-keys.txt /root/.config/sops/age/nexus-prod-keys.txt
+export AGE_IDENTITY_FILE=/root/.config/sops/age/nexus-prod-keys.txt
+export BACKUP_AGE_IDENTITY_FILE=/root/.config/sops/age/nexus-prod-keys.txt
 ```
 
 Verify the configured backup prefix and choose the newest usable artifact:
@@ -67,7 +67,7 @@ Run the drill into scratch targets first. This command produces measured
 `RPO_SECONDS` and `RTO_SECONDS`; until it runs, those values are not measured:
 
 ```sh
-ENV_FILE=/etc/nexus/prod.env BACKUP_AGE_IDENTITY_FILE=/root/.config/age/nexus-backup-age-identity.txt sh scripts/nexus-restore-drill.sh /var/tmp/nexus-backup.tar.age
+ENV_FILE=/etc/nexus/prod.env BACKUP_AGE_IDENTITY_FILE=/root/.config/sops/age/nexus-prod-keys.txt sh scripts/nexus-restore-drill.sh /var/tmp/nexus-backup.tar.age
 ```
 
 Abort if the drill report is missing any component evidence or if ClickHouse,
@@ -239,7 +239,7 @@ the incident.
 
 | Metric | Value |
 |---|---|
-| Last restore drill artifact | NOT MEASURED - run `ENV_FILE=/etc/nexus/prod.env BACKUP_AGE_IDENTITY_FILE=/root/.config/age/nexus-backup-age-identity.txt sh scripts/nexus-restore-drill.sh /path/to/nexus-backup-YYYYmmddTHHMMSSZ.tar.age` |
+| Last restore drill artifact | NOT MEASURED - run `ENV_FILE=/etc/nexus/prod.env BACKUP_AGE_IDENTITY_FILE=/root/.config/sops/age/nexus-prod-keys.txt sh scripts/nexus-restore-drill.sh /path/to/nexus-backup-YYYYmmddTHHMMSSZ.tar.age` |
 | RPO_SECONDS | NOT MEASURED - run the restore drill command above |
 | RTO_SECONDS | NOT MEASURED - run the restore drill command above |
 | Postgres evidence | NOT MEASURED - run the restore drill command above |

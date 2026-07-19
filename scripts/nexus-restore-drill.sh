@@ -99,7 +99,12 @@ select coalesce(jsonb_agg(jsonb_build_object('table', table_name, 'rows', rows) 
 verify_postgres() {
   pg_container="$RUN_ID-postgres"; guard_name "$pg_container"
   start_container "$pg_container" -e POSTGRES_PASSWORD=drill -e POSTGRES_USER=drill postgres:16-alpine
-  i=0; until docker exec "$pg_container" pg_isready -U drill >/dev/null 2>&1; do i=$((i + 1)); [ "$i" -lt 60 ] || die "scratch Postgres did not become ready"; sleep 1; done
+  i=0; ok=0
+  until [ "$ok" -ge 3 ]; do
+    if docker exec "$pg_container" psql -U drill -d drill -Atc 'select 1' >/dev/null 2>&1; then ok=$((ok + 1)); else ok=0; fi
+    i=$((i + 1)); [ "$i" -lt 90 ] || die "scratch Postgres did not become ready"
+    sleep 1
+  done
   expected="$SCRATCH/expected-postgres.json"
   actual="$SCRATCH/actual-postgres.json"
   jq -c '[.postgres.databases[] | {name,table_rows:(.table_rows|sort_by(.table))}] | sort_by(.name)' "$MANIFEST" > "$expected"

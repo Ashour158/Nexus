@@ -117,9 +117,11 @@ postgres_backup() {
     -e POSTGRES_USER=drill \
     postgres:16-alpine >/dev/null
   ready=0
-  until docker exec "$PG_VERIFY_CONTAINER" pg_isready -U drill >/dev/null 2>&1; do
+  stable=0
+  until [ "$stable" -ge 3 ]; do
+    if docker exec "$PG_VERIFY_CONTAINER" psql -U drill -d drill -Atc 'select 1' >/dev/null 2>&1; then stable=$((stable + 1)); else stable=0; fi
     ready=$((ready + 1))
-    [ "$ready" -lt 60 ] || die "scratch Postgres did not become ready for dump verification"
+    [ "$ready" -lt 90 ] || die "scratch Postgres did not become ready for dump verification"
     sleep 1
   done
   printf '[' > "$STAGE/evidence/postgres.json"

@@ -161,16 +161,18 @@ export function WidgetChart({
     [rows, dimCol]
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const emitPoint = (payload: any): void => {
+  // Recharts click payloads are loosely typed upstream; accept unknown and
+  // narrow structurally instead of reaching for `any`.
+  const emitPoint = (payload: unknown): void => {
     if (!onPointClick || !dimCol || payload == null) return;
-    const raw = (payload.payload ?? payload).__rawDim;
+    const record = payload as { payload?: Record<string, unknown> } & Record<string, unknown>;
+    const raw = (record.payload ?? record).__rawDim;
     if (raw === undefined) return;
     onPointClick({ dimKey: dimCol.key, value: raw });
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const emitFromChartState = (state: any): void => {
-    emitPoint(state?.activePayload?.[0]?.payload);
+  const emitFromChartState = (state: unknown): void => {
+    const s = state as { activePayload?: Array<{ payload?: unknown }> } | null | undefined;
+    emitPoint(s?.activePayload?.[0]?.payload);
   };
   const clickable = Boolean(onPointClick && dimCol);
   const seriesCursor = clickable ? ('pointer' as const) : undefined;

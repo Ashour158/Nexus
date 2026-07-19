@@ -1,4 +1,47 @@
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
+
+// These are unit tests of the flag logic, not of Redis: replace ioredis with a
+// minimal in-memory implementation of the five commands FeatureFlagService
+// uses so the suite passes on a machine with no Redis running.
+vi.mock('ioredis', () => {
+  class FakeRedis {
+    private store = new Map<string, string>();
+
+    async set(key: string, value: string): Promise<'OK'> {
+      this.store.set(key, value);
+      return 'OK';
+    }
+
+    async get(key: string): Promise<string | null> {
+      return this.store.get(key) ?? null;
+    }
+
+    async del(...keys: string[]): Promise<number> {
+      let n = 0;
+      for (const key of keys) if (this.store.delete(key)) n += 1;
+      return n;
+    }
+
+    async scan(_cursor: string, ...args: (string | number)[]): Promise<[string, string[]]> {
+      const matchIdx = args.indexOf('MATCH');
+      const pattern = matchIdx >= 0 ? String(args[matchIdx + 1]) : '*';
+      const regex = new RegExp(
+        `^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`
+      );
+      return ['0', [...this.store.keys()].filter((k) => regex.test(k))];
+    }
+
+    async mget(...keys: string[]): Promise<(string | null)[]> {
+      return keys.map((k) => this.store.get(k) ?? null);
+    }
+
+    async quit(): Promise<'OK'> {
+      return 'OK';
+    }
+  }
+  return { Redis: FakeRedis, default: FakeRedis };
+});
+
 import { FeatureFlagService } from '../index.js';
 
 const service = new FeatureFlagService();

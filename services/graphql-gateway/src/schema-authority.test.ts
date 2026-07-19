@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const deprecationReason = 'CPQ mutations moved to finance-service transition authority.';
 
+// Resolve relative to this file, not process.cwd(): in the workspace run the
+// worker cwd is the repo root, not services/graphql-gateway.
+const schemasDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'schemas');
+
 function schema(name: string) {
-  return readFileSync(resolve(process.cwd(), 'schemas', `${name}.graphql`), 'utf8');
+  return readFileSync(resolve(schemasDir, `${name}.graphql`), 'utf8');
 }
 
 describe('GraphQL gateway CPQ authority schema', () => {

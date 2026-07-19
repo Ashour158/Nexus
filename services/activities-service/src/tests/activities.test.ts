@@ -49,10 +49,6 @@ vi.mock('../prisma.js', () => ({
   createActivitiesPrisma: vi.fn(() => mocks.prisma),
 }));
 
-vi.mock('../routes/health.routes.js', () => ({
-  registerActivitiesHealthRoutes: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock('../routes/activities.routes.js', () => ({
   registerActivitiesRoutes: vi.fn().mockResolvedValue(undefined),
 }));

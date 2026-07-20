@@ -2,7 +2,17 @@
 
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { Map as MapIcon, MapPin } from 'lucide-react';
+import {
+  CRMEmptyState,
+  CRMErrorState,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMSegmentedControl,
+  CRMSidePanel,
+  CRMStatusBadge,
+  CRMToolbar,
+} from '@/components/ui/crm';
 import { useConfirm } from '@/hooks/use-confirm';
 import { useAuthStore } from '@/stores/auth.store';
 import { useUsers } from '@/hooks/use-users';
@@ -81,38 +91,26 @@ export default function TerritoriesPage() {
   const list = territories ?? [];
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-on-surface">Territories</h1>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            Rule-based routing of leads and accounts to owners
-          </p>
-        </div>
-        {isAdmin && tab === 'territories' ? (
+    <CRMModuleShell>
+      <CRMPageHeader
+        icon={MapIcon}
+        title="Territories"
+        description="Rule-based routing of leads and accounts to owners"
+        actions={isAdmin && tab === 'territories' ? (
           <Button onClick={openCreate}>+ New Territory</Button>
         ) : null}
-      </div>
-
-      <div className="mb-6 flex gap-1 border-b border-outline-variant">
-        {([
-          ['territories', 'Territories'],
-          ['routing-logs', 'Routing Logs'],
-          ['test', 'Test Assignment'],
-        ] as [Tab, string][]).map(([value, label]) => (
-          <button
-            key={value}
-            onClick={() => setTab(value)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-              tab === value
-                ? 'border-primary text-primary'
-                : 'border-transparent text-on-surface-variant hover:text-on-surface'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      />
+      <CRMToolbar>
+        <CRMSegmentedControl
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'territories', label: 'Territories' },
+            { value: 'routing-logs', label: 'Routing Logs' },
+            { value: 'test', label: 'Test Assignment' },
+          ]}
+        />
+      </CRMToolbar>
 
       {tab === 'territories' ? (
         isLoading ? (
@@ -122,18 +120,17 @@ export default function TerritoriesPage() {
             ))}
           </div>
         ) : isError ? (
-          <EmptyState
-            icon="⚠️"
+          <CRMErrorState
             title="Couldn't load territories"
             description="The territory service may be unavailable."
-            cta={{ label: 'Retry', onClick: () => void refetch() }}
+            action={<Button onClick={() => void refetch()}>Retry</Button>}
           />
         ) : list.length === 0 ? (
-          <EmptyState
-            icon="🗺️"
+          <CRMEmptyState
+            icon={MapIcon}
             title="No territories yet"
             description="Create rule-based territories to automatically route leads and accounts to the right owners."
-            cta={isAdmin ? { label: '+ Add Territory', onClick: openCreate } : undefined}
+            action={isAdmin ? <Button onClick={openCreate}>+ Add Territory</Button> : undefined}
           />
         ) : (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -150,13 +147,13 @@ export default function TerritoriesPage() {
                     <h3 className="font-semibold text-on-surface">{t.name}</h3>
                     <div className="flex shrink-0 gap-1">
                       {t.isDefault ? (
-                        <span className="rounded-full bg-warning-container px-2 py-0.5 text-xs text-warning">
+                        <CRMStatusBadge tone="amber">
                           Default
-                        </span>
+                        </CRMStatusBadge>
                       ) : null}
-                      <span className="rounded-full bg-primary-container px-2 py-0.5 text-xs text-primary">
+                      <CRMStatusBadge tone="blue">
                         {TYPE_LABEL[t.type] ?? t.type}
-                      </span>
+                      </CRMStatusBadge>
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-center">
@@ -181,14 +178,9 @@ export default function TerritoriesPage() {
 
             <div className="lg:col-span-1">
               {detail ? (
-                <div className="rounded-xl border border-outline-variant bg-surface p-5">
+                <CRMSidePanel title={detail.name} description={`${TYPE_LABEL[detail.type] ?? detail.type} · priority ${detail.priority}`}>
                   <div className="mb-3 flex items-start justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-on-surface">{detail.name}</h3>
-                      <p className="text-sm text-on-surface-variant">
-                        {TYPE_LABEL[detail.type] ?? detail.type} · priority {detail.priority}
-                      </p>
-                    </div>
+                    <div />
                     {isAdmin ? (
                       <div className="flex gap-1">
                         <Button variant="secondary" size="sm" onClick={() => openEdit(detail)}>
@@ -244,11 +236,9 @@ export default function TerritoriesPage() {
                       </p>
                     )}
                   </div>
-                </div>
+                </CRMSidePanel>
               ) : (
-                <div className="rounded-xl border border-dashed border-outline-variant p-8 text-center text-sm text-on-surface-variant">
-                  Select a territory to view its rules and owners.
-                </div>
+                <CRMEmptyState icon={MapPin} title="Select a territory to view its rules and owners." />
               )}
             </div>
           </div>
@@ -270,6 +260,6 @@ export default function TerritoriesPage() {
       />
 
       {ConfirmDialog}
-    </div>
+    </CRMModuleShell>
   );
 }

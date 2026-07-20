@@ -5,7 +5,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClients } from '@/lib/api-client';
 import { Modal } from '@/components/ui/modal';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { CalendarDays } from 'lucide-react';
+import {
+  CRMCard,
+  CRMEmptyState,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMSidePanel,
+  CRMStatusBadge,
+} from '@/components/ui/crm';
 
 type EventType = 'meeting' | 'task' | 'call' | 'deadline';
 
@@ -74,25 +82,24 @@ export default function CalendarPage() {
   }, [events.data]);
 
   return (
-    <main className="space-y-4 p-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-bold text-on-surface">Calendar</h1>
-          <p className="text-sm text-on-surface-variant">{view} view</p>
-        </div>
-        <div className="flex items-center gap-2">
+    <CRMModuleShell>
+      <CRMPageHeader
+        icon={CalendarDays}
+        title="Calendar"
+        description={`${view} view`}
+        actions={<>
           <select value={view} onChange={(e) => setView(e.target.value as 'day' | 'week' | 'month')} className="rounded border border-outline-variant px-2 py-2 text-sm">
             <option value="day">Day</option><option value="week">Week</option><option value="month">Month</option>
           </select>
-          <button onClick={() => setShowCreate(true)} className="rounded bg-primary px-3 py-2 text-sm font-medium text-white">Create event</button>
-        </div>
-      </header>
+          <button onClick={() => setShowCreate(true)} className="rounded bg-primary px-3 py-2 text-sm font-medium text-on-primary">Create event</button>
+        </>}
+      />
 
-      <section className="rounded-xl border border-outline-variant bg-surface p-4">
+      <CRMCard>
         <div className="mb-3 flex items-center justify-between rounded bg-surface-container-low p-3 text-sm">
           <div>
             <span className="font-medium">Google Calendar</span>{' '}
-            <span className="rounded bg-success-container px-2 py-0.5 text-xs text-on-success-container">Connected</span>
+            <CRMStatusBadge tone="emerald">Connected</CRMStatusBadge>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-on-surface-variant">Last synced: {events.data?.[0]?.syncedAt ? new Date(events.data[0].syncedAt).toLocaleString() : 'Never'}</span>
@@ -120,20 +127,19 @@ export default function CalendarPage() {
             events.isLoading ? (
               <p className="text-sm text-on-surface-variant">Loading...</p>
             ) : (
-              <EmptyState
-                icon="📅"
+              <CRMEmptyState
+                icon={CalendarDays}
                 title="Nothing scheduled"
                 description="No meetings or tasks scheduled for this period"
-                cta={{ label: '+ Add Event', onClick: () => setShowCreate(true) }}
+                action={<button onClick={() => setShowCreate(true)}>+ Add Event</button>}
               />
             )
           ) : null}
         </div>
-      </section>
+      </CRMCard>
 
       {view === 'week' ? (
-        <section className="max-h-[420px] overflow-y-auto rounded-xl border border-outline-variant bg-surface p-4">
-          <h2 className="mb-3 text-sm font-semibold text-on-surface">Week working hours</h2>
+        <CRMCard className="max-h-[420px] overflow-y-auto" title="Week working hours">
           <div className="space-y-0">
             {Array.from({ length: 24 }, (_, hour) => {
               const isWorkingHour = hour >= 8 && hour < 18;
@@ -151,16 +157,15 @@ export default function CalendarPage() {
               );
             })}
           </div>
-        </section>
+        </CRMCard>
       ) : null}
 
       {selected ? (
-        <aside className="rounded-xl border border-outline-variant bg-surface p-4">
-          <h2 className="text-sm font-semibold text-on-surface">Event details</h2>
+        <CRMSidePanel title="Event details">
           <p className="mt-2 text-sm">Activity: {selected.activityId}</p>
           <p className="text-sm text-on-surface-variant">Provider: {selected.provider}</p>
           <p className="text-sm text-on-surface-variant">Synced: {new Date(selected.syncedAt).toLocaleString()}</p>
-        </aside>
+        </CRMSidePanel>
       ) : null}
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Create event" size="xl">
@@ -178,9 +183,9 @@ export default function CalendarPage() {
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" onClick={() => setShowCreate(false)} className="rounded border border-outline-variant px-4 py-2 text-sm text-on-surface">Cancel</button>
-          <button type="button" onClick={() => create.mutate()} disabled={!form.title || !form.date || !form.time || create.isPending} className="rounded bg-primary px-4 py-2 text-sm text-white disabled:opacity-50">Save event</button>
+          <button type="button" onClick={() => create.mutate()} disabled={!form.title || !form.date || !form.time || create.isPending} className="rounded bg-primary px-4 py-2 text-sm text-on-primary disabled:opacity-50">Save event</button>
         </div>
       </Modal>
-    </main>
+    </CRMModuleShell>
   );
 }

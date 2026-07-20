@@ -1,8 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { ExportButton } from '@/components/export/ExportButton';
+import { BookOpen, Search } from 'lucide-react';
+import {
+  CRMEmptyState,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMStatusBadge,
+  CRMToolbar,
+} from '@/components/ui/crm';
 
 interface Article {
   id: string;
@@ -39,24 +46,27 @@ export default function KnowledgePage() {
   };
 
   return (
-    <div className="max-w-3xl p-6">
-      <div className="mb-2 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-on-surface">Knowledge Base</h1>
-        <ExportButton module="knowledge" />
-      </div>
-      <p className="mb-6 text-sm text-on-surface-variant">Sales playbooks, battle cards, and product docs</p>
-      <form onSubmit={handleSearch} className="mb-6 flex gap-2">
+    <CRMModuleShell className="max-w-3xl">
+      <CRMPageHeader
+        icon={BookOpen}
+        title="Knowledge Base"
+        description="Sales playbooks, battle cards, and product docs"
+        actions={<ExportButton module="knowledge" />}
+      />
+      <CRMToolbar>
+      <form onSubmit={handleSearch} className="flex w-full gap-2">
         <input className="flex-1 rounded-lg border border-outline-variant px-3 py-2 text-sm" placeholder="Search articles..." value={query} onChange={(e) => setQuery(e.target.value)} />
-        <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm text-white">Search</button>
+        <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm text-on-primary">Search</button>
       </form>
+      </CRMToolbar>
       {loading ? (
         <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-surface-container-high" />)}</div>
       ) : articles.length === 0 ? (
-        <EmptyState
-          icon="🔍"
+        <CRMEmptyState
+          icon={Search}
           title="No articles found"
           description={`No results for "${query}". Try different keywords`}
-          cta={{ label: 'Clear search', onClick: () => { setQuery(''); fetchArticles(); } }}
+          action={<button onClick={() => { setQuery(''); fetchArticles(); }}>Clear search</button>}
         />
       ) : (
         <div className="space-y-3">
@@ -64,7 +74,7 @@ export default function KnowledgePage() {
             <div key={a.id} className="cursor-pointer rounded-xl border border-outline-variant bg-surface p-4 transition-shadow hover:shadow-sm">
               <div className="flex items-start justify-between">
                 <div>
-                  <span className="rounded-full bg-primary-container px-2 py-0.5 text-xs font-medium text-primary">{a.category}</span>
+                  <CRMStatusBadge tone="blue">{a.category}</CRMStatusBadge>
                   <h3 className="mt-2 font-medium text-on-surface">{a.title}</h3>
                   <p className="mt-1 line-clamp-2 text-sm text-on-surface-variant">{a.content.slice(0, 120)}...</p>
                 </div>
@@ -77,6 +87,6 @@ export default function KnowledgePage() {
           ))}
         </div>
       )}
-    </div>
+    </CRMModuleShell>
   );
 }

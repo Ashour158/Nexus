@@ -1,7 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { Award, Trophy } from 'lucide-react';
+import {
+  CRMCard,
+  CRMEmptyState,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMStatusBadge,
+} from '@/components/ui/crm';
 
 interface Badge {
   id: string;
@@ -59,23 +66,19 @@ export default function IncentivesPage() {
   }, []);
 
   return (
-    <div className="p-6">
-      <h1 className="mb-6 text-2xl font-bold text-on-surface">Incentives & Badges</h1>
+    <CRMModuleShell>
+      <CRMPageHeader icon={Award} title="Incentives & Badges" />
       {loading ? (
         <div className="animate-pulse space-y-3">{[1, 2].map((i) => <div key={i} className="h-24 rounded-xl bg-surface-container-high" />)}</div>
       ) : (
         <>
-          <section className="mb-8">
-            <h2 className="mb-3 font-semibold text-on-surface">Your Badges</h2>
+          <CRMCard className="mb-8" title="Your Badges">
             {badges.length === 0 ? (
-              <div className="rounded-xl bg-surface-container-low py-2">
-                <EmptyState
-                  icon="🏅"
-                  compact
+                <CRMEmptyState
+                  icon={Award}
                   title="No badges yet"
                   description="Close deals to earn your first badge"
                 />
-              </div>
             ) : (
               <div className="grid grid-cols-3 gap-3 md:grid-cols-6">
                 {badges.map((b) => (
@@ -89,18 +92,14 @@ export default function IncentivesPage() {
                 ))}
               </div>
             )}
-          </section>
-          <section>
-            <h2 className="mb-3 font-semibold text-on-surface">Active Contests</h2>
+          </CRMCard>
+          <CRMCard title="Active Contests">
             {contests.length === 0 ? (
-              <div className="rounded-xl bg-surface-container-low py-2">
-                <EmptyState
-                  icon="🏆"
-                  compact
+                <CRMEmptyState
+                  icon={Trophy}
                   title="No active contests"
                   description="Sales contests will appear here when created by an admin"
                 />
-              </div>
             ) : (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {contests.map((c) => (
@@ -113,11 +112,9 @@ export default function IncentivesPage() {
                       {(() => {
                         const active = c.isActive ?? c.status === 'ACTIVE';
                         return (
-                          <span
-                            className={`rounded px-2 py-0.5 text-xs font-medium ${active ? 'bg-success-container text-on-success-container' : 'bg-surface-container-high text-on-surface'}`}
-                          >
+                          <CRMStatusBadge tone={active ? 'emerald' : 'slate'}>
                             {active ? 'ACTIVE' : 'ENDED'}
-                          </span>
+                          </CRMStatusBadge>
                         );
                       })()}
                     </div>
@@ -139,10 +136,10 @@ export default function IncentivesPage() {
                 ))}
               </div>
             )}
-          </section>
+          </CRMCard>
         </>
       )}
-    </div>
+    </CRMModuleShell>
   );
 }
 

@@ -3,6 +3,17 @@
 import dynamic from 'next/dynamic';
 import { useMemo, useState, type JSX } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { BarChart3, FileText, MessageSquare, Settings } from 'lucide-react';
+import {
+  CRMCard,
+  CRMMetricCard,
+  CRMMetricGrid,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMSegmentedControl,
+  CRMTableShell,
+  CRMToolbar,
+} from '@/components/ui/crm';
 
 const ConversationsBarChart = dynamic(() => import('./charts').then((m) => m.ConversationsBarChart), { ssr: false });
 
@@ -55,60 +66,59 @@ export default function ChatbotPage(): JSX.Element {
   }, [convRows]);
 
   return (
-    <main className="space-y-4 px-6 py-6">
-      <h1 className="text-2xl font-bold">Chatbot</h1>
-      <div className="flex gap-1 border-b border-outline-variant">
-        {(['conversations', 'configuration', 'analytics'] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === t ? 'border-outline font-semibold' : 'border-transparent text-on-surface-variant'}`}>{t[0].toUpperCase() + t.slice(1)}</button>
-        ))}
-      </div>
+    <CRMModuleShell>
+      <CRMPageHeader icon={MessageSquare} title="Chatbot" />
+      <CRMToolbar>
+        <CRMSegmentedControl
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'conversations', label: 'Conversations', icon: MessageSquare },
+            { value: 'configuration', label: 'Configuration', icon: Settings },
+            { value: 'analytics', label: 'Analytics', icon: BarChart3 },
+          ]}
+        />
+      </CRMToolbar>
 
       {tab === 'conversations' ? (
-        <div className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
+        <CRMTableShell>
           <table className="w-full text-sm">
             <thead className="bg-surface-container-low text-start text-xs uppercase text-on-surface-variant"><tr><th className="px-3 py-2">Channel</th><th className="px-3 py-2">Customer ID</th><th className="px-3 py-2">State</th><th className="px-3 py-2">Last Activity</th></tr></thead>
             <tbody className="divide-y divide-outline-variant">{convRows.map((c) => <tr key={c.id}><td className="px-3 py-2">{c.channel}</td><td className="px-3 py-2">{c.externalId}</td><td className="px-3 py-2">{c.state}</td><td className="px-3 py-2">{new Date(c.lastMessageAt).toLocaleString()}</td></tr>)}</tbody>
           </table>
-        </div>
+        </CRMTableShell>
       ) : null}
 
       {tab === 'configuration' ? (
         <div className="grid gap-4 lg:grid-cols-2">
-          <section className="space-y-2 rounded-lg border border-outline-variant bg-surface p-4">
-            <h2 className="font-semibold">WhatsApp</h2>
+          <CRMCard title="WhatsApp">
             <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={waPhoneId} onChange={(e) => setWaPhoneId(e.target.value)} placeholder="Phone ID" />
             <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={waAccessToken} onChange={(e) => setWaAccessToken(e.target.value)} type="password" placeholder="Access Token" />
             <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={waVerifyToken} onChange={(e) => setWaVerifyToken(e.target.value)} placeholder="Verify Token" />
             <p className="text-xs text-on-surface-variant">Webhook URL: /api/v1/webhooks/whatsapp</p>
-          </section>
-          <section className="space-y-2 rounded-lg border border-outline-variant bg-surface p-4">
-            <h2 className="font-semibold">Telegram</h2>
+          </CRMCard>
+          <CRMCard title="Telegram">
             <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={tgToken} onChange={(e) => setTgToken(e.target.value)} type="password" placeholder="Bot Token" />
             <p className="text-xs text-on-surface-variant">Webhook URL: /api/v1/webhooks/telegram</p>
-          </section>
+          </CRMCard>
         </div>
       ) : null}
 
       {tab === 'analytics' ? (
         <div className="space-y-4">
-          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <Metric label="Total Conversations" value={String(analytics.total)} />
-            <Metric label="Quotes Created via Bot" value={String(analytics.quotesCreated)} />
-            <Metric label="Conversion Rate" value={`${analytics.conversionRate.toFixed(1)}%`} />
-            <Metric label="Avg Messages per Quote" value={analytics.avgMsgsPerQuote.toFixed(1)} />
-          </section>
-          <section className="rounded-lg border border-outline-variant bg-surface p-4">
-            <h2 className="mb-2 text-sm font-semibold">Conversations per day (14d)</h2>
+          <CRMMetricGrid className="md:grid-cols-2 xl:grid-cols-4">
+            <CRMMetricCard icon={MessageSquare} label="Total Conversations" value={analytics.total} />
+            <CRMMetricCard icon={FileText} label="Quotes Created via Bot" value={analytics.quotesCreated} tone="emerald" />
+            <CRMMetricCard icon={BarChart3} label="Conversion Rate" value={`${analytics.conversionRate.toFixed(1)}%`} tone="amber" />
+            <CRMMetricCard icon={MessageSquare} label="Avg Messages per Quote" value={analytics.avgMsgsPerQuote.toFixed(1)} tone="orange" />
+          </CRMMetricGrid>
+          <CRMCard title="Conversations per day (14d)">
             <div className="h-72">
               <ConversationsBarChart data={analytics.byDay.slice(-14)} />
             </div>
-          </section>
+          </CRMCard>
         </div>
       ) : null}
-    </main>
+    </CRMModuleShell>
   );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-lg border border-outline-variant bg-surface p-3"><p className="text-xs uppercase text-on-surface-variant">{label}</p><p className="mt-1 text-xl font-bold">{value}</p></div>;
 }

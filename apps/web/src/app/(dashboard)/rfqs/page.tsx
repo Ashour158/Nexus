@@ -5,8 +5,16 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth.store';
 import { notify } from '@/lib/toast';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { ExportButton } from '@/components/export/ExportButton';
+import { ClipboardList } from 'lucide-react';
+import {
+  CRMCard,
+  CRMEmptyState,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMStatusBadge,
+  CRMTableShell,
+} from '@/components/ui/crm';
 
 type RFQ = {
   id: string;
@@ -53,27 +61,28 @@ export default function RFQsPage(): JSX.Element {
   });
 
   return (
-    <main className="space-y-4 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">RFQs</h1>
-        <ExportButton module="rfqs" />
-      </div>
+    <CRMModuleShell>
+      <CRMPageHeader
+        icon={ClipboardList}
+        title="RFQs"
+        actions={<ExportButton module="rfqs" />}
+      />
 
-      <section className="rounded-lg border bg-surface p-4">
+      <CRMCard>
         <div className="flex gap-2">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="flex-1 rounded border px-3 py-2 text-sm"
+            className="flex-1 rounded border border-outline-variant px-3 py-2 text-sm"
             placeholder="RFQ title"
           />
-          <button onClick={() => create.mutate()} className="rounded bg-primary px-3 py-2 text-sm text-white">
+          <button onClick={() => create.mutate()} className="rounded bg-primary px-3 py-2 text-sm text-on-primary">
             Create RFQ
           </button>
         </div>
-      </section>
+      </CRMCard>
 
-      <section className="rounded-lg border bg-surface p-2">
+      <CRMTableShell>
         <table className="w-full text-sm">
           <thead className="text-start text-xs uppercase text-on-surface-variant">
             <tr>
@@ -86,13 +95,13 @@ export default function RFQsPage(): JSX.Element {
           </thead>
           <tbody>
             {(list.data ?? []).map((row) => (
-              <tr key={row.id} className="border-t">
+              <tr key={row.id} className="border-t border-outline-variant">
                 <td className="px-3 py-2">{row.rfqNumber}</td>
                 <td className="px-3 py-2">{row.title ?? row.name ?? 'Untitled RFQ'}</td>
-                <td className="px-3 py-2">{row.status}</td>
+                <td className="px-3 py-2"><CRMStatusBadge>{row.status}</CRMStatusBadge></td>
                 <td className="px-3 py-2">{row.currency}</td>
                 <td className="px-3 py-2 text-end">
-                  <Link href={`/rfqs/${row.id}`} className="rounded border px-2 py-1 text-xs">
+                  <Link href={`/rfqs/${row.id}`} className="rounded border border-outline-variant px-2 py-1 text-xs">
                     Open
                   </Link>
                 </td>
@@ -101,20 +110,19 @@ export default function RFQsPage(): JSX.Element {
             {(list.data ?? []).length === 0 ? (
               <tr>
                 <td colSpan={5} className="py-8">
-                  <EmptyState
-                    icon="📋"
+                  <CRMEmptyState
+                    icon={ClipboardList}
                     title="No RFQs yet"
                     description="Create your first Request for Quotation to start procurement"
-                    cta={{ label: '+ New RFQ', onClick: () => create.mutate() }}
-                    compact
+                    action={<button onClick={() => create.mutate()}>+ New RFQ</button>}
                   />
                 </td>
               </tr>
             ) : null}
           </tbody>
         </table>
-      </section>
-    </main>
+      </CRMTableShell>
+    </CRMModuleShell>
   );
 }
 

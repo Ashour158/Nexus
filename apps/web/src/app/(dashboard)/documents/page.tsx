@@ -3,10 +3,18 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { File, FileText, Sheet, Loader2 } from 'lucide-react';
+import { File, FileText, Grid2X2, List, Sheet, Loader2 } from 'lucide-react';
 import { DocumentUpload } from '@/components/documents/DocumentUpload';
 import { apiClients } from '@/lib/api-client';
 import { formatDate } from '@/lib/format';
+import {
+  CRMEmptyState,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMSegmentedControl,
+  CRMTableShell,
+  CRMToolbar,
+} from '@/components/ui/crm';
 
 interface FileRecord {
   id: string;
@@ -46,26 +54,24 @@ export default function DocumentsPage() {
   const docs = data ?? [];
 
   return (
-    <main className="space-y-4 p-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold text-on-surface">Document Library</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setView('grid')}
-            className={`rounded px-3 py-2 text-sm ${view === 'grid' ? 'bg-inverse-surface text-white' : 'border border-outline-variant'}`}
-          >
-            Grid
-          </button>
-          <button
-            onClick={() => setView('list')}
-            className={`rounded px-3 py-2 text-sm ${view === 'list' ? 'bg-inverse-surface text-white' : 'border border-outline-variant'}`}
-          >
-            List
-          </button>
-        </div>
-      </header>
+    <CRMModuleShell>
+      <CRMPageHeader
+        icon={FileText}
+        title="Document Library"
+        actions={
+          <CRMSegmentedControl
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'grid', label: 'Grid', icon: Grid2X2 },
+              { value: 'list', label: 'List', icon: List },
+            ]}
+          />
+        }
+      />
 
-      <div className="rounded-xl border border-outline-variant bg-surface p-3 flex flex-wrap gap-2 text-sm">
+      <CRMToolbar>
+        <div className="flex w-full flex-wrap gap-2 text-sm">
         <select
           value={entityTypeFilter}
           onChange={(e) => setEntityTypeFilter(e.target.value)}
@@ -84,7 +90,8 @@ export default function DocumentsPage() {
         >
           Refresh
         </button>
-      </div>
+        </div>
+      </CRMToolbar>
 
       <DocumentUpload />
 
@@ -93,10 +100,11 @@ export default function DocumentsPage() {
           <Loader2 className="h-6 w-6 animate-spin text-on-surface-variant" />
         </div>
       ) : docs.length === 0 ? (
-        <div className="rounded-xl border border-outline-variant bg-surface p-8 text-center">
-          <p className="text-sm text-on-surface-variant">No documents uploaded yet.</p>
-          <p className="mt-1 text-xs text-on-surface-variant">Upload a file above to get started.</p>
-        </div>
+        <CRMEmptyState
+          icon={FileText}
+          title="No documents uploaded yet."
+          description="Upload a file above to get started."
+        />
       ) : view === 'grid' ? (
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {docs.map((d) => (
@@ -115,7 +123,7 @@ export default function DocumentsPage() {
           ))}
         </section>
       ) : (
-        <section className="overflow-x-auto rounded-xl border border-outline-variant bg-surface">
+        <CRMTableShell>
           <table className="min-w-full text-sm">
             <thead className="bg-surface-container-low text-start text-xs uppercase tracking-wide text-on-surface-variant">
               <tr>
@@ -142,8 +150,8 @@ export default function DocumentsPage() {
               ))}
             </tbody>
           </table>
-        </section>
+        </CRMTableShell>
       )}
-    </main>
+    </CRMModuleShell>
   );
 }

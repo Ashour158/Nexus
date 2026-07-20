@@ -1,6 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { BarChart3 } from 'lucide-react';
+import {
+  CRMEmptyState,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMSidePanel,
+  CRMTableShell,
+} from '@/components/ui/crm';
 
 interface ReportData {
   id: string;
@@ -29,15 +37,27 @@ export default function ReportingPage() {
   }, []);
 
   const handleSelectReport = async (report: ReportData) => {
-    const res = await fetch(`/api/reporting/reports/${report.id}`);
-    const full = await res.json();
-    setActiveReport(full);
+    // Show the list row immediately so the panel reflects the click even if the
+    // run below is slow or fails — previously a failed drill-in left the
+    // previous report on screen with no indication anything had happened.
+    setActiveReport(report);
+    try {
+      const res = await fetch(`/api/reporting/reports/${report.id}`);
+      if (!res.ok) return;
+      const full = await res.json();
+      // Unwrap the envelope. Storing `full` put { success, data } into state, so
+      // every field read (`activeReport.rows`, `.name`) was undefined and the
+      // table always fell through to its "no data" branch.
+      if (full?.data) setActiveReport(full.data);
+    } catch {
+      /* keep the list row on screen; the panel's empty state covers it */
+    }
   };
 
   return (
-    <div className="flex gap-6 p-6">
-      <div className="w-64 shrink-0">
-        <h2 className="mb-3 text-sm font-semibold text-on-surface">Reports</h2>
+    <CRMModuleShell
+      sidebar={
+      <CRMSidePanel title="Reports">
         <div className="space-y-1">
           {loading
             ? [1, 2, 3].map((i) => <div key={i} className="h-10 animate-pulse rounded-lg bg-surface-container-high" />)
@@ -56,26 +76,28 @@ export default function ReportingPage() {
               ))}
           {!loading && reports.length === 0 ? <p className="px-2 text-xs text-on-surface-variant">No reports yet</p> : null}
         </div>
-      </div>
-
-      <div className="flex-1">
+      </CRMSidePanel>
+      }
+    >
         {!activeReport ? (
-          <div className="py-16 text-center">
-            <p className="mb-2 text-4xl">📊</p>
-            <p className="font-medium text-on-surface-variant">Select a report</p>
-            <p className="mt-1 text-sm text-on-surface-variant">Choose a report from the sidebar to view its data</p>
-          </div>
+          <>
+            <CRMPageHeader icon={BarChart3} title="Reports" />
+            <CRMEmptyState
+              icon={BarChart3}
+              title="Select a report"
+              description="Choose a report from the sidebar to view its data"
+            />
+          </>
         ) : (
           <div>
-            <div className="mb-4">
-              <h1 className="text-xl font-bold text-on-surface">{activeReport.name}</h1>
-              {activeReport.description ? <p className="mt-1 text-sm text-on-surface-variant">{activeReport.description}</p> : null}
-              <p className="mt-1 text-xs text-on-surface-variant">
-                Updated {new Date(activeReport.updatedAt).toLocaleDateString()}
-              </p>
-            </div>
+            <CRMPageHeader
+              icon={BarChart3}
+              title={activeReport.name}
+              description={activeReport.description}
+              badges={<span className="text-xs text-on-surface-variant">Updated {new Date(activeReport.updatedAt).toLocaleDateString()}</span>}
+            />
             {activeReport.data && activeReport.data.length > 0 ? (
-              <div className="overflow-x-auto rounded-xl border border-outline-variant bg-surface">
+              <CRMTableShell className="mt-6">
                 <table className="w-full text-sm">
                   <thead className="border-b border-outline-variant bg-surface-container-low">
                     <tr>
@@ -98,16 +120,12 @@ export default function ReportingPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </CRMTableShell>
             ) : (
-              <div className="rounded-xl bg-surface-container-low py-12 text-center">
-                <p className="mb-2 text-3xl">📭</p>
-                <p className="text-sm text-on-surface-variant">No data in this report yet</p>
-              </div>
+              <CRMEmptyState icon={BarChart3} title="No data in this report yet" />
             )}
           </div>
         )}
-      </div>
-    </div>
+    </CRMModuleShell>
   );
 }

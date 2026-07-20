@@ -2,11 +2,17 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight, Settings } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LifeBuoy, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { FilterBar } from '@/components/ui/filter-bar';
-import { EmptyState } from '@/components/ui/EmptyState';
+import {
+  CRMEmptyState,
+  CRMErrorState,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMToolbar,
+} from '@/components/ui/crm';
 import { EditableSelectCell } from '@/components/ui/editable-cell';
 import { SavedViewsControl } from '@/components/crm/SavedViewsControl';
 import { ExportButton } from '@/components/export/ExportButton';
@@ -66,17 +72,12 @@ export default function TicketsPage() {
   const hasMore = rows.length === PAGE_SIZE;
 
   return (
-    <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8" style={{ backgroundColor: 'var(--bg-secondary)' }}>
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-            Tickets
-          </h1>
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            Track support cases, SLAs, and customer conversations
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
+    <CRMModuleShell>
+      <CRMPageHeader
+        icon={LifeBuoy}
+        title="Tickets"
+        description="Track support cases, SLAs, and customer conversations"
+        actions={<>
           <ExportButton module="tickets" filters={{ status, priority, assigneeId, search }} />
           <SavedViewsControl
             entityType="ticket"
@@ -99,11 +100,11 @@ export default function TicketsPage() {
           <Button type="button" onClick={() => setCreateOpen(true)}>
             New ticket
           </Button>
-        </div>
-      </header>
+        </>}
+      />
 
       <div className="space-y-4">
-        <FilterBar
+        <CRMToolbar><FilterBar
           searchPlaceholder="Search by subject, number, description…"
           searchValue={search}
           onSearchChange={(v) => {
@@ -149,15 +150,10 @@ export default function TicketsPage() {
               },
             },
           ]}
-        />
+        /></CRMToolbar>
 
         {ticketsQuery.isError ? (
-          <div
-            role="alert"
-            className="rounded-md border border-error/40 bg-error-container p-4 text-sm text-on-error-container "
-          >
-            Failed to load tickets. Try refreshing.
-          </div>
+          <CRMErrorState title="Failed to load tickets." description="Try refreshing." />
         ) : null}
 
         <DataTable
@@ -260,11 +256,11 @@ export default function TicketsPage() {
             },
           ]}
           emptyState={
-            <EmptyState
-              icon="🎫"
+            <CRMEmptyState
+              icon={LifeBuoy}
               title="No tickets found"
               description="Adjust your filters or create a new ticket to get started."
-              cta={{ label: 'New ticket', onClick: () => setCreateOpen(true) }}
+              action={<Button onClick={() => setCreateOpen(true)}>New ticket</Button>}
             />
           }
         />
@@ -301,6 +297,6 @@ export default function TicketsPage() {
       </div>
 
       <CreateTicketModal open={createOpen} onClose={() => setCreateOpen(false)} />
-    </main>
+    </CRMModuleShell>
   );
 }

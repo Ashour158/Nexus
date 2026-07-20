@@ -27,7 +27,17 @@ import {
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
-import { EmptyState } from '@/components/dashboard/EmptyState';
+import {
+  CRMCard,
+  CRMEmptyState,
+  CRMMetricCard,
+  CRMMetricGrid,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMSidePanel,
+  CRMStatusBadge,
+  CRMTableShell,
+} from '@/components/ui/crm';
 import { formatCurrency, formatDate } from '@/lib/format';
 
 type DealStatus = 'CLOSED WON' | 'IN PROGRESS' | 'PENDING APPROVAL' | 'CLOSED LOST';
@@ -119,8 +129,8 @@ export default function ReportsPage(): ReactElement {
 
   if (error || performanceData.length === 0) {
     return (
-      <EmptyState
-        icon={<BarChart3 className="h-5 w-5" />}
+      <CRMEmptyState
+        icon={BarChart3}
         title="Reports data not yet available"
         description="The reporting service is not configured or returned no data."
       />
@@ -128,21 +138,21 @@ export default function ReportsPage(): ReactElement {
   }
 
   return (
-    <div className="grid min-h-[calc(100vh-8rem)] gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
-      <aside className="rounded-xl border border-[#e7edf3] bg-surface p-5 shadow-sm xl:sticky xl:top-24 xl:self-start">
+    <CRMModuleShell
+      sidebar={
+      <CRMSidePanel title="Create Report" description="Report builder" className="xl:sticky xl:top-24">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary-container text-[#4f46e5]">
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary-container text-primary">
             <FileBarChart className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-xs font-bold uppercase text-[#4f46e5]">Report builder</p>
-            <h2 className="text-xl font-bold tracking-tight text-on-surface">Create Report</h2>
+            <p className="text-xs font-bold uppercase text-primary">Report builder</p>
           </div>
         </div>
 
         <div className="mt-6 space-y-5">
           <Field label="Report Template">
-            <select value={template} onChange={(event) => setTemplate(event.target.value)} className="h-12 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-primary/30">
+            <select value={template} onChange={(event) => setTemplate(event.target.value)} className="h-12 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30">
               <option value="sales-region">Sales by Region</option>
               <option value="lead-conversion">Lead Conversion Rate</option>
               <option value="team-performance">Team Performance</option>
@@ -150,23 +160,23 @@ export default function ReportsPage(): ReactElement {
           </Field>
 
           <Field label="Date Range">
-            <input type="date" value={dateRange} onChange={(event) => setDateRange(event.target.value)} className="h-12 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-primary/30" />
+            <input type="date" value={dateRange} onChange={(event) => setDateRange(event.target.value)} className="h-12 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30" />
           </Field>
 
           <div>
             <p className="pb-2 text-sm font-semibold text-on-surface">Filter Options</p>
             <div className="space-y-2">
-              <select value={user} onChange={(event) => setUser(event.target.value)} className="h-12 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-primary/30">
+              <select value={user} onChange={(event) => setUser(event.target.value)} className="h-12 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30">
                 <option value="all">All Users</option>
                 <option value="dev-admin">Dev Admin</option>
                 <option value="sara-manager">Sara Manager</option>
               </select>
-              <select value={team} onChange={(event) => setTeam(event.target.value)} className="h-12 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-primary/30">
+              <select value={team} onChange={(event) => setTeam(event.target.value)} className="h-12 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30">
                 <option value="all">All Teams</option>
                 <option value="enterprise">Enterprise Team</option>
                 <option value="smb">SMB Team</option>
               </select>
-              <select value={stage} onChange={(event) => setStage(event.target.value)} className="h-12 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-primary/30">
+              <select value={stage} onChange={(event) => setStage(event.target.value)} className="h-12 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30">
                 <option value="all">All Deal Stages</option>
                 <option value="CLOSED WON">Closed Won</option>
                 <option value="IN PROGRESS">In Progress</option>
@@ -185,21 +195,19 @@ export default function ReportsPage(): ReactElement {
           </div>
         </div>
 
-        <button className="mt-8 h-12 w-full rounded-lg bg-[#4f46e5] px-4 text-base font-bold text-white shadow-sm hover:bg-primary">
+        <button className="mt-8 h-12 w-full rounded-lg bg-primary px-4 text-base font-bold text-on-primary shadow-sm hover:bg-primary/90">
           Generate Report
         </button>
-      </aside>
-
-      <main className="min-w-0 space-y-6">
-        <div className="flex flex-col gap-4 rounded-xl border border-[#e7edf3] bg-surface p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase text-[#4f46e5]">Sales performance</p>
-            <h1 className="mt-1 text-3xl font-black tracking-tight text-on-surface">
-              Q3 Sales Performance for the West Coast Team
-            </h1>
-            <p className="mt-1 text-sm text-on-surface-variant">Generated on {formatDate(new Date().toISOString())}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
+      </CRMSidePanel>
+      }
+    >
+        <CRMPageHeader
+          eyebrow="Sales performance"
+          icon={FileBarChart}
+          title="Q3 Sales Performance for the West Coast Team"
+          description={`Generated on ${formatDate(new Date().toISOString())}`}
+          actions={
+            <>
             <label className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
               <input
@@ -213,60 +221,62 @@ export default function ReportsPage(): ReactElement {
               <Download className="h-4 w-4" />
               Export
             </button>
-          </div>
-        </div>
+            </>
+          }
+          metrics={
+            <CRMMetricGrid>
+              <CRMMetricCard icon={TrendingUp} label="Total Sales" value={formatCurrency(totalSales)} note="12.5% vs last quarter" tone="emerald" />
+              <CRMMetricCard icon={TrendingDown} label="Average Deal Size" value={formatCurrency(averageDealSize)} note="-2.1% vs last quarter" tone="rose" />
+              <CRMMetricCard icon={BarChart3} label="Closed Deals" value={closedDeals} note="8 more than last quarter" tone="blue" />
+            </CRMMetricGrid>
+          }
+        />
 
-        <section className="grid gap-4 md:grid-cols-3">
-          <Kpi label="Total Sales" value={formatCurrency(totalSales)} trend="up" note="12.5% vs last quarter" />
-          <Kpi label="Average Deal Size" value={formatCurrency(averageDealSize)} trend="down" note="-2.1% vs last quarter" />
-          <Kpi label="Closed Deals" value={String(closedDeals)} trend="up" note="8 more than last quarter" />
-        </section>
-
-        <section className="rounded-xl border border-[#e7edf3] bg-surface p-5 shadow-sm">
+        <CRMCard>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-lg font-bold text-on-surface">Sales Over Time</h3>
               <p className="text-sm text-on-surface-variant">Generated from current report filters.</p>
             </div>
-            <span className="rounded-lg bg-primary-container px-3 py-1 text-xs font-bold uppercase text-[#4f46e5]">{chartType} chart</span>
+            <span className="rounded-lg bg-primary-container px-3 py-1 text-xs font-bold uppercase text-primary">{chartType} chart</span>
           </div>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               {chartType === 'line' ? (
                 <LineChart data={salesOverTime}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} />
-                  <YAxis tickFormatter={(value: number) => `$${(value / 1000).toFixed(0)}k`} tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tickFormatter={(value: number) => `$${(value / 1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
                   <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                  <Line type="monotone" dataKey="value" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4 }} />
+                  <Line type="monotone" dataKey="value" stroke="var(--color-primary)" strokeWidth={3} dot={{ r: 4 }} />
                 </LineChart>
               ) : chartType === 'pie' ? (
                 <PieChart>
                   <Pie data={territoryData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={110} paddingAngle={4}>
                     {territoryData.map((_, index) => (
-                      <Cell key={index} fill={['#4f46e5', '#7ED321', '#F5A623', '#9013FE'][index % 4]} />
+                      <Cell key={index} fill={['var(--color-primary)', 'var(--color-success)', 'var(--color-warning)'][index % 3]} />
                     ))}
                   </Pie>
                   <Tooltip formatter={(value: number) => formatCurrency(value)} />
                 </PieChart>
               ) : (
                 <BarChart data={salesOverTime}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} />
-                  <YAxis tickFormatter={(value: number) => `$${(value / 1000).toFixed(0)}k`} tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tickFormatter={(value: number) => `$${(value / 1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
                   <Tooltip formatter={(value: number) => formatCurrency(value)} />
                   <Bar dataKey="value" radius={[8, 8, 0, 0]}>
                     {salesOverTime.map((_, index) => (
-                      <Cell key={index} fill={['#4f46e5', '#4A90E2', '#7ED321', '#F5A623', '#9013FE'][index % 5]} />
+                      <Cell key={index} fill={['var(--color-primary)', 'var(--color-success)', 'var(--color-warning)'][index % 3]} />
                     ))}
                   </Bar>
                 </BarChart>
               )}
             </ResponsiveContainer>
           </div>
-        </section>
+        </CRMCard>
 
-        <section className="overflow-hidden rounded-xl border border-[#e7edf3] bg-surface shadow-sm">
+        <CRMTableShell>
           <div className="border-b border-outline-variant p-5">
             <h3 className="text-lg font-bold text-on-surface">Deals Data</h3>
           </div>
@@ -294,9 +304,8 @@ export default function ReportsPage(): ReactElement {
               </tbody>
             </table>
           </div>
-        </section>
-      </main>
-    </div>
+        </CRMTableShell>
+    </CRMModuleShell>
   );
 }
 
@@ -315,7 +324,7 @@ function ChartButton({ active, icon, label, onClick }: { active: boolean; icon: 
       type="button"
       onClick={onClick}
       className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold ${
-        active ? 'bg-primary-container text-[#4f46e5]' : 'text-on-surface-variant hover:bg-surface-container-high'
+        active ? 'bg-primary-container text-primary' : 'text-on-surface-variant hover:bg-surface-container-high'
       }`}
     >
       {icon}
@@ -324,29 +333,15 @@ function ChartButton({ active, icon, label, onClick }: { active: boolean; icon: 
   );
 }
 
-function Kpi({ label, value, trend, note }: { label: string; value: string; trend: 'up' | 'down'; note: string }): ReactElement {
-  const positive = trend === 'up';
-  return (
-    <div className="rounded-xl border border-[#e7edf3] bg-surface p-5 shadow-sm">
-      <p className="text-sm font-semibold text-on-surface-variant">{label}</p>
-      <p className="mt-2 text-3xl font-bold text-on-surface">{value}</p>
-      <p className={`mt-2 flex items-center gap-1 text-sm font-semibold ${positive ? 'text-success' : 'text-error'}`}>
-        {positive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-        {note}
-      </p>
-    </div>
-  );
-}
-
 function StatusPill({ status }: { status: DealStatus }): ReactElement {
-  const className =
+  const tone =
     status === 'CLOSED WON'
-      ? 'bg-success-container text-on-success-container'
+      ? 'emerald'
       : status === 'CLOSED LOST'
-        ? 'bg-error-container text-on-error-container'
+        ? 'rose'
         : status === 'IN PROGRESS'
-          ? 'bg-warning-container text-on-warning-container'
-          : 'bg-primary-container text-on-primary-container';
+          ? 'amber'
+          : 'blue';
 
-  return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${className}`}>{status}</span>;
+  return <CRMStatusBadge tone={tone}>{status}</CRMStatusBadge>;
 }

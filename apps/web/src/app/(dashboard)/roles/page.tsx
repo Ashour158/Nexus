@@ -13,6 +13,15 @@ import {
   useUpdateRole,
 } from '@/hooks/use-roles';
 import { useUiStore } from '@/stores/ui.store';
+import { ShieldCheck } from 'lucide-react';
+import {
+  CRMEmptyState,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMStatusBadge,
+  CRMTableShell,
+  CRMToolbar,
+} from '@/components/ui/crm';
 
 export default function RolesPage(): JSX.Element {
   const toast = useUiStore((s) => s.pushToast);
@@ -95,16 +104,15 @@ export default function RolesPage(): JSX.Element {
   };
 
   return (
-    <main className="mx-auto max-w-6xl space-y-4 px-4 py-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-on-surface">Roles & Permissions</h1>
-          <p className="text-sm text-on-surface-variant">Create roles and define what each team member can access.</p>
-        </div>
-        <Button onClick={openCreate}>+ Create Role</Button>
-      </header>
+    <CRMModuleShell className="mx-auto max-w-6xl">
+      <CRMPageHeader
+        icon={ShieldCheck}
+        title="Roles & Permissions"
+        description="Create roles and define what each team member can access."
+        actions={<Button onClick={openCreate}>+ Create Role</Button>}
+      />
 
-      <section className="rounded-lg border border-outline-variant bg-surface p-4">
+      <CRMToolbar>
         <div className="max-w-md">
           <Input
             placeholder="Search roles..."
@@ -112,9 +120,9 @@ export default function RolesPage(): JSX.Element {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-      </section>
+      </CRMToolbar>
 
-      <section className="overflow-x-auto rounded-lg border border-outline-variant bg-surface">
+      <CRMTableShell>
         {rolesQuery.isLoading ? (
           <div className="p-4 space-y-2">
             <Skeleton className="h-10" />
@@ -144,9 +152,9 @@ export default function RolesPage(): JSX.Element {
                   </td>
                   <td className="px-4 py-3 text-center">
                     {role.isSystem ? (
-                      <span className="rounded-full bg-primary-container px-2 py-0.5 text-xs text-primary">System</span>
+                      <CRMStatusBadge tone="blue">System</CRMStatusBadge>
                     ) : (
-                      <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-xs text-on-surface-variant">Custom</span>
+                      <CRMStatusBadge tone="slate">Custom</CRMStatusBadge>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -168,15 +176,15 @@ export default function RolesPage(): JSX.Element {
               ))}
               {filteredRoles.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-on-surface-variant">
-                    No roles found.
+                  <td colSpan={5}>
+                    <CRMEmptyState icon={ShieldCheck} title="No roles found." />
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         )}
-      </section>
+      </CRMTableShell>
 
       {ConfirmDialog}
       {modalOpen && (
@@ -231,6 +239,6 @@ export default function RolesPage(): JSX.Element {
           </div>
         </div>
       )}
-    </main>
+    </CRMModuleShell>
   );
 }

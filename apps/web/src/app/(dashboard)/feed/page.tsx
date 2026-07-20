@@ -2,7 +2,12 @@
 
 import Link from 'next/link';
 import { Activity, Rss } from 'lucide-react';
-import { EmptyState } from '@/components/ui/EmptyState';
+import {
+  CRMCard,
+  CRMEmptyState,
+  CRMModuleShell,
+  CRMPageHeader,
+} from '@/components/ui/crm';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDateTime } from '@/lib/format';
 import { useFeed, type FeedActivity } from '@/hooks/use-follow';
@@ -17,25 +22,15 @@ export default function FeedPage() {
   const items = feedQuery.data ?? [];
 
   return (
-    <div className="space-y-5">
-      <section className="overflow-hidden rounded-lg border border-[#dbe7f3] bg-surface shadow-sm">
-        <div className="h-1.5 bg-gradient-to-r from-primary via-success to-warning" />
-        <div className="flex items-start gap-3 p-4 sm:p-5">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-sm shadow-primary/30">
-            <Rss className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase text-primary">Your following feed</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-on-surface">Following</h1>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
-              Recent activity across the accounts and contacts you follow. Follow a record
-              from its detail page to see its updates here.
-            </p>
-          </div>
-        </div>
-      </section>
+    <CRMModuleShell>
+      <CRMPageHeader
+        eyebrow="Your following feed"
+        icon={Rss}
+        title="Following"
+        description="Recent activity across the accounts and contacts you follow. Follow a record from its detail page to see its updates here."
+      />
 
-      <section className="rounded-lg border border-[#e7edf3] bg-surface p-4 shadow-sm">
+      <CRMCard>
         {feedQuery.isLoading ? (
           <div className="space-y-3">
             <Skeleton className="h-16" />
@@ -43,8 +38,8 @@ export default function FeedPage() {
             <Skeleton className="h-16" />
           </div>
         ) : items.length === 0 ? (
-          <EmptyState
-            icon="📡"
+          <CRMEmptyState
+            icon={Rss}
             title="Nothing to show yet"
             description="Follow accounts and contacts to see their recent activity in one place."
           />
@@ -55,8 +50,8 @@ export default function FeedPage() {
             ))}
           </ul>
         )}
-      </section>
-    </div>
+      </CRMCard>
+    </CRMModuleShell>
   );
 }
 

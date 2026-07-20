@@ -6,7 +6,19 @@ import { apiClients } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { CircleDollarSign, Clock3, FileSignature } from 'lucide-react';
+import {
+  CRMCard,
+  CRMEmptyState,
+  CRMFilterPills,
+  CRMMetricCard,
+  CRMMetricGrid,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMStatusBadge,
+  CRMTableShell,
+  CRMToolbar,
+} from '@/components/ui/crm';
 import { useUiStore } from '@/stores/ui.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { formatCurrency, formatDate } from '@/lib/format';
@@ -25,13 +37,13 @@ interface Contract {
   createdAt: string;
 }
 
-const statusStyles: Record<Contract['status'], string> = {
-  DRAFT: 'bg-surface-container-high text-on-surface',
-  PENDING_SIGNATURE: 'bg-primary-container text-primary',
-  ACTIVE: 'bg-success-container text-success',
-  EXPIRED: 'bg-surface-container-high text-on-surface-variant',
-  TERMINATED: 'bg-error-container text-error',
-  RENEWED: 'bg-tertiary-container text-tertiary',
+const statusTones: Record<Contract['status'], 'slate' | 'blue' | 'emerald' | 'rose' | 'orange'> = {
+  DRAFT: 'slate',
+  PENDING_SIGNATURE: 'blue',
+  ACTIVE: 'emerald',
+  EXPIRED: 'slate',
+  TERMINATED: 'rose',
+  RENEWED: 'orange',
 };
 
 interface Paginated<T> {
@@ -116,17 +128,22 @@ export default function ContractsPage(): JSX.Element {
   }).length;
 
   return (
-    <main className="space-y-4 p-4">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Contracts</h1>
-          <p className="text-sm text-on-surface-variant">Track lifecycle and signatures for customer contracts.</p>
-        </div>
-        <ExportButton module="contracts" />
-      </header>
+    <CRMModuleShell>
+      <CRMPageHeader
+        icon={FileSignature}
+        title="Contracts"
+        description="Track lifecycle and signatures for customer contracts."
+        actions={<ExportButton module="contracts" />}
+        metrics={
+          <CRMMetricGrid>
+            <CRMMetricCard icon={FileSignature} label="Active Contracts" value={activeContracts.length} tone="blue" />
+            <CRMMetricCard icon={CircleDollarSign} label="Total Value" value={formatCurrency(totalValue)} tone="emerald" />
+            <CRMMetricCard icon={Clock3} label="Expiring Soon" value={expiringSoon} tone="amber" />
+          </CRMMetricGrid>
+        }
+      />
 
-      <section className="rounded-lg border border-outline-variant bg-surface p-4">
-        <h2 className="mb-3 font-medium text-on-surface">Create contract</h2>
+      <CRMCard title="Create contract">
         <div className="grid gap-3 md:grid-cols-3">
           <Input placeholder="Title" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
           <Input placeholder="Account ID" value={form.accountId} onChange={(e) => setForm((p) => ({ ...p, accountId: e.target.value }))} />
@@ -139,26 +156,24 @@ export default function ContractsPage(): JSX.Element {
         <div className="mt-3">
           <Button onClick={() => create.mutate()} disabled={create.isPending}>Create</Button>
         </div>
-      </section>
+      </CRMCard>
 
-      <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="rounded-lg border border-outline-variant bg-surface p-4"><p className="text-xs uppercase text-on-surface-variant">Active Contracts</p><p className="text-2xl font-bold text-on-surface">{activeContracts.length}</p></div>
-        <div className="rounded-lg border border-outline-variant bg-surface p-4"><p className="text-xs uppercase text-on-surface-variant">Total Value</p><p className="text-2xl font-bold text-success">{formatCurrency(totalValue)}</p></div>
-        <div className="rounded-lg border border-outline-variant bg-surface p-4"><p className="text-xs uppercase text-on-surface-variant">Expiring Soon</p><p className="text-2xl font-bold text-warning">{expiringSoon}</p></div>
-      </section>
+      <CRMToolbar>
+        <CRMFilterPills
+          value={status}
+          onChange={setStatus}
+          options={['ALL', 'DRAFT', 'PENDING_SIGNATURE', 'ACTIVE', 'EXPIRED', 'TERMINATED', 'RENEWED'].map(
+            (value) => ({ value: value as 'ALL' | Contract['status'], label: value })
+          )}
+        />
+      </CRMToolbar>
 
-      <div className="flex flex-wrap gap-2">
-        {['ALL', 'DRAFT', 'PENDING_SIGNATURE', 'ACTIVE', 'EXPIRED', 'TERMINATED', 'RENEWED'].map((value) => (
-          <button key={value} type="button" onClick={() => setStatus(value as 'ALL' | Contract['status'])} className={`rounded-full px-3 py-1 text-xs font-medium ${status === value ? 'bg-inverse-surface text-white' : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'}`}>{value}</button>
-        ))}
-      </div>
-
-      <section className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
+      <CRMTableShell>
         {query.isLoading ? (
           <div className="space-y-2 p-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10" />)}</div>
         ) : contracts.length === 0 ? (
-          <EmptyState
-            icon="📄"
+          <CRMEmptyState
+            icon={FileSignature}
             title="No contracts found"
             description={
               status === 'ALL'
@@ -176,7 +191,7 @@ export default function ContractsPage(): JSX.Element {
                 <tr key={contract.id}>
                   <td className="px-3 py-2 font-medium">{contract.name}</td>
                   <td className="font-mono text-xs">{contract.accountId}</td>
-                  <td><span className={`rounded-full px-2 py-0.5 text-xs ${statusStyles[contract.status]}`}>{contract.status}</span></td>
+                  <td><CRMStatusBadge tone={statusTones[contract.status]}>{contract.status}</CRMStatusBadge></td>
                   <td>{contract.currency} {formatCurrency(Number(contract.totalValue))}</td>
                   <td>{contract.startDate ? formatDate(contract.startDate) : '—'}</td>
                   <td>{contract.endDate ? formatDate(contract.endDate) : '—'}</td>
@@ -189,7 +204,7 @@ export default function ContractsPage(): JSX.Element {
             </tbody>
           </table>
         )}
-      </section>
-    </main>
+      </CRMTableShell>
+    </CRMModuleShell>
   );
 }

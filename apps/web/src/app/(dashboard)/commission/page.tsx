@@ -4,7 +4,17 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { BadgeDollarSign, Ruler } from 'lucide-react';
+import {
+  CRMCard,
+  CRMEmptyState,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMSegmentedControl,
+  CRMStatusBadge,
+  CRMTableShell,
+  CRMToolbar,
+} from '@/components/ui/crm';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth.store';
 import {
@@ -23,10 +33,10 @@ import {
 
 type Tab = 'plans' | 'statements';
 
-const STATUS_STYLES: Record<CommissionStatementStatus, string> = {
-  PENDING: 'bg-warning-container text-on-warning-container',
-  APPROVED: 'bg-primary-container text-on-primary-container',
-  PAID: 'bg-success-container text-on-success-container',
+const STATUS_TONES: Record<CommissionStatementStatus, 'amber' | 'blue' | 'emerald'> = {
+  PENDING: 'amber',
+  APPROVED: 'blue',
+  PAID: 'emerald',
 };
 
 export default function CommissionPage() {
@@ -40,44 +50,32 @@ export default function CommissionPage() {
   const [tab, setTab] = useState<Tab>('statements');
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-on-surface">Commission</h1>
-          <p className="mt-0.5 text-sm text-on-surface-variant">Commission plans, rules, and rep statements</p>
-        </div>
-      </div>
-
-      <div className="mb-6 flex gap-2 border-b border-outline-variant">
-        <TabButton active={tab === 'statements'} onClick={() => setTab('statements')}>
-          Statements
-        </TabButton>
-        {canManage ? (
-          <TabButton active={tab === 'plans'} onClick={() => setTab('plans')}>
-            Plans & Rules
-          </TabButton>
-        ) : null}
-      </div>
+    <CRMModuleShell>
+      <CRMPageHeader
+        icon={BadgeDollarSign}
+        title="Commission"
+        description="Commission plans, rules, and rep statements"
+      />
+      <CRMToolbar>
+        <CRMSegmentedControl
+          value={tab}
+          onChange={setTab}
+          options={
+            canManage
+              ? [
+                  { value: 'statements' as Tab, label: 'Statements' },
+                  { value: 'plans' as Tab, label: 'Plans & Rules' },
+                ]
+              : [{ value: 'statements' as Tab, label: 'Statements' }]
+          }
+        />
+      </CRMToolbar>
 
       {tab === 'plans' && canManage ? <PlansView /> : null}
       {tab === 'statements' ? (
         <StatementsView isAdmin={canManage} canApprove={canApprove} currentUserId={userId ?? ''} />
       ) : null}
-    </div>
-  );
-}
-
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
-        active ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'
-      }`}
-    >
-      {children}
-    </button>
+    </CRMModuleShell>
   );
 }
 
@@ -107,8 +105,7 @@ function PlansView() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-outline-variant bg-surface p-4">
-        <h2 className="mb-3 font-semibold text-on-surface">New commission plan</h2>
+      <CRMCard title="New commission plan">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
           <Input placeholder="Plan name" value={name} onChange={(e) => setName(e.target.value)} />
           <Input
@@ -127,7 +124,7 @@ function PlansView() {
             {createPlan.isPending ? 'Creating…' : 'Create plan'}
           </Button>
         </div>
-      </section>
+      </CRMCard>
 
       {isLoading ? (
         <div className="animate-pulse space-y-3">
@@ -136,9 +133,9 @@ function PlansView() {
           ))}
         </div>
       ) : !plans || plans.length === 0 ? (
-        <div className="rounded-xl bg-surface-container-low py-2">
-          <EmptyState icon="📐" title="No commission plans" description="Create a plan above to start computing commissions" />
-        </div>
+        <CRMCard padded={false}>
+          <CRMEmptyState icon={Ruler} title="No commission plans" description="Create a plan above to start computing commissions" />
+        </CRMCard>
       ) : (
         <div className="space-y-4">
           {plans.map((plan) => (
@@ -310,7 +307,8 @@ function StatementsView({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
+      <CRMToolbar>
+        <div className="flex flex-wrap items-center gap-3">
         <Select value={status} onChange={(e) => setStatus(e.target.value as CommissionStatementStatus | '')} className="w-44">
           <option value="">All statuses</option>
           <option value="PENDING">Pending</option>
@@ -323,7 +321,8 @@ function StatementsView({
           onChange={(e) => setPeriod(e.target.value)}
           className="w-44"
         />
-      </div>
+        </div>
+      </CRMToolbar>
 
       {isLoading ? (
         <div className="animate-pulse space-y-3">
@@ -332,15 +331,15 @@ function StatementsView({
           ))}
         </div>
       ) : !statements || statements.length === 0 ? (
-        <div className="rounded-xl bg-surface-container-low py-2">
-          <EmptyState
-            icon="💵"
+        <CRMCard padded={false}>
+          <CRMEmptyState
+            icon={BadgeDollarSign}
             title="No commission statements"
             description={isAdmin ? 'Statements appear here as deals are won' : 'Your commission statements will appear here'}
           />
-        </div>
+        </CRMCard>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-outline-variant bg-surface">
+        <CRMTableShell>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-outline-variant text-left text-xs text-on-surface-variant">
@@ -366,9 +365,9 @@ function StatementsView({
                     {formatCurrency(s.commissionAmount, s.currency)}
                   </td>
                   <td className="px-4 py-2">
-                    <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[s.status]}`}>
+                    <CRMStatusBadge tone={STATUS_TONES[s.status]}>
                       {s.status}
-                    </span>
+                    </CRMStatusBadge>
                     {s.approvedAt ? (
                       <span className="ml-1 text-[10px] text-on-surface-variant">{formatDate(s.approvedAt)}</span>
                     ) : null}
@@ -390,7 +389,7 @@ function StatementsView({
               ))}
             </tbody>
           </table>
-        </div>
+        </CRMTableShell>
       )}
     </div>
   );

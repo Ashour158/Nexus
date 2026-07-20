@@ -6,6 +6,7 @@ import { ChevronLeft, Inbox, Mail, Paperclip, RefreshCw, Search, Send, X } from 
 import { useAuthStore } from '@/stores/auth.store';
 import DOMPurify from 'dompurify';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { CRMEmptyState, CRMModuleShell, CRMPageHeader } from '@/components/ui/crm';
 
 interface Thread {
   id: string;
@@ -120,24 +121,25 @@ export default function InboxPage() {
 
   if (!connection?.connected) {
     return (
-      <div className="flex h-[60vh] flex-col items-center justify-center gap-6 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-container">
-          <Mail className="h-8 w-8 text-primary" />
-        </div>
-        <div>
-          <h2 className="mb-2 text-xl font-semibold text-on-surface">Connect Your Email</h2>
-          <p className="max-w-md text-on-surface-variant">Connect Gmail or Outlook to read and reply to emails without leaving NEXUS.</p>
-        </div>
-        <div className="flex gap-3">
+      <CRMModuleShell>
+        <CRMPageHeader icon={Inbox} title="Inbox" />
+        <CRMEmptyState
+          icon={Mail}
+          title="Connect Your Email"
+          description="Connect Gmail or Outlook to read and reply to emails without leaving NEXUS."
+          action={<div className="flex gap-3">
           <a href="/api/email/oauth/gmail/init" className="rounded-lg border border-outline-variant bg-surface px-5 py-2.5 text-sm font-medium text-on-surface hover:bg-surface-container-low">Connect Gmail</a>
           <button disabled className="cursor-not-allowed rounded-lg border border-outline-variant bg-surface-container-high px-5 py-2.5 text-sm font-medium text-on-surface-variant">Outlook (soon)</button>
-        </div>
-      </div>
+          </div>}
+        />
+      </CRMModuleShell>
     );
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden rounded-xl border border-outline-variant bg-surface">
+    <CRMModuleShell className="space-y-4">
+      <CRMPageHeader icon={Inbox} title="Inbox" />
+    <div className="flex h-[calc(100vh-14rem)] overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-card">
       <div className={`flex flex-col border-e border-outline-variant ${selectedThread ? 'hidden w-80 md:flex' : 'w-full md:w-80'}`}>
         <div className="flex items-center gap-2 border-b border-outline-variant p-3">
           <div className="relative flex-1">
@@ -145,7 +147,7 @@ export default function InboxPage() {
             <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search emails..." className="w-full rounded-lg border border-outline-variant py-2 ps-8 pe-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
           </div>
           <button onClick={() => void refetch()} className="rounded-lg p-2 hover:bg-surface-container-high" title="Refresh" aria-label="Refresh inbox"><RefreshCw className="h-4 w-4 text-on-surface-variant" /></button>
-          <button onClick={() => setShowCompose(true)} className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary">Compose</button>
+          <button onClick={() => setShowCompose(true)} className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-on-primary hover:bg-primary/90">Compose</button>
         </div>
         <div className="flex-1 overflow-y-auto">
           {isLoading ? <div className="p-4 text-sm text-on-surface-variant">Loading emails...</div> : null}
@@ -175,8 +177,8 @@ export default function InboxPage() {
           <div className="flex-1 space-y-4 overflow-y-auto p-4">
             {messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.isInbound ? 'justify-start' : 'justify-end'}`}>
-                <div className={`max-w-[80%] rounded-xl p-4 ${msg.isInbound ? 'bg-surface-container-high text-on-surface' : 'bg-primary text-white'}`}>
-                  <div className={`mb-2 text-xs ${msg.isInbound ? 'text-on-surface-variant' : 'text-on-primary-container'}`}>{msg.isInbound ? msg.from : 'You'} · {new Date(msg.sentAt).toLocaleString()}</div>
+                <div className={`max-w-[80%] rounded-xl p-4 ${msg.isInbound ? 'bg-surface-container-high text-on-surface' : 'bg-primary text-on-primary'}`}>
+                  <div className={`mb-2 text-xs ${msg.isInbound ? 'text-on-surface-variant' : 'text-on-primary/80'}`}>{msg.isInbound ? msg.from : 'You'} · {new Date(msg.sentAt).toLocaleString()}</div>
                   <div className="whitespace-pre-wrap text-sm" dangerouslySetInnerHTML={{ __html: sanitizeEmailBody(msg.body) }} />
                 </div>
               </div>
@@ -194,7 +196,7 @@ export default function InboxPage() {
               <button onClick={() => {
                 if (!selectedThread || !replyBody.trim()) return;
                 sendMutation.mutate({ threadId: selectedThread.id, to: selectedThread.from, subject: `Re: ${selectedThread.subject}`, body: replyBody });
-              }} disabled={!replyBody.trim() || sendMutation.isPending} className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-white hover:bg-primary disabled:opacity-50"><Send className="h-3.5 w-3.5" />{sendMutation.isPending ? 'Sending...' : 'Send'}</button>
+              }} disabled={!replyBody.trim() || sendMutation.isPending} className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-on-primary hover:bg-primary/90 disabled:opacity-50"><Send className="h-3.5 w-3.5" />{sendMutation.isPending ? 'Sending...' : 'Send'}</button>
             </div>
           </div>
         </div>
@@ -206,7 +208,7 @@ export default function InboxPage() {
         <div className="pointer-events-none fixed inset-0 z-50 flex items-end justify-end p-4">
           <div className="pointer-events-auto w-full max-w-2xl overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-2xl">
             <div className="flex items-center justify-between bg-surface-container-highest px-4 py-3">
-              <span className="text-sm font-medium text-white">New Email</span>
+              <span className="text-sm font-medium text-on-surface">New Email</span>
               <button onClick={() => setShowCompose(false)} className="rounded p-1 hover:bg-surface-container-high" aria-label="Close compose"><X className="h-4 w-4 text-on-surface-variant" /></button>
             </div>
             <div className="space-y-3 p-4">
@@ -256,7 +258,7 @@ export default function InboxPage() {
                     );
                   }}
                   disabled={!composeTo.trim() || !composeBody.trim() || sendMutation.isPending}
-                  className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary hover:bg-primary/90 disabled:opacity-50"
                 ><Send className="h-3.5 w-3.5" />{sendMutation.isPending ? 'Sending...' : 'Send'}</button>
               </div>
             </div>
@@ -264,5 +266,6 @@ export default function InboxPage() {
         </div>
       ) : null}
     </div>
+    </CRMModuleShell>
   );
 }

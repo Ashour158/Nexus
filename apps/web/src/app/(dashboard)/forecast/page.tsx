@@ -5,6 +5,17 @@ import { useMutation } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth.store';
 import { notify } from '@/lib/toast';
 import { AnalyticsForecastSection } from './analytics-forecast';
+import { BadgeCheck, CircleDollarSign, Gauge, Trophy } from 'lucide-react';
+import {
+  CRMCard,
+  CRMEmptyState,
+  CRMErrorState,
+  CRMMetricCard,
+  CRMMetricGrid,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMTableShell,
+} from '@/components/ui/crm';
 
 
 interface ForecastStage {
@@ -158,13 +169,12 @@ export default function ForecastPage() {
   });
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-on-surface">Sales Forecast</h1>
-          <p className="mt-1 text-sm text-on-surface-variant">Pipeline weighted by deal probability</p>
-        </div>
-        <select
+    <CRMModuleShell>
+      <CRMPageHeader
+        icon={Gauge}
+        title="Sales Forecast"
+        description="Pipeline weighted by deal probability"
+        actions={<select
           value={period}
           onChange={(e) => setPeriod(e.target.value)}
           className="rounded-lg border border-outline-variant px-3 py-2 text-sm"
@@ -173,8 +183,16 @@ export default function ForecastPage() {
           <option value="this_quarter">This Quarter</option>
           <option value="this_year">This Year</option>
           <option value="next_quarter">Next Quarter</option>
-        </select>
-      </div>
+        </select>}
+        metrics={data ? (
+          <CRMMetricGrid>
+            <CRMMetricCard icon={CircleDollarSign} label="Pipeline" value={fmt(data.pipeline)} tone="slate" />
+            <CRMMetricCard icon={Gauge} label="Weighted" value={fmt(data.weighted)} tone="blue" />
+            <CRMMetricCard icon={BadgeCheck} label="Committed" value={fmt(data.committed)} tone="orange" />
+            <CRMMetricCard icon={Trophy} label="Closed Won" value={fmt(data.closed)} tone="emerald" />
+          </CRMMetricGrid>
+        ) : undefined}
+      />
 
       {loading ? (
         <div className="mb-6 grid grid-cols-4 gap-4">
@@ -183,38 +201,21 @@ export default function ForecastPage() {
           ))}
         </div>
       ) : !data ? (
-        <div role="alert" className="rounded-xl border border-error/30 bg-error-container px-4 py-8 text-center text-error">
-          {forecastError ?? 'Unable to load forecast'}
-        </div>
+        <CRMErrorState title={forecastError ?? 'Unable to load forecast'} />
       ) : (
         <>
-          <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-            {[
-              { label: 'Pipeline', value: fmt(data.pipeline), color: 'bg-surface-container-low border-outline-variant' },
-              { label: 'Weighted', value: fmt(data.weighted), color: 'bg-primary-container border-primary/40' },
-              { label: 'Committed', value: fmt(data.committed), color: 'bg-primary-container border-primary/40' },
-              { label: 'Closed Won', value: fmt(data.closed), color: 'bg-success-container border-success/30' },
-            ].map((card) => (
-              <div key={card.label} className={`rounded-xl border p-4 ${card.color}`}>
-                <p className="mb-1 text-xs text-on-surface-variant">{card.label}</p>
-                <p className="text-xl font-bold text-on-surface">{card.value}</p>
-              </div>
-            ))}
-          </div>
-
           {stages.length === 0 ? (
-            <div className="rounded-xl border border-outline-variant bg-surface p-12 text-center">
-              <p className="text-sm font-medium text-on-surface">
-                {stagesMissing ? 'Stage breakdown unavailable' : 'No stages in this period'}
-              </p>
-              <p className="mt-1 text-xs text-on-surface-variant">
-                {stagesMissing
+            <CRMEmptyState
+              icon={Gauge}
+              title={stagesMissing ? 'Stage breakdown unavailable' : 'No stages in this period'}
+              description={
+                stagesMissing
                   ? 'The forecast service returned a response without a stage breakdown. Totals above may be incomplete.'
-                  : 'No open deals fall inside the selected period.'}
-              </p>
-            </div>
+                  : 'No open deals fall inside the selected period.'
+              }
+            />
           ) : (
-          <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
+          <CRMTableShell>
             <table className="w-full text-sm">
               <thead className="border-b border-outline-variant bg-surface-container-low">
                 <tr>
@@ -239,7 +240,7 @@ export default function ForecastPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </CRMTableShell>
           )}
         </>
       )}
@@ -247,11 +248,11 @@ export default function ForecastPage() {
       {!accessToken ? (
         <p className="mt-8 text-sm text-on-surface-variant">Sign in to view team rollup and manager overrides.</p>
       ) : (
-        <section className="mt-10">
-          <h2 className="text-lg font-semibold text-on-surface">Team rollup & overrides</h2>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            Rep commits from CRM weighted totals; managers can persist an override per rep for this period.
-          </p>
+        <CRMCard
+          className="mt-10"
+          title="Team rollup & overrides"
+          description="Rep commits from CRM weighted totals; managers can persist an override per rep for this period."
+        >
 
           {teamLoading ? (
             <div className="mt-4 h-32 animate-pulse rounded-xl bg-surface-container-high" />
@@ -270,7 +271,7 @@ export default function ForecastPage() {
                 </div>
               </div>
 
-              <div className="mt-4 overflow-hidden rounded-xl border border-outline-variant bg-surface">
+              <CRMTableShell className="mt-4">
                 <table className="w-full text-sm">
                   <thead className="border-b border-outline-variant bg-surface-container-low">
                     <tr>
@@ -303,13 +304,13 @@ export default function ForecastPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </CRMTableShell>
             </>
           ) : null}
-        </section>
+        </CRMCard>
       )}
 
       <AnalyticsForecastSection />
-    </div>
+    </CRMModuleShell>
   );
 }

@@ -6,12 +6,19 @@ import type { Note } from '@nexus/shared-types';
 import { useConfirm } from '@/hooks/use-confirm';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { StickyNote } from 'lucide-react';
+import {
+  CRMEmptyState,
+  CRMErrorState,
+  CRMFilterPills,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMToolbar,
+} from '@/components/ui/crm';
 import { Textarea } from '@/components/ui/textarea';
 import { useNotes, useCreateNote, useUpdateNote, useDeleteNote } from '@/hooks/use-notes';
 import { useUsers } from '@/hooks/use-users';
 import { formatDate } from '@/lib/format';
-import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/stores/auth.store';
 
 type NoteTab = 'all' | 'pinned';
@@ -53,11 +60,9 @@ export default function NotesPage() {
 
   if (!canRead) {
     return (
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-        <div className="rounded-lg border border-warning/30 bg-warning-container p-6 text-sm text-on-warning-container">
-          You do not have permission to view notes.
-        </div>
-      </div>
+      <CRMModuleShell className="mx-auto max-w-5xl">
+        <CRMErrorState title="You do not have permission to view notes." />
+      </CRMModuleShell>
     );
   }
 
@@ -127,29 +132,20 @@ export default function NotesPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-on-surface">Notes</h1>
-        <Button onClick={startCreate}>New Note</Button>
-      </div>
+    <CRMModuleShell className="mx-auto max-w-5xl">
+      <CRMPageHeader
+        icon={StickyNote}
+        title="Notes"
+        actions={<Button onClick={startCreate}>New Note</Button>}
+      />
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => { setTab(t.id); setPage(1); }}
-            className={cn(
-              'rounded-lg px-3 py-1.5 text-sm font-medium transition',
-              tab === t.id ? 'bg-inverse-surface text-white' : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="mb-4 flex flex-wrap gap-2">
+      <CRMToolbar>
+        <CRMFilterPills
+          value={tab}
+          options={tabs.map((item) => ({ value: item.id, label: item.label }))}
+          onChange={(value) => { setTab(value); setPage(1); }}
+        />
+        <div className="flex flex-wrap gap-2">
         <input
           type="text"
           value={dealId}
@@ -190,7 +186,8 @@ export default function NotesPage() {
             </option>
           ))}
         </select>
-      </div>
+        </div>
+      </CRMToolbar>
 
       <form onSubmit={onSubmit} className="mb-6 rounded-xl border border-outline-variant bg-surface p-4">
         <Textarea
@@ -257,7 +254,7 @@ export default function NotesPage() {
           ))}
         </div>
       ) : notes.length === 0 ? (
-        <EmptyState icon="📝" title="No notes found" description="Try adjusting filters or create a new note." />
+        <CRMEmptyState icon={StickyNote} title="No notes found" description="Try adjusting filters or create a new note." />
       ) : (
         <div className="space-y-3">
           {notes.map((note) => (
@@ -340,6 +337,6 @@ export default function NotesPage() {
           </div>
         </div>
       )}
-    </div>
+    </CRMModuleShell>
   );
 }

@@ -15,6 +15,14 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import {
+  CRMErrorState,
+  CRMMetricGrid,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMTableShell,
+  CRMToolbar,
+} from '@/components/ui/crm';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { useUsers } from '@/hooks/use-users';
 
@@ -124,15 +132,47 @@ export default function AnalyticsPage(): ReactElement {
 
   if (error || !data) {
     return (
-      <div className="rounded-xl border border-error/30 bg-error-container p-8 text-sm text-error">
-        Analytics data is not available. Please check the reporting preview API.
-      </div>
+      <CRMErrorState
+        title="Analytics data is not available."
+        description="Please check the reporting preview API."
+      />
     );
   }
 
   return (
-    <main className="space-y-8">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <CRMModuleShell>
+      <CRMPageHeader
+        eyebrow="Analytics"
+        icon={TrendingUp}
+        title="Detailed Performance Log"
+        description={`Showing ${rows.length.toLocaleString()} transactions across ${(data.territory ?? []).length} territories`}
+        actions={
+          <>
+            <button className="hidden items-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 py-2 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low sm:inline-flex">
+              <Share2 className="h-4 w-4" />
+              Share
+            </button>
+            <button className="hidden items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary transition hover:bg-primary/90 sm:inline-flex">
+              Export
+            </button>
+          </>
+        }
+        metrics={
+          // SparkMetric, not CRMMetricCard: these four tiles carry trend
+          // sparklines and CRMMetricCard has no sparkline slot. Swapping them
+          // for the generic primitive silently dropped the trend data, which is
+          // most of the value of an analytics KPI row — consistency is not worth
+          // deleting information. This is exactly the "leave it bespoke rather
+          // than force a bad fit" case.
+          <CRMMetricGrid>
+            <SparkMetric label="Won Revenue" value={metricCurrency(data.wonAmount)} tone="blue" sparkline={data.kpis?.revenueSparkline ?? []} />
+            <SparkMetric label="Win Rate" value={`${finite(data.winRatePct).toFixed(1)}%`} tone="emerald" sparkline={data.kpis?.conversionSparkline ?? []} />
+            <SparkMetric label="Open Pipeline" value={metricCurrency(data.pipelineValue)} tone="amber" sparkline={data.kpis?.activeDealsSparkline ?? []} />
+            <SparkMetric label="Weighted Pipeline" value={metricCurrency(data.weightedPipeline)} tone="indigo" sparkline={data.kpis?.avgDealSizeSparkline ?? []} />
+          </CRMMetricGrid>
+        }
+      />
+      <CRMToolbar>
         <div className="flex flex-wrap items-end gap-3">
           <SelectControl label="Date Range" value={dateRange} onChange={setDateRange} options={[
             ['last-30', 'Last 30 Days'],
@@ -163,31 +203,15 @@ export default function AnalyticsPage(): ReactElement {
           >
             <RefreshCw className={cn('h-5 w-5', isFetching && 'animate-spin')} />
           </button>
-          <button className="hidden items-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 py-2 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low sm:inline-flex">
-            <Share2 className="h-4 w-4" />
-            Share
-          </button>
-          <button className="hidden items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary sm:inline-flex">
-            Export
-          </button>
         </div>
-      </section>
+      </CRMToolbar>
 
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <SparkMetric label="Won Revenue" value={metricCurrency(data.wonAmount)} tone="blue" sparkline={data.kpis?.revenueSparkline ?? []} />
-        <SparkMetric label="Win Rate" value={`${finite(data.winRatePct).toFixed(1)}%`} tone="emerald" sparkline={data.kpis?.conversionSparkline ?? []} />
-        <SparkMetric label="Open Pipeline" value={metricCurrency(data.pipelineValue)} tone="amber" sparkline={data.kpis?.activeDealsSparkline ?? []} />
-        <SparkMetric label="Weighted Pipeline" value={metricCurrency(data.weightedPipeline)} tone="indigo" sparkline={data.kpis?.avgDealSizeSparkline ?? []} />
-      </section>
-
-      <section className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-outline-variant p-6 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-on-surface">Detailed Performance Log</h1>
-            <p className="text-sm text-on-surface-variant">
-              Showing {rows.length.toLocaleString()} transactions across {(data.territory ?? []).length} territories
-            </p>
-          </div>
+      <CRMTableShell>
+        {/* The title/description that used to live here now sits in
+            CRMPageHeader above; keeping both rendered the same heading and the
+            same transaction count twice on the page. Only the table's own
+            controls remain. */}
+        <div className="flex flex-col gap-4 border-b border-outline-variant p-6 lg:flex-row lg:items-center lg:justify-end">
           <div className="flex flex-wrap items-center gap-3">
             <label className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
@@ -239,7 +263,7 @@ export default function AnalyticsPage(): ReactElement {
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-inverse-surface text-[10px] font-bold text-white">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-inverse-surface text-[10px] font-bold text-inverse-on-surface">
                         {initials(row.ownerName)}
                       </div>
                       <span className="text-sm text-on-surface-variant">{row.ownerName}</span>
@@ -268,13 +292,13 @@ export default function AnalyticsPage(): ReactElement {
             <button className="rounded border border-outline-variant bg-surface px-3 py-1 text-xs font-bold text-on-surface-variant opacity-50" disabled>
               Previous
             </button>
-            <button className="h-6 w-6 rounded bg-primary text-[10px] font-bold text-white">1</button>
+            <button className="h-6 w-6 rounded bg-primary text-[10px] font-bold text-on-primary">1</button>
             <button className="rounded border border-outline-variant bg-surface px-3 py-1 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low">
               Next
             </button>
           </div>
         </div>
-      </section>
+      </CRMTableShell>
 
       <section className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         <div className="rounded-xl border border-outline-variant bg-surface p-6 shadow-sm lg:col-span-2">
@@ -305,9 +329,9 @@ export default function AnalyticsPage(): ReactElement {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl bg-inverse-surface p-6 text-white shadow-lg">
-          <HelpCircle className="absolute right-4 top-4 h-16 w-16 text-white opacity-10" />
-          <h2 className="mb-6 text-lg font-bold text-white">Recent Events</h2>
+        <div className="relative overflow-hidden rounded-xl bg-inverse-surface p-6 text-inverse-on-surface shadow-lg">
+          <HelpCircle className="absolute right-4 top-4 h-16 w-16 text-inverse-on-surface opacity-10" />
+          <h2 className="mb-6 text-lg font-bold text-inverse-on-surface">Recent Events</h2>
           <div className="relative z-10 space-y-4">
             {(data.events ?? []).slice(0, 4).map((event, index) => (
               <div key={event.id} className={cn('flex gap-3 border-l-2 pl-4 py-1', index === 0 ? 'border-primary' : 'border-outline-variant')}>
@@ -315,7 +339,7 @@ export default function AnalyticsPage(): ReactElement {
                   {index === 0 ? '2m ago' : event.timestamp}
                 </div>
                 <p className="flex-1 text-xs leading-5 text-outline">
-                  <span className="font-bold text-white">{event.actor}</span> {event.action}
+                  <span className="font-bold text-inverse-on-surface">{event.actor}</span> {event.action}
                 </p>
               </div>
             ))}
@@ -325,7 +349,7 @@ export default function AnalyticsPage(): ReactElement {
           </button>
         </div>
       </section>
-    </main>
+    </CRMModuleShell>
   );
 }
 

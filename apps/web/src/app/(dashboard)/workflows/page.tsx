@@ -8,6 +8,16 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUiStore } from '@/stores/ui.store';
 import { formatDateTime } from '@/lib/format';
+import { Workflow as WorkflowIcon } from 'lucide-react';
+import {
+  CRMEmptyState,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMSegmentedControl,
+  CRMStatusBadge,
+  CRMTableShell,
+  CRMToolbar,
+} from '@/components/ui/crm';
 
 interface Workflow {
   id: string;
@@ -25,13 +35,12 @@ interface Execution {
   completedAt: string | null;
 }
 
-function statusClass(status: Execution['status']): string {
-  if (status === 'RUNNING') return 'bg-primary-container text-primary';
-  if (status === 'COMPLETED') return 'bg-success-container text-success';
-  if (status === 'FAILED') return 'bg-error-container text-error';
-  if (status === 'PAUSED') return 'bg-warning-container text-warning';
-  if (status === 'CANCELLED') return 'bg-surface-container-highest text-on-surface';
-  return 'bg-surface-container-high text-on-surface';
+function statusTone(status: Execution['status']): 'blue' | 'emerald' | 'rose' | 'amber' | 'slate' {
+  if (status === 'RUNNING') return 'blue';
+  if (status === 'COMPLETED') return 'emerald';
+  if (status === 'FAILED') return 'rose';
+  if (status === 'PAUSED') return 'amber';
+  return 'slate';
 }
 
 interface Paginated<T> {
@@ -99,25 +108,30 @@ export default function WorkflowsPage(): JSX.Element {
   );
 
   return (
-    <main className="space-y-4 p-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Workflows</h1>
-          <p className="text-sm text-on-surface-variant">Automation workflows and recent execution history.</p>
-        </div>
-        <Button onClick={() => router.push('/workflows/new')}>+ New Workflow</Button>
-      </header>
-      <div className="inline-flex rounded-md border border-outline-variant bg-surface p-0.5">
-        <button type="button" onClick={() => setTab('workflows')} className={`rounded px-3 py-1 text-sm ${tab === 'workflows' ? 'bg-inverse-surface text-white' : 'text-on-surface-variant hover:bg-surface-container-high'}`}>Workflows</button>
-        <button type="button" onClick={() => setTab('executions')} className={`rounded px-3 py-1 text-sm ${tab === 'executions' ? 'bg-inverse-surface text-white' : 'text-on-surface-variant hover:bg-surface-container-high'}`}>Executions</button>
-      </div>
+    <CRMModuleShell>
+      <CRMPageHeader
+        icon={WorkflowIcon}
+        title="Workflows"
+        description="Automation workflows and recent execution history."
+        actions={<Button onClick={() => router.push('/workflows/new')}>+ New Workflow</Button>}
+      />
+      <CRMToolbar>
+        <CRMSegmentedControl
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'workflows', label: 'Workflows' },
+            { value: 'executions', label: 'Executions' },
+          ]}
+        />
+      </CRMToolbar>
 
       {tab === 'workflows' ? (
-        <section className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
+        <CRMTableShell>
           {workflowsQuery.isLoading ? (
             <div className="space-y-2 p-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10" />)}</div>
           ) : workflows.length === 0 ? (
-            <p className="p-8 text-center text-sm text-on-surface-variant">No workflows configured.</p>
+            <CRMEmptyState icon={WorkflowIcon} title="No workflows configured." />
           ) : (
             <table className="w-full text-sm">
               <thead className="bg-surface-container-low text-start text-xs uppercase text-on-surface-variant">
@@ -129,9 +143,9 @@ export default function WorkflowsPage(): JSX.Element {
                     <td className="px-3 py-2 font-medium">{workflow.name}</td>
                     <td>{workflow.trigger}</td>
                     <td>
-                      <span className={`rounded-full px-2 py-0.5 text-xs ${workflow.isActive ? 'bg-success-container text-success' : 'bg-surface-container-high text-on-surface'}`}>
+                      <CRMStatusBadge tone={workflow.isActive ? 'emerald' : 'slate'}>
                         {workflow.isActive ? 'Active' : 'Inactive'}
-                      </span>
+                      </CRMStatusBadge>
                     </td>
                     <td>{formatDateTime(workflow.createdAt)}</td>
                     <td className="pe-3 text-end">
@@ -164,13 +178,13 @@ export default function WorkflowsPage(): JSX.Element {
               </tbody>
             </table>
           )}
-        </section>
+        </CRMTableShell>
       ) : (
-        <section className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
+        <CRMTableShell>
           {executionsQuery.isLoading ? (
             <div className="space-y-2 p-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10" />)}</div>
           ) : executions.length === 0 ? (
-            <p className="p-8 text-center text-sm text-on-surface-variant">No executions yet.</p>
+            <CRMEmptyState icon={WorkflowIcon} title="No executions yet." />
           ) : (
             <table className="w-full text-sm">
               <thead className="bg-surface-container-low text-start text-xs uppercase text-on-surface-variant">
@@ -188,7 +202,7 @@ export default function WorkflowsPage(): JSX.Element {
                         {workflowNames.get(execution.workflowId) ?? execution.workflowId}
                       </td>
                       <td>
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${statusClass(execution.status)}`}>{execution.status}</span>
+                        <CRMStatusBadge tone={statusTone(execution.status)}>{execution.status}</CRMStatusBadge>
                       </td>
                       <td>{formatDateTime(execution.startedAt)}</td>
                       <td>{seconds}s</td>
@@ -198,8 +212,8 @@ export default function WorkflowsPage(): JSX.Element {
               </tbody>
             </table>
           )}
-        </section>
+        </CRMTableShell>
       )}
-    </main>
+    </CRMModuleShell>
   );
 }

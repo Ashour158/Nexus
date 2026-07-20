@@ -7,6 +7,14 @@ import { useConfirm } from '@/hooks/use-confirm';
 import { notify } from '@/lib/toast';
 import { formatDateTime } from '@/lib/format';
 import { Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
+import {
+  CRMEmptyState,
+  CRMFilterPills,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMTableShell,
+  CRMToolbar,
+} from '@/components/ui/crm';
 
 interface RecycleItem {
   id: string;
@@ -53,42 +61,33 @@ export default function RecycleBinPage() {
   const items = data?.data ?? [];
 
   return (
-    <main className="space-y-4 px-6 py-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-on-surface">Recycle Bin</h1>
-        <div className="flex items-center gap-2 text-sm text-on-surface-variant">
+    <CRMModuleShell>
+      <CRMPageHeader
+        icon={Trash2}
+        title="Recycle Bin"
+        badges={<div className="flex items-center gap-2 text-sm text-on-surface-variant">
           <AlertTriangle className="h-4 w-4" />
           Items are permanently deleted after 30 days
-        </div>
-      </div>
+        </div>}
+      />
 
-      <div className="flex gap-2">
-        <button
-          onClick={() => setModuleFilter('')}
-          className={`rounded-md px-3 py-1.5 text-sm ${!moduleFilter ? 'bg-inverse-surface text-white' : 'border border-outline-variant bg-surface text-on-surface'}`}
-        >
-          All
-        </button>
-        {['leads', 'contacts', 'accounts', 'deals'].map((m) => (
-          <button
-            key={m}
-            onClick={() => setModuleFilter(m)}
-            className={`rounded-md px-3 py-1.5 text-sm capitalize ${moduleFilter === m ? 'bg-inverse-surface text-white' : 'border border-outline-variant bg-surface text-on-surface'}`}
-          >
-            {m}
-          </button>
-        ))}
-      </div>
+      <CRMToolbar>
+        <CRMFilterPills
+          value={moduleFilter}
+          onChange={setModuleFilter}
+          options={[
+            { value: '', label: 'All' },
+            ...['leads', 'contacts', 'accounts', 'deals'].map((value) => ({ value, label: value })),
+          ]}
+        />
+      </CRMToolbar>
 
       {isLoading ? (
         <p className="text-sm text-on-surface-variant">Loading…</p>
       ) : items.length === 0 ? (
-        <div className="rounded-lg border border-outline-variant bg-surface p-8 text-center">
-          <Trash2 className="mx-auto h-8 w-8 text-outline" />
-          <p className="mt-2 text-sm text-on-surface-variant">Recycle bin is empty</p>
-        </div>
+        <CRMEmptyState icon={Trash2} title="Recycle bin is empty" />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-outline-variant bg-surface">
+        <CRMTableShell>
           <table className="w-full text-sm">
             <thead className="bg-surface-container-low text-left text-xs uppercase text-on-surface-variant">
               <tr>
@@ -141,9 +140,9 @@ export default function RecycleBinPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </CRMTableShell>
       )}
       {ConfirmDialog}
-    </main>
+    </CRMModuleShell>
   );
 }

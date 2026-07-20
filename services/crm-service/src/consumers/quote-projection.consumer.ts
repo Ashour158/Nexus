@@ -152,11 +152,37 @@ export async function projectFinanceQuoteEvent(
   };
 
   try {
-    const projection = await prisma.quoteProjection.upsert({
-      where: { tenantId_quoteId: { tenantId, quoteId } },
-      create: data,
-      update: data,
-    } as never);
+    // Version-guarded write. An unconditional `upsert ... update: data` let a
+    // LATE-ARRIVING OLDER event overwrite newer state: replaying or reordering
+    // quote.created after quote.sent reverted the projection from SENT/v2 back
+    // to DRAFT/v1. Kafka only orders within a partition, and the outbox relay
+    // can redeliver, so out-of-order arrival is expected rather than exotic.
+    //
+    // updateMany (not update) because it accepts a filter beyond the unique key:
+    // apply only when the incoming event is at least as new as what is stored.
+    const applied = await (prisma.quoteProjection as never as {
+      updateMany: (args: unknown) => Promise<{ count: number }>;
+    }).updateMany({
+      where: { tenantId, quoteId, sourceEventVersion: { lte: sourceEventVersion } },
+      data,
+    });
+
+    let projection: unknown;
+    if (applied.count > 0) {
+      projection = await prisma.quoteProjection.findFirst({ where: { tenantId, quoteId } } as never);
+    } else {
+      const existing = await prisma.quoteProjection.findFirst({
+        where: { tenantId, quoteId },
+      } as never);
+      if (existing) {
+        // A newer version is already stored — this event is stale. Record it in
+        // the event log below (so replay/audit still sees it) but leave the
+        // projection alone.
+        projection = existing;
+      } else {
+        projection = await prisma.quoteProjection.create({ data } as never);
+      }
+    }
 
     await prisma.quoteProjectionEvent.create({
       data: {

@@ -105,7 +105,10 @@ export default function OrdersPage(): JSX.Element {
                   </td>
                   <td className="px-4 py-3 font-mono text-[11px] text-on-surface-variant">{order.accountId.slice(0, 10)}…</td>
                   <td className="px-4 py-3">
-                    <CRMStatusBadge tone={STATUS_TONES[order.status] ?? 'slate'}>
+                    <CRMStatusBadge
+                      tone={STATUS_TONES[order.status] ?? 'slate'}
+                      className={order.status === 'CANCELLED' ? 'line-through' : undefined}
+                    >
                       {order.status.replace('_', ' ')}
                     </CRMStatusBadge>
                   </td>

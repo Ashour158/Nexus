@@ -95,14 +95,18 @@ export default function ChatbotPage(): JSX.Element {
       {tab === 'configuration' ? (
         <div className="grid gap-4 lg:grid-cols-2">
           <CRMCard title="WhatsApp">
-            <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={waPhoneId} onChange={(e) => setWaPhoneId(e.target.value)} placeholder="Phone ID" />
-            <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={waAccessToken} onChange={(e) => setWaAccessToken(e.target.value)} type="password" placeholder="Access Token" />
-            <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={waVerifyToken} onChange={(e) => setWaVerifyToken(e.target.value)} placeholder="Verify Token" />
-            <p className="text-xs text-on-surface-variant">Webhook URL: /api/v1/webhooks/whatsapp</p>
+            <div className="space-y-2">
+              <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={waPhoneId} onChange={(e) => setWaPhoneId(e.target.value)} placeholder="Phone ID" />
+              <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={waAccessToken} onChange={(e) => setWaAccessToken(e.target.value)} type="password" placeholder="Access Token" />
+              <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={waVerifyToken} onChange={(e) => setWaVerifyToken(e.target.value)} placeholder="Verify Token" />
+              <p className="text-xs text-on-surface-variant">Webhook URL: /api/v1/webhooks/whatsapp</p>
+            </div>
           </CRMCard>
           <CRMCard title="Telegram">
-            <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={tgToken} onChange={(e) => setTgToken(e.target.value)} type="password" placeholder="Bot Token" />
-            <p className="text-xs text-on-surface-variant">Webhook URL: /api/v1/webhooks/telegram</p>
+            <div className="space-y-2">
+              <input className="h-9 w-full rounded border border-outline-variant px-3 text-sm" value={tgToken} onChange={(e) => setTgToken(e.target.value)} type="password" placeholder="Bot Token" />
+              <p className="text-xs text-on-surface-variant">Webhook URL: /api/v1/webhooks/telegram</p>
+            </div>
           </CRMCard>
         </div>
       ) : null}

@@ -114,7 +114,14 @@ export default function RFQsPage(): JSX.Element {
                     icon={ClipboardList}
                     title="No RFQs yet"
                     description="Create your first Request for Quotation to start procurement"
-                    action={<button onClick={() => create.mutate()}>+ New RFQ</button>}
+                    action={(
+                      <button
+                        onClick={() => create.mutate()}
+                        className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-on-primary hover:bg-primary/90"
+                      >
+                        + New RFQ
+                      </button>
+                    )}
                   />
                 </td>
               </tr>

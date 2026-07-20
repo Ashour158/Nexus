@@ -77,7 +77,10 @@ export default function RecycleBinPage() {
           onChange={setModuleFilter}
           options={[
             { value: '', label: 'All' },
-            ...['leads', 'contacts', 'accounts', 'deals'].map((value) => ({ value, label: value })),
+            ...['leads', 'contacts', 'accounts', 'deals'].map((value) => ({
+              value,
+              label: value.charAt(0).toUpperCase() + value.slice(1),
+            })),
           ]}
         />
       </CRMToolbar>

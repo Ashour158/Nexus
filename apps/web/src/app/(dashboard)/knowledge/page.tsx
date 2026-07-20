@@ -66,7 +66,14 @@ export default function KnowledgePage() {
           icon={Search}
           title="No articles found"
           description={`No results for "${query}". Try different keywords`}
-          action={<button onClick={() => { setQuery(''); fetchArticles(); }}>Clear search</button>}
+          action={(
+            <button
+              onClick={() => { setQuery(''); fetchArticles(); }}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-on-primary hover:bg-primary/90"
+            >
+              Clear search
+            </button>
+          )}
         />
       ) : (
         <div className="space-y-3">

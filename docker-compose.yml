@@ -44,6 +44,12 @@ services:
       - postgres
     environment:
       DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@postgres:5432/nexus
+      # Empty in dev (ini's `host=postgres` stands). Prod sets these in .env to
+      # point at the managed cluster — the entrypoint rewrites the [databases]
+      # line at start, so the checked-in ini stays the single source of truth
+      # and no hand-edit of the working tree is ever needed again.
+      PGBOUNCER_UPSTREAM_HOST: ${PGBOUNCER_UPSTREAM_HOST:-}
+      PGBOUNCER_UPSTREAM_PORT: ${PGBOUNCER_UPSTREAM_PORT:-5432}
 
   redis:
     image: redis:7-alpine

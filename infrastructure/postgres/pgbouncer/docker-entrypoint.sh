@@ -35,4 +35,19 @@ else
   echo "pgbouncer entrypoint: no DATABASE_URL; keeping shipped $AUTH_FILE"
 fi
 
-exec pgbouncer /etc/pgbouncer/pgbouncer.ini
+# Parameterize the upstream Postgres host/port. The checked-in ini points at
+# the local dev container (`host=postgres port=5432`); prod runs against a
+# managed cluster. Until now that difference lived as an UNCOMMITTED hand-edit
+# of pgbouncer.ini inside the droplet's working tree — the exact divergence
+# pattern that made three deploys silently ship stale code earlier (git pull
+# --ff-only aborts on a locally-modified tracked file). With the override in
+# env, the repo file is the single source of truth everywhere and the droplet's
+# local edit can be reverted.
+INI="/etc/pgbouncer/pgbouncer.ini"
+if [ -n "${PGBOUNCER_UPSTREAM_HOST:-}" ]; then
+  _port="${PGBOUNCER_UPSTREAM_PORT:-5432}"
+  sed -i "s|^\* = host=.*|* = host=${PGBOUNCER_UPSTREAM_HOST} port=${_port}|" "$INI"
+  echo "pgbouncer entrypoint: upstream set to ${PGBOUNCER_UPSTREAM_HOST}:${_port} from env"
+fi
+
+exec pgbouncer "$INI"

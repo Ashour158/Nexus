@@ -113,6 +113,17 @@ export function createInvoicesService(
     return row;
   }
 
+  // Single-flight guard for order → invoice creation. The pre-existing
+  // `findFirst` check is a check-then-create race: two requests for the same
+  // order both see "no invoice yet" and both create one, so an order gets
+  // invoiced twice and invoice.created fires twice — money duplicated. Within a
+  // process, coalescing concurrent calls onto one in-flight promise makes the
+  // create+publish happen exactly once. (A DB unique constraint is the
+  // cross-replica backstop and is tracked separately; this closes the common,
+  // same-instance case and is what the concurrency regression test asserts.)
+  // Keyed per factory instance so tests and tenants never share state.
+  const inflightInvoiceByOrder = new Map<string, Promise<Invoice>>();
+
   return {
     async listInvoices(
       tenantId: string,
@@ -203,62 +214,82 @@ export function createInvoicesService(
       orderId: string,
       opts: { dueDate?: string; notes?: string } = {}
     ): Promise<Invoice> {
-      const order = await prisma.salesOrder.findFirst({
-        where: { id: orderId, tenantId },
-      });
-      if (!order) throw new NotFoundError('SalesOrder', orderId);
+      // Coalesce concurrent calls for the SAME order onto one in-flight promise.
+      // The get/set below must stay synchronous (no await between them) so a
+      // second concurrent caller observes the first's entry before it can start
+      // its own create.
+      const key = `${tenantId}:${orderId}`;
+      const inflight = inflightInvoiceByOrder.get(key);
+      if (inflight) return inflight;
 
-      // Idempotency: don't re-invoice an order that already has a live invoice.
-      const existing = await prisma.invoice.findFirst({
-        where: { tenantId, orderId, status: { not: 'VOID' } },
-      });
-      if (existing) return existing;
-
-      const created = await prisma.$transaction(async (tx) => {
-        const invoiceNumber = await generateInvoiceNumber(tx, tenantId);
-        return tx.invoice.create({
-          data: {
-            tenantId,
-            accountId: order.accountId,
-            orderId: order.id,
-            quoteId: order.quoteId ?? null,
-            invoiceNumber,
-            status: 'DRAFT',
-            // Server-derived money — copied from the order, never from the client.
-            currency: order.currency,
-            subtotal: order.subtotal,
-            discountAmount: order.discountAmount,
-            taxAmount: order.taxAmount,
-            total: order.total,
-            dueDate: opts.dueDate ? new Date(opts.dueDate) : null,
-            lineItems: order.lineItems as Prisma.InputJsonValue,
-            notes: opts.notes ?? null,
-            customFields: {
-              sourceOrderId: order.id,
-              sourceOrderNumber: order.orderNumber,
-              sourceQuoteId: order.quoteId ?? null,
-            } as Prisma.InputJsonValue,
-          },
+      const promise = (async (): Promise<Invoice> => {
+        const order = await prisma.salesOrder.findFirst({
+          where: { id: orderId, tenantId },
         });
-      });
+        if (!order) throw new NotFoundError('SalesOrder', orderId);
 
-      await producer
-        .publish(TOPICS.INVOICES, {
-          type: 'invoice.created',
-          tenantId,
-          payload: {
-            invoiceId: created.id,
-            accountId: created.accountId,
-            orderId: created.orderId ?? null,
-            quoteId: created.quoteId ?? null,
-            total: Number(created.total.toFixed(2)),
-            currency: created.currency,
-            dueDate: (created.dueDate ?? created.createdAt).toISOString(),
-          },
-        })
-        .catch(() => undefined);
+        // Idempotency: don't re-invoice an order that already has a live invoice.
+        const existing = await prisma.invoice.findFirst({
+          where: { tenantId, orderId, status: { not: 'VOID' } },
+        });
+        if (existing) return existing;
 
-      return created;
+        const created = await prisma.$transaction(async (tx) => {
+          const invoiceNumber = await generateInvoiceNumber(tx, tenantId);
+          return tx.invoice.create({
+            data: {
+              tenantId,
+              accountId: order.accountId,
+              orderId: order.id,
+              quoteId: order.quoteId ?? null,
+              invoiceNumber,
+              status: 'DRAFT',
+              // Server-derived money — copied from the order, never from the client.
+              currency: order.currency,
+              subtotal: order.subtotal,
+              discountAmount: order.discountAmount,
+              taxAmount: order.taxAmount,
+              total: order.total,
+              dueDate: opts.dueDate ? new Date(opts.dueDate) : null,
+              lineItems: order.lineItems as Prisma.InputJsonValue,
+              notes: opts.notes ?? null,
+              customFields: {
+                sourceOrderId: order.id,
+                sourceOrderNumber: order.orderNumber,
+                sourceQuoteId: order.quoteId ?? null,
+              } as Prisma.InputJsonValue,
+            },
+          });
+        });
+
+        await producer
+          .publish(TOPICS.INVOICES, {
+            type: 'invoice.created',
+            tenantId,
+            payload: {
+              invoiceId: created.id,
+              accountId: created.accountId,
+              orderId: created.orderId ?? null,
+              quoteId: created.quoteId ?? null,
+              total: Number(created.total.toFixed(2)),
+              currency: created.currency,
+              dueDate: (created.dueDate ?? created.createdAt).toISOString(),
+            },
+          })
+          .catch(() => undefined);
+
+        return created;
+      })();
+
+      inflightInvoiceByOrder.set(key, promise);
+      try {
+        return await promise;
+      } finally {
+        // Clear as soon as this batch of concurrent callers settles, so a later
+        // legitimate re-invoice (e.g. after a void) is not blocked by a stale
+        // entry.
+        inflightInvoiceByOrder.delete(key);
+      }
     },
 
     async updateInvoice(
@@ -375,7 +406,44 @@ export function createInvoicesService(
         );
       }
 
-      const { payment, updated } = await prisma.$transaction(async (tx) => {
+      const { payment, updated, isNew } = await prisma.$transaction(async (tx) => {
+        // Idempotency: a retried request carrying the same external payment
+        // reference must not record a SECOND payment (transport retries, a
+        // double-clicked "mark paid"). If a prior COMPLETED payment already
+        // carries this reference, re-derive the invoice status from the existing
+        // set and return WITHOUT inserting a duplicate row or re-publishing. A
+        // DB unique on (tenantId, reference) is the cross-replica backstop and
+        // is tracked separately; this closes the retry case the regression test
+        // asserts.
+        if (data.reference) {
+          const priors = await tx.payment.findMany({
+            where: { invoiceId, tenantId, status: 'COMPLETED' },
+          });
+          const dup = priors.find((pmt) => pmt.reference === data.reference);
+          if (dup) {
+            const paidSoFar = priors
+              .filter((pmt) => pmt.currency === invoice.currency)
+              .reduce(
+                (acc, cur) => acc.plus(new Decimal(cur.amount.toString())),
+                new Decimal(0)
+              );
+            const invTotal = new Decimal(invoice.total.toString());
+            let status: Prisma.InvoiceUpdateInput['status'];
+            if (paidSoFar.greaterThanOrEqualTo(invTotal)) status = 'PAID';
+            else if (paidSoFar.greaterThan(0)) status = 'PARTIAL';
+            else status = invoice.status;
+            const u = await tx.invoice.update({
+              where: { id: invoiceId },
+              data: {
+                status,
+                paidAmount: new Prisma.Decimal(paidSoFar.toFixed(2)),
+                paidAt: status === 'PAID' ? invoice.paidAt ?? new Date() : invoice.paidAt,
+              },
+            });
+            return { payment: dup, updated: u, isNew: false };
+          }
+        }
+
         const p = await tx.payment.create({
           data: {
             tenantId,
@@ -444,10 +512,14 @@ export function createInvoicesService(
                 : invoice.paidAt,
           },
         });
-        return { payment: p, updated: u };
+        return { payment: p, updated: u, isNew: true };
       });
 
-      if (updated.status === 'PAID') {
+      // Only publish on a genuinely new payment. Without this guard, retrying a
+      // reference that fully pays an invoice would re-emit invoice.paid and move
+      // money twice downstream — the very double-publish this file guards
+      // against elsewhere.
+      if (isNew && updated.status === 'PAID') {
         await producer
           .publish(TOPICS.PAYMENTS, {
             type: 'invoice.paid',

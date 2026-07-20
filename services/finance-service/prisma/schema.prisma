@@ -610,6 +610,11 @@ model Invoice {
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, accountId])
   @@index([tenantId, status])
+  // Plain index for lookups. A PARTIAL UNIQUE index
+  // `(tenantId, orderId) WHERE orderId IS NOT NULL AND status <> 'VOID'` also
+  // exists (migration 20260721000000) to stop one order being invoiced twice
+  // while still allowing re-invoicing after a void; Prisma cannot express the
+  // filter, so it is migration-only.
   @@index([tenantId, orderId])
   @@unique([id, tenantId])
 }
@@ -645,6 +650,10 @@ enum InvoiceStatus {
   UNCOLLECTIBLE
 }
 
+// NOTE: a PARTIAL unique index `(tenantId, invoiceId, reference) WHERE reference
+// IS NOT NULL` backs payment idempotency. Prisma's schema cannot express a
+// filtered unique, so it lives in migration
+// 20260721000000_money_path_idempotency_backstops, not as a @@unique here.
 model Payment {
   id            String        @id @default(cuid())
   tenantId      String

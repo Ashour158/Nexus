@@ -52,6 +52,30 @@ export function createQueueService(prisma: CadencePrisma, producer: NexusProduce
     return null;
   }
 
+  async function resolvePhone(enrollment: {
+    objectType: string;
+    objectId: string;
+    tenantId: string;
+  }): Promise<string | null> {
+    const token = process.env.INTERNAL_SERVICE_TOKEN ?? '';
+    const base = process.env.CRM_SERVICE_URL ?? 'http://localhost:3001';
+    const path =
+      enrollment.objectType === 'CONTACT'
+        ? `contacts/${enrollment.objectId}`
+        : enrollment.objectType === 'LEAD'
+          ? `leads/${enrollment.objectId}`
+          : null;
+    if (!path) return null;
+    const res = await fetch(`${base}/api/v1/${path}`, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    }).catch(() => null);
+    if (!res?.ok) return null;
+    const json = (await res.json().catch(() => null)) as {
+      data?: { phone?: string | null; mobilePhone?: string | null };
+    } | null;
+    return json?.data?.phone ?? json?.data?.mobilePhone ?? null;
+  }
+
   async function processQueue() {
     const due = await prisma.stepExecution.findMany({
       where: { status: 'PENDING', scheduledAt: { lte: new Date() } },
@@ -142,8 +166,30 @@ export function createQueueService(prisma: CadencePrisma, producer: NexusProduce
             throw new Error(`task creation failed: crm-service ${res.status}`);
           }
         } else if (step.type === 'SMS') {
-          status = 'SKIPPED';
-          result = 'sms not integrated';
+          const phone = await resolvePhone(enrollment);
+          if (!phone) {
+            status = 'SKIPPED';
+            result = 'no phone found for contact/lead';
+          } else {
+            // Queue through comm-service's SMS outbox, exactly like the EMAIL
+            // step. Delivery is env-gated on Twilio in comm-service; a queue
+            // failure throws so the step does not advance as if it were sent.
+            const res = await fetch(`${process.env.COMM_SERVICE_URL}/api/v1/internal/outbox/sms-broadcast`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '',
+              },
+              body: JSON.stringify({
+                tenantId: enrollment.tenantId,
+                recipients: [phone],
+                body: step.body ?? '',
+              }),
+            });
+            if (!res.ok) {
+              throw new Error(`sms dispatch failed: comm-service ${res.status}`);
+            }
+          }
         }
       } catch (err) {
         status = 'FAILED';

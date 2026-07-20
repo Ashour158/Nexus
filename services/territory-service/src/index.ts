@@ -80,16 +80,30 @@ consumer.on('lead.created', async (event) => {
   }
 });
 
-// account.created → evaluate territory rules and record the assignment.
-// crm-service has no internal account-owner endpoint yet, so we publish an
-// `account.routed` event (see assignRecord) for it to consume; this handler
-// stays additive and fail-open.
+// account.created → evaluate territory rules, assign owner, call CRM back.
+// Mirrors the lead path: the routing ledger + account.routed event still fire
+// inside assignRecord, and now the chosen owner is also written to the account
+// via crm-service's internal account-owner endpoint. Fail-open.
 consumer.on('account.created', async (event) => {
   try {
     const account = event.payload as Record<string, unknown>;
     const accountId = String(account.accountId ?? account.id ?? '');
     if (!accountId) return;
-    await territories.assignRecord(event.tenantId, 'ACCOUNT', accountId, { ...account, id: accountId });
+    const assigned = await territories.assignRecord(event.tenantId, 'ACCOUNT', accountId, { ...account, id: accountId });
+    if (assigned?.assignedOwnerId) {
+      const res = await fetch(`${process.env.CRM_SERVICE_URL}/api/v1/internal/accounts/${accountId}/owner`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '',
+          'x-tenant-id': event.tenantId,
+        },
+        body: JSON.stringify({ ownerId: assigned.assignedOwnerId }),
+      });
+      if (!res.ok) {
+        console.warn(`[TerritoryConsumer] account owner callback failed: ${res.status} ${await res.text().catch(() => '')}`);
+      }
+    }
   } catch (err: any) {
     console.warn('[TerritoryConsumer] account.created handler error:', err?.message);
   }

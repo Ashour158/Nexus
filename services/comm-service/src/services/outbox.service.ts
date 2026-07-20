@@ -1,3 +1,4 @@
+import { buildEmailThreadHeaders } from '../lib/thread-headers.js';
 import type { PaginatedResult } from '@nexus/shared-types';
 import { NotFoundError } from '@nexus/service-utils';
 import { TOPICS, type NexusProducer } from '@nexus/kafka';
@@ -128,11 +129,18 @@ export function createOutboxService(
                 row.mailAccountId && resolveAccountChannel
                   ? await resolveAccountChannel(tenantId, row.mailAccountId)
                   : email;
+              const thread = buildEmailThreadHeaders({
+                messageKey: row.id,
+                entityType: row.entityType,
+                entityId: row.entityId,
+              });
               await channel.send({
                 to: row.to,
                 subject: row.subject ?? '(no subject)',
                 html: row.body,
                 text: row.body.replace(/<[^>]+>/g, ' ').slice(0, 8000),
+                messageId: thread.messageId,
+                references: thread.references,
               });
             } else if (row.channel === 'SMS') {
               await sms.send({ to: row.to, body: row.body });

@@ -621,6 +621,34 @@ export async function registerCrmInternalRoutes(
         const updated = await prisma.lead.update({ where: { id }, data: update });
         return reply.send({ success: true, data: updated });
       });
+
+      // Account owner write-back for territory routing. territory-service
+      // evaluated the rules and emitted account.routed, but without this
+      // endpoint the chosen owner was never written to the account — accounts
+      // got a routing ledger + event and nothing else, unlike leads. Account
+      // has an ownerId column but no territoryId, so only ownerId is updated.
+      r.patch('/internal/accounts/:id/owner', async (req, reply) => {
+        if (!verifyServiceToken(req)) {
+          return reply.code(401).send({ success: false, error: { code: 'UNAUTHORIZED', message: 'Unauthorized', requestId: req.id } });
+        }
+        const tenantId = tenantIdFromRequest(req);
+        if (!tenantId) {
+          return reply.code(400).send({ success: false, error: { code: 'MISSING_X_TENANT_ID', message: 'Missing X-Tenant-Id header', requestId: req.id } });
+        }
+        const { id } = req.params as { id: string };
+        const body = req.body as { ownerId?: string };
+        if (!body.ownerId) {
+          return reply.code(400).send({ success: false, error: { code: 'BAD_REQUEST', message: 'ownerId is required', requestId: req.id } });
+        }
+
+        const existing = await prisma.account.findFirst({ where: { id, tenantId } });
+        if (!existing) {
+          return reply.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Account not found', requestId: req.id } });
+        }
+
+        const updated = await prisma.account.update({ where: { id }, data: { ownerId: body.ownerId } });
+        return reply.send({ success: true, data: updated });
+      });
     },
     { prefix: '/api/v1' }
   );

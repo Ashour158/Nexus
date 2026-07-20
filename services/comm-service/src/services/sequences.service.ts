@@ -1,3 +1,4 @@
+import { buildEmailThreadHeaders } from '../lib/thread-headers.js';
 import { BusinessRuleError, NotFoundError } from '@nexus/service-utils';
 import type { Prisma } from '../../../../node_modules/.prisma/comm-client/index.js';
 import type { EmailSequence, SequenceEnrollment } from '../../../../node_modules/.prisma/comm-client/index.js';
@@ -173,11 +174,18 @@ export function createSequencesService(
           },
           { fillMissingWith: '' }
         );
+        const thread = buildEmailThreadHeaders({
+          messageKey: `${en.id}-${en.currentStep}`,
+          entityType: en.contactId ? 'contact' : null,
+          entityId: en.contactId ?? null,
+        });
         await smtp.send({
           to: emailTo,
           subject: rendered.subject,
           html: rendered.htmlBody,
           text: rendered.textBody,
+          messageId: thread.messageId,
+          references: thread.references,
         });
         sent += 1;
         const nextIdx = en.currentStep + 1;

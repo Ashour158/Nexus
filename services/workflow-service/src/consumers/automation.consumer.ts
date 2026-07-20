@@ -24,6 +24,14 @@ export const AUTOMATION_TOPICS: string[] = [
   TOPICS.NOTIFICATIONS,
   TOPICS.ANALYTICS,
   TOPICS.WORKFLOWS,
+  // Blueprint transitions — including `blueprint.transition.function`, which the
+  // blueprint after-actions publish for a "custom function" and which no worker
+  // consumed. Routing the BLUEPRINT topic into the automation engine is exactly
+  // the "an automation/webhook worker can pick them up" path that comment
+  // intends: a user configures an automation rule keyed on module `blueprint`
+  // (e.g. function == 'recalculate_score') and its actions run. Additive — rules
+  // only fire when configured, and the causation-depth guard prevents loops.
+  TOPICS.BLUEPRINT,
   TICKET_TOPIC,
 ];
 

@@ -172,9 +172,49 @@ export function createSlaService(prisma: WorkflowPrisma, producer?: NexusProduce
           continue;
         }
 
-        // For workflow-based SLA checks, we can't directly access CRM timestamps.
-        // In production, this would query CRM/ClickHouse for the entity's creation/update time.
-        // Here we return a placeholder that assumes within SLA unless explicitly breached.
+        // No open breach row yet — compute elapsed time ON DEMAND from the same
+        // SLA clock the background scanner uses (the in-flight workflow
+        // execution's startedAt for this entity), rather than assuming
+        // within-SLA. Previously this branch did nothing, so a live SLA_CHECK
+        // node / /sla/check only ever reported breaches the scanner had already
+        // written — it could never catch one first.
+        let executions: Array<{ triggerType: string; triggerPayload: unknown; startedAt: Date }>;
+        try {
+          executions = await prisma.workflowExecution.findMany({
+            where: {
+              tenantId,
+              status: { in: ['RUNNING', 'PAUSED'] },
+              triggerType: { startsWith: def.entityType },
+            },
+            select: { triggerType: true, triggerPayload: true, startedAt: true },
+            take: 500,
+          });
+        } catch {
+          continue; // DB hiccup — can't assert a breach for this SLA; skip.
+        }
+
+        let startedAt: Date | null = null;
+        for (const exec of executions) {
+          const et = entityTypeFromTrigger(exec.triggerType);
+          if (et !== def.entityType.toLowerCase()) continue;
+          const pid = entityIdFromPayload((exec.triggerPayload ?? {}) as Record<string, unknown>, et);
+          if (pid === entityId && (!startedAt || exec.startedAt < startedAt)) {
+            startedAt = exec.startedAt; // earliest matching execution = clock start
+          }
+        }
+        if (!startedAt) continue; // no resolvable clock — cannot assert a breach.
+
+        const hoursElapsed = elapsedHours(startedAt, new Date(), def.businessHoursOnly);
+        if (hoursElapsed >= def.timeLimitHours) {
+          breaches.push({
+            slaId: def.id,
+            slaName: def.name,
+            entityId,
+            entityType,
+            hoursElapsed: Math.round(hoursElapsed * 100) / 100,
+            hoursAllowed: def.timeLimitHours,
+          });
+        }
       }
 
       return {

@@ -17,9 +17,17 @@ function DataQualityBadge({ score }: { score?: number | null }) {
       : score >= 50
         ? 'bg-warning-container text-on-warning-container'
         : 'bg-error-container text-on-error-container';
+  // Labelled "DQ", not a bare percentage. On a pipeline card this pill sits
+  // directly beside the stage probability, so two unlabelled percentages meaning
+  // completely different things ended up side by side — a rep reading "95% 10%"
+  // has no way to tell which is which, and the explanation was hidden in a
+  // hover title that never appears on touch.
   return (
-    <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${color}`} title="Data Quality Score">
-      {score}%
+    <span
+      className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${color}`}
+      title={`Data quality score: ${score}% — how complete this record's fields are`}
+    >
+      DQ {score}%
     </span>
   );
 }
@@ -123,7 +131,12 @@ export function DealCard({
           <h4 className="line-clamp-2 text-sm font-medium text-foreground">{deal.name}</h4>
           <DataQualityBadge score={(deal as Deal & { dataQualityScore?: number | null }).dataQualityScore} />
         </div>
-        <span className="shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">{probability}%</span>
+        <span
+          className="shrink-0 text-xs font-semibold tabular-nums text-muted-foreground"
+          title="Probability this deal closes, from its stage"
+        >
+          {probability}% win
+        </span>
       </div>
 
       <div className="mb-2 text-base font-semibold tabular-nums text-foreground">

@@ -493,6 +493,13 @@ export default function TemplatesPage() {
                       <p className="truncate text-sm font-medium text-on-surface">{preview.subject}</p>
                     </div>
                   ) : null}
+                  {/*
+                    Intentionally `bg-white`, not a theme token — this is the
+                    canvas for the rendered email/document preview. Recipients
+                    see it on white in their mail client, so theming it dark
+                    would make the preview misrepresent the real output. This is
+                    the one deliberate exception to the design-token rule.
+                  */}
                   <div className="min-h-[300px] flex-1 bg-white">
                     {previewState === 'error' ? (
                       <div className="p-4 text-sm text-error">

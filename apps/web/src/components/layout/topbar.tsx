@@ -28,19 +28,24 @@ interface Crumb {
   href: string;
 }
 
+/**
+ * Only genuine exceptions belong here — segments `slugToTitle` below gets WRONG.
+ * The previous contents (deals→Deals, new→New, …) were all cases slugToTitle
+ * already handled identically, so the map looked comprehensive while covering
+ * none of the segments that actually render badly: acronyms lose their casing
+ * ("Rfqs", "Sso", "Gdpr", "Api Keys") and win-loss needs a separator.
+ */
 const LABEL_OVERRIDES: Record<string, string> = {
-  deals: 'Deals',
-  new: 'New',
-  edit: 'Edit',
-  contacts: 'Contacts',
-  accounts: 'Accounts',
-  leads: 'Leads',
-  activities: 'Activities',
-  tasks: 'Tasks',
-  quotes: 'Quotes',
-  invoices: 'Invoices',
-  settings: 'Settings',
-  login: 'Login',
+  'win-loss': 'Win / Loss',
+  rfqs: 'RFQs',
+  sso: 'SSO',
+  gdpr: 'GDPR',
+  cpq: 'CPQ',
+  crm: 'CRM',
+  zatca: 'ZATCA',
+  'api-keys': 'API Keys',
+  'ai-models': 'AI Models',
+  'sla-policies': 'SLA Policies',
 };
 
 /**
@@ -274,9 +279,12 @@ export function Topbar(): ReactElement {
   );
 }
 
-// RR-H19: exported (not rendered) so it can be dropped back into the topbar once
-// the design-token migration reaches full `dark:` coverage. Do NOT render it
-// before then — only ~17% of surfaces are themed, so it yields a broken mixed UI.
+// Rendered in the topbar (see above). The token migration is done: every colour
+// resolves through `rgb(var(--md-*))` with a full `.dark` block in
+// design-tokens.css, so surfaces flip without needing per-component `dark:`
+// variants — coverage is ~93% of components, not the ~17% an earlier version of
+// this comment warned about. That stale warning outlived the work it described
+// and said "do NOT render this" about a toggle that was already shipped.
 export function DarkModeToggle() {
   const [isDark, setIsDark] = useState(false);
 

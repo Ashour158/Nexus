@@ -122,9 +122,11 @@ function ConnectorCard({
           ) : null}
 
           {isPlanned ? (
-            <Button size="sm" variant="secondary" disabled title="On the roadmap — not yet available">
-              Roadmap
-            </Button>
+            // A badge, not a disabled button. Roadmap state is information, not
+            // an action — rendering it as a greyed-out button reads as "this
+            // should work and is broken", which is the impression a dead
+            // affordance always leaves.
+            <StatusBadge status="On the roadmap" variant="neutral" />
           ) : connector.connected ? (
             <div className="flex items-center gap-2">
               {managePath ? (
@@ -169,9 +171,14 @@ function ConnectorCard({
               </Button>
             </Link>
           ) : (
-            <Button size="sm" variant="secondary" disabled>
-              Configure
-            </Button>
+            // Reached when a connector is neither OAuth nor has a setup page —
+            // there is genuinely nothing to configure here yet. Previously this
+            // rendered a disabled "Configure" button with no explanation, which
+            // is the worst kind of dead affordance: it looks broken rather than
+            // unavailable, and gives the user nothing to act on.
+            <span className="text-xs text-on-surface-variant">
+              Self-serve setup not available yet
+            </span>
           )}
         </div>
       </div>

@@ -24,6 +24,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { TicketPrisma } from '../prisma.js';
+import type { TicketsService } from '../services/tickets.service.js';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
@@ -81,12 +82,67 @@ const TICKET_SAFE_SELECT = {
   },
 } as const;
 
+const VALID_PRIORITIES = new Set(['LOW', 'MEDIUM', 'HIGH', 'URGENT']);
+
+/** Body portal-service POSTs to materialize a customer-filed case as a ticket. */
+const CreatePortalTicketSchema = z.object({
+  subject: z.string().min(1),
+  description: z.string().optional(),
+  priority: z.string().optional(),
+  channel: z.string().optional(),
+  source: z.string().optional(),
+  requesterContactId: z.string().nullish(),
+  requesterEmail: z.string().nullish(),
+});
+
 export async function registerInternalPortalRoutes(
   app: FastifyInstance,
-  prisma: TicketPrisma
+  prisma: TicketPrisma,
+  tickets: TicketsService
 ): Promise<void> {
   await app.register(
     async (r) => {
+      // Materialize a portal-filed case as a real ticket. portal-service has
+      // always POSTed here, but only a GET existed — so every portal case
+      // fell back to a `portal.case.submitted` event that no service consumed,
+      // and never became a ticket. This closes that dead path, routing through
+      // the same createTicket path as any other ticket (number generation, SLA
+      // policy, entitlement, ticket.created event).
+      r.post('/internal/accounts/:accountId/tickets', async (req, reply) => {
+        if (!verifyServiceToken(req)) return unauthorized(reply, req.id);
+        const tenantId = tenantIdFromHeader(req);
+        if (!tenantId) return badRequest(reply, req.id, 'x-tenant-id is required');
+        const { accountId } = req.params as { accountId: string };
+        if (!accountId) return badRequest(reply, req.id, 'accountId is required');
+
+        const parsed = CreatePortalTicketSchema.safeParse(req.body);
+        if (!parsed.success) return badRequest(reply, req.id, 'Invalid ticket payload');
+        const b = parsed.data;
+
+        const priorityUpper = b.priority?.toUpperCase();
+        const priority = (priorityUpper && VALID_PRIORITIES.has(priorityUpper)
+          ? priorityUpper
+          : 'MEDIUM') as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
+        const ticket = await tickets.createTicket(tenantId, undefined, {
+          subject: b.subject,
+          description: b.description,
+          priority,
+          accountId,
+          // TicketChannel has no PORTAL member; portal is a web self-service
+          // origin. Preserve the true source in customFields for reporting.
+          channel: 'WEB',
+          requesterContactId: b.requesterContactId ?? undefined,
+          requesterEmail: b.requesterEmail ?? undefined,
+          tags: ['portal'],
+          customFields: { source: b.source ?? 'PORTAL' },
+        });
+
+        return reply
+          .code(201)
+          .send({ success: true, data: { id: ticket.id, number: ticket.number, status: ticket.status } });
+      });
+
       r.get('/internal/accounts/:accountId/tickets', async (req, reply) => {
         if (!verifyServiceToken(req)) return unauthorized(reply, req.id);
         const tenantId = tenantIdFromHeader(req);

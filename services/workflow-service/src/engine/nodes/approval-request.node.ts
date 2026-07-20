@@ -37,7 +37,10 @@ export async function handleApprovalRequestNode(
   // Base URL of approval-service (no path suffix); default matches the fleet port.
   // Strip a trailing `/api/v1` (and any trailing slash) so we can append the full
   // route path unambiguously, matching how finance-service calls it.
-  const rawBase = process.env.APPROVAL_SERVICE_URL ?? 'http://localhost:3016';
+  // approval-service listens on 3014 (see its index.ts), not 3016. Prod sets
+  // APPROVAL_SERVICE_URL explicitly so this only bit a local run with the env
+  // unset — but a wrong default is a latent footgun, so correct it.
+  const rawBase = process.env.APPROVAL_SERVICE_URL ?? 'http://localhost:3014';
   const base = rawBase.replace(/\/+$/, '').replace(/\/api\/v1$/, '');
 
   const payload: {

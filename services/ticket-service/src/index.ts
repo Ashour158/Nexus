@@ -60,7 +60,7 @@ app.setErrorHandler(globalErrorHandler);
 await registerTicketRoutes(app, tickets);
 await registerSlaRoutes(app, tickets);
 await registerEntitlementRoutes(app, tickets);
-await registerInternalPortalRoutes(app, prisma);
+await registerInternalPortalRoutes(app, prisma, tickets);
 
 // Kafka producer is best-effort: if the broker is down we keep serving requests.
 try {

@@ -39,8 +39,11 @@ export default function ChatbotPage(): JSX.Element {
   const conversations = useQuery({
     queryKey: ['chatbot', 'conversations'],
     queryFn: async () => {
-      const base = process.env.NEXT_PUBLIC_CHATBOT_URL ?? 'http://localhost:3017';
-      const res = await fetch(`${base}/api/v1/conversations`);
+      // Same-origin BFF path (see next.config.mjs). This used to call
+      // NEXT_PUBLIC_CHATBOT_URL, defaulting to http://localhost:3017, straight
+      // from the browser — cross-origin and with no auth header, so it only
+      // worked on a developer's own machine and failed in every deployment.
+      const res = await fetch('/bff/chatbot/conversations');
       if (!res.ok) throw new Error(`Failed to load conversations: ${res.status}`);
       return (await res.json()) as ConversationList;
     },

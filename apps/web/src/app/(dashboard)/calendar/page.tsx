@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClients } from '@/lib/api-client';
+import { useConnectorCatalog } from '@/hooks/use-integrations';
 import { Modal } from '@/components/ui/modal';
 import { CalendarDays } from 'lucide-react';
 import {
@@ -48,6 +49,14 @@ export default function CalendarPage() {
     queryFn: () => apiClients.integration.get<CalendarEvent[]>('/integrations/calendar/events'),
   });
 
+  // Real connection state for the status badge below. `undefined` while the
+  // catalog is still loading, so the badge can say "checking" rather than
+  // asserting either state before it knows.
+  const connectors = useConnectorCatalog();
+  const googleConnected = connectors.data
+    ? connectors.data.some((c) => c.provider === 'google' && c.connected)
+    : undefined;
+
   const sync = useMutation({
     mutationFn: () => apiClients.integration.post('/integrations/calendar/sync', {}),
     onSuccess: async () => qc.invalidateQueries({ queryKey: ['calendar-events'] }),
@@ -57,11 +66,35 @@ export default function CalendarPage() {
     mutationFn: () => {
       const start = new Date(`${form.date}T${form.time}:00`);
       const end = new Date(start.getTime() + form.duration * 60_000);
+      // The form collects attendees, deal, join link, notes, reminder and type,
+      // but only title/start/end were ever sent — the rest were silently
+      // discarded on submit, so a user filled in six fields that went nowhere.
+      // The API already accepts description/location/videoLink/attendees; they
+      // just were not being passed.
+      const attendees = form.attendees
+        .split(/[,;]/)
+        .map((email) => email.trim())
+        .filter(Boolean)
+        .map((email) => ({ email }));
+
+      // `type`, `reminder` and `deal` have no field on the calendar API. Rather
+      // than drop them, fold them into the description so the information
+      // reaches the invite instead of vanishing.
+      const descriptionParts = [
+        form.notes.trim(),
+        form.deal.trim() ? `Deal: ${form.deal.trim()}` : '',
+        form.type ? `Type: ${form.type}` : '',
+        form.reminder ? `Reminder: ${form.reminder}` : '',
+      ].filter(Boolean);
+
       return apiClients.integration.post('/integrations/calendar/events', {
         activityId: crypto.randomUUID(),
         summary: form.title,
         start: start.toISOString(),
         end: end.toISOString(),
+        ...(descriptionParts.length ? { description: descriptionParts.join('\n') } : {}),
+        ...(form.joinLink.trim() ? { videoLink: form.joinLink.trim() } : {}),
+        ...(attendees.length ? { attendees } : {}),
       });
     },
     onSuccess: async () => {
@@ -99,7 +132,19 @@ export default function CalendarPage() {
         <div className="mb-3 flex items-center justify-between rounded bg-surface-container-low p-3 text-sm">
           <div>
             <span className="font-medium">Google Calendar</span>{' '}
-            <CRMStatusBadge tone="emerald">Connected</CRMStatusBadge>
+            {/* Derived from the connector catalog, not hardcoded. This badge
+                previously read "Connected" as static text for everyone,
+                including users who had never linked a calendar — so the page
+                asserted a connection that did not exist and the Sync button
+                appeared to be silently failing rather than having nothing to
+                sync. */}
+            {googleConnected === undefined ? (
+              <CRMStatusBadge tone="slate">Checking…</CRMStatusBadge>
+            ) : googleConnected ? (
+              <CRMStatusBadge tone="emerald">Connected</CRMStatusBadge>
+            ) : (
+              <CRMStatusBadge tone="amber">Not connected</CRMStatusBadge>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-on-surface-variant">Last synced: {events.data?.[0]?.syncedAt ? new Date(events.data[0].syncedAt).toLocaleString() : 'Never'}</span>

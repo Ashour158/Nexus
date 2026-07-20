@@ -104,6 +104,13 @@ const nextConfig = {
       { source: '/bff/incentive/:path*', destination: 'http://incentive-service:3024/api/v1/:path*' },
       { source: '/bff/command-center/:path*', destination: 'http://workflow-service:3007/api/v1/command-center/:path*' },
       { source: '/bff/telephony/:path*', destination: 'http://comm-service:3009/api/v1/telephony/:path*' },
+      // The chatbot page previously fetched NEXT_PUBLIC_CHATBOT_URL directly,
+      // defaulting to http://localhost:3017 — a cross-origin, unauthenticated
+      // call from the BROWSER. It could only ever work on a dev box with the
+      // service running locally; in any real deployment it failed outright.
+      // Routing it through the BFF like every other service means middleware
+      // attaches the bearer and it stays same-origin.
+      { source: '/bff/chatbot/:path*', destination: 'http://chatbot-service:3017/api/v1/:path*' },
     ];
   },
   async headers() {

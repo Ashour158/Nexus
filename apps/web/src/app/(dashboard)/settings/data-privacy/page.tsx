@@ -9,6 +9,11 @@ import { ShieldAlert } from 'lucide-react';
 export default function DataPrivacyPage() {
   const token = useAuthStore((s) => s.accessToken);
   const isAdmin = useAuthStore((s) => s.isAdmin);
+  // The erasure endpoint requires `requestedBy` for the audit trail and rejects
+  // the request without it. This button previously POSTed to a misspelled path
+  // ("gdpe-erasure") with a `contactEmail` field the API does not accept, so it
+  // failed twice over — and only ever surfaced as a toast.
+  const currentUserEmail = useAuthStore((s) => s.email ?? '');
   const [transferFrom, setTransferFrom] = useState('');
   const [transferTo, setTransferTo] = useState('');
   const [modules, setModules] = useState<string[]>(['all']);
@@ -19,7 +24,7 @@ export default function DataPrivacyPage() {
   const { data: teamData } = useQuery({ queryKey: ['team'], queryFn: () => fetch('/api/auth/profile/team', { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()) });
 
   const transfer = useMutation({ mutationFn: () => fetch('/api/auth/data-ownership/transfer', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ fromUserId: transferFrom, toUserId: transferTo, modules }) }).then((r) => r.json()), onSuccess: (res) => res.success ? notify.success(res.message || 'Transfer initiated') : notify.error('Transfer failed', res.error) });
-  const gdprErase = useMutation({ mutationFn: () => fetch('/api/auth/data-ownership/gdpe-erasure', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ contactEmail: gdprEmail, reason: gdprReason }) }).then((r) => r.json()), onSuccess: (res) => res.success ? notify.success(res.message || 'Erasure request submitted') : notify.error('Request failed', res.error) });
+  const gdprErase = useMutation({ mutationFn: () => fetch('/api/auth/gdpr/erasure', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ subjectEmail: gdprEmail, requestedBy: currentUserEmail, reason: gdprReason }) }).then((r) => r.json()), onSuccess: (res) => res.success ? notify.success(res.message || 'Erasure request submitted') : notify.error('Request failed', res.error) });
 
   if (!isAdmin()) return <div className="flex flex-col items-center justify-center py-20"><ShieldAlert className="mb-4 h-12 w-12 text-outline" /><h2 className="text-lg font-semibold text-on-surface-variant">Admin Access Required</h2></div>;
 

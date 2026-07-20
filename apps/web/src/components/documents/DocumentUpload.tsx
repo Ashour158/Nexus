@@ -29,7 +29,11 @@ export function DocumentUpload() {
       try {
         const payload = new FormData();
         payload.append('file', file);
-        await apiClients.storage.post('/upload', payload, {
+        // storage-service registers this as POST /files/upload (files.routes.ts).
+        // Posting to /upload 404'd, so document upload had never worked — and
+        // because the failure surfaced only as a toast, the Documents page still
+        // looked functional (the file list reads a different, working endpoint).
+        await apiClients.storage.post('/files/upload', payload, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         setUploads((prev) => prev.map((x) => (x.id === u.id ? { ...x, progress: 100 } : x)));

@@ -18,9 +18,19 @@ import { useActivities, useCompleteActivity, useCreateActivity, useUpdateActivit
 import { useUsers } from '@/hooks/use-users';
 import { useAuthStore } from '@/stores/auth.store';
 import { useUiStore } from '@/stores/ui.store';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/button';
 import { ExportButton } from '@/components/export/ExportButton';
+import {
+  CRMEmptyState,
+  CRMMetricCard,
+  CRMMetricGrid,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMSidePanel,
+  CRMStatusBadge,
+  CRMTableShell,
+  CRMToolbar,
+} from '@/components/ui/crm';
 import {
   Dialog,
   DialogContent,
@@ -70,19 +80,21 @@ type StatusFilter = 'all' | 'open' | 'in-progress' | 'completed';
 type PriorityFilter = 'all' | 'HIGH' | 'NORMAL' | 'LOW';
 type DueFilter = 'all' | 'overdue' | 'today' | 'week';
 
-const PRIORITY_STYLES: Record<string, string> = {
-  HIGH: 'bg-error-container text-error',
-  NORMAL: 'bg-warning-container text-warning',
-  LOW: 'bg-success-container text-success',
+type BadgeTone = 'blue' | 'emerald' | 'amber' | 'orange' | 'rose' | 'slate';
+
+const PRIORITY_TONES: Record<string, BadgeTone> = {
+  HIGH: 'rose',
+  NORMAL: 'amber',
+  LOW: 'emerald',
 };
 
-const STATUS_STYLES: Record<string, string> = {
-  TODO: 'bg-primary-container text-primary',
-  PLANNED: 'bg-primary-container text-primary',
-  IN_PROGRESS: 'bg-warning-container text-warning',
-  COMPLETED: 'bg-success-container text-success',
-  DONE: 'bg-success-container text-success',
-  CANCELLED: 'bg-surface-container-high text-on-surface-variant',
+const STATUS_TONES: Record<string, BadgeTone> = {
+  TODO: 'blue',
+  PLANNED: 'blue',
+  IN_PROGRESS: 'amber',
+  COMPLETED: 'emerald',
+  DONE: 'emerald',
+  CANCELLED: 'slate',
 };
 
 function isCompleted(task: TaskItem): boolean {
@@ -253,82 +265,79 @@ export default function TasksPage(): ReactElement {
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <section className="min-w-0 space-y-5">
-        <div className="overflow-hidden rounded-lg border border-[#dbe7f3] bg-surface shadow-sm">
-          <div className="h-1.5 bg-gradient-to-r from-[#4A90E2] via-[#7ED321] to-warning" />
-          <div className="p-4 sm:p-5">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase text-primary">Execution queue</p>
-                <h1 className="mt-1 text-3xl font-black tracking-tight text-on-surface">Tasks</h1>
-                <p className="mt-1 text-sm text-on-surface-variant">Manage follow-ups, ownership, priorities, and due dates efficiently.</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <ExportButton module="tasks" />
-                <button
-                  type="button"
-                  onClick={openCreate}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#4A90E2] px-4 text-sm font-bold text-white shadow-sm"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Task
-                </button>
-              </div>
-            </div>
+    <CRMModuleShell className="space-y-6">
+      <CRMPageHeader
+        eyebrow="Execution queue"
+        icon={CheckSquare}
+        title="Tasks"
+        description="Manage follow-ups, ownership, priorities, and due dates efficiently."
+        actions={
+          <>
+            <ExportButton module="tasks" />
+            <Button onClick={openCreate}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add Task
+            </Button>
+          </>
+        }
+        metrics={
+          <CRMMetricGrid>
+            <CRMMetricCard icon={CheckSquare} label="Total Tasks" value={stats.total} tone="blue" />
+            <CRMMetricCard icon={AlertCircle} label="High Priority" value={stats.high} tone="rose" />
+            <CRMMetricCard icon={Clock} label="Overdue" value={stats.overdue} tone="amber" />
+            <CRMMetricCard icon={CheckCircle2} label="Completed" value={stats.completed} tone="emerald" />
+          </CRMMetricGrid>
+        }
+      />
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Metric label="Total Tasks" value={String(stats.total)} tone="blue" />
-              <Metric label="High Priority" value={String(stats.high)} tone="red" />
-              <Metric label="Overdue" value={String(stats.overdue)} tone="amber" />
-              <Metric label="Completed" value={String(stats.completed)} tone="green" />
-            </div>
-          </div>
+      <CRMToolbar>
+        <label className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search tasks..."
+            className="h-12 w-full rounded-lg border border-outline-variant bg-surface-container-high pl-10 pr-3 text-sm text-on-surface outline-none transition focus:border-primary/40 focus:bg-surface focus:ring-2 focus:ring-primary/30"
+          />
+        </label>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <FilterSelect label="Status" value={statusFilter} onChange={(value) => setStatusFilter(value as StatusFilter)} options={[
+            ['all', 'All'],
+            ['open', 'Open'],
+            ['in-progress', 'In Progress'],
+            ['completed', 'Completed'],
+          ]} />
+          <FilterSelect label="Priority" value={priorityFilter} onChange={(value) => setPriorityFilter(value as PriorityFilter)} options={[
+            ['all', 'All'],
+            ['HIGH', 'High'],
+            ['NORMAL', 'Medium'],
+            ['LOW', 'Low'],
+          ]} />
+          <FilterSelect label="Due Date" value={dueFilter} onChange={(value) => setDueFilter(value as DueFilter)} options={[
+            ['all', 'All'],
+            ['overdue', 'Overdue'],
+            ['today', 'Today'],
+            ['week', 'Next 7 Days'],
+          ]} />
         </div>
+      </CRMToolbar>
 
-        <div className="rounded-xl border border-[#e7edf3] bg-surface p-4 shadow-sm">
-          <div className="flex flex-col gap-3 lg:flex-row">
-            <label className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search tasks..."
-                className="h-12 w-full rounded-lg border border-outline-variant bg-surface-container-high pl-10 pr-3 text-sm outline-none transition focus:border-primary/40 focus:bg-surface focus:ring-2 focus:ring-primary/30"
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <section className="min-w-0">
+          <CRMTableShell>
+            {tasksQuery.isLoading ? (
+              <div className="space-y-3 p-4">
+                {[...Array(5)].map((_, index) => (
+                  <div key={index} className="h-16 animate-pulse rounded-lg bg-surface-container-high" />
+                ))}
+              </div>
+            ) : filteredTasks.length === 0 ? (
+              <CRMEmptyState
+                icon={CheckSquare}
+                title="No tasks found"
+                description="Change filters or create a new task from the activity workflow."
               />
-            </label>
-            <FilterSelect label="Status" value={statusFilter} onChange={(value) => setStatusFilter(value as StatusFilter)} options={[
-              ['all', 'All'],
-              ['open', 'Open'],
-              ['in-progress', 'In Progress'],
-              ['completed', 'Completed'],
-            ]} />
-            <FilterSelect label="Priority" value={priorityFilter} onChange={(value) => setPriorityFilter(value as PriorityFilter)} options={[
-              ['all', 'All'],
-              ['HIGH', 'High'],
-              ['NORMAL', 'Medium'],
-              ['LOW', 'Low'],
-            ]} />
-            <FilterSelect label="Due Date" value={dueFilter} onChange={(value) => setDueFilter(value as DueFilter)} options={[
-              ['all', 'All'],
-              ['overdue', 'Overdue'],
-              ['today', 'Today'],
-              ['week', 'Next 7 Days'],
-            ]} />
-          </div>
-        </div>
-
-        <div className="overflow-hidden rounded-xl border border-[#e7edf3] bg-surface shadow-sm">
-          {tasksQuery.isLoading ? (
-            <div className="space-y-3 p-4">
-              {[...Array(5)].map((_, index) => (
-                <div key={index} className="h-16 animate-pulse rounded-lg bg-surface-container-high" />
-              ))}
-            </div>
-          ) : filteredTasks.length === 0 ? (
-            <EmptyState icon="✓" title="No tasks found" description="Change filters or create a new task from the activity workflow." />
-          ) : (
-            <div className="overflow-x-auto">
+            ) : (
               <table className="w-full min-w-[760px] text-sm">
                 <thead className="bg-surface-container-low text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
                   <tr>
@@ -350,21 +359,25 @@ export default function TasksPage(): ReactElement {
                         selectedTask?.id === task.id && 'bg-primary-container/70'
                       )}
                     >
-                      <td className={cn('p-4 font-semibold', selectedTask?.id === task.id ? 'text-[#4A90E2]' : 'text-on-surface')}>
+                      <td className={cn('p-4 font-semibold', selectedTask?.id === task.id ? 'text-primary' : 'text-on-surface')}>
                         {task.subject}
                         {isOverdue(task) ? (
-                          <span className="ml-2 rounded-full bg-error-container px-2 py-0.5 text-[10px] font-bold uppercase text-error">
+                          <CRMStatusBadge tone="rose" className="ml-2 uppercase">
                             Overdue
-                          </span>
+                          </CRMStatusBadge>
                         ) : null}
                       </td>
                       <td className="p-4 text-on-surface-variant">{formatDate(task.dueDate)}</td>
                       <td className="p-4">
-                        <Badge className={PRIORITY_STYLES[task.priority] ?? PRIORITY_STYLES.NORMAL}>{task.priority}</Badge>
+                        <CRMStatusBadge tone={PRIORITY_TONES[task.priority] ?? 'amber'} className="uppercase">
+                          {task.priority}
+                        </CRMStatusBadge>
                       </td>
                       <td className="p-4 text-on-surface-variant">{task.ownerId ? ownerMap.get(task.ownerId) ?? task.ownerId : 'Unassigned'}</td>
                       <td className="p-4">
-                        <Badge className={STATUS_STYLES[task.status] ?? STATUS_STYLES.TODO}>{task.status.replace('_', ' ')}</Badge>
+                        <CRMStatusBadge tone={STATUS_TONES[task.status] ?? 'blue'} className="uppercase">
+                          {task.status.replace('_', ' ')}
+                        </CRMStatusBadge>
                       </td>
                       <td className="p-4">
                         {isCompleted(task) ? (
@@ -376,7 +389,7 @@ export default function TasksPage(): ReactElement {
                               event.stopPropagation();
                               void handleComplete(task);
                             }}
-                            className="font-semibold text-[#4A90E2] hover:underline"
+                            className="font-semibold text-primary hover:underline"
                           >
                             Complete
                           </button>
@@ -386,95 +399,90 @@ export default function TasksPage(): ReactElement {
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
-        </div>
-      </section>
+            )}
+          </CRMTableShell>
+        </section>
 
-      <aside className="rounded-xl border border-[#e7edf3] bg-surface p-5 shadow-sm xl:sticky xl:top-24 xl:self-start">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase text-primary">Task details</p>
-            <h2 className="mt-1 text-xl font-bold text-on-surface">Selected task</h2>
-          </div>
-          <div className="rounded-lg bg-primary-container p-2 text-primary">
-            <CheckSquare className="h-5 w-5" />
-          </div>
-        </div>
-
-        {selectedTask ? (
-          <form className="mt-5 space-y-4" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
-            <Field label="Task Name">
-              <input className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.subject} onChange={(event) => setDraft((prev) => ({ ...prev, subject: event.target.value }))} />
-            </Field>
-            <Field label="Description">
-              <textarea className="form-textarea min-h-28 w-full resize-none rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.description} onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))} />
-            </Field>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-              <Field label="Due Date">
-                <input type="date" className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.dueDate} onChange={(event) => setDraft((prev) => ({ ...prev, dueDate: event.target.value }))} />
+        <CRMSidePanel
+          title="Selected task"
+          description="Inspect and edit the task highlighted in the queue."
+          className="xl:sticky xl:top-24 xl:self-start"
+        >
+          {selectedTask ? (
+            <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
+              <Field label="Task Name">
+                <input className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.subject} onChange={(event) => setDraft((prev) => ({ ...prev, subject: event.target.value }))} />
               </Field>
-              <Field label="Priority">
-                <select className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.priority} onChange={(event) => setDraft((prev) => ({ ...prev, priority: event.target.value }))}>
-                  <option value="LOW">Low</option>
-                  <option value="NORMAL">Medium</option>
-                  <option value="HIGH">High</option>
-                </select>
+              <Field label="Description">
+                <textarea className="form-textarea min-h-28 w-full resize-none rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.description} onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))} />
               </Field>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-              <Field label="Assigned To">
-                <select className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.ownerId} onChange={(event) => setDraft((prev) => ({ ...prev, ownerId: event.target.value }))}>
-                  <option value="">Unassigned</option>
-                  {(usersQuery.data?.data ?? []).map((user) => (
-                    <option key={user.id} value={user.id}>{user.firstName} {user.lastName}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Status">
-                <select className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.status} onChange={(event) => setDraft((prev) => ({ ...prev, status: event.target.value }))}>
-                  <option value="TODO">Open</option>
-                  <option value="PLANNED">Planned</option>
-                  <option value="IN_PROGRESS">In Progress</option>
-                  <option value="COMPLETED">Completed</option>
-                </select>
-              </Field>
-            </div>
-
-            <div>
-              <p className="mb-1 text-sm font-medium text-on-surface">Associated Record</p>
-              <div className="space-y-2 rounded-lg bg-surface-container-high p-3 text-sm">
-                <AssociatedLink href={selectedTask.leadId ? `/leads/${selectedTask.leadId}` : null} label="Lead" value={selectedTask.leadId} />
-                <AssociatedLink href={selectedTask.dealId ? `/deals/${selectedTask.dealId}` : null} label="Deal" value={selectedTask.dealId} />
-                <AssociatedLink href={selectedTask.contactId ? `/contacts/${selectedTask.contactId}` : null} label="Contact" value={selectedTask.contactId} />
-                <AssociatedLink href={selectedTask.accountId ? `/accounts/${selectedTask.accountId}` : null} label="Account" value={selectedTask.accountId} />
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                <Field label="Due Date">
+                  <input type="date" className="form-input h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.dueDate} onChange={(event) => setDraft((prev) => ({ ...prev, dueDate: event.target.value }))} />
+                </Field>
+                <Field label="Priority">
+                  <select className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.priority} onChange={(event) => setDraft((prev) => ({ ...prev, priority: event.target.value }))}>
+                    <option value="LOW">Low</option>
+                    <option value="NORMAL">Medium</option>
+                    <option value="HIGH">High</option>
+                  </select>
+                </Field>
               </div>
-            </div>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                <Field label="Assigned To">
+                  <select className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.ownerId} onChange={(event) => setDraft((prev) => ({ ...prev, ownerId: event.target.value }))}>
+                    <option value="">Unassigned</option>
+                    {(usersQuery.data?.data ?? []).map((user) => (
+                      <option key={user.id} value={user.id}>{user.firstName} {user.lastName}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Status">
+                  <select className="form-select h-11 w-full rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary/30" value={draft.status} onChange={(event) => setDraft((prev) => ({ ...prev, status: event.target.value }))}>
+                    <option value="TODO">Open</option>
+                    <option value="PLANNED">Planned</option>
+                    <option value="IN_PROGRESS">In Progress</option>
+                    <option value="COMPLETED">Completed</option>
+                  </select>
+                </Field>
+              </div>
 
-            <div className="grid gap-3 rounded-lg border border-outline-variant bg-surface-container-low p-3 text-sm text-on-surface-variant">
-              <span className="inline-flex items-center gap-2"><CalendarDays className="h-4 w-4 text-primary" /> Created {formatDate(selectedTask.createdAt)}</span>
-              <span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4 text-primary" /> Owner {selectedTask.ownerId ? ownerMap.get(selectedTask.ownerId) ?? selectedTask.ownerId : 'Unassigned'}</span>
-              {isOverdue(selectedTask) ? <span className="inline-flex items-center gap-2 text-error"><AlertCircle className="h-4 w-4" /> This task is overdue</span> : null}
-            </div>
+              <div>
+                <p className="mb-1 text-sm font-medium text-on-surface">Associated Record</p>
+                <div className="space-y-2 rounded-lg bg-surface-container-high p-3 text-sm">
+                  <AssociatedLink href={selectedTask.leadId ? `/leads/${selectedTask.leadId}` : null} label="Lead" value={selectedTask.leadId} />
+                  <AssociatedLink href={selectedTask.dealId ? `/deals/${selectedTask.dealId}` : null} label="Deal" value={selectedTask.dealId} />
+                  <AssociatedLink href={selectedTask.contactId ? `/contacts/${selectedTask.contactId}` : null} label="Contact" value={selectedTask.contactId} />
+                  <AssociatedLink href={selectedTask.accountId ? `/accounts/${selectedTask.accountId}` : null} label="Account" value={selectedTask.accountId} />
+                </div>
+              </div>
 
-            <div className="flex justify-end gap-3 border-t border-outline-variant pt-4">
-              <button type="button" className="h-10 rounded-lg bg-surface-container-high px-4 text-sm font-bold text-on-surface" onClick={() => setSelectedId(filteredTasks[0]?.id ?? null)}>
-                Cancel
-              </button>
-              <Button type="submit" className="h-10 bg-[#7ED321] px-4 text-sm font-bold text-white hover:bg-[#70bd1d]" isLoading={updateActivity.isPending}>
-                <CheckCircle2 className="mr-2 h-4 w-4" />
-                Save Changes
-              </Button>
-            </div>
-          </form>
-        ) : (
-          <div className="mt-8 rounded-lg border border-dashed border-outline-variant bg-surface-container-low p-8 text-center">
-            <Clock className="mx-auto h-10 w-10 text-outline" />
-            <p className="mt-3 text-sm font-semibold text-on-surface">No task selected</p>
-            <p className="mt-1 text-sm text-on-surface-variant">Select a task from the queue to inspect and edit it.</p>
-          </div>
-        )}
-      </aside>
+              <div className="grid gap-3 rounded-lg border border-outline-variant bg-surface-container-low p-3 text-sm text-on-surface-variant">
+                <span className="inline-flex items-center gap-2"><CalendarDays className="h-4 w-4 text-primary" /> Created {formatDate(selectedTask.createdAt)}</span>
+                <span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4 text-primary" /> Owner {selectedTask.ownerId ? ownerMap.get(selectedTask.ownerId) ?? selectedTask.ownerId : 'Unassigned'}</span>
+                {isOverdue(selectedTask) ? <span className="inline-flex items-center gap-2 text-error"><AlertCircle className="h-4 w-4" /> This task is overdue</span> : null}
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-outline-variant pt-4">
+                <button type="button" className="h-10 rounded-lg bg-surface-container-high px-4 text-sm font-bold text-on-surface" onClick={() => setSelectedId(filteredTasks[0]?.id ?? null)}>
+                  Cancel
+                </button>
+                <Button type="submit" className="h-10 px-4 text-sm font-bold" isLoading={updateActivity.isPending}>
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Save Changes
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <CRMEmptyState
+              icon={Clock}
+              title="No task selected"
+              description="Select a task from the queue to inspect and edit it."
+              className="rounded-lg border border-dashed border-outline-variant bg-surface-container-low"
+            />
+          )}
+        </CRMSidePanel>
+      </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
@@ -547,32 +555,14 @@ export default function TasksPage(): ReactElement {
               <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-[#7ED321] text-white hover:bg-[#70bd1d]" isLoading={createActivity.isPending}>
+              <Button type="submit" isLoading={createActivity.isPending}>
                 Create task
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-function Metric({ label, value, tone }: { label: string; value: string; tone: 'blue' | 'red' | 'amber' | 'green' }): ReactElement {
-  const styles = {
-    blue: 'from-primary to-info text-primary',
-    red: 'from-error to-tertiary text-error',
-    amber: 'from-warning to-warning text-warning',
-    green: 'from-success to-success text-success',
-  }[tone];
-  return (
-    <div className="overflow-hidden rounded-lg border border-[#e7edf3] bg-[#f9f9ff]">
-      <div className={cn('h-1.5 bg-gradient-to-r', styles.split(' ').slice(0, 2).join(' '))} />
-      <div className="p-4">
-        <p className="text-xs font-semibold uppercase text-on-surface-variant">{label}</p>
-        <p className={cn('mt-2 text-2xl font-bold', styles.split(' ')[2])}>{value}</p>
-      </div>
-    </div>
+    </CRMModuleShell>
   );
 }
 
@@ -604,10 +594,6 @@ function FilterSelect({
   );
 }
 
-function Badge({ children, className }: { children: React.ReactNode; className: string }): ReactElement {
-  return <span className={cn('rounded-full px-2 py-1 text-xs font-bold uppercase', className)}>{children}</span>;
-}
-
 function Field({ label, children }: { label: string; children: React.ReactNode }): ReactElement {
   return (
     <label className="block">
@@ -620,13 +606,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function AssociatedLink({ href, label, value }: { href: string | null; label: string; value: string | null }): ReactElement | null {
   if (!value) return null;
   return href ? (
-    <Link href={href} className="flex items-center gap-2 font-medium text-[#4A90E2] hover:underline">
+    <Link href={href} className="flex items-center gap-2 font-medium text-primary hover:underline">
       <CheckSquare className="h-4 w-4" />
       {label}: {value}
     </Link>
   ) : (
     <span className="flex items-center gap-2 font-medium text-on-surface">
-      <CheckSquare className="h-4 w-4 text-[#4A90E2]" />
+      <CheckSquare className="h-4 w-4 text-primary" />
       {label}: {value}
     </span>
   );

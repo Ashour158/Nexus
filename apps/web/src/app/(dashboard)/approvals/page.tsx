@@ -8,7 +8,6 @@ import {
   Clock3,
   FileCheck2,
   Filter,
-  GitBranch,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -25,7 +24,20 @@ import {
 } from '@/hooks/use-approvals';
 import { ApprovalDetailDrawer } from '@/components/approvals/ApprovalDetailDrawer';
 import { PolicyAdmin } from '@/components/approvals/PolicyAdmin';
-import { cn } from '@/lib/cn';
+import {
+  CRMCard,
+  CRMEmptyState,
+  CRMErrorState,
+  CRMFilterPills,
+  CRMMetricCard,
+  CRMMetricGrid,
+  CRMModuleShell,
+  CRMPageHeader,
+  CRMSegmentedControl,
+  CRMSidePanel,
+  CRMStatusBadge,
+  CRMToolbar,
+} from '@/components/ui/crm';
 
 type Scope = 'MINE' | 'ALL' | ApprovalStatus;
 type View = 'inbox' | 'policies';
@@ -72,12 +84,14 @@ const PREVIEW_APPROVALS: ApprovalRequest[] = [
   },
 ];
 
-function statusClass(status: ApprovalStatus): string {
-  if (status === 'PENDING') return 'bg-warning-container text-on-warning-container ring-warning/30';
-  if (status === 'ESCALATED') return 'bg-warning-container text-on-warning-container ring-warning/30';
-  if (status === 'APPROVED') return 'bg-success-container text-on-success-container ring-success/30';
-  if (status === 'CANCELLED') return 'bg-surface-container-high text-on-surface-variant ring-outline-variant';
-  return 'bg-error-container text-error ring-error/30';
+type BadgeTone = 'blue' | 'emerald' | 'amber' | 'orange' | 'rose' | 'slate';
+
+function statusTone(status: ApprovalStatus): BadgeTone {
+  if (status === 'PENDING') return 'amber';
+  if (status === 'ESCALATED') return 'amber';
+  if (status === 'APPROVED') return 'emerald';
+  if (status === 'CANCELLED') return 'slate';
+  return 'rose';
 }
 
 function money(value: unknown): string {
@@ -163,112 +177,82 @@ export default function ApprovalsPage() {
   const listLoading = scope === 'MINE' ? mineQuery.isLoading : allQuery.isLoading;
 
   return (
-    <div className="space-y-8">
-      <section className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
-        <div className="grid gap-0 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="p-6 sm:p-8">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center gap-2 rounded-lg bg-primary-container px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#4f46e5]">
-                <ShieldCheck className="h-4 w-4" />
-                Governance Queue
-              </span>
-              <span className="rounded-lg bg-surface-container-high px-3 py-2 text-xs font-semibold text-on-surface-variant">
-                Approval engine
-              </span>
-            </div>
-            <div className="mt-5 max-w-3xl">
-              <h1 className="text-3xl font-black tracking-tight text-on-surface sm:text-4xl">
-                Approval command center
-              </h1>
-              <p className="mt-3 text-sm leading-6 text-on-surface-variant sm:text-base">
-                Review multi-level approval requests across every module, act on your queue, and govern
-                the routing policies behind them.
-              </p>
-            </div>
-            <div className="mt-5 flex gap-2">
-              <ViewTab active={view === 'inbox'} onClick={() => setView('inbox')} icon={FileCheck2} label="Inbox" />
-              {isAdmin ? (
-                <ViewTab
-                  active={view === 'policies'}
-                  onClick={() => setView('policies')}
-                  icon={SlidersHorizontal}
-                  label="Policies"
-                />
-              ) : null}
-            </div>
-          </div>
-          <div className="border-t border-outline-variant bg-surface-container-low p-6 lg:border-l lg:border-t-0">
-            <div className="grid grid-cols-2 gap-3">
-              <MetricCard icon={Clock3} label="Pending" value={stats.pending} tone="amber" />
-              <MetricCard icon={AlertCircle} label="Escalated" value={stats.escalated} tone="orange" />
-              <MetricCard icon={CheckCircle2} label="Approved" value={stats.approved} tone="emerald" />
-              <MetricCard icon={FileCheck2} label="In view" value={stats.all} tone="blue" />
-            </div>
-          </div>
-        </div>
-      </section>
+    <CRMModuleShell>
+      <CRMPageHeader
+        eyebrow="Governance Queue"
+        icon={ShieldCheck}
+        title="Approval command center"
+        description="Review multi-level approval requests across every module, act on your queue, and govern the routing policies behind them."
+        badges={
+          <span className="rounded-lg bg-surface-container-high px-3 py-2 text-xs font-semibold text-on-surface-variant">
+            Approval engine
+          </span>
+        }
+        actions={
+          <CRMSegmentedControl
+            value={view}
+            onChange={setView}
+            options={
+              isAdmin
+                ? [
+                    { value: 'inbox' as View, label: 'Inbox', icon: FileCheck2 },
+                    { value: 'policies' as View, label: 'Policies', icon: SlidersHorizontal },
+                  ]
+                : [{ value: 'inbox' as View, label: 'Inbox', icon: FileCheck2 }]
+            }
+          />
+        }
+        metrics={
+          <CRMMetricGrid>
+            <CRMMetricCard icon={Clock3} label="Pending" value={stats.pending} tone="amber" />
+            <CRMMetricCard icon={AlertCircle} label="Escalated" value={stats.escalated} tone="orange" />
+            <CRMMetricCard icon={CheckCircle2} label="Approved" value={stats.approved} tone="emerald" />
+            <CRMMetricCard icon={FileCheck2} label="In view" value={stats.all} tone="blue" />
+          </CRMMetricGrid>
+        }
+      />
 
       {view === 'policies' && isAdmin ? (
         <PolicyAdmin />
       ) : (
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="min-w-0 space-y-6">
-            <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div className="flex flex-wrap gap-2">
-                  {SCOPES.map((item) => (
-                    <button
-                      key={item.value}
-                      type="button"
-                      onClick={() => setScope(item.value)}
-                      className={cn(
-                        'rounded-lg px-4 py-2 text-sm font-bold transition',
-                        scope === item.value
-                          ? 'bg-[#4f46e5] text-white shadow-sm'
-                          : 'border border-outline-variant bg-surface text-on-surface-variant hover:border-primary/40 hover:bg-primary-container hover:text-[#4f46e5]'
-                      )}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <label className="relative block min-w-0 sm:w-72">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
-                    <input
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      className="h-11 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-10 pr-3 text-sm text-on-surface outline-none transition focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
-                      placeholder="Search approvals..."
-                      type="search"
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    onClick={refresh}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 text-sm font-bold text-on-surface-variant transition hover:bg-surface-container-low"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Refresh
-                  </button>
-                </div>
+            <CRMToolbar>
+              <CRMFilterPills value={scope} options={SCOPES} onChange={setScope} />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <label className="relative block min-w-0 sm:w-72">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    className="h-11 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-10 pr-3 text-sm text-on-surface outline-none transition focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/30"
+                    placeholder="Search approvals..."
+                    type="search"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={refresh}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-outline-variant bg-surface px-4 text-sm font-bold text-on-surface-variant transition hover:bg-surface-container-low"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </button>
               </div>
-            </div>
+            </CRMToolbar>
 
-            <section className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant px-5 py-4">
-                <div>
-                  <h2 className="text-lg font-bold text-on-surface">Decision inbox</h2>
-                  <p className="text-sm text-on-surface-variant">
-                    {listLoading ? 'Loading approvals...' : `${rows.length} records in view`}
-                  </p>
-                </div>
+            <CRMCard
+              padded={false}
+              title="Decision inbox"
+              description={listLoading ? 'Loading approvals...' : `${rows.length} records in view`}
+              actions={
                 <span className="inline-flex items-center gap-2 rounded-lg bg-surface-container-high px-3 py-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                   <Filter className="h-4 w-4" />
                   {scope}
                 </span>
-              </div>
-
+              }
+              className="overflow-hidden"
+            >
               {usingPreview ? (
                 <div className="border-b border-warning/30 bg-warning-container px-5 py-3 text-sm font-medium text-on-warning-container">
                   Approval service is offline — showing development preview records.
@@ -276,11 +260,12 @@ export default function ApprovalsPage() {
               ) : null}
 
               {allError && !usingPreview && scope !== 'MINE' ? (
-                <StatePanel
-                  icon={AlertCircle}
-                  title="Approval service is unavailable"
-                  body="The queue could not be loaded. The page shell is stable; retry once the approval service is back online."
-                />
+                <div className="p-5">
+                  <CRMErrorState
+                    title="Approval service is unavailable"
+                    description="The queue could not be loaded. The page shell is stable; retry once the approval service is back online."
+                  />
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[900px] text-left text-sm">
@@ -302,7 +287,7 @@ export default function ApprovalsPage() {
                           <tr key={row.id} className="transition hover:bg-surface-container-low/80">
                             <td className="px-5 py-4">
                               <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-container text-xs font-black text-[#4f46e5]">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-container text-xs font-black text-on-primary-container">
                                   {initials(row.module)}
                                 </div>
                                 <div className="min-w-0">
@@ -319,15 +304,13 @@ export default function ApprovalsPage() {
                             <td className="px-5 py-4 text-on-surface-variant">L{row.currentStep}</td>
                             <td className="px-5 py-4 text-on-surface-variant">{formatDate(row.createdAt)}</td>
                             <td className="px-5 py-4">
-                              <span className={cn('inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-bold ring-1', statusClass(row.status))}>
-                                {row.status}
-                              </span>
+                              <CRMStatusBadge tone={statusTone(row.status)}>{row.status}</CRMStatusBadge>
                             </td>
                             <td className="px-5 py-4 text-right">
                               <button
                                 type="button"
                                 onClick={() => setOpenId(row.id)}
-                                className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-xs font-bold text-[#4f46e5] transition hover:bg-primary-container"
+                                className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary-container"
                               >
                                 Review
                               </button>
@@ -337,11 +320,11 @@ export default function ApprovalsPage() {
                       })}
                       {rows.length === 0 ? (
                         <tr>
-                          <td className="px-5 py-12" colSpan={7}>
-                            <StatePanel
+                          <td colSpan={7}>
+                            <CRMEmptyState
                               icon={listLoading ? TimerReset : FileCheck2}
                               title={listLoading ? 'Loading approval queue' : 'No approvals match this view'}
-                              body={
+                              description={
                                 listLoading
                                   ? 'Fetching request status, approvers, and commercial impact.'
                                   : 'Try another scope or search term.'
@@ -354,23 +337,16 @@ export default function ApprovalsPage() {
                   </table>
                 </div>
               )}
-            </section>
+            </CRMCard>
           </div>
 
           <aside className="space-y-6">
             <DiscountRequestCard onCreated={refresh} />
 
-            <section className="rounded-xl border border-outline-variant bg-surface p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-bold text-on-surface">Awaiting my decision</h2>
-                  <p className="text-sm text-on-surface-variant">Requests routed to you right now.</p>
-                </div>
-                <GitBranch className="h-5 w-5 text-[#4f46e5]" />
-              </div>
-              <div className="mt-5 space-y-3">
+            <CRMSidePanel title="Awaiting my decision" description="Requests routed to you right now.">
+              <div className="space-y-3">
                 {mineQuery.isError && !isDev ? (
-                  <StatePanel icon={AlertCircle} title="Could not load your queue" body="Retry when the approval service is reachable." compact />
+                  <CRMErrorState title="Could not load your queue" description="Retry when the approval service is reachable." />
                 ) : null}
                 {mineRows.map((row) => (
                   <button
@@ -384,26 +360,26 @@ export default function ApprovalsPage() {
                         <p className="truncate font-bold text-on-surface">{row.module}</p>
                         <p className="mt-1 truncate font-mono text-xs text-on-surface-variant">{row.recordId}</p>
                       </div>
-                      <span className={cn('shrink-0 rounded px-2 py-1 text-[10px] font-bold ring-1', statusClass(row.status))}>
+                      <CRMStatusBadge tone={statusTone(row.status)} className="shrink-0 text-[10px]">
                         {row.status}
-                      </span>
+                      </CRMStatusBadge>
                     </div>
                   </button>
                 ))}
                 {!mineQuery.isError && mineRows.length === 0 ? (
-                  <StatePanel
+                  <CRMEmptyState
                     icon={CheckCircle2}
                     title={mineQuery.isLoading ? 'Loading your approvals' : 'Nothing waiting on you'}
-                    body={mineQuery.isLoading ? 'Checking requests routed to you.' : 'Your approval queue is clear.'}
-                    compact
+                    description={mineQuery.isLoading ? 'Checking requests routed to you.' : 'Your approval queue is clear.'}
+                    className="p-5"
                   />
                 ) : null}
               </div>
-            </section>
+            </CRMSidePanel>
 
-            <section className="rounded-xl bg-inverse-surface p-5 text-white shadow-sm">
+            <section className="rounded-xl bg-inverse-surface p-5 text-inverse-on-surface shadow-card">
               <h2 className="text-lg font-bold">Approval controls</h2>
-              <div className="mt-4 space-y-4 text-sm text-outline">
+              <div className="mt-4 space-y-4 text-sm text-inverse-on-surface/70">
                 <ControlLine label="Routing engine" value="Policy + hierarchy" />
                 <ControlLine label="Quorum" value="ALL / ANY / N-of-M" />
                 <ControlLine label="Audit trail" value="Immutable events" />
@@ -422,7 +398,7 @@ export default function ApprovalsPage() {
           isAdmin={isAdmin}
         />
       ) : null}
-    </div>
+    </CRMModuleShell>
   );
 }
 
@@ -500,15 +476,8 @@ function DiscountRequestCard({ onCreated }: { onCreated: () => void }) {
   });
 
   return (
-    <section className="rounded-xl border border-outline-variant bg-surface p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-on-surface">Create DRQ</h2>
-          <p className="text-sm text-on-surface-variant">Validated discount request with approval hierarchy.</p>
-        </div>
-        <ShieldCheck className="h-5 w-5 text-[#4f46e5]" />
-      </div>
-      <div className="mt-4 space-y-3">
+    <CRMSidePanel title="Create DRQ" description="Validated discount request with approval hierarchy.">
+      <div className="space-y-3">
         <label className="block text-xs font-bold uppercase tracking-wide text-on-surface-variant">
           Quote
           <select
@@ -587,10 +556,10 @@ function DiscountRequestCard({ onCreated }: { onCreated: () => void }) {
           ))}
         </div>
         {createDrq.isError ? (
-          <p className="rounded-lg bg-error-container p-2 text-xs font-semibold text-error">{createDrq.error.message}</p>
+          <p className="rounded-lg bg-error-container p-2 text-xs font-semibold text-on-error-container">{createDrq.error.message}</p>
         ) : null}
         {createDrq.isSuccess ? (
-          <p className="rounded-lg bg-success-container p-2 text-xs font-semibold text-success">
+          <p className="rounded-lg bg-success-container p-2 text-xs font-semibold text-on-success-container">
             DRQ created and routed to the approval workflow.
           </p>
         ) : null}
@@ -598,98 +567,20 @@ function DiscountRequestCard({ onCreated }: { onCreated: () => void }) {
           type="button"
           onClick={() => createDrq.mutate()}
           disabled={createDrq.isPending}
-          className="w-full rounded-lg bg-[#4f46e5] px-4 py-2 text-sm font-bold text-white transition hover:bg-primary disabled:opacity-60"
+          className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:bg-primary/90 disabled:opacity-60"
         >
           {createDrq.isPending ? 'Validating...' : 'Create DRQ workflow'}
         </button>
       </div>
-    </section>
-  );
-}
-
-function ViewTab({
-  active,
-  onClick,
-  icon: Icon,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition',
-        active
-          ? 'bg-inverse-surface text-white'
-          : 'border border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container-low'
-      )}
-    >
-      <Icon className="h-4 w-4" />
-      {label}
-    </button>
-  );
-}
-
-function MetricCard({
-  icon: Icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: number;
-  tone: 'amber' | 'orange' | 'emerald' | 'blue';
-}) {
-  const tones = {
-    amber: 'bg-warning-container text-warning',
-    orange: 'bg-warning-container text-warning',
-    emerald: 'bg-success-container text-success',
-    blue: 'bg-primary-container text-[#4f46e5]',
-  };
-  return (
-    <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
-      <div className={cn('mb-3 inline-flex rounded-lg p-2', tones[tone])}>
-        <Icon className="h-4 w-4" />
-      </div>
-      <p className="text-2xl font-black text-on-surface">{value}</p>
-      <p className="mt-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant">{label}</p>
-    </div>
-  );
-}
-
-function StatePanel({
-  icon: Icon,
-  title,
-  body,
-  compact = false,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  body: string;
-  compact?: boolean;
-}) {
-  return (
-    <div className={cn('flex flex-col items-center justify-center text-center', compact ? 'py-5' : 'py-10')}>
-      <div className="rounded-lg bg-surface-container-high p-3 text-on-surface-variant">
-        <Icon className="h-5 w-5" />
-      </div>
-      <p className="mt-3 font-bold text-on-surface">{title}</p>
-      <p className="mt-1 max-w-md text-sm leading-6 text-on-surface-variant">{body}</p>
-    </div>
+    </CRMSidePanel>
   );
 }
 
 function ControlLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-surface/10 pb-3 last:border-0 last:pb-0">
+    <div className="flex items-center justify-between gap-4 border-b border-inverse-on-surface/10 pb-3 last:border-0 last:pb-0">
       <span>{label}</span>
-      <span className="font-bold text-white">{value}</span>
+      <span className="font-bold text-inverse-on-surface">{value}</span>
     </div>
   );
 }

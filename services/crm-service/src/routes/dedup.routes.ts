@@ -5,6 +5,30 @@ import type { createDedupService } from '../services/dedup.service.js';
 
 type DedupService = ReturnType<typeof createDedupService>;
 
+/**
+ * May this caller manage duplicates?
+ *
+ * The seeded super-user role is `SUPER_ADMIN` (see seed-demo.mjs). Every check
+ * in this file tested only for `admin` / `manager`, so the platform's most
+ * privileged role was refused with a 403 on every dedup endpoint — the merge UI
+ * on /settings/duplicates and /accounts/duplicates was unusable for exactly the
+ * people meant to use it.
+ *
+ * auth-service hit this same bug and fixed it the same way in
+ * profile.routes.ts and data-ownership.routes.ts; this file was missed. Kept as
+ * one helper rather than four copies so the next role rename has a single place
+ * to change.
+ */
+function canManageDuplicates(roles: string[] | undefined): boolean {
+  const roleSet = new Set((roles ?? []).map((r) => r.toLowerCase()));
+  return (
+    roleSet.has('admin') ||
+    roleSet.has('manager') ||
+    roleSet.has('super_admin') ||
+    roleSet.has('superadmin')
+  );
+}
+
 export async function registerDedupRoutes(
   app: FastifyInstance,
   prisma: CrmPrisma,
@@ -13,8 +37,7 @@ export async function registerDedupRoutes(
   await app.register(async (r) => {
     r.post('/dedup/scan', async (req, reply) => {
       const { tenantId, roles } = (req as any).user as { tenantId: string; roles: string[] };
-      const roleSet = new Set((roles ?? []).map((x) => x.toLowerCase()));
-      if (!roleSet.has('admin') && !roleSet.has('manager')) {
+      if (!canManageDuplicates(roles)) {
         return reply.code(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Forbidden', requestId: req.id } });
       }
       dedupService.runFullScan(tenantId).catch((err) => app.log.error({ err }, 'Dedup scan failed'));
@@ -23,8 +46,7 @@ export async function registerDedupRoutes(
 
     r.get('/dedup/groups', async (req, reply) => {
       const { tenantId, roles } = (req as any).user as { tenantId: string; roles: string[] };
-      const roleSet = new Set((roles ?? []).map((x) => x.toLowerCase()));
-      if (!roleSet.has('admin') && !roleSet.has('manager')) {
+      if (!canManageDuplicates(roles)) {
         return reply.code(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Forbidden', requestId: req.id } });
       }
       const { entityType, status = 'pending', limit = '20', offset = '0' } = req.query as {
@@ -129,8 +151,7 @@ export async function registerDedupRoutes(
 
     r.post('/dedup/groups/:id/merge', async (req, reply) => {
       const { tenantId, sub: userId, roles } = (req as any).user as { tenantId: string; sub: string; roles: string[] };
-      const roleSet = new Set((roles ?? []).map((x) => x.toLowerCase()));
-      if (!roleSet.has('admin') && !roleSet.has('manager')) {
+      if (!canManageDuplicates(roles)) {
         return reply.code(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Forbidden', requestId: req.id } });
       }
       const { id } = req.params as { id: string };
@@ -154,8 +175,7 @@ export async function registerDedupRoutes(
 
     r.post('/dedup/groups/:id/dismiss', async (req, reply) => {
       const { sub: userId, roles } = (req as any).user as { sub: string; roles: string[] };
-      const roleSet = new Set((roles ?? []).map((x) => x.toLowerCase()));
-      if (!roleSet.has('admin') && !roleSet.has('manager')) {
+      if (!canManageDuplicates(roles)) {
         return reply.code(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Forbidden', requestId: req.id } });
       }
       const { id } = req.params as { id: string };

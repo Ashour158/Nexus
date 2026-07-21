@@ -149,9 +149,14 @@ export async function middleware(request: NextRequest) {
     ) {
       const rotated = await rotateTokens(refreshCookie);
       if (rotated) {
-        const headers = new Headers(request.headers);
-        headers.set('authorization', `Bearer ${rotated.accessToken}`);
-        const res = NextResponse.next({ request: { headers } });
+        // 307 back to the SAME URL with the rotated cookies. Set-Cookie from a
+        // pass-through response does not survive the external /bff rewrite
+        // (verified live: rotation worked but the browser kept the consumed
+        // refresh token, so the very next call 401'd). A redirect response
+        // always carries middleware cookies; browsers and fetch() retry the
+        // request automatically — with the fresh nexus_token, this branch is
+        // then skipped, so no loop.
+        const res = NextResponse.redirect(request.url, 307);
         res.cookies.set({
           name: TOKEN_COOKIE,
           value: rotated.accessToken,

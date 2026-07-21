@@ -1,6 +1,6 @@
 {
   "uid": "nexus-tenant-sla",
-  "title": "Nexus \u00e2\u20ac\u201d Tenant SLA Prerequisite",
+  "title": "Nexus — Tenant SLA Prerequisite",
   "description": "Per-tenant SLA panels are gated because the current HTTP collectors are not observed and do not define tenant_id or user_id labels.",
   "tags": [
     "sla",

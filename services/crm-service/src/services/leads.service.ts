@@ -63,17 +63,25 @@ function buildWhere(
   if (filters.status) where.status = filters.status;
   if (filters.source) where.source = filters.source;
   if (filters.rating) where.rating = filters.rating;
-  if (filters.search?.trim()) {
-    const q = filters.search.trim();
-    where.OR = [
-      { firstName: { contains: q, mode: 'insensitive' } },
-      { lastName: { contains: q, mode: 'insensitive' } },
-      { email: { contains: q, mode: 'insensitive' } },
-      { company: { contains: q, mode: 'insensitive' } },
-    ];
-  }
+  // Free-text `search` is intentionally NOT a SQL contains: firstName/
+  // lastName/email are stored encrypted, so ciphertext substring match never
+  // hits (it silently returned nothing whenever encryption was on). The
+  // filter is applied decrypt-side in listLeads. `company` stays plaintext
+  // but rides the same in-memory path for one consistent behavior.
   return where;
 }
+
+/** Case-insensitive substring match across decrypted fields. */
+function leadMatchesQuery(row: Record<string, unknown>, q: string): boolean {
+  const needle = q.toLowerCase();
+  return ['firstName', 'lastName', 'email', 'company'].some((f) => {
+    const v = row[f];
+    return typeof v === 'string' && v.toLowerCase().includes(needle);
+  });
+}
+
+/** Cap for decrypt-side search/sort passes — see contacts.service for rationale. */
+const DECRYPT_SEARCH_CAP = 5000;
 
 function resolveSortField(
   sortBy: string | undefined
@@ -135,6 +143,38 @@ export function createLeadsService(prisma: CrmPrisma, producer: NexusProducer) {
         tenantId,
         { filters, pagination, ownership: access?.ownershipWhere ?? null, roles: access?.roles ?? null },
         async () => {
+          const q = filters.search?.trim();
+          const encryptedSort = sortField === 'lastName';
+          if (q || encryptedSort) {
+            const all = await prisma.lead.findMany({
+              where,
+              take: DECRYPT_SEARCH_CAP,
+              orderBy: { createdAt: 'desc' },
+            });
+            let rows = q
+              ? (all as unknown as Record<string, unknown>[]).filter((r) => leadMatchesQuery(r, q))
+              : (all as unknown as Record<string, unknown>[]);
+            if (encryptedSort) {
+              const dir = pagination.sortDir === 'desc' ? -1 : 1;
+              rows = [...rows].sort((a, b) =>
+                String(a.lastName ?? '').localeCompare(String(b.lastName ?? '')) * dir
+              );
+            }
+            const total = rows.length;
+            const page = rows.slice(
+              (pagination.page - 1) * pagination.limit,
+              pagination.page * pagination.limit
+            );
+            const masked = (await maskFieldPermissions(
+              prisma,
+              tenantId,
+              'lead',
+              page,
+              access?.roles
+            )) as unknown as Lead[];
+            return toPaginatedResult(masked, total, pagination.page, pagination.limit);
+          }
+
           const [total, rows] = await Promise.all([
             prisma.lead.count({ where }),
             prisma.lead.findMany({

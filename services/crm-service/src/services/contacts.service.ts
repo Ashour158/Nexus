@@ -48,17 +48,30 @@ function buildWhere(
   if (filters.accountId) where.accountId = filters.accountId;
   if (filters.ownerId) where.ownerId = filters.ownerId;
   if (filters.isActive !== undefined) where.isActive = filters.isActive;
-  if (filters.search?.trim()) {
-    const q = filters.search.trim();
-    where.OR = [
-      { firstName: { contains: q, mode: 'insensitive' } },
-      { lastName: { contains: q, mode: 'insensitive' } },
-      { email: { contains: q, mode: 'insensitive' } },
-      { phone: { contains: q, mode: 'insensitive' } },
-    ];
-  }
+  // NOTE: the free-text `search` filter is deliberately NOT translated to SQL
+  // `contains` here. firstName/lastName/email/phone are stored encrypted
+  // (randomized AES-GCM JSON), so a ciphertext substring match never hits —
+  // the old OR block silently returned nothing whenever encryption was on.
+  // Search is applied decrypt-side in listContacts instead.
   return where;
 }
+
+/** Case-insensitive substring match across decrypted PII fields. */
+function matchesQuery(row: Record<string, unknown>, q: string, fields: string[]): boolean {
+  const needle = q.toLowerCase();
+  return fields.some((f) => {
+    const v = row[f];
+    return typeof v === 'string' && v.toLowerCase().includes(needle);
+  });
+}
+
+/**
+ * Hard cap on rows pulled for a decrypt-side search/sort pass. Substring search
+ * over encrypted columns cannot run in SQL, so we page through up to this many
+ * tenant rows and filter after the read-path decryption. Beyond this scale the
+ * search-service (OpenSearch) is the intended path for free-text lookup.
+ */
+const DECRYPT_SEARCH_CAP = 5000;
 
 function resolveSortField(
   sortBy: string | undefined
@@ -99,6 +112,42 @@ export function createContactsService(prisma: CrmPrisma, producer: NexusProducer
         tenantId,
         { filters, pagination, ownership: access?.ownershipWhere ?? null, roles: access?.roles ?? null },
         async () => {
+          const q = filters.search?.trim();
+          // Encrypted columns: substring search and name ORDER BY can only be
+          // done after decryption (which the read path applies automatically).
+          const encryptedSort = sortField === 'lastName' || sortField === 'firstName';
+          if (q || encryptedSort) {
+            const all = await prisma.contact.findMany({
+              where,
+              take: DECRYPT_SEARCH_CAP,
+              orderBy: { createdAt: 'desc' },
+            });
+            let rows = q
+              ? (all as unknown as Record<string, unknown>[]).filter((r) =>
+                  matchesQuery(r, q, ['firstName', 'lastName', 'email', 'phone'])
+                )
+              : (all as unknown as Record<string, unknown>[]);
+            if (encryptedSort) {
+              const dir = pagination.sortDir === 'desc' ? -1 : 1;
+              rows = [...rows].sort((a, b) =>
+                String(a[sortField] ?? '').localeCompare(String(b[sortField] ?? '')) * dir
+              );
+            }
+            const total = rows.length;
+            const page = rows.slice(
+              (pagination.page - 1) * pagination.limit,
+              pagination.page * pagination.limit
+            );
+            const masked = (await maskFieldPermissions(
+              prisma,
+              tenantId,
+              'contact',
+              page,
+              access?.roles
+            )) as unknown as Contact[];
+            return toPaginatedResult(masked, total, pagination.page, pagination.limit);
+          }
+
           const [total, rows] = await Promise.all([
             prisma.contact.count({ where }),
             prisma.contact.findMany({

@@ -124,10 +124,47 @@ export function withFieldEncryption(
   configs: EncryptedFieldConfig[]
 ): void {
   const configMap = new Map(configs.map((c) => [c.model, new Set(c.fields)]));
+  // Union of every encrypted field name, for the deep read-path decrypt: an
+  // encrypted Contact can arrive nested under a non-configured model's result
+  // (deal → include contact, stakeholder → contact select …), where a
+  // model-scoped decrypt never sees it and the API would return raw
+  // ciphertext JSON. Matching is field-NAME + ciphertext-shape, so a
+  // plaintext field that shares a name (e.g. another model's `phone`) is
+  // untouched — JSON.parse/auth-tag verification gates every rewrite.
+  const allEncryptedFields = new Set(configs.flatMap((c) => c.fields));
+  const looksEncrypted = (v: string) => v.startsWith('{"ciphertext"');
+  const deepDecrypt = (node: unknown, depth = 0): void => {
+    if (!node || typeof node !== 'object' || depth > 8) return;
+    if (Array.isArray(node)) {
+      for (const item of node) deepDecrypt(item, depth + 1);
+      return;
+    }
+    const rec = node as Record<string, unknown>;
+    for (const key of Object.keys(rec)) {
+      const val = rec[key];
+      if (typeof val === 'string' && allEncryptedFields.has(key) && looksEncrypted(val)) {
+        try {
+          rec[key] = decryptField(key, JSON.parse(val) as EncryptedField, masterKey);
+        } catch {
+          // Not our ciphertext after all — leave as-is.
+        }
+      } else if (val && typeof val === 'object') {
+        deepDecrypt(val, depth + 1);
+      }
+    }
+  };
 
   prisma.$use(async (params, next) => {
     const fields = configMap.get(params.model as string);
-    if (!fields) return next(params);
+    if (!fields) {
+      // Still deep-decrypt reads: configured models can arrive as included
+      // relations under any other model's query.
+      const result = await next(params);
+      if (result && !['createMany', 'updateMany', 'deleteMany', 'count', 'aggregate', 'groupBy'].includes(params.action as string)) {
+        deepDecrypt(result);
+      }
+      return result;
+    }
 
     if (['create', 'createMany', 'update', 'updateMany', 'upsert'].includes(params.action as string)) {
       const data = (params.args as Record<string, unknown>)?.data;
@@ -164,25 +201,9 @@ export function withFieldEncryption(
       ) &&
       result
     ) {
-      const decrypt = (record: Record<string, unknown>) => {
-        for (const field of fields) {
-          const val = record[field];
-          if (typeof val === 'string') {
-            try {
-              const parsed = JSON.parse(val) as EncryptedField;
-              record[field] = decryptField(field, parsed, masterKey);
-            } catch {
-              // Not encrypted, leave as-is
-            }
-          }
-        }
-      };
-
-      if (Array.isArray(result)) {
-        result.forEach(decrypt);
-      } else {
-        decrypt(result as Record<string, unknown>);
-      }
+      // Deep walk (not just this model's own columns): decrypts included
+      // relations too, and is shape-gated so plaintext survives untouched.
+      deepDecrypt(result);
     }
 
     return result;

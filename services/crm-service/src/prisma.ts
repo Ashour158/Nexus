@@ -124,10 +124,15 @@ export function createCrmPrisma() {
   const encryptionKey = process.env.ENCRYPTION_MASTER_KEY;
   if (encryptionKey && encryptionKey.length >= 32) {
     withFieldEncryption(base as any, encryptionKey, [
-      { model: 'Contact', fields: ['email', 'phone', 'mobile', 'address'] },
+      // firstName/lastName are PII too (audit: "plaintext CRM contact names").
+      // Substring search on encrypted columns is impossible in SQL — the list
+      // endpoints' `q` filter therefore decrypt-side filters (see
+      // filterDecryptedByQuery in contacts/leads services) instead of WHERE
+      // contains, which silently matched nothing on encrypted fields anyway.
+      { model: 'Contact', fields: ['firstName', 'lastName', 'email', 'phone', 'mobile', 'address'] },
       { model: 'Account', fields: ['email', 'phone', 'billingAddressLine1', 'billingAddressLine2', 'shippingAddressLine1', 'shippingAddressLine2'] },
       { model: 'Note', fields: ['content'] },
-      { model: 'Lead', fields: ['email', 'phone', 'address'] },
+      { model: 'Lead', fields: ['firstName', 'lastName', 'email', 'phone', 'address'] },
     ]);
   }
 

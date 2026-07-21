@@ -51,7 +51,15 @@ function encryptV2(plaintext) {
   });
 }
 
-const prisma = new PrismaClient();
+// The generated auth client's datasource is env("AUTH_DATABASE_URL"); prod sets
+// DATABASE_URL. Point the client at whichever is present so the script runs
+// regardless of which name the container exposes.
+const dbUrl = process.env.AUTH_DATABASE_URL || process.env.DATABASE_URL;
+if (!dbUrl) {
+  console.error('No AUTH_DATABASE_URL / DATABASE_URL in env');
+  process.exit(1);
+}
+const prisma = new PrismaClient({ datasources: { db: { url: dbUrl } } });
 let rewritten = 0, skipped = 0, failed = 0;
 
 for (const { table, cols } of TARGETS) {

@@ -335,6 +335,17 @@ export const CRM_MODULE_GROUPS: CrmModuleGroup[] = [
         sidebar: true,
       },
       {
+        id: 'billing',
+        label: 'Billing',
+        href: '/billing',
+        icon: CreditCard,
+        status: 'wired',
+        service: 'finance-service',
+        description: 'Recurring subscriptions born from activated contracts: MRR/ARR, billing cadence, cancellation.',
+        depth: ['subscription list', 'MRR/ARR roll-up', 'invoice linkage', 'cancel lifecycle'],
+        sidebar: true,
+      },
+      {
         id: 'contracts',
         label: 'Contracts',
         href: '/contracts',

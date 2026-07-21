@@ -4,6 +4,7 @@ import type { FinancePrisma } from '../prisma.js';
 import { registerProductsRoutes } from './products.routes.js';
 import { registerInvoicesRoutes } from './invoices.routes.js';
 import { registerContractsRoutes } from './contracts.routes.js';
+import { registerSubscriptionsRoutes } from './subscriptions.routes.js';
 import { registerCpqRoutes } from './cpq.routes.js';
 import { registerQuotesRoutes } from './quotes.routes.js';
 import { registerCommissionRoutes } from './commission.routes.js';
@@ -39,6 +40,7 @@ export async function registerAllRoutes(
   await registerProductsRoutes(app, prisma);
   await registerInvoicesRoutes(app, prisma, producer);
   await registerContractsRoutes(app, prisma);
+  await registerSubscriptionsRoutes(app, prisma);
   await registerCpqRoutes(app, prisma);
   await registerQuotesRoutes(app, prisma, producer);
   await registerDiscountRequestRoutes(app, prisma, producer);

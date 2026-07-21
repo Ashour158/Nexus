@@ -37,7 +37,7 @@ export default function PlanningPage() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/planning/forecast-overrides/team-summary?period=${period}`)
+    fetch(`/api/planning/forecast-overrides/team-summary?periodKey=${period}`)
       .then((r) => r.json())
       .then((d) => {
         // team-summary responds { success, data: { reps, totals } }; tolerate a

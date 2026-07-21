@@ -10,7 +10,7 @@ import { createRedisClient } from './redis.js';
 import { registerSwagger, isSwaggerEnabled } from './swagger.js';
 import { ValidationError } from './errors.js';
 import { flattenValidationError } from './validation.js';
-import { registerVersionRoute } from './health.js';
+import { registerVersionRoute, httpRequestsTotal, httpRequestDuration } from './health.js';
 import pino from 'pino';
 import * as Sentry from '@sentry/node';
 import { type KeyObject } from 'node:crypto';
@@ -331,6 +331,35 @@ export async function createService(config: ServiceConfig): Promise<FastifyInsta
     if (traceparent) {
       (request.requestContext as { set: (key: string, value: string) => void }).set('traceparent', traceparent);
     }
+  });
+
+  // Section 48 — record every response into the shared Prometheus collectors
+  // (nexus_http_requests_total / nexus_http_request_duration_seconds). The
+  // `route` label is the ROUTE PATTERN (`/api/v1/deals/:id`), never the raw
+  // URL — raw URLs embed record ids and would explode label cardinality.
+  // Errored requests are covered too: `globalErrorHandler` (and Fastify's
+  // default handler) still sends a reply, so `onResponse` fires with the final
+  // status code. An `onError` recorder would run BEFORE the error handler
+  // assigns that status and double-count against this hook, so it is
+  // deliberately omitted. Infra probes (/health, /ready, /metrics, /version)
+  // are excluded: scrapers hit them constantly with always-200/fast responses,
+  // which would dilute 5xx-rate denominators and p95 latency on quiet services.
+  const isInfraProbe = (path: string): boolean =>
+    path.startsWith('/health') ||
+    path.startsWith('/metrics') ||
+    path.startsWith('/ready') ||
+    path === '/version';
+  app.addHook('onResponse', async (request, reply) => {
+    const route = request.routeOptions?.url ?? request.routerPath ?? 'unmatched';
+    if (isInfraProbe(pathOnly(request.url))) return;
+    const labels = {
+      method: request.method,
+      route,
+      status_code: String(reply.statusCode),
+      service: config.name,
+    };
+    httpRequestsTotal.inc(labels);
+    httpRequestDuration.observe(labels, reply.elapsedTime / 1000);
   });
 
   // Section 35 — API Versioning + Rate Limiting + Security headers on every response

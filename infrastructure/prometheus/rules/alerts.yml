@@ -1,12 +1,11 @@
 # Nexus production-readiness alerts.
 # Loaded by prometheus.yml from /etc/prometheus/rules/*.yml.
 #
-# IMPORTANT: packages/service-utils declares nexus_http_requests_total and
-# nexus_http_request_duration_seconds, but the repository currently never calls
-# inc()/observe() for either collector. Labelled collectors emit no time series
-# until observed, so 5xx-rate and request-latency alerts would be permanently
-# blind. Do not add false-confidence rules for those signals until request hooks
-# populate them. HttpRequestTelemetryMissing keeps that gap visible meanwhile.
+# nexus_http_requests_total / nexus_http_request_duration_seconds are populated
+# by the shared `onResponse` hook in packages/service-utils (createService),
+# labelled by method / route pattern / status_code / service. Infra probes
+# (/health, /ready, /metrics, /version) are excluded at the source, so rate
+# denominators below reflect real traffic only.
 groups:
   - name: nexus-availability
     rules:
@@ -27,22 +26,64 @@ groups:
           summary: 'Nexus target {{ $labels.instance }} is restarting'
           description: '{{ $labels.instance }} restarted more than twice in 15 minutes.'
 
-  - name: nexus-telemetry-readiness
+  - name: nexus-http
     rules:
-      # This intentionally fires for healthy scrape targets that expose no
-      # samples for the registered request counter. Once HTTP instrumentation is
-      # wired, replace this gap alert with the requested 5xx and p95 rules.
-      - alert: NexusHttpRequestTelemetryMissing
+      # Sustained 5xx error rate. The ratio is NaN when a service has no
+      # traffic in the window, and NaN never satisfies `>`, so idle services
+      # cannot fire. Warning at 5%, critical at 20%.
+      - alert: NexusHttp5xxRateHigh
         expr: |
-          (up{job="nexus-services"} == 1)
-            unless on (job, instance)
-          count by (job, instance) (nexus_http_requests_total{job="nexus-services"})
+          sum by (service) (rate(nexus_http_requests_total{job="nexus-services",status_code=~"5.."}[5m]))
+            /
+          sum by (service) (rate(nexus_http_requests_total{job="nexus-services"}[5m]))
+            > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High 5xx rate on {{ $labels.service }}'
+          description: '{{ $labels.service }} has served more than 5% 5xx responses for 5 minutes ({{ $value | humanizePercentage }}).'
+
+      - alert: NexusHttp5xxRateCritical
+        expr: |
+          sum by (service) (rate(nexus_http_requests_total{job="nexus-services",status_code=~"5.."}[5m]))
+            /
+          sum by (service) (rate(nexus_http_requests_total{job="nexus-services"}[5m]))
+            > 0.20
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Critical 5xx rate on {{ $labels.service }}'
+          description: '{{ $labels.service }} has served more than 20% 5xx responses for 5 minutes ({{ $value | humanizePercentage }}).'
+
+      # p95 request latency from the shared duration histogram. Idle services
+      # yield NaN (empty rate) and cannot fire.
+      - alert: NexusHttpP95LatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, service) (rate(nexus_http_request_duration_seconds_bucket{job="nexus-services"}[5m]))
+          ) > 1
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: 'HTTP request telemetry missing for {{ $labels.instance }}'
-          description: '{{ $labels.instance }} is scrapeable but emits no nexus_http_requests_total samples; 5xx-rate and request-latency alerting is unavailable.'
+          summary: 'High p95 latency on {{ $labels.service }}'
+          description: 'p95 request latency for {{ $labels.service }} has exceeded 1s for 10 minutes ({{ $value }}s).'
+
+      - alert: NexusHttpP95LatencyCritical
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, service) (rate(nexus_http_request_duration_seconds_bucket{job="nexus-services"}[5m]))
+          ) > 2.5
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Critical p95 latency on {{ $labels.service }}'
+          description: 'p95 request latency for {{ $labels.service }} has exceeded 2.5s for 10 minutes ({{ $value }}s).'
 
   - name: nexus-runtime
     rules:

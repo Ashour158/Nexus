@@ -120,26 +120,10 @@ export class DLQReplay {
 
     try {
       await consumer.connect();
+      // fromBeginning covers the no-committed-offsets case; kafkajs forbids
+      // seek() before run() ("Consumer group was not initialized"), so no
+      // manual rewind here.
       await consumer.subscribe({ topic, fromBeginning: true });
-
-      const admin = this.kafka.admin();
-      await admin.connect();
-      try {
-        const offsets = await admin.fetchOffsets({ groupId, topics: [topic] });
-        const hasCommittedOffsets = offsets.some((o) =>
-          o.partitions.some(
-            (p) => p.offset !== undefined && p.offset !== '-1'
-          )
-        );
-        if (!hasCommittedOffsets) {
-          const topicOffsets = await admin.fetchTopicOffsets(topic);
-          for (const o of topicOffsets) {
-            await consumer.seek({ topic, partition: o.partition, offset: '0' });
-          }
-        }
-      } finally {
-        await admin.disconnect();
-      }
 
       let processedCount = 0;
 
@@ -178,7 +162,23 @@ export class DLQReplay {
         },
       });
 
-      await new Promise((r) => setTimeout(r, this.fetchTimeoutMs));
+      // Wait until the batch limit is hit or consumption stalls. A fixed short
+      // sleep raced the consumer-group join (often >3s), stopping the consumer
+      // before it ever fetched a message.
+      const maxWaitMs = 60_000;
+      const start = Date.now();
+      let lastProgress = { count: -1, at: Date.now() };
+      while (Date.now() - start < maxWaitMs && processedCount < limit) {
+        if (processedCount !== lastProgress.count) {
+          lastProgress = { count: processedCount, at: Date.now() };
+        } else if (
+          processedCount > 0 &&
+          Date.now() - lastProgress.at >= this.fetchTimeoutMs
+        ) {
+          break; // consumed something, then went quiet — topic is drained
+        }
+        await new Promise((r) => setTimeout(r, 500));
+      }
 
       await consumer.stop();
       await runPromise;

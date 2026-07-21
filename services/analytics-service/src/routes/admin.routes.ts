@@ -50,6 +50,10 @@ export async function registerAdminRoutes(app: FastifyInstance, clickhouse: Clic
               currency?: string;
               probability?: number;
               createdAt?: string;
+              status?: string;
+              wonAt?: string;
+              lostAt?: string;
+              actualCloseDate?: string;
             }>;
           };
           const deals = body.data ?? [];
@@ -75,6 +79,7 @@ export async function registerAdminRoutes(app: FastifyInstance, clickhouse: Clic
               const amount = Number(d.amount ?? 0);
               const currency = String(d.currency ?? 'USD');
               const { baseAmount, baseCurrency } = convert(amount, currency);
+              // Every deal gets its `deal.created` row.
               values.push({
                 tenant_id: tenantId,
                 deal_id: String(d.id),
@@ -90,6 +95,36 @@ export async function registerAdminRoutes(app: FastifyInstance, clickhouse: Clic
                 probability: Number(d.probability ?? 0),
                 occurred_at: chDateTime(d.createdAt ?? new Date().toISOString()),
               });
+              // Closed deals ALSO get their terminal `deal.won`/`deal.lost` row.
+              // Without this the rebuild emitted only `deal.created`, so every
+              // revenue/pipeline query keyed on `event_type IN ('deal.won',
+              // 'deal.lost')` read zero — the "healthy warehouse, empty KPIs"
+              // bug. Mirrors what the live Kafka consumer writes for these
+              // events (stage_id/pipeline_id blank, forecast_category CLOSED).
+              const status = String(d.status ?? '').toUpperCase();
+              if (status === 'WON' || status === 'LOST') {
+                const closedIso =
+                  (status === 'WON' ? d.wonAt : d.lostAt) ??
+                  d.actualCloseDate ??
+                  d.createdAt ??
+                  new Date().toISOString();
+                values.push({
+                  tenant_id: tenantId,
+                  deal_id: String(d.id),
+                  owner_id: String(d.ownerId ?? ''),
+                  account_id: String(d.accountId ?? ''),
+                  pipeline_id: '',
+                  stage_id: '',
+                  event_type: status === 'WON' ? 'deal.won' : 'deal.lost',
+                  amount,
+                  currency,
+                  base_amount: baseAmount,
+                  base_currency: baseCurrency,
+                  probability: status === 'WON' ? 100 : 0,
+                  forecast_category: 'CLOSED',
+                  occurred_at: chDateTime(closedIso),
+                });
+              }
             }
             await clickhouse.insert({ table: 'deal_events', values, format: 'JSONEachRow' });
           }

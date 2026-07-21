@@ -254,6 +254,11 @@ function periodKeyToYearQuarter(periodKey: string): { year: number; quarter?: nu
   if (q2) return { year: Number(q2[1]), quarter: Number(q2[2]) };
   const year4 = /^(\d{4})$/.exec(key);
   if (year4) return { year: Number(year4[1]) };
+  // The web pages use month pickers (YYYY-MM). Mapping a month to its quarter
+  // is deterministic — unlike the typo cases below, nothing silently resolves
+  // to "current period".
+  const ym = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(key);
+  if (ym) return { year: Number(ym[1]), quarter: Math.floor((Number(ym[2]) - 1) / 3) + 1 };
   const now = new Date();
   const year = now.getUTCFullYear();
   if (key === 'this_quarter') return { year, quarter: Math.floor(now.getUTCMonth() / 3) + 1 };

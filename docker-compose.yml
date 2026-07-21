@@ -1202,6 +1202,9 @@ services:
       # deals-service & leads-service decommissioned (merged into crm-service) — not polled.
       ACCOUNTS_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_accounts
       OUTBOX_RELAY_DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexus}@pgbouncer:6432/nexus_auth
+      # DLQ replay is opt-in: flip DLQ_REPLAY_ENABLED=true in .env only for a
+      # supervised drain (POST /admin/dlq/replay on loopback :3027), then revert.
+      DLQ_REPLAY_ENABLED: ${DLQ_REPLAY_ENABLED:-false}
     depends_on:
       postgres:
         condition: service_healthy

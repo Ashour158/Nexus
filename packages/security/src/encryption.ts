@@ -2,28 +2,60 @@
  * Field-Level Encryption — AES-256-GCM for sensitive PII fields.
  */
 
-import { createCipheriv, createDecipheriv, createHmac, randomBytes, scryptSync } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes, scryptSync } from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 const SALT_LENGTH = 32;
+const HKDF_INFO = 'nexus-field-encryption-v2';
 
 export interface EncryptedField {
   ciphertext: string;
   iv: string;
   authTag: string;
   salt: string;
+  /**
+   * KDF version. Absent/undefined = legacy scrypt-derived key (v1);
+   * 2 = HKDF-SHA256. New writes always emit v2 — scrypt's cost is pointless
+   * here (the master key is high-entropy, not a password) and, being
+   * synchronous, it blocked the event loop for ~80ms PER FIELD on reads,
+   * which serialized whole list endpoints into tens of seconds.
+   */
+  v?: 2;
 }
 
-function deriveKey(masterKey: string, salt: Buffer): Buffer {
-  return scryptSync(masterKey, salt, 32);
+/**
+ * Cache for LEGACY (v1) scrypt-derived keys, keyed by the per-record salt.
+ * Every v1 read used to pay a blocking ~80ms scryptSync; with the cache each
+ * distinct salt pays it once per process. Bounded FIFO so it cannot grow
+ * unboundedly. (Not keyed by masterKey: a process only ever holds one, and a
+ * wrong cached key is caught by the GCM auth tag, never silently accepted.)
+ */
+const legacyKeyCache = new Map<string, Buffer>();
+const LEGACY_KEY_CACHE_MAX = 10_000;
+
+function deriveLegacyKey(masterKey: string, saltB64: string): Buffer {
+  const cached = legacyKeyCache.get(saltB64);
+  if (cached) return cached;
+  const key = scryptSync(masterKey, Buffer.from(saltB64, 'base64'), 32);
+  if (legacyKeyCache.size >= LEGACY_KEY_CACHE_MAX) {
+    const oldest = legacyKeyCache.keys().next().value;
+    if (oldest !== undefined) legacyKeyCache.delete(oldest);
+  }
+  legacyKeyCache.set(saltB64, key);
+  return key;
+}
+
+/** v2 key derivation: HKDF-SHA256 — microseconds, safe on the request path. */
+function deriveKeyV2(masterKey: string, salt: Buffer): Buffer {
+  return Buffer.from(hkdfSync('sha256', masterKey, salt, HKDF_INFO, 32));
 }
 
 export function encryptField(fieldName: string, plaintext: string, masterKey: string): EncryptedField {
   const salt = randomBytes(SALT_LENGTH);
   const iv = randomBytes(IV_LENGTH);
-  const key = deriveKey(masterKey, salt);
+  const key = deriveKeyV2(masterKey, salt);
   const cipher = createCipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH });
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf-8'), cipher.final()]);
   const authTag = cipher.getAuthTag();
@@ -33,6 +65,7 @@ export function encryptField(fieldName: string, plaintext: string, masterKey: st
     iv: iv.toString('base64'),
     authTag: authTag.toString('base64'),
     salt: salt.toString('base64'),
+    v: 2,
   };
 }
 
@@ -40,7 +73,7 @@ export function decryptField(fieldName: string, encrypted: EncryptedField, maste
   const salt = Buffer.from(encrypted.salt, 'base64');
   const iv = Buffer.from(encrypted.iv, 'base64');
   const authTag = Buffer.from(encrypted.authTag, 'base64');
-  const key = deriveKey(masterKey, salt);
+  const key = encrypted.v === 2 ? deriveKeyV2(masterKey, salt) : deriveLegacyKey(masterKey, encrypted.salt);
   const decipher = createDecipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH });
   decipher.setAuthTag(authTag);
   const decrypted = Buffer.concat([decipher.update(Buffer.from(encrypted.ciphertext, 'base64')), decipher.final()]);

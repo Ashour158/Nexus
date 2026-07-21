@@ -17,11 +17,14 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'Nexus CRM',
   description: 'Enterprise revenue platform — Nexus CRM',
-  manifest: '/manifest.json',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: '/favicon.svg',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'NEXUS CRM',
+    title: 'Nexus CRM',
   },
   // CSP is now enforced via HTTP response headers (fastify-helmet) for stronger protection
   // Meta-tag CSP is redundant and can be bypassed in some scenarios
@@ -31,6 +34,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
+  themeColor: '#4f46e5',
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
@@ -54,28 +58,24 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             `,
           }}
         />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              /* The old caching service worker pinned users to a stale app
-                 shell. Unregister any existing SW and clear caches on every
-                 load; re-registering /sw.js (now a kill-switch) is intentionally
-                 removed until offline support is redone network-first. */
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                    registrations.forEach(function(registration) { registration.unregister(); });
-                  }).catch(function(){});
-                  if (window.caches && caches.keys) {
-                    caches.keys().then(function(keys) {
-                      keys.forEach(function(k) { caches.delete(k); });
-                    }).catch(function(){});
-                  }
-                });
-              }
-            `,
-          }}
-        />
+        {process.env.NODE_ENV === 'production' && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+                  window.addEventListener('load', function() {
+                    navigator.serviceWorker.register('/sw.js', {
+                      scope: '/',
+                      updateViaCache: 'none'
+                    }).catch(function(error) {
+                      console.warn('[Nexus PWA] Service worker registration failed', error);
+                    });
+                  }, { once: true });
+                }
+              `,
+            }}
+          />
+        )}
       </head>
       <body className={inter.className}>
         <AppProviders>{children}</AppProviders>

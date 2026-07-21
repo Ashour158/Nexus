@@ -1,58 +1,66 @@
-# Nexus starter alert rules.
-# Conservative thresholds — tune per environment. Loaded via prometheus.yml `rule_files`.
-# Metric names come from packages/service-utils (nexus_http_* + prom-client defaults).
-# `severity` labels route in alertmanager.yml: critical -> PagerDuty, warning -> Slack.
+# Nexus production-readiness alerts.
+# Loaded by prometheus.yml from /etc/prometheus/rules/*.yml.
+#
+# IMPORTANT: packages/service-utils declares nexus_http_requests_total and
+# nexus_http_request_duration_seconds, but the repository currently never calls
+# inc()/observe() for either collector. Labelled collectors emit no time series
+# until observed, so 5xx-rate and request-latency alerts would be permanently
+# blind. Do not add false-confidence rules for those signals until request hooks
+# populate them. HttpRequestTelemetryMissing keeps that gap visible meanwhile.
 groups:
   - name: nexus-availability
     rules:
-      # A scrape target has been unreachable for >2m (process down / not listening).
-      - alert: TargetDown
-        expr: up == 0
+      - alert: NexusServiceTargetDown
+        expr: up{job="nexus-services"} == 0
         for: 2m
         labels:
           severity: critical
         annotations:
-          summary: 'Target {{ $labels.job }}/{{ $labels.instance }} is down'
-          description: 'Prometheus has failed to scrape {{ $labels.instance }} (job {{ $labels.job }}) for more than 2 minutes.'
+          summary: 'Nexus target {{ $labels.instance }} is down'
+          description: 'Prometheus has failed to scrape {{ $labels.instance }} for more than 2 minutes.'
 
-      # A service process has restarted repeatedly — likely a crash loop.
-      # process_start_time_seconds is a prom-client default (no cadvisor/node-exporter deployed).
-      - alert: ServiceRestarting
-        expr: changes(process_start_time_seconds[15m]) > 2
-        for: 0m
+      - alert: NexusServiceRestarting
+        expr: changes(nexus_process_start_time_seconds{job="nexus-services"}[15m]) > 2
         labels:
           severity: warning
         annotations:
-          summary: 'Service {{ if $labels.service }}{{ $labels.service }}{{ else }}{{ $labels.instance }}{{ end }} is restarting'
-          description: '{{ $labels.instance }} has restarted more than twice in the last 15 minutes (possible crash loop).'
+          summary: 'Nexus target {{ $labels.instance }} is restarting'
+          description: '{{ $labels.instance }} restarted more than twice in 15 minutes.'
 
-  - name: nexus-http
+  - name: nexus-telemetry-readiness
     rules:
-      # >5% of requests returning 5xx over the last 5 minutes.
-      # Denominator is naturally >0 only when there is traffic, so idle services don't fire.
-      - alert: HighHttp5xxRate
+      # This intentionally fires for healthy scrape targets that expose no
+      # samples for the registered request counter. Once HTTP instrumentation is
+      # wired, replace this gap alert with the requested 5xx and p95 rules.
+      - alert: NexusHttpRequestTelemetryMissing
         expr: |
-          sum by (service) (rate(nexus_http_requests_total{status_code=~"5.."}[5m]))
-            /
-          sum by (service) (rate(nexus_http_requests_total[5m]))
-            > 0.05
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: 'High 5xx rate on {{ $labels.service }}'
-          description: '{{ $labels.service }} is serving more than 5% 5xx responses over the last 5 minutes.'
-
-      # p95 request latency above 1s for 10 minutes.
-      - alert: HighRequestLatency
-        expr: |
-          histogram_quantile(
-            0.95,
-            sum by (le, service) (rate(nexus_http_request_duration_seconds_bucket[5m]))
-          ) > 1
+          (up{job="nexus-services"} == 1)
+            unless on (job, instance)
+          count by (job, instance) (nexus_http_requests_total{job="nexus-services"})
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: 'High p95 latency on {{ $labels.service }}'
-          description: 'p95 request latency for {{ $labels.service }} has exceeded 1s for 10 minutes.'
+          summary: 'HTTP request telemetry missing for {{ $labels.instance }}'
+          description: '{{ $labels.instance }} is scrapeable but emits no nexus_http_requests_total samples; 5xx-rate and request-latency alerting is unavailable.'
+
+  - name: nexus-runtime
+    rules:
+      # Real prom-client default metrics, all prefixed by collectDefaultMetrics.
+      - alert: NexusHighProcessCpu
+        expr: rate(nexus_process_cpu_seconds_total{job="nexus-services"}[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High process CPU on {{ $labels.instance }}'
+          description: '{{ $labels.instance }} has consumed more than 0.8 CPU-seconds per second for 10 minutes.'
+
+      - alert: NexusEventLoopLag
+        expr: nexus_nodejs_eventloop_lag_p99_seconds{job="nexus-services"} > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Event-loop lag on {{ $labels.instance }}'
+          description: 'p99 Node.js event-loop lag on {{ $labels.instance }} has exceeded 500ms for 10 minutes.'

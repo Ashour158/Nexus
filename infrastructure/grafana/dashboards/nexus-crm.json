@@ -1,83 +1,88 @@
 {
+  "uid": "nexus-crm-overview",
   "title": "Nexus CRM Overview",
-  "tags": [
-    "nexus",
-    "crm"
-  ],
-  "timezone": "UTC",
+  "description": "Service health from metrics that Nexus currently emits. Request-rate, 5xx, and latency panels are intentionally omitted until the registered HTTP collectors are populated by request hooks.",
+  "tags": ["nexus", "crm"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
   "panels": [
     {
       "id": 1,
-      "title": "Request Rate",
+      "title": "Scrape availability",
       "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        {
-          "expr": "sum(rate(http_requests_total[5m]))",
-          "legendFormat": "req/s"
-        }
+        { "expr": "avg(up{job=\"nexus-services\"})", "legendFormat": "available", "refId": "A" }
       ],
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 0
-      }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "red", "value": null },
+            { "color": "orange", "value": 0.95 },
+            { "color": "green", "value": 1 }
+          ] }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 }
     },
     {
       "id": 2,
-      "title": "Error Rate",
+      "title": "HTTP telemetry gaps",
+      "description": "A non-zero result blocks reliable 5xx-rate and request-latency alerts.",
       "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))",
-          "legendFormat": "error %"
+          "expr": "count((up{job=\"nexus-services\"} == 1) unless on (job, instance) count by (job, instance) (nexus_http_requests_total{job=\"nexus-services\"})) or vector(0)",
+          "legendFormat": "targets",
+          "refId": "A"
         }
       ],
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      }
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 1 }
+          ] }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 }
     },
     {
       "id": 3,
-      "title": "Latency P95",
+      "title": "Node.js event-loop lag (p99)",
       "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
-          "legendFormat": "p95"
+          "expr": "nexus_nodejs_eventloop_lag_p99_seconds{job=\"nexus-services\"}",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
         }
       ],
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 8
-      }
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 8 }
     },
     {
       "id": 4,
-      "title": "Kafka Lag",
+      "title": "Process CPU",
       "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "kafka_consumer_group_lag",
-          "legendFormat": "{{topic}}"
+          "expr": "rate(nexus_process_cpu_seconds_total{job=\"nexus-services\"}[5m])",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
         }
       ],
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 16
-      }
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 17 }
     }
-  ],
-  "time": {
-    "from": "now-1h",
-    "to": "now"
-  },
-  "refresh": "30s"
+  ]
 }

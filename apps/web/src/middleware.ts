@@ -19,7 +19,7 @@ const PUBLIC_PATHS = [
   '/bff',
   '/_next',
   '/favicon.ico',
-  '/manifest.json',
+  '/manifest.webmanifest',
   '/sw.js',
   '/offline.html',
 ];

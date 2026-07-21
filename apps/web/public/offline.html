@@ -1,57 +1,65 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Offline — Nexus CRM</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Inter', system-ui, sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      background: #F8FAFC;
-      color: #1E293B;
-    }
-    .container {
-      text-align: center;
-      padding: 2rem;
-      max-width: 400px;
-    }
-    .icon {
-      width: 80px;
-      height: 80px;
-      margin: 0 auto 1.5rem;
-      background: #EEF1FE;
-      border-radius: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 36px;
-    }
-    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-    p { color: #64748B; margin-bottom: 1.5rem; line-height: 1.6; }
-    button {
-      background: #4F6CF7;
-      color: white;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 8px;
-      font-size: 1rem;
-      cursor: pointer;
-      font-weight: 500;
-    }
-    button:hover { background: #3D5AE5; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="icon">📡</div>
-    <h1>You're Offline</h1>
-    <p>Nexus CRM is currently unavailable. Your changes will be synced automatically when you're back online.</p>
-    <button onclick="location.reload()">Try Again</button>
-  </div>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#4f46e5" />
+    <title>Offline — Nexus CRM</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: #f7f8fc;
+        color: #1b1b24;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      main {
+        width: min(100%, 430px);
+        padding: 40px 32px;
+        border: 1px solid #cfd0e0;
+        border-radius: 24px;
+        background: #fff;
+        box-shadow: 0 18px 50px rgb(31 41 55 / 10%);
+        text-align: center;
+      }
+      .mark {
+        display: grid;
+        width: 72px;
+        height: 72px;
+        margin: 0 auto 24px;
+        place-items: center;
+        border-radius: 20px;
+        background: #4f46e5;
+        color: #fff;
+        font-size: 34px;
+        font-weight: 800;
+      }
+      h1 { margin: 0 0 12px; font-size: 1.75rem; }
+      p { margin: 0 0 28px; color: #45455a; line-height: 1.6; }
+      button {
+        min-height: 44px;
+        padding: 0 22px;
+        border: 0;
+        border-radius: 12px;
+        background: #4f46e5;
+        color: #fff;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:focus-visible { outline: 3px solid #c7d2fe; outline-offset: 3px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark" aria-hidden="true">N</div>
+      <h1>You’re offline</h1>
+      <p>Nexus CRM needs a network connection to load customer data securely. Reconnect, then try again.</p>
+      <button type="button" onclick="window.location.reload()">Try again</button>
+    </main>
+  </body>
 </html>

@@ -48,7 +48,7 @@
       "gridPos": { "h": 10, "w": 24, "x": 0, "y": 18 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "bytes" } },
-      "targets": [ { "expr": "process_resident_memory_bytes{job=\"nexus-services\"}", "legendFormat": "{{instance}}", "refId": "A" } ]
+      "targets": [ { "expr": "nexus_process_resident_memory_bytes{job=\"nexus-services\"}", "legendFormat": "{{instance}}", "refId": "A" } ]
     }
   ]
 }

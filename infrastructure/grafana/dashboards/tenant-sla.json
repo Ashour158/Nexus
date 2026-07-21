@@ -1,19 +1,32 @@
 {
   "uid": "nexus-tenant-sla",
-  "title": "Nexus — Tenant SLA Prerequisite",
+  "title": "Nexus \u00e2\u20ac\u201d Tenant SLA Prerequisite",
   "description": "Per-tenant SLA panels are gated because the current HTTP collectors are not observed and do not define tenant_id or user_id labels.",
-  "tags": ["sla", "tenant", "nexus", "readiness"],
+  "tags": [
+    "sla",
+    "tenant",
+    "nexus",
+    "readiness"
+  ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 1,
   "refresh": "30s",
-  "time": { "from": "now-24h", "to": "now" },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
   "panels": [
     {
       "id": 1,
       "title": "Tenant SLI instrumentation required",
       "type": "text",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "options": {
         "mode": "markdown",
         "content": "## Tenant SLA reporting is not yet measurable\n\n`packages/service-utils` registers HTTP request collectors, but no request hook currently records samples. The collectors also have no `tenant_id` or `user_id` labels. Availability, p95 latency, error budget, and active-user panels would therefore be misleading.\n\nInstrument the shared request lifecycle first, then add bounded-cardinality tenant SLI recording rules before enabling contractual tenant dashboards."
@@ -23,8 +36,16 @@
       "id": 2,
       "title": "Healthy targets missing HTTP samples",
       "type": "stat",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "expr": "count((up{job=\"nexus-services\"} == 1) unless on (job, instance) count by (job, instance) (nexus_http_requests_total{job=\"nexus-services\"})) or vector(0)",
@@ -33,10 +54,19 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "thresholds": { "mode": "absolute", "steps": [
-            { "color": "green", "value": null },
-            { "color": "orange", "value": 1 }
-          ] }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
         }
       }
     },
@@ -44,8 +74,16 @@
       "id": 3,
       "title": "Current scrape availability (not a tenant SLI)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 8,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "expr": "up{job=\"nexus-services\"}",
@@ -53,7 +91,12 @@
           "refId": "A"
         }
       ],
-      "fieldConfig": { "defaults": { "min": 0, "max": 1 } }
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1
+        }
+      }
     }
   ]
 }

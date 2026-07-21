@@ -76,7 +76,7 @@ export async function registerKitsRoutes(
       r.get('/product-kits', { preHandler: requirePermission(PERMISSIONS.PRODUCTS.READ) }, async (request, reply) => {
         const jwt = request.user as JwtPayload;
         const rows = await prisma.productKit.findMany({
-          where: { tenantId: jwt.tenantId },
+          where: { tenantId: jwt.tenantId, deletedAt: null },
           include: { items: true },
           orderBy: { createdAt: 'desc' },
         });
@@ -118,7 +118,7 @@ export async function registerKitsRoutes(
         const { id } = IdParam.parse(request.params);
         const parsed = UpdateKitSchema.safeParse(request.body);
         if (!parsed.success) throw new ValidationError('Invalid body', parsed.error.flatten());
-        const existing = await prisma.productKit.findFirst({ where: { id, tenantId: jwt.tenantId } });
+        const existing = await prisma.productKit.findFirst({ where: { id, tenantId: jwt.tenantId, deletedAt: null } });
         if (!existing) throw new NotFoundError('ProductKit', id);
         const data = parsed.data;
 
@@ -158,10 +158,11 @@ export async function registerKitsRoutes(
       r.delete('/product-kits/:id', { preHandler: requirePermission(PERMISSIONS.PRODUCTS.DELETE) }, async (request, reply) => {
         const jwt = request.user as JwtPayload;
         const { id } = IdParam.parse(request.params);
-        const existing = await prisma.productKit.findFirst({ where: { id, tenantId: jwt.tenantId } });
+        const existing = await prisma.productKit.findFirst({ where: { id, tenantId: jwt.tenantId, deletedAt: null } });
         if (!existing) throw new NotFoundError('ProductKit', id);
-        // Items cascade-delete via the ProductKitItem relation.
-        await prisma.productKit.delete({ where: { id } });
+        // Soft-delete: quotes configured from this kit keep a resolvable
+        // reference; items stay attached to the hidden kit.
+        await prisma.productKit.update({ where: { id }, data: { deletedAt: new Date(), isActive: false } });
         await emitKitEvent(prisma, jwt.tenantId, 'kit.deleted', id, { name: existing.name });
         return reply.send({ success: true, data: { id, deleted: true } });
       });

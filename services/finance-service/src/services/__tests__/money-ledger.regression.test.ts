@@ -206,8 +206,9 @@ describe('money ledger regression protection', () => {
     // Catches both callers passing the pre-transaction existence check and committing duplicates.
     const kafka = producer();
     let nextSequence = 2;
+    let createdCount = 0;
     const create = vi.fn(async ({ data }: { data: Record<string, unknown> }) =>
-      invoice({ id: `invoice-${create.mock.calls.length}`, ...data })
+      invoice({ id: `invoice-${++createdCount}`, ...data })
     );
     const tx = {
       $queryRaw: vi.fn(async () => [{ nextSequence: nextSequence++ }]),

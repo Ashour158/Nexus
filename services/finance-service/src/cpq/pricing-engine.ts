@@ -250,7 +250,7 @@ export class CpqPricingEngine {
     const priceBookEntries = new Map<string, PriceBookEntryRow[]>();
     if (priceBookId) {
       const book = await this.prisma.priceBook.findFirst({
-        where: { id: priceBookId, tenantId: req.tenantId, isActive: true },
+        where: { id: priceBookId, tenantId: req.tenantId, isActive: true, deletedAt: null },
         select: { id: true },
       });
       if (book) {

@@ -511,6 +511,10 @@ model Contract {
   lineItems       Json           @default("[]")
   customFields    Json           @default("{}")
   version         Int            @default(1)
+  // Soft-delete: DRAFT contracts are "deleted" by stamping this, never by a
+  // row DELETE (audit: finance records lacked soft-delete). Read paths filter
+  // deletedAt: null. See migration 20260721120000_finance_soft_delete.
+  deletedAt       DateTime?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   subscriptions   Subscription[]
@@ -929,6 +933,7 @@ model ProductKit {
   listPrice         Decimal          @db.Decimal(18, 2)
   isActive          Boolean          @default(true)
   allowItemOverride Boolean          @default(true)
+  deletedAt         DateTime?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
   items             ProductKitItem[]
@@ -965,6 +970,7 @@ model PriceBook {
   validFrom DateTime?
   validTo   DateTime?
   tiers     String[]        @default([])
+  deletedAt DateTime?
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   entries   PriceBookEntry[]

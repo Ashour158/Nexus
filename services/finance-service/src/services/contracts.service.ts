@@ -44,7 +44,7 @@ function buildWhere(
   tenantId: string,
   filters: ContractListFilters
 ): Prisma.ContractWhereInput {
-  const where: Prisma.ContractWhereInput = { tenantId };
+  const where: Prisma.ContractWhereInput = { tenantId, deletedAt: null };
   if (filters.accountId) where.accountId = filters.accountId;
   if (filters.status) where.status = filters.status;
   if (filters.search?.trim()) {
@@ -59,7 +59,7 @@ function buildWhere(
 
 export function createContractsService(prisma: FinancePrisma) {
   async function loadOrThrow(tenantId: string, id: string): Promise<Contract> {
-    const row = await prisma.contract.findFirst({ where: { id, tenantId } });
+    const row = await prisma.contract.findFirst({ where: { id, tenantId, deletedAt: null } });
     if (!row) throw new NotFoundError('Contract', id);
     return row;
   }
@@ -208,7 +208,9 @@ export function createContractsService(prisma: FinancePrisma) {
           `Only draft contracts can be deleted (status ${existing.status}); terminate signed contracts instead`
         );
       }
-      await prisma.contract.delete({ where: { id } });
+      // Soft-delete: stamp instead of removing the row, so the draft stays
+      // recoverable and referential history (numbering, audits) survives.
+      await prisma.contract.update({ where: { id }, data: { deletedAt: new Date() } });
       producer.publish(TOPICS.CONTRACTS, {
         type: 'contract.deleted',
         tenantId,

@@ -78,7 +78,7 @@ export async function registerPriceBookRoutes(
       r.get('/price-books', { preHandler: requirePermission(PERMISSIONS.PRODUCTS.READ) }, async (request, reply) => {
         const jwt = request.user as JwtPayload;
         const rows = await prisma.priceBook.findMany({
-          where: { tenantId: jwt.tenantId },
+          where: { tenantId: jwt.tenantId, deletedAt: null },
           include: { entries: true },
           orderBy: { createdAt: 'desc' },
         });
@@ -90,7 +90,7 @@ export async function registerPriceBookRoutes(
         const parsed = PriceBookSchema.parse(request.body);
         if (parsed.isDefault) {
           await prisma.priceBook.updateMany({
-            where: { tenantId: jwt.tenantId, isDefault: true },
+            where: { tenantId: jwt.tenantId, isDefault: true, deletedAt: null },
             data: { isDefault: false },
           });
         }
@@ -126,7 +126,7 @@ export async function registerPriceBookRoutes(
         const { id } = IdParam.parse(request.params);
         const parsed = UpdatePriceBookSchema.safeParse(request.body);
         if (!parsed.success) throw new ValidationError('Invalid body', parsed.error.flatten());
-        const existing = await prisma.priceBook.findFirst({ where: { id, tenantId: jwt.tenantId } });
+        const existing = await prisma.priceBook.findFirst({ where: { id, tenantId: jwt.tenantId, deletedAt: null } });
         if (!existing) throw new NotFoundError('PriceBook', id);
         const data = parsed.data;
 
@@ -174,10 +174,11 @@ export async function registerPriceBookRoutes(
       r.delete('/price-books/:id', { preHandler: requirePermission(PERMISSIONS.PRODUCTS.DELETE) }, async (request, reply) => {
         const jwt = request.user as JwtPayload;
         const { id } = IdParam.parse(request.params);
-        const existing = await prisma.priceBook.findFirst({ where: { id, tenantId: jwt.tenantId } });
+        const existing = await prisma.priceBook.findFirst({ where: { id, tenantId: jwt.tenantId, deletedAt: null } });
         if (!existing) throw new NotFoundError('PriceBook', id);
-        // Entries cascade-delete via the PriceBookEntry relation.
-        await prisma.priceBook.delete({ where: { id } });
+        // Soft-delete: quotes priced from this book keep a resolvable
+        // reference; entries stay with the hidden book instead of cascading.
+        await prisma.priceBook.update({ where: { id }, data: { deletedAt: new Date(), isActive: false, isDefault: false } });
         await emitPriceBookEvent(prisma, jwt.tenantId, 'pricebook.deleted', id, { name: existing.name });
         return reply.send({ success: true, data: { id, deleted: true } });
       });
